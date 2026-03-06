@@ -18,10 +18,6 @@
  */
 package org.smartblackbox.qfs.settings;
 
-import java.text.DecimalFormat;
-import java.util.HashMap;
-import java.util.Map;
-
 import org.ini4j.Profile.Section;
 import org.ini4j.Wini;
 import org.lwjgl.nuklear.NkRect;
@@ -30,6 +26,10 @@ import org.smartblackbox.utils.AbstractSettings;
 import org.smartblackbox.utils.ISettings;
 import org.smartblackbox.utils.Utils;
 
+import java.text.DecimalFormat;
+import java.util.HashMap;
+import java.util.Map;
+
 public class AppSettings extends AbstractSettings implements ISettings {
 
     private static AppSettings instance;
@@ -37,9 +37,9 @@ public class AppSettings extends AbstractSettings implements ISettings {
     public static int MAX_NUM_THREADS = Runtime.getRuntime().availableProcessors();
     private int numThreads = MAX_NUM_THREADS;
 
-    private boolean useFixedNodes = true;
+    private boolean useFixedNodes        = true;
     // Range: 0.0 - 1.0
-    private double absorptionFixedNodes = 1.0;
+    private double  reflectionFixedNodes = 1.0;
     private boolean useLoop;
     private boolean isChanged;
 
@@ -195,12 +195,12 @@ public class AppSettings extends AbstractSettings implements ISettings {
         }
     }
 
-    public double getAbsorptionFixedNodes() {
-        return absorptionFixedNodes;
+    public double getReflectionFixedNodes() {
+        return reflectionFixedNodes;
     }
 
-    public void setAbsorptionFixedNodes(double absorptionFixedNodes) {
-        this.absorptionFixedNodes = absorptionFixedNodes;
+    public void setReflectionFixedNodes(double reflectionFixedNodes) {
+        this.reflectionFixedNodes = reflectionFixedNodes;
     }
 
     public boolean isUseLoop() {

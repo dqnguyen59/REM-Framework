@@ -28,10 +28,8 @@ import org.smartblackbox.utils.AppInfo;
 import org.smartblackbox.utils.Utils;
 
 public class Main {
-	
-	private static GLWindow glWindow;
 
-	public static void main(String[] args) {
+    public static void main(String[] args) {
 		AppInfo.getManifestInfo("QuantumFieldSimulator");
 
 		System.out.println(AppInfo.getTitle());
@@ -51,8 +49,8 @@ public class Main {
 		Utils.deleteAllTmpFiles(Constants.BASE_PATH + "tmp");
 		
 		AppSettings.getInstance().loadFromFile(Constants.BASE_PATH + Constants.APP_SETTINGS_FILE);
-		
-		glWindow = new GLWindow(Constants.TITLE);
+
+        GLWindow glWindow = new GLWindow(Constants.TITLE);
 		Engine engine = new QuantumFieldSimulator(glWindow);
 	
 		try {

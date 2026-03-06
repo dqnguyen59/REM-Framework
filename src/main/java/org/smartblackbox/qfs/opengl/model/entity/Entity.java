@@ -41,7 +41,7 @@ public class Entity {
 	// So data will not be messed up when doing some interacting calculations.
 	// After all has been nodes has been calculated, then copy the positionBuff to position.
 	protected Vector3d position = new Vector3d();
-	protected Vector3d positionBuff = new Vector3d();
+	protected Vector3d posBuff  = new Vector3d();
 	// swapBufIndex can only be 0 or 1
 	protected static int swapBufIndex = 0;
 
@@ -57,10 +57,10 @@ public class Entity {
 	protected boolean isHiLighted = false;
 	
 	public Entity(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
-		this.parent = parent;
-		this.model = model;
+		this.parent   = parent;
+		this.model    = model;
 		this.position = new Vector3d(position);
-		setPosition(new Vector3d(position));
+		initPosition(new Vector3d(position));
 		this.rotation = new Vector3d(rotation);
 		this.scale = scale;
 		transformMatrixfList[0] = new Matrix4f();
@@ -89,7 +89,7 @@ public class Entity {
 	public void setParent(Entity parent) {
 		this.parent = parent;
 	}
-	
+
 	/**
 	 * This is a read only method.
 	 * Use {@link #getPosiitonBuff()} to modify values.
@@ -100,16 +100,20 @@ public class Entity {
 		return position;
 	}
 
-	public Vector3d getPositionBuff() {
-		return positionBuff;
+	public Vector3d getPosBuff() {
+		return posBuff;
 	}
 
 	public void setPosition(Vector3d position) {
-		positionBuff.set(position);
+		posBuff.set(position);
+	}
+
+	public void initPosition(Vector3d position) {
+		posBuff.set(position);
 	}
 
 	public void setPosition(double x, double y, double z) {
-		positionBuff.set(x, y, z);
+		posBuff.set(x, y, z);
 	}
 	
 	public void incPosition(Vector3d p) {
@@ -117,41 +121,41 @@ public class Entity {
 	}
 
 	public void incPosition(double x, double y, double z) {
-		positionBuff.add(x, y, z);
+		posBuff.add(x, y, z);
 	}
 	
 	public void decPosition(double x, double y, double z) {
-		positionBuff.sub(x, y, z);
+		posBuff.sub(x, y, z);
 	}
 	
 	public double setPositionDX(double dx) {
-		return positionBuff.x += dx;
+		return posBuff.x += dx;
 	}
 	
 	public double setPositionDY(double dy) {
-		return positionBuff.y += dy;
+		return posBuff.y += dy;
 	}
 	
 	public double setPositionDZ(double dz) {
-		return positionBuff.z += dz;
+		return posBuff.z += dz;
 	}
 	
 	public double setPositionX(double newPos) {
-		return positionBuff.x = newPos;
+		return posBuff.x = newPos;
 	}
 	
 	public double setPositionY(double newPos) {
-		return positionBuff.y = newPos;
+		return posBuff.y = newPos;
 	}
 	
 	public double setPositionZ(double newPos) {
-		return positionBuff.z = newPos;
+		return posBuff.z = newPos;
 	}
 	
 	public void updatePosition() {
-		position.x = positionBuff.x;
-		position.y = positionBuff.y;
-		position.z = positionBuff.z;
+		position.x = posBuff.x;
+		position.y = posBuff.y;
+		position.z = posBuff.z;
 	}
 	
 	public Vector3d getDirection() {

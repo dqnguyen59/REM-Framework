@@ -18,32 +18,22 @@
  */
 package org.smartblackbox.qfs.settings;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.ini4j.Wini;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
 import org.joml.Vector3i;
 import org.lwjgl.glfw.GLFW;
 import org.smartblackbox.qfs.Constants;
-import org.smartblackbox.qfs.gui.model.DialogFileModel;
-import org.smartblackbox.qfs.gui.model.NuklearModel;
-import org.smartblackbox.qfs.opengl.model.Camera;
-import org.smartblackbox.qfs.opengl.model.DetectorModel;
-import org.smartblackbox.qfs.opengl.model.Material;
-import org.smartblackbox.qfs.opengl.model.ObjFileModel;
-import org.smartblackbox.qfs.opengl.model.Oscillator;
-import org.smartblackbox.qfs.opengl.model.QFSModel;
-import org.smartblackbox.qfs.opengl.model.RainModel;
-import org.smartblackbox.qfs.opengl.model.Scene;
-import org.smartblackbox.qfs.opengl.model.Terrain;
+import org.smartblackbox.qfs.opengl.model.*;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
 import org.smartblackbox.qfs.opengl.model.entity.QFSNode;
 import org.smartblackbox.qfs.opengl.model.lights.Light;
 import org.smartblackbox.qfs.opengl.utils.OBJFormatLoader;
 import org.smartblackbox.utils.AbstractSettings;
 import org.smartblackbox.utils.ISettings;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class QFSProject extends AbstractSettings implements ISettings {
 
@@ -60,10 +50,10 @@ public class QFSProject extends AbstractSettings implements ISettings {
 	 */
 	private Vector3i dimension = new Vector3i();
 	
-	private double constantFrequency = 0.60;
+	private double constantFrequency = 1.00;
 	private double constantWaveSpeed = 1.00;
-    private double constantElectricFactor = 0.35;
-    private double constantMagneticFactor = 0.26;
+    private double constantElectricFactor = 0.12;
+    private double constantMagneticFactor = 0.94;
 
 	// Don't set the glSwapInterval below 1! It will cause instability of the application and freeze.
 	private int glSwapInterval = 1;

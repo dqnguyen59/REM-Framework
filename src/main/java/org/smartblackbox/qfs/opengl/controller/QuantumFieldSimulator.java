@@ -18,28 +18,15 @@
  */
 package org.smartblackbox.qfs.opengl.controller;
 
-import java.util.ArrayList;
-
-import org.joml.Vector2d;
-import org.joml.Vector3d;
-import org.joml.Vector3f;
-import org.joml.Vector3i;
-import org.joml.Vector4f;
+import org.joml.*;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL11;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.IMouseAndKeyboardEvents;
 import org.smartblackbox.qfs.gui.model.NuklearModel.Frame;
-import org.smartblackbox.qfs.opengl.model.DetectorModel;
-import org.smartblackbox.qfs.opengl.model.Material;
-import org.smartblackbox.qfs.opengl.model.ObjFileModel;
-import org.smartblackbox.qfs.opengl.model.Oscillator;
-import org.smartblackbox.qfs.opengl.model.QFSModel;
+import org.smartblackbox.qfs.opengl.model.*;
 import org.smartblackbox.qfs.opengl.model.QFSModel.Mode;
 import org.smartblackbox.qfs.opengl.model.QFSModel.NodeSelectionMode;
-import org.smartblackbox.qfs.opengl.model.Scene;
-import org.smartblackbox.qfs.opengl.model.Terrain;
-import org.smartblackbox.qfs.opengl.model.Texture;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
 import org.smartblackbox.qfs.opengl.model.entity.QFSNode;
 import org.smartblackbox.qfs.opengl.model.lights.DirectionalLight;
@@ -56,6 +43,9 @@ import org.smartblackbox.qfs.settings.SlitWallSettings;
 import org.smartblackbox.utils.PerformanceMonitor;
 import org.smartblackbox.utils.PerformanceMonitor.Measurement;
 import org.smartblackbox.utils.Utils;
+
+import java.lang.Math;
+import java.util.ArrayList;
 
 public class QuantumFieldSimulator extends Engine implements IMouseAndKeyboardEvents {
 
@@ -471,7 +461,7 @@ public class QuantumFieldSimulator extends Engine implements IMouseAndKeyboardEv
                 switch (qfsModel.getMode()) {
                     case light:
                         if (qfsModel.getSelectedLight() != null)
-                            qfsModel.getSelectedLight().getPositionBuff().x -= inc;
+                            qfsModel.getSelectedLight().getPosBuff().x -= inc;
                         break;
                     default:
                         break;
@@ -481,7 +471,7 @@ public class QuantumFieldSimulator extends Engine implements IMouseAndKeyboardEv
                 switch (qfsModel.getMode()) {
                     case light:
                         if (qfsModel.getSelectedLight() != null)
-                            qfsModel.getSelectedLight().getPositionBuff().x += inc;
+                            qfsModel.getSelectedLight().getPosBuff().x += inc;
                         break;
                     default:
                         break;
@@ -512,7 +502,7 @@ public class QuantumFieldSimulator extends Engine implements IMouseAndKeyboardEv
                         break;
                     case light:
                         if (qfsModel.getSelectedLight() != null)
-                            qfsModel.getSelectedLight().getPositionBuff().z -= inc;
+                            qfsModel.getSelectedLight().getPosBuff().z -= inc;
                         break;
                     default:
                         break;
@@ -541,7 +531,7 @@ public class QuantumFieldSimulator extends Engine implements IMouseAndKeyboardEv
                         break;
                     case light:
                         if (qfsModel.getSelectedLight() != null)
-                            qfsModel.getSelectedLight().getPositionBuff().z += inc;
+                            qfsModel.getSelectedLight().getPosBuff().z += inc;
                         break;
                     default:
                         break;
@@ -551,7 +541,7 @@ public class QuantumFieldSimulator extends Engine implements IMouseAndKeyboardEv
                 switch (qfsModel.getMode()) {
                     case light:
                         if (qfsModel.getSelectedLight() != null)
-                            qfsModel.getSelectedLight().getPositionBuff().y += inc;
+                            qfsModel.getSelectedLight().getPosBuff().y += inc;
                         break;
                     default:
                         break;
@@ -561,7 +551,7 @@ public class QuantumFieldSimulator extends Engine implements IMouseAndKeyboardEv
                 switch (qfsModel.getMode()) {
                     case light:
                         if (qfsModel.getSelectedLight() != null)
-                            qfsModel.getSelectedLight().getPositionBuff().y -= inc;
+                            qfsModel.getSelectedLight().getPosBuff().y -= inc;
                         break;
                     default:
                         break;
@@ -605,6 +595,7 @@ public class QuantumFieldSimulator extends Engine implements IMouseAndKeyboardEv
             case GLFW.GLFW_KEY_SPACE:
                 if (qfsModel.isSimulating() && selectedNode != null)
                     selectedNode.incPosition(new Vector3d(0, 0, qfsProject.rainModel.getForce()));
+//                    selectedNode.addForce(new Vector3d(0, 0, qfsProject.rainModel.getForce()));
                 break;
         }
 
@@ -661,7 +652,7 @@ public class QuantumFieldSimulator extends Engine implements IMouseAndKeyboardEv
                     } else {
                         if (!selectedNode.isFixed()) {
                             // Set the node position and make it fixed.
-                            selectedNode.getPositionBuff().z = qfsProject.rainModel.getForce();
+                            selectedNode.getPosBuff().z = qfsProject.rainModel.getForce();
                             selectedNode.setFixed(true);
                             // Remember that this node is set fixed.
                             customNodeFixed.add(selectedNode);
@@ -891,7 +882,7 @@ public class QuantumFieldSimulator extends Engine implements IMouseAndKeyboardEv
 
                 if (node != null && o != null) {
                     node.setPosition(oscillator.getNodeInitPosition());
-                    node.getPositionBuff().add(o);
+                    node.getPosBuff().add(o);
                 }
             }
         }

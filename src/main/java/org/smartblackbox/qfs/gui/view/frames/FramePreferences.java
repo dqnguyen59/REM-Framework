@@ -67,9 +67,9 @@ public class FramePreferences extends AbstractFrame {
 			nk_spacer(ctx, spacer1, 1);
 			
 			if (!appSettings.isUseFixedNodes()) {
-				appSettings.setAbsorptionFixedNodes(nk_label_edit(ctx, stack, " Absorption Fixed Nodes:",
-					bufAbsorptionFixedNodes, appSettings.getAbsorptionFixedNodes(), leftCol, rightCol));
-				appSettings.setAbsorptionFixedNodes(nk_slider(ctx, 0.0, appSettings.getAbsorptionFixedNodes(), 1.0, 0.01));
+				appSettings.setReflectionFixedNodes(nk_label_edit(ctx, stack, " Absorption Fixed Nodes:",
+                                                                  bufAbsorptionFixedNodes, appSettings.getReflectionFixedNodes(), leftCol, rightCol));
+				appSettings.setReflectionFixedNodes(nk_slider(ctx, 0.0, appSettings.getReflectionFixedNodes(), 1.0, 0.01));
 				nk_spacer(ctx, spacer1, 1);
 
 				appSettings.setUseLoop(nk_check_label(ctx, " Use Loop:", appSettings.isUseLoop(), leftCol, rightCol));

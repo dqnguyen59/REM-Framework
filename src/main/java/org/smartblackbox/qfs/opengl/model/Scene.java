@@ -18,16 +18,7 @@
  */
 package org.smartblackbox.qfs.opengl.model;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.joml.Intersectionf;
-import org.joml.Matrix4f;
-import org.joml.Vector2f;
-import org.joml.Vector3d;
-import org.joml.Vector3f;
-import org.joml.Vector3i;
-import org.joml.Vector4f;
+import org.joml.*;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
 import org.smartblackbox.qfs.opengl.model.entity.QFSNode;
 import org.smartblackbox.qfs.opengl.model.lights.DirectionalLight;
@@ -36,6 +27,10 @@ import org.smartblackbox.qfs.settings.QFSProject;
 import org.smartblackbox.qfs.settings.QFSSettings;
 import org.smartblackbox.qfs.settings.SlitWallSettings;
 
+import java.lang.Math;
+import java.util.ArrayList;
+import java.util.List;
+
 public class Scene {
 
 	private AppSettings appSettings = AppSettings.getInstance();
@@ -43,6 +38,7 @@ public class Scene {
 	private QFSProject qfsProject = QFSProject.getInstance();
 	private QFSSettings settings = qfsProject.settings;
 	private SlitWallSettings slitWall = qfsProject.slitWall;
+	private QFSModel qfsModel = qfsProject.getQfsModel();
 
 	private List<Terrain> terrains;
 	private List<Entity> entities;
@@ -482,9 +478,23 @@ public class Scene {
 			
 			@Override
 			public void run() {
-				while (i < end) {
-					((QFSNode) nodeArray[i++]).calcNewPosition();
+				// If set to false then the node stops updating its position
+				if (qfsModel.isSimulating()) {
+					switch (settings.getNodeFormulaVersion()) {
+						case v_0_2:
+							while (i < end) {
+								((QFSNode) nodeArray[i++]).updateNodeProperties_v0_2();
+							}
+							break;
+						default:
+							while (i < end) {
+								((QFSNode) nodeArray[i++]).updateNodeProperties_v0_1();
+							}
+							break;
+
+					}
 				}
+
 				taskCompleted();
 			}
 		}).start();
