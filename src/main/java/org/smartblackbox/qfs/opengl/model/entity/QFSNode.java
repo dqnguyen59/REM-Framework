@@ -517,22 +517,22 @@ public class QFSNode extends Entity {
 
                         // Get eField relative position
 //                        efRelP.set(neighbor.eField.p).sub(neighbor.basePosition);
-                        efRelP.set(neighbor.eField.pBuf).sub(neighbor.basePosition);
+                        efRelP.set(neighbor.eField.p).sub(neighbor.basePosition);
                         // Get bField direction relative to neighbor
-                        bfNeighborDir.set(neighbor.bField.pBuf).sub(bField.pBuf).normalize();
+                        bfNeighborDir.set(neighbor.bField.p).sub(bField.p).normalize();
                         // Calculate new bField acceleration
                         bfa.set(bfNeighborDir).cross(neighbor.eField.v);
 
-                        bf.add(neighbor.bField.pBuf).sub(bField.pBuf).add(bfa.mul(1));
+                        bf.add(neighbor.bField.p).sub(bField.p).add(bfa.mul(1));
 
                         // Get bField relative velocity
                         //bfRelP.set(neighbor.bField.p).sub(neighbor.basePosition);
                         // Get eField direction relative to neighbor
-                        efNeighborDir.set(bField.pBuf).sub(neighbor.bField.pBuf).normalize();
+                        efNeighborDir.set(bField.p).sub(neighbor.bField.p).normalize();
                         // Calculate new bField acceleration
                         efa.set(efNeighborDir).cross(neighbor.bField.v);
 
-                        ef.add(neighbor.eField.pBuf).sub(eField.pBuf).add(efa);
+                        ef.add(neighbor.eField.p).sub(eField.p).add(efa);
 //                        ef.add(neighbor.eField.pBuf).sub(basePosition);
                     }
                 }
