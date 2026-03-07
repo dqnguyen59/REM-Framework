@@ -219,7 +219,6 @@ public class AppSettings extends AbstractSettings implements ISettings {
      * Use this function to check if reset is required.
      * If true, then define your customized reset.
      *
-     * @return true if {@link #reset()} has been called.
      */
     public boolean isChanged() {
         if (isChanged) {
