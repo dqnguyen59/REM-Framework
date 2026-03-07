@@ -21,10 +21,7 @@ package org.smartblackbox.qfs.opengl.model.entity;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
 import org.joml.Vector4f;
-import org.smartblackbox.qfs.opengl.model.Material;
-import org.smartblackbox.qfs.opengl.model.ObjFileModel;
-import org.smartblackbox.qfs.opengl.model.QFSModel;
-import org.smartblackbox.qfs.opengl.model.Scene;
+import org.smartblackbox.qfs.opengl.model.*;
 import org.smartblackbox.qfs.opengl.utils.Neighbor;
 import org.smartblackbox.qfs.settings.AppSettings;
 import org.smartblackbox.qfs.settings.QFSProject;
@@ -73,9 +70,15 @@ public class QFSNode extends Entity {
      */
     private AVP bField;
 
-    private Vector3d baseField = new Vector3d();
     private final Vector3d ef = new Vector3d();
-    private final Vector3d mf = new Vector3d();
+    private final Vector3d efa = new Vector3d();
+    private final Vector3d efRelP = new Vector3d();
+    private final Vector3d efNeighborDir = new Vector3d();
+    private final Vector3d bf = new Vector3d();
+    private final Vector3d bfa = new Vector3d();
+    private final Vector3d bfp = new Vector3d();
+    private final Vector3d bfRelP = new Vector3d();
+    private final Vector3d bfNeighborDir = new Vector3d();
     private Vector3d acceleration = new Vector3d();
     private Vector3d velocity = new Vector3d();
     private Vector3i index = new Vector3i(-1);
@@ -129,13 +132,12 @@ public class QFSNode extends Entity {
         super.setPosition(position);
         if (fixedPos == null) fixedPos = new Vector3d();
         fixedPos.set(position);
-        getEField().p.set(position);
+        //getEField().p.set(position);
     }
 
     @Override
     public void initPosition(Vector3d position) {
         super.setPosition(position);
-        baseField = new Vector3d(position);
         if (fixedPos == null) fixedPos = new Vector3d();
         fixedPos.set(position);
         getEField().p.set(position);
@@ -146,6 +148,11 @@ public class QFSNode extends Entity {
 
     public QFSNode[] getNeighbors() {
         return neighbors;
+    }
+
+    public void incPosition(double x, double y, double z) {
+        super.incPosition(x, y, z);
+        eField.pBuf.add(x, y, z);
     }
 
     public void setNeighbor(Neighbor neighbor, QFSNode node) {
@@ -234,6 +241,13 @@ public class QFSNode extends Entity {
      */
     public void setCustomColor(Vector4f color) {
         customColor = color;
+    }
+
+    @Override
+    public void updatePosition() {
+        super.updatePosition();
+        eField.p.set(eField.pBuf);
+        bField.p.set(bField.pBuf);
     }
 
     @Override
@@ -389,7 +403,7 @@ public class QFSNode extends Entity {
             double f = 0.1;
 
             ef.set(0);
-            mf.set(0);
+            bf.set(0);
 
             for (QFSNode neighbor : neighbors) {
                 if (neighbor != null) {
@@ -432,12 +446,12 @@ public class QFSNode extends Entity {
             Vector3d nBack = neighbors[NEIGHBOR_BACK] == null ? new Vector3d()
                     : neighbors[NEIGHBOR_BACK].position;
 
-            mf.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
-            mf.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
-            mf.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
+            bf.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
+            bf.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
+            bf.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
 
             Vector3d e_f = ef.mul(gamma);
-            Vector3d m_f = mf.mul(beta);
+            Vector3d m_f = bf.mul(beta);
 
             acceleration.set(e_f.add(m_f));
 
@@ -471,10 +485,10 @@ public class QFSNode extends Entity {
             double cws = qfsProject.getConstantWaveSpeed() / 6;
             double gamma = qfsProject.getConstantElectricFactor();
             double beta = qfsProject.getConstantMagneticFactor();
-            double f = 0.1;
+            double f = 0.01;
 
             ef.set(0);
-            mf.set(0);
+            bf.set(0);
 
             for (QFSNode neighbor : neighbors) {
                 if (neighbor != null) {
@@ -483,63 +497,83 @@ public class QFSNode extends Entity {
 
                         if (alpha == 0) {
                             velocity.set(0);
-                            posBuff.set(fixedPos);
+                            //eField.p.set(fixedPos);
                         }
 
-                        if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
-                            ef.y += (neighbor.position.y - position.y) * alpha;
-                            ef.z += (neighbor.position.z - position.z) * alpha;
-                        }
-                        if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
-                            ef.x += (neighbor.position.x - position.x) * alpha;
-                            ef.z += (neighbor.position.z - position.z) * alpha;
-                        }
-                        if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
-                            ef.x += (neighbor.position.x - position.x) * alpha;
-                            ef.y += (neighbor.position.y - position.y) * alpha;
-                        }
+//                        if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+//                            ef.y += (neighbor.eField.p.y - eField.p.y) * alpha;
+//                            ef.z += (neighbor.eField.p.z - eField.p.z) * alpha;
+//                        }
+//                        if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+//                            ef.x += (neighbor.eField.p.x - eField.p.x) * alpha;
+//                            ef.z += (neighbor.eField.p.z - eField.p.z) * alpha;
+//                        }
+//                        if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+//                            ef.x += (neighbor.eField.p.x - eField.p.x) * alpha;
+//                            ef.y += (neighbor.eField.p.y - eField.p.y) * alpha;
+//                        }
                     } else {
-                        ef.add(neighbor.position).sub(position);
+//                        ef.add(neighbor.eField.p).sub(eField.p);
+
+                        // Get eField relative position
+//                        efRelP.set(neighbor.eField.p).sub(neighbor.basePosition);
+                        efRelP.set(neighbor.eField.pBuf).sub(neighbor.basePosition);
+                        // Get bField direction relative to neighbor
+                        bfNeighborDir.set(neighbor.bField.pBuf).sub(bField.pBuf).normalize();
+                        // Calculate new bField acceleration
+                        bfa.set(bfNeighborDir).cross(neighbor.eField.v);
+
+                        bf.add(neighbor.bField.pBuf).sub(bField.pBuf).add(bfa.mul(1));
+
+                        // Get bField relative velocity
+                        //bfRelP.set(neighbor.bField.p).sub(neighbor.basePosition);
+                        // Get eField direction relative to neighbor
+                        efNeighborDir.set(bField.pBuf).sub(neighbor.bField.pBuf).normalize();
+                        // Calculate new bField acceleration
+                        efa.set(efNeighborDir).cross(neighbor.bField.v);
+
+                        ef.add(neighbor.eField.pBuf).sub(eField.pBuf).add(efa);
+//                        ef.add(neighbor.eField.pBuf).sub(basePosition);
                     }
                 }
             }
 
-            Vector3d nLeft = neighbors[NEIGHBOR_LEFT] == null ? new Vector3d()
-                    : neighbors[NEIGHBOR_LEFT].position;
-            Vector3d nRight = neighbors[NEIGHBOR_RIGHT] == null ? new Vector3d()
-                    : neighbors[NEIGHBOR_RIGHT].position;
-            Vector3d nTop = neighbors[NEIGHBOR_TOP] == null ? new Vector3d()
-                    : neighbors[NEIGHBOR_TOP].position;
-            Vector3d nBottom = neighbors[NEIGHBOR_BOTTOM] == null ? new Vector3d()
-                    : neighbors[NEIGHBOR_BOTTOM].position;
-            Vector3d nFront = neighbors[NEIGHBOR_FRONT] == null ? new Vector3d()
-                    : neighbors[NEIGHBOR_FRONT].position;
-            Vector3d nBack = neighbors[NEIGHBOR_BACK] == null ? new Vector3d()
-                    : neighbors[NEIGHBOR_BACK].position;
-
-            mf.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
-            mf.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
-            mf.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
-
             Vector3d e_f = ef.mul(gamma);
-            Vector3d m_f = mf.mul(beta);
+            Vector3d m_f = bf.mul(beta);
 
-            acceleration.set(e_f.add(m_f));
+//            acceleration.set(e_f.add(m_f));
+            eField.a.set(ef.mul(gamma));
+            bField.a.set(bf.mul(beta));
 
             // Note that the result of the addition or multiplication is stored in the object
             // variable itself.
             //positionBuff.add(velocity.add(e_f)).add(e_f.mul(0.5));
-            posBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul(0.5));
+//            posBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul(0.5));
+            eField.pBuf.add(eField.v.add(eField.a.mul(cws))).add(eField.a.mul(0.5));
+            bField.pBuf.add(bField.v.add(bField.a.mul(cws))).add(bField.a.mul(0.5));
 
             //			positionBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul
             //			(0.5));
 
-            if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.x = fixedPos.x;
-            if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;
-            if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.z = fixedPos.z;
+            if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                eField.pBuf.x = fixedPos.x;
+//                bField.pBuf.x = fixedPos.x;
+            }
+            if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                eField.pBuf.y = fixedPos.y;
+//                bField.pBuf.y = fixedPos.y;
+            }
+            if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                eField.pBuf.z = fixedPos.z;
+//                bField.pBuf.z = fixedPos.z;
+            }
+
+            //eField.pBuf.set(ef);
+            //bField.pBuf.set(bf);
+            posBuff.set(eField.pBuf);
         }
 
-        setEMFieldColor(isFixed ? FIXED_COLOR : ef);
+        setEMFieldColor(isFixed ? FIXED_COLOR : posBuff);
     }
 
 }
