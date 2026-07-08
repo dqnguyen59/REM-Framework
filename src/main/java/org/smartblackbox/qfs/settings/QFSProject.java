@@ -26,7 +26,8 @@ import org.lwjgl.glfw.GLFW;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.opengl.model.*;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
-import org.smartblackbox.qfs.opengl.model.entity.QFSNode;
+import org.smartblackbox.qfs.opengl.model.entity.Identity;
+import org.smartblackbox.qfs.opengl.model.entity.Node;
 import org.smartblackbox.qfs.opengl.model.lights.Light;
 import org.smartblackbox.qfs.opengl.utils.OBJFormatLoader;
 import org.smartblackbox.utils.AbstractSettings;
@@ -56,10 +57,10 @@ public class QFSProject extends AbstractSettings implements ISettings {
     private double constantMagneticFactor = 0.94;
 
 	// Don't set the glSwapInterval below 1! It will cause instability of the application and freeze.
-	private int glSwapInterval = 1;
+	private int glSwapInterval = 2;
 
-	private QFSModel qfsModel = new QFSModel();
-	public Camera camera = new Camera();
+	private REMModel REMModel = new REMModel();
+	public  Camera   camera   = new Camera();
 	public Scene scene;
 	public Terrain terrain;
 	public Vector3d baseRotation = new Vector3d(-66.6, 0, 0);
@@ -71,7 +72,7 @@ public class QFSProject extends AbstractSettings implements ISettings {
 	
 	private ArrayList<Light> lights = new ArrayList<Light>();
 
-	public List<Oscillator> oscillators = new ArrayList<Oscillator>();
+	public List<Identity> identities = new ArrayList<Identity>();
 
 	public static QFSProject getInstance() {
 		if (instance == null) {
@@ -151,18 +152,18 @@ public class QFSProject extends AbstractSettings implements ISettings {
 		slitWall.loadFromFile(ini, "SlitWall", 0);
 		
 		int size = getInt("Oscillators", "Size", 0);
-		oscillators.clear();
+		identities.clear();
 		for (int i = 0; i < size; i++) {
-			Oscillator oscillator = new Oscillator("", new Vector3i());
-			oscillator.loadFromFile(ini, "Oscillator", i);
-			oscillators.add(oscillator);
+			Identity identity = new Identity("", new Vector3i());
+			identity.loadFromFile(ini, "Oscillator", i);
+			identities.add(identity);
 		}
 
 		rainModel.loadFromFile(ini, "Rain", index);
 		detectorModel.loadFromFile(ini, "Detector", index);
 		
-		if (oscillators.size() > 0)
-			qfsModel.selectedOscillator = oscillators.get(0);
+		if (identities.size() > 0)
+			REMModel.selectedIdentity = identities.get(0);
 		
 		if (settings.getVisibleIndexX() >= dimension.x) {
 			settings.setVisibleIndexX(dimension.x / 2);
@@ -175,18 +176,18 @@ public class QFSProject extends AbstractSettings implements ISettings {
 		if (settings.getVisibleIndexZ() >= dimension.z) {
 			settings.setVisibleIndexZ(dimension.z / 2);
 		}
-		
-		qfsModel.getCurrentMouseNodeIndex().x = dimension.x / 2;
-		qfsModel.getCurrentMouseNodeIndex().y = dimension.y / 2;
-		qfsModel.getCurrentMouseNodeIndex().z = dimension.z / 2;
+
+		REMModel.getCurrentMouseNodeIndex().x = dimension.x / 2;
+		REMModel.getCurrentMouseNodeIndex().y = dimension.y / 2;
+		REMModel.getCurrentMouseNodeIndex().z = dimension.z / 2;
 
 		reset();
-		qfsModel.setLoadingReady(false);
+		REMModel.setLoadingReady(false);
 		new Thread(new Runnable() {
 			
 			@Override
 			public void run() {
-				while (!qfsModel.isLoadingReady()) {
+				while (!REMModel.isLoadingReady()) {
 					try {
 						Thread.sleep(100);
 					} catch (InterruptedException e) {
@@ -239,10 +240,10 @@ public class QFSProject extends AbstractSettings implements ISettings {
 			ini.remove("Oscillator" + i);
 		}
 
-		int size = oscillators.size();
+		int size = identities.size();
 		put("Oscillators", "Size", size);
 		for (int i = 0; i < size; i++) {
-			oscillators.get(i).saveToFile(ini, "Oscillator", i);
+			identities.get(i).saveToFile(ini, "Oscillator", i);
 		}
 
 		rainModel.saveToFile(ini, "Rain", index);
@@ -264,7 +265,7 @@ public class QFSProject extends AbstractSettings implements ISettings {
 			nodeIndex.x = getInt("Wall" + i, "index.x", -1);
 			nodeIndex.y = getInt("Wall" + i, "index.y", -1);
 			nodeIndex.z = getInt("Wall" + i, "index.z", -1);
-			QFSNode node = scene.getNodeByIndex(nodeIndex);
+			Node node = scene.getNodeByIndex(nodeIndex);
 			if (node != null) {
 				scene.getWallNodeIndexList().add(nodeIndex);
 			}
@@ -392,8 +393,8 @@ public class QFSProject extends AbstractSettings implements ISettings {
 		isChanged = true;
 		setConstantFrequency(constantFrequency);
 		slitWall.reset();
-		for (Oscillator oscillator : oscillators) {
-			oscillator.reset();
+		for (Identity identity : identities) {
+			identity.reset();
 		}
 	}
 
@@ -524,12 +525,12 @@ public class QFSProject extends AbstractSettings implements ISettings {
 		lights.remove(light);
 	}
 
-	public QFSModel getQfsModel() {
-		return qfsModel;
+	public REMModel getQfsModel() {
+		return REMModel;
 	}
 
-	public void setQfsModel(QFSModel qfsModel) {
-		this.qfsModel = qfsModel;
+	public void setQfsModel(REMModel REMModel) {
+		this.REMModel = REMModel;
 	}
 
 }

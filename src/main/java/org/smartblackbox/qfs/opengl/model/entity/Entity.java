@@ -92,8 +92,7 @@ public class Entity {
 
 	/**
 	 * This is a read only method.
-	 * Use {@link #getPosiitonBuff()} to modify values.
-	 * 
+	 *
 	 * @return position
 	 */
 	public Vector3d getPosition() {
@@ -300,11 +299,11 @@ public class Entity {
 	 * See {@link #getTransformMatrixf()}.
 	 */
 	public static void swapBuffer() {
-		QFSNode.swapBufIndex = 1 - QFSNode.swapBufIndex;
+		Node.swapBufIndex = 1 - Node.swapBufIndex;
 	}
 
 	public static Object getSwapBufferIndex() {
-		return QFSNode.swapBufIndex;
+		return Node.swapBufIndex;
 	}
 
 	public void setTransformMatrix(Matrix4d transformMatrix) {

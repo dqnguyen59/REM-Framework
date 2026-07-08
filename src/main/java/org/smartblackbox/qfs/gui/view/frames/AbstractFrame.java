@@ -13,29 +13,14 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
- * 
+ *
  * File created on 01/01/2023
  */
 package org.smartblackbox.qfs.gui.view.frames;
 
-import java.io.File;
-import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
-import java.text.DecimalFormat;
-import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Stack;
-
 import org.joml.Vector3f;
 import org.joml.Vector4f;
-import org.lwjgl.nuklear.NkColor;
-import org.lwjgl.nuklear.NkColorf;
-import org.lwjgl.nuklear.NkContext;
-import org.lwjgl.nuklear.NkPluginFilter;
-import org.lwjgl.nuklear.NkRect;
-import org.lwjgl.nuklear.NkVec2;
-import org.lwjgl.nuklear.Nuklear;
+import org.lwjgl.nuklear.*;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.smartblackbox.qfs.Constants;
@@ -46,8 +31,17 @@ import org.smartblackbox.qfs.gui.model.Theme;
 import org.smartblackbox.qfs.settings.AppSettings;
 import org.smartblackbox.utils.Utils;
 
+import java.io.File;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import java.text.DecimalFormat;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Stack;
+
 /**
- * 
+ *
  * @author dqnguyen
  *
  */
@@ -64,7 +58,7 @@ public abstract class AbstractFrame implements IFrame {
 	private static NkPluginFilter decimalFilter = NkPluginFilter.create(Nuklear::nnk_filter_decimal);
 	private static NkPluginFilter floatFilter = NkPluginFilter.create(Nuklear::nnk_filter_float);
 
-	protected AppSettings appSettings = AppSettings.getInstance(); 
+	protected AppSettings appSettings = AppSettings.getInstance();
 
 	protected long windowHandle;
 	private String _hiddenChar = " ";
@@ -81,13 +75,12 @@ public abstract class AbstractFrame implements IFrame {
 	protected int rowHeight = appSettings.getFontSize() + 4;
 	protected int rowHeightEdit = appSettings.getFontSize() + 6;
 
-	protected NkRect windowRect = null;
-	protected int windowOptions = 0
-			| Nuklear.NK_WINDOW_TITLE
-			| Nuklear.NK_WINDOW_BORDER
-			| Nuklear.NK_WINDOW_MOVABLE
-			| Nuklear.NK_WINDOW_CLOSABLE
-			| Nuklear.NK_WINDOW_NO_SCROLLBAR
+	protected final NkRect windowRect = NkRect.create();
+	protected int windowOptions = Nuklear.NK_WINDOW_TITLE
+                                  | Nuklear.NK_WINDOW_BORDER
+                                  | Nuklear.NK_WINDOW_MOVABLE
+                                  | Nuklear.NK_WINDOW_CLOSABLE
+                                  | Nuklear.NK_WINDOW_NO_SCROLLBAR
 			;
 	private boolean windowSizeChanged;
 
@@ -99,14 +92,18 @@ public abstract class AbstractFrame implements IFrame {
 	private int lastTabIndex;
 	private boolean tabKeyPressed;
 	private boolean focusChanged;
-	
+
 	private List<GroupModel> groupModelList = new ArrayList<>();
 	public GroupModel currentGroup;
 	private boolean isTabIndexEnd;
 	private boolean isTabIndexBegin;
-	
-	private Stack<NkColor> stackTextColor = new Stack<>();
-	
+
+	private Stack<int[]> stackTextColor = new Stack<>();
+
+	private final NkRect frameRect = NkRect.create();
+	private final NkRect contentRect = NkRect.create();
+	private NkVec2 pos = NkVec2.create();
+
 	public AbstractFrame(NuklearModel nuklearModel) {
 		this.nuklearModel = nuklearModel;
 	}
@@ -133,14 +130,14 @@ public abstract class AbstractFrame implements IFrame {
 	private void update() {
 		_hiddenChar = "" + (_hiddenChar.contains(" ")? ((char) 13) : " ");
 	}
-	
+
 	/**
-	 * 
+	 *
 	 * Bug: unable to change the frame position!!!
-	 * 
+	 *
 	 * A workaround to align the frame to the right or to change its position.
 	 * Add this hidden character to the title of a frame nk_begin().
-	 * 
+	 *
 	 * @return alternating character between space " " and character #13
 	 */
 	protected String getAlternateChar() {
@@ -148,7 +145,7 @@ public abstract class AbstractFrame implements IFrame {
 	}
 
 	abstract public String getTitle();
-	
+
 	protected int getWindowWidth() {
 		return appSettings.getWindowWidth();
 	}
@@ -165,11 +162,11 @@ public abstract class AbstractFrame implements IFrame {
 		if (lastWidth != width || lastHeight != height) {
 			update();
 		}
-		
+
 		if (centered) {
 			if (windowRect == null) {
 				x = (getWindowWidth() - width) / 2;
-				y = (getWindowHeight() - height) / 2;			
+				y = (getWindowHeight() - height) / 2;
 			}
 			else {
 				x = (int) ((getWindowWidth() - windowRect.w()) / 2);
@@ -194,11 +191,10 @@ public abstract class AbstractFrame implements IFrame {
 				}
 			}
 		}
-		
+
 		// Create the rectangle that represents
-		windowRect = NkRect.create();
 		Nuklear.nk_rect(x, y, width, height, windowRect);
-		
+
 		if (nuklearModel.getFocusedFrame() == this) {
 			ctx.style().window().header().label_normal(Theme.colorHeaderTextActive);
 			ctx.style().window().header().label_active(Theme.colorHeaderTextActive);
@@ -209,17 +205,14 @@ public abstract class AbstractFrame implements IFrame {
 		}
 
 		if (Nuklear.nk_begin(ctx, getTitle() + getAlternateChar(), windowRect, windowOptions)) {
-			NkVec2 pos = NkVec2.create();
 			Nuklear.nk_window_get_position(ctx, pos);
 			float w = Nuklear.nk_window_get_width(ctx);
 			float h = Nuklear.nk_window_get_height(ctx);
-			NkRect frameRect = NkRect.create();
 			frameRect.x(pos.x());
 			frameRect.y(pos.y());
 			frameRect.w(w);
 			frameRect.h(h);
 
-			NkRect contentRect = NkRect.create();
 			Nuklear.nk_window_get_content_region(ctx, contentRect);
 
 			contentRect.x(contentRect.x() - 6);
@@ -231,14 +224,14 @@ public abstract class AbstractFrame implements IFrame {
 
 			ctx.style().window().header().label_normal(Theme.colorHeaderText);
 			ctx.style().window().header().label_active(Theme.colorHeaderText);
-			
+
 			if (isDialog() && nuklearModel.getDialogStack().getCurrent() != null) {
 				nuklearModel.getDialogStack().getCurrent().setWindowRect(contentRect);
 			}
-			
+
 			if (Nuklear.nk_window_has_focus(ctx)) {
 				// TODO: Make tab key work. Difficulty: very hard, maybe a modification of LWJGL source is required.
-				
+
 //				boolean shiftKeyDown = Nuklear.nk_input_is_key_down(ctx.input(), Nuklear.NK_KEY_SHIFT);
 //				boolean tabKeyReleased = Nuklear.nk_input_is_key_released(ctx.input(), Nuklear.NK_KEY_TAB);
 //				if (tabKeyReleased) {
@@ -253,9 +246,9 @@ public abstract class AbstractFrame implements IFrame {
 //					tabKeyPressed = true;
 //				}
 			}
-			
+
 			NkRect lastRect = appSettings.getFrameRectMap().get(title);
-			
+
 			if (lastRect == null ||
 				lastRect.x() != frameRect.x() ||
 				lastRect.y() != frameRect.y() ||
@@ -265,19 +258,19 @@ public abstract class AbstractFrame implements IFrame {
 				System.out.println("Frame: " + title + "; X: " + frameRect.x() + " ; y :" + frameRect.y());
 
 				appSettings.getFrameRectMap().put(title, frameRect);
-				
+
 				appSettings.saveToFile();
 			}
-			
+
 			layout(ctx, (int)contentRect.x(), (int)contentRect.y(), width, height);
-			
+
 			tabKeyPressed = false;
 			focusChanged = false;
 		}
 		else {
 			close();
 		}
-		
+
 		Nuklear.nk_end(ctx);
 		lastWidth = width;
 		lastHeight = height;
@@ -286,7 +279,7 @@ public abstract class AbstractFrame implements IFrame {
 	protected void createLayout(NkContext ctx, int x, int y, int width, int height) {
 		_createLayout(ctx, x, y, width, height, false);
 	}
-	
+
 	protected void createLayoutCentered(NkContext ctx, int width, int height) {
 		_createLayout(ctx, 0, 0, width, height, true);
 	}
@@ -300,28 +293,40 @@ public abstract class AbstractFrame implements IFrame {
 	/**
 	 * Change the text color and push the current color.
 	 * Call {@link #popTextColor(NkContext)} to return to the previous color.
-	 * 
+	 *
 	 * @param ctx
 	 * @param color
 	 */
 	protected void pushTextColor(NkContext ctx, NkColor color) {
-		stackTextColor.push(NkColor.create().set(ctx.style().text().color()));
-		ctx.style().text().color(NkColor.create().set(color));
+		NkColor old = ctx.style().text().color();
+
+		stackTextColor.push(new int[] {
+				old.r() & 0xFF,
+				old.g() & 0xFF,
+				old.b() & 0xFF,
+				old.a() & 0xFF
+		});
+
+		ctx.style().text().color(color);
 	}
 
 	/**
 	 * Set the text color to the saved (pushed) color. See {@link #pushTextColor(NkContext, NkColor)}
-	 * 
+	 *
 	 * @param ctx
 	 */
 	protected void popTextColor(NkContext ctx) {
-		ctx.style().text().color(stackTextColor.pop());
+		int[] old = stackTextColor.pop();
+
+		ctx.style().text().color(
+				Theme.createColor(old[0], old[1], old[2], old[3])
+		                        );
 	}
-	
+
 	protected boolean nk_group_begin(NkContext ctx, MemoryStack stack, GroupModel groupModel, int option) {
 		if (groupModelList.indexOf(groupModel) == -1)
 			groupModelList.add(groupModel);
-		
+
 		groupModel.setBufGroupName(stack.calloc(256));
 		MemoryUtil.memASCII(groupModel.getName(), false, groupModel.getBufGroupName());
 
@@ -347,36 +352,44 @@ public abstract class AbstractFrame implements IFrame {
 		Nuklear.nk_spacer(ctx);
 	}
 
-	protected boolean nk_menu_item_label(NkContext ctx, String label) {
+	protected boolean nk_menu_item_label(NkContext ctx, String label, MemoryStack stack) {
 		boolean isReleased = false;
 
-		float savedRouding = ctx.style().button().rounding();
+		float savedRounding = ctx.style().button().rounding();
 		float savedBorder = ctx.style().button().border();
-		NkColor savedColor = NkColor.create().set(ctx.style().button().normal().data().color());
-		
+
+		NkColor savedColor = NkColor.malloc(stack)
+		                            .set(ctx.style().button().normal().data().color());
+
 		ctx.style().button().rounding(0);
 		ctx.style().button().normal().data().color(Theme.colorBackground);
 		ctx.style().button().border(0);
-		
-		if (label.equals(button_label_pressed) && (isReleased = !Nuklear.nk_input_is_mouse_down(ctx.input(), Nuklear.NK_BUTTON_LEFT))) {
+
+		if (label.equals(button_label_pressed) &&
+		    !Nuklear.nk_input_is_mouse_down(ctx.input(), Nuklear.NK_BUTTON_LEFT)) {
 			button_label_pressed = "";
+			isReleased = true;
 		}
-		
-		ctx.style().button().text_alignment(Nuklear.NK_TEXT_ALIGN_MIDDLE | Nuklear.NK_TEXT_ALIGN_LEFT);
+
+		ctx.style().button().text_alignment(
+				Nuklear.NK_TEXT_ALIGN_MIDDLE | Nuklear.NK_TEXT_ALIGN_LEFT
+		                                   );
+
 		if (Nuklear.nk_button_label(ctx, label)) {
 			button_label_pressed = label;
 		}
-		
-		ctx.style().button().rounding(savedRouding);
+
+		ctx.style().button().rounding(savedRounding);
 		ctx.style().button().border(savedBorder);
 		ctx.style().button().normal().data().color(savedColor);
+
 		return isReleased;
 	}
 
 	/**
 	 * The current Nuklear.nk_button_label does not have release button.
-	 * As a workaround, use this method to replace it. 
-	 * 
+	 * As a workaround, use this method to replace it.
+	 *
 	 * @param ctx
 	 * @param label must be unique!
 	 * @return true if mouse button is released.
@@ -392,53 +405,53 @@ public abstract class AbstractFrame implements IFrame {
 		if (Nuklear.nk_button_label(ctx, label)) {
 			button_label_pressed = label;
 		}
-		
+
 		return isReleased;
 	}
 
 	protected void nk_label_value(NkContext ctx, String label, String value, double leftCol, double rightCol, int alignLabel, int alignValue) {
 		Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeight, 2);
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) leftCol);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFontBold());
 		Nuklear.nk_label(ctx, label, alignLabel);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFont());
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) rightCol);
 		Nuklear.nk_label(ctx, value, alignValue);
-		
+
 		Nuklear.nk_layout_row_end(ctx);
 	}
-	
+
 	protected void nk_label_value(NkContext ctx, String label, String value, double leftCol, double rightCol) {
 		Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeight, 2);
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) leftCol);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFontBold());
 		Nuklear.nk_label(ctx, label, Nuklear.NK_TEXT_LEFT);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFont());
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) rightCol);
 		Nuklear.nk_label(ctx, value, Nuklear.NK_TEXT_LEFT);
-		
+
 		Nuklear.nk_layout_row_end(ctx);
 	}
-	
+
 	protected boolean nk_button_label(NkContext ctx, String label) {
 		return nk_button_label(ctx, label, Nuklear.NK_TEXT_ALIGN_CENTERED);
 	}
 
 	protected boolean nk_check_label(NkContext ctx, String label, boolean value, double leftCol, double rightCol) {
 		Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightEdit, 2);
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) leftCol);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFontBold());
 		Nuklear.nk_label(ctx, label, Nuklear.NK_TEXT_LEFT);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFont());
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) rightCol);
 		value = Nuklear.nk_check_label(ctx, "", value);
-		
+
 		Nuklear.nk_layout_row_end(ctx);
 		return value;
 	}
@@ -470,18 +483,18 @@ public abstract class AbstractFrame implements IFrame {
 				//| Nuklear.NK_EDIT_MULTILINE
 				//| Nuklear.NK_EDIT_GOTO_END_ON_ACTIVATE
 				;
-		
+
 		ByteBuffer buffer = stack.calloc(256);
 		String text = stringBuffer.length() == 0? value : stringBuffer.toString();
 		int length = MemoryUtil.memASCII(text, false, buffer);
 		IntBuffer len = stack.ints(length);
-		
+
 		// If tab key is pressed, then focus the edit field where tabIndex == focusCount.
 		if ((tabKeyPressed || currentGroup != null && currentGroup.is_scroll_changed(ctx, stack)) && tabIndex == focusCount) {
 			Nuklear.nk_edit_focus(ctx, mode);
 			Nuklear.nk_input_key(ctx, Nuklear.NK_KEY_TEXT_SELECT_ALL, true);
 		}
-		
+
 		int res = Nuklear.nk_edit_string(ctx, mode, buffer, len, 255, filter);
 
 		// Make sure the focus of the current edit field is lost when a tab key is pressed.
@@ -491,7 +504,7 @@ public abstract class AbstractFrame implements IFrame {
 		}
 
 		int direction = Nuklear.nk_input_is_key_down(ctx.input(), Nuklear.NK_KEY_SHIFT)? -1 : 1;
-		
+
 		switch (res) {
 		case EDIT_IS_INVISIBLE:
 			if ((tabKeyPressed || currentGroup != null && currentGroup.isScrolling()) && tabIndex == focusCount) {
@@ -536,7 +549,7 @@ public abstract class AbstractFrame implements IFrame {
 			break;
 		case EDIT_GAIN_FOCUS:
 			if (!tabKeyPressed) {
-				lastTabIndex = tabIndex; 
+				lastTabIndex = tabIndex;
 				tabIndex = focusCount;
 			}
 			focusChanged = true;
@@ -554,22 +567,22 @@ public abstract class AbstractFrame implements IFrame {
 			currentGroup.setMinFocusIndex(focusCount);
 			currentGroup.setMaxFocusIndex(focusCount);
 		}
-		
+
 		focusCount++;
-		return value;		
+		return value;
 	}
 
 	protected String nk_label_edit(NkContext ctx, MemoryStack stack, String label, StringBuffer stringBuffer, String value, double leftCol, double rightCol) {
 		Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightEdit, 2);
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) leftCol);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFontBold());
 		Nuklear.nk_label(ctx, label, Nuklear.NK_TEXT_LEFT);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFont());
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) rightCol);
 		value = editString(ctx, stack, stringBuffer, value, asciiFilter);
-		
+
 		Nuklear.nk_layout_row_end(ctx);
 		return value;
 	}
@@ -596,7 +609,7 @@ public abstract class AbstractFrame implements IFrame {
 
 	protected int nk_label_edit(NkContext ctx, MemoryStack stack, String label, StringBuffer stringBuffer, int value, double leftCol, double rightCol) {
 		Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightEdit, 2);
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) leftCol);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFontBold());
 		Nuklear.nk_label(ctx, label, Nuklear.NK_TEXT_LEFT);
@@ -604,7 +617,7 @@ public abstract class AbstractFrame implements IFrame {
 
 		Nuklear.nk_layout_row_push(ctx, (float) rightCol);
 		value = editInt(ctx, stack, stringBuffer, value);
-		
+
 		Nuklear.nk_layout_row_end(ctx);
 		return value;
 	}
@@ -651,15 +664,15 @@ public abstract class AbstractFrame implements IFrame {
 	protected double nk_label_edit(NkContext ctx, MemoryStack stack, String label, StringBuffer buffer,
 			double value, DecimalFormat format, double leftCol, double rightCol) {
 		Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightEdit, 2);
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) leftCol);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFontBold());
 		Nuklear.nk_label(ctx, label, Nuklear.NK_TEXT_LEFT);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFont());
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) rightCol);
 		value = editDouble(ctx, stack, buffer, value, format);
-		
+
 		Nuklear.nk_layout_row_end(ctx);
 		return value;
 	}
@@ -712,27 +725,27 @@ public abstract class AbstractFrame implements IFrame {
 
 	protected String nk_label_combo_options(NkContext ctx, MemoryStack stack, String label, String[] values, String value, double leftCol, double rightCol) {
 		Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightEdit, 2);
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) leftCol);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFontBold());
 		Nuklear.nk_label(ctx, label, Nuklear.NK_TEXT_LEFT);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFont());
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) rightCol);
 		value = nk_combo_options(ctx, stack, values, value);
-		
+
 		Nuklear.nk_layout_row_end(ctx);
 		return value;
 	}
 
 	protected String nk_label_Options(NkContext ctx, String label, String[] values, String value, double leftCol, double rightCol, int rightColumns) {
 		Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightEdit, 2);
-		
+
 		Nuklear.nk_layout_row_push(ctx, (float) leftCol);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFontBold());
 		Nuklear.nk_label(ctx, label, Nuklear.NK_TEXT_LEFT);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFont());
-		
+
 		boolean isChanged = false;
 		for (String s : values) {
 			Nuklear.nk_layout_row_push(ctx, (float) rightCol / rightColumns);
@@ -743,7 +756,7 @@ public abstract class AbstractFrame implements IFrame {
 				}
 			}
 		}
-		
+
 		Nuklear.nk_layout_row_end(ctx);
 		return value;
 	}
@@ -837,7 +850,7 @@ public abstract class AbstractFrame implements IFrame {
 			String newValue = nk_option(ctx, list, currentValue, 1);
 
 			if (!newValue.equalsIgnoreCase(currentValue)) {
-				currentValue = newValue; 
+				currentValue = newValue;
 				Nuklear.nk_combo_close(ctx);
 			}
 
@@ -849,22 +862,22 @@ public abstract class AbstractFrame implements IFrame {
 	public String getSelectedFile() {
 		return ((DialogFileModel) nuklearModel.getDialogStack().getCurrent()).getSelectedFileName();
 	}
-    
+
 	public void setSelectedFile(String fileName) {
 		((DialogFileModel) nuklearModel.getDialogStack().getCurrent()).setSelectedFileName(fileName);
 	}
 
 	public boolean nk_file_list_view(NkContext ctx, String path, String projectFileExt, DialogFileModel dlgFileModel) {
 		boolean isDoubleClicked = false;
-		
+
 		if (Nuklear.nk_group_begin(ctx, "ScrollableFiles", 0)) {
 
 			Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
 			List<File> files = Utils.getFiles(path, Constants.PROJECT_FILE_EXT);
-			
+
 			if (dlgFileModel.getSelectedFileName().isEmpty() && files.size() > 0)
-				dlgFileModel.setSelectedFileName(files.get(0).getName()); 
-			
+				dlgFileModel.setSelectedFileName(files.get(0).getName());
+
 			for (File file : files) {
 				boolean selected = dlgFileModel.getSelectedFileName().equalsIgnoreCase(file.getName());
 				if (Nuklear.nk_select_label(ctx, file.getName(), Nuklear.NK_TEXT_ALIGN_LEFT, selected)) {

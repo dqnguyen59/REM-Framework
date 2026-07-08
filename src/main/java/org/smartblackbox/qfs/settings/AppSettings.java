@@ -21,6 +21,7 @@ package org.smartblackbox.qfs.settings;
 import org.ini4j.Profile.Section;
 import org.ini4j.Wini;
 import org.lwjgl.nuklear.NkRect;
+import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.utils.AbstractSettings;
 import org.smartblackbox.utils.ISettings;
@@ -135,12 +136,14 @@ public class AppSettings extends AbstractSettings implements ISettings {
                 if (!value.isEmpty()) {
                     String[] array = value.split(",");
 
-                    NkRect rect = NkRect.create();
-                    rect.x(Float.parseFloat(array[0]));
-                    rect.y(Float.parseFloat(array[1]));
-                    rect.w(Float.parseFloat(array[2]));
-                    rect.h(Float.parseFloat(array[3]));
-                    frameRectMap.put(key, rect);
+                    try (MemoryStack stack = MemoryStack.stackPush()) {
+                        NkRect rect = NkRect.malloc(stack);
+                        rect.x(Float.parseFloat(array[0]));
+                        rect.y(Float.parseFloat(array[1]));
+                        rect.w(Float.parseFloat(array[2]));
+                        rect.h(Float.parseFloat(array[3]));
+                        frameRectMap.put(key, rect);
+                    }
                 }
             }
         }
@@ -219,7 +222,6 @@ public class AppSettings extends AbstractSettings implements ISettings {
      * Use this function to check if reset is required.
      * If true, then define your customized reset.
      *
-     * @return true if {@link #reset()} has been called.
      */
     public boolean isChanged() {
         if (isChanged) {

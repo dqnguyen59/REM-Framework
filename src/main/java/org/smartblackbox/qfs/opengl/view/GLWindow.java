@@ -24,7 +24,7 @@ import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
-import org.lwjgl.opengles.GLES20;
+//import org.lwjgl.opengles.GLES20;
 import org.lwjgl.system.MemoryUtil;
 import org.smartblackbox.qfs.settings.AppSettings;
 import org.smartblackbox.qfs.settings.QFSProject;

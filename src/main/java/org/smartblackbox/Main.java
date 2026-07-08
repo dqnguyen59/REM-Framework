@@ -21,7 +21,7 @@ package org.smartblackbox;
 import org.lwjgl.Version;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.opengl.controller.Engine;
-import org.smartblackbox.qfs.opengl.controller.QuantumFieldSimulator;
+import org.smartblackbox.qfs.opengl.controller.REMFieldSimulator;
 import org.smartblackbox.qfs.opengl.view.GLWindow;
 import org.smartblackbox.qfs.settings.AppSettings;
 import org.smartblackbox.utils.AppInfo;
@@ -51,7 +51,7 @@ public class Main {
 		AppSettings.getInstance().loadFromFile(Constants.BASE_PATH + Constants.APP_SETTINGS_FILE);
 
         GLWindow glWindow = new GLWindow(Constants.TITLE);
-		Engine engine = new QuantumFieldSimulator(glWindow);
+		Engine engine = new REMFieldSimulator(glWindow);
 	
 		try {
 			engine.init();

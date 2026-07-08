@@ -23,26 +23,26 @@ import org.joml.Vector3i;
 import org.joml.Vector4f;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
-import org.smartblackbox.qfs.opengl.model.entity.QFSNode;
+import org.smartblackbox.qfs.opengl.model.entity.Node;
 import org.smartblackbox.qfs.opengl.utils.Neighbor;
 import org.smartblackbox.qfs.opengl.utils.OBJFormatLoader;
 import org.smartblackbox.qfs.settings.AppSettings;
 import org.smartblackbox.qfs.settings.QFSProject;
 
-public class QFSFields {
+public class REMFields {
 
 	private AppSettings appSettings = AppSettings.getInstance();
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private QFSModel qfsModel = qfsProject.getQfsModel(); 
-	private Scene scene; 
+	private QFSProject  qfsProject  = QFSProject.getInstance();
+	private REMModel    REMModel    = qfsProject.getQfsModel();
+	private Scene       scene;
 	
 	private Entity baseField;
 
 	private OBJFormatLoader loader;
-	public QFSNode nForce;
-	public QFSNode nVelocity;
+	public  Node            nForce;
+	public  Node            nVelocity;
 
-	public QFSFields(Scene scene) {
+	public REMFields(Scene scene) {
 		loader = new OBJFormatLoader();
 		this.scene = scene;  
 	}
@@ -106,12 +106,12 @@ public class QFSFields {
 		// Draw xyz arrows on entity baseField.
 		//drawArrows(baseField, step, modelSphere, sizeI, sizeJ, sizeK);
 		
-		QFSNode[][][] fieldMatrix = new QFSNode[sizeK][sizeJ][sizeI];
+		Node[][][] fieldMatrix = new Node[sizeK][sizeJ][sizeI];
 
 		int NumNodes = sizeI * sizeJ * sizeK;
 		
-		qfsModel.setLoadingReady(false);
-		qfsModel.setProgress(0.0);
+		REMModel.setLoadingReady(false);
+		REMModel.setProgress(0.0);
 		
 		new Thread(new Runnable() {
 			
@@ -121,9 +121,9 @@ public class QFSFields {
 				for (int k = 0; k < sizeK; k++) {
 					for (int j = 0; j < sizeJ; j++) {
 						for (int i = 0; i < sizeI; i++) {
-							QFSNode n = scene.createQFSNode(baseField, modelSphere,
-									new Vector3d((i - sizeI / 2) * step, (j - sizeJ / 2) * step, (k - sizeK / 2) * step),
-									new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
+							Node n = scene.createQFSNode(baseField, modelSphere,
+							                             new Vector3d((i - sizeI / 2) * step, (j - sizeJ / 2) * step, (k - sizeK / 2) * step),
+							                             new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
 							n.setIndex(i, j, k);
 							
 							n.setOverrideModelMaterial(true);
@@ -151,7 +151,7 @@ public class QFSFields {
 
 
 							countNode++;
-							qfsModel.setProgress((double) countNode / (double) NumNodes * 100);
+							REMModel.setProgress((double) countNode / (double) NumNodes * 100);
 						}
 					}
 				}
@@ -189,7 +189,7 @@ public class QFSFields {
 						}
 					}
 				}
-				qfsModel.setLoadingReady(true);
+				REMModel.setLoadingReady(true);
 			}
 		}).start();
 		
@@ -205,17 +205,17 @@ public class QFSFields {
 		return baseField;
 	}
 
-	public QFSNode getNode(int x, int y, int z) {
+	public Node getNode(int x, int y, int z) {
 		for (Entity entity : scene.getEntities()) {
-			if (entity.getClass() == QFSNode.class) {
-				if (((QFSNode) entity).isIndex(x, y, z))
-					return (QFSNode) entity;
+			if (entity.getClass() == Node.class) {
+				if (((Node) entity).isIndex(x, y, z))
+					return (Node) entity;
 			}
 		}
 		return null;
 	}
 
-	public QFSNode getNode(Vector3i node) {
+	public Node getNode(Vector3i node) {
 		return getNode(node.x, node.y, node.z);
 	}
 	

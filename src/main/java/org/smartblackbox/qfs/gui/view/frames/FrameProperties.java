@@ -22,13 +22,13 @@ import org.joml.Vector3d;
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
-import org.smartblackbox.qfs.opengl.model.QFSModel;
+import org.smartblackbox.qfs.opengl.model.REMModel;
 import org.smartblackbox.qfs.settings.QFSProject;
 
 public class FrameProperties extends AbstractFrame {
 
 	private QFSProject qfsProject = QFSProject.getInstance();
-	private QFSModel qfsModel = qfsProject.getQfsModel(); 
+	private REMModel   REMModel   = qfsProject.getQfsModel();
 
 	private float leftCol = 0.6f;
 	private float rightCol = 0.4f;
@@ -64,8 +64,8 @@ public class FrameProperties extends AbstractFrame {
 		nk_label_value(ctx, " Height", String.format("%d", getWindowHeight()), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
 		nk_spacer(ctx, spacer1);
 
-        nk_label_value(ctx, " Mouse.X", String.format("%.0f", qfsModel.getMousePos().x), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
-		nk_label_value(ctx, " Mouse.Y", String.format("%.0f", qfsModel.getMousePos().y), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
+        nk_label_value(ctx, " Mouse.X", String.format("%.0f", REMModel.getMousePos().x), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
+		nk_label_value(ctx, " Mouse.Y", String.format("%.0f", REMModel.getMousePos().y), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
 		nk_spacer(ctx, spacer1);
 
 		nk_label_value(ctx, " CameraPos.x", String.format("%.2f", qfsProject.camera.getPosition().x), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
@@ -76,12 +76,12 @@ public class FrameProperties extends AbstractFrame {
 		nk_label_value(ctx, " CameraRot.z", String.format("%.2f", qfsProject.camera.getRotation().z), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
 		nk_spacer(ctx, spacer1);
 
-        nk_label_value(ctx, " NodeSelector.x", String.format("%d", qfsModel.getCurrentMouseNodeIndex().x), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
-		nk_label_value(ctx, " NodeSelector.y", String.format("%d", qfsModel.getCurrentMouseNodeIndex().y), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
-		nk_label_value(ctx, " NodeSelector.z", String.format("%d", qfsModel.getCurrentMouseNodeIndex().z), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
+        nk_label_value(ctx, " NodeSelector.x", String.format("%d", REMModel.getCurrentMouseNodeIndex().x), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
+		nk_label_value(ctx, " NodeSelector.y", String.format("%d", REMModel.getCurrentMouseNodeIndex().y), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
+		nk_label_value(ctx, " NodeSelector.z", String.format("%d", REMModel.getCurrentMouseNodeIndex().z), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
 		nk_spacer(ctx, spacer1);
 		
-        Vector3d p = qfsModel.getCurrentMouseNode().getPosition();
+        Vector3d p = REMModel.getCurrentMouseNode().getPosition();
         nk_label_value(ctx, " NodePos.x", String.format("%.8f", p.x), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
 		nk_label_value(ctx, " NodePos.y", String.format("%.8f", p.y), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);
 		nk_label_value(ctx, " NodePos.z", String.format("%.8f", p.z), leftCol, rightCol, Nuklear.NK_TEXT_LEFT, Nuklear.NK_TEXT_RIGHT);

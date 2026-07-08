@@ -32,7 +32,7 @@ import java.util.Objects;
 public class FrameQFSSettings extends AbstractFrame {
 
     private int   width        = 300;
-    private int   height       = 790;
+    private int   height       = 720;
     private int   heightAdjust = 0;
     private float leftCol      = 0.6f;
     private float rightCol     = 0.4f;
@@ -79,6 +79,10 @@ public class FrameQFSSettings extends AbstractFrame {
                 heightAdjust = 0;
                 break;
         }
+        if (Objects.requireNonNull(settings.getNodeFormulaVersion()) == NodeFormulaVersion.v_0_2) {
+            heightAdjust += 70;
+        }
+
         createLayout(ctx, 0, nuklearModel.getMenuBarHeight() + 120, width, height + heightAdjust);
     }
 
@@ -237,13 +241,15 @@ public class FrameQFSSettings extends AbstractFrame {
                     nk_slider(ctx, 0, qfsProject.getConstantElectricFactor(), 1.0, 0.0001));
             nk_spacer(ctx, spacer1, 1);
 
-            qfsProject.setConstantMagneticFactor(
-                    nk_label_edit(ctx, stack, " Magnetic Field:", bufMagneticField,
-                                  qfsProject.getConstantMagneticFactor(),
-                                  appSettings.getFormatScientific8(), leftCol, rightCol));
-            qfsProject.setConstantMagneticFactor(
-                    nk_slider(ctx, 0, qfsProject.getConstantMagneticFactor(), 0.9999, 0.0001));
-            nk_spacer(ctx, spacer1, 1);
+            if (settings.getNodeFormulaVersion() == NodeFormulaVersion.v_0_2) {
+                qfsProject.setConstantMagneticFactor(
+                        nk_label_edit(ctx, stack, " Magnetic Field:", bufMagneticField,
+                                      qfsProject.getConstantMagneticFactor(),
+                                      appSettings.getFormatScientific8(), leftCol, rightCol));
+                qfsProject.setConstantMagneticFactor(
+                        nk_slider(ctx, 0, qfsProject.getConstantMagneticFactor(), 0.9999, 0.0001));
+                nk_spacer(ctx, spacer1, 1);
+            }
 
             Nuklear.nk_layout_row_end(ctx);
         }

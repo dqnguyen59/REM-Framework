@@ -18,10 +18,6 @@
  */
 package org.smartblackbox.qfs.opengl.view.renderer;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
@@ -35,6 +31,10 @@ import org.smartblackbox.qfs.opengl.model.lights.DirectionalLight;
 import org.smartblackbox.qfs.opengl.model.lights.Light;
 import org.smartblackbox.qfs.settings.QFSProject;
 import org.smartblackbox.utils.Utils;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class EntityRenderer implements IRenderer {
 
@@ -160,7 +160,7 @@ public class EntityRenderer implements IRenderer {
 		GL20.glEnableVertexAttribArray(0);
 		GL20.glEnableVertexAttribArray(1);
 		GL20.glEnableVertexAttribArray(2);
-		
+
 		if (model.getMaterial().isDisableCulling())
 			Renderer.disableCulling();
 		else

@@ -21,7 +21,7 @@ package org.smartblackbox.qfs.opengl.model;
 import org.ini4j.Wini;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
-import org.smartblackbox.qfs.opengl.model.entity.QFSNode;
+import org.smartblackbox.qfs.opengl.model.entity.Node;
 import org.smartblackbox.utils.AbstractSettings;
 import org.smartblackbox.utils.PerformanceMonitor;
 
@@ -88,7 +88,7 @@ public class DetectorModel extends AbstractSettings {
 		isIgnited = true;
 	}
 
-	public void ignite(QFSNode node, double force) {
+	public void ignite(Node node, double force) {
 		if (node != null) {
 			reset();
 			isStarted = true;
@@ -97,7 +97,7 @@ public class DetectorModel extends AbstractSettings {
 		}
 	}
 
-	public int detect(QFSNode node) {
+	public int detect(Node node) {
 		nodeVelocity = node.getVelocity().length();
 		if (isStarted) {
 			if (node.getVelocity().length() > 0 && firstDetectionFrames == -1) {

@@ -21,22 +21,20 @@ package org.smartblackbox.qfs.opengl.model.entity;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
 import org.joml.Vector4f;
-import org.smartblackbox.qfs.opengl.model.Material;
-import org.smartblackbox.qfs.opengl.model.ObjFileModel;
-import org.smartblackbox.qfs.opengl.model.QFSModel;
-import org.smartblackbox.qfs.opengl.model.Scene;
+import org.smartblackbox.qfs.opengl.model.*;
 import org.smartblackbox.qfs.opengl.utils.Neighbor;
 import org.smartblackbox.qfs.settings.AppSettings;
 import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.QFSSettings.NodeFormulaVersion;
 
-public class QFSNode extends Entity {
+public class Node extends Entity {
 
     private static final Vector3d FIXED_COLOR = new Vector3d(1f, 1f, 1f);
 
     private final AppSettings appSettings = AppSettings.getInstance();
-    private final QFSProject  qfsProject  = QFSProject.getInstance();
-    private final QFSModel    qfsModel    = qfsProject.getQfsModel();
-    private final Scene       scene       = qfsProject.scene;
+    private final QFSProject qfsProject = QFSProject.getInstance();
+    private final REMModel   REMModel   = qfsProject.getQfsModel();
+    private final Scene      scene      = qfsProject.scene;
 
     private static final int NEIGHBOR_RIGHT  = 0;
     private static final int NEIGHBOR_TOP    = 1;
@@ -53,8 +51,8 @@ public class QFSNode extends Entity {
      * 4: neighbors bottom
      * 5: neighbors back
      */
-    private final QFSNode[] neighbors = new QFSNode[6];
-    private       boolean   hasNeighbors;
+    private final Node[]  neighbors = new Node[6];
+    private       boolean hasNeighbors;
     private       boolean   isFixed;
     private       boolean   isXFixed;
     private       boolean   isYFixed;
@@ -82,7 +80,7 @@ public class QFSNode extends Entity {
     private       double   customScale  = -1;
     private       Vector4f customColor;
 
-    public QFSNode(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
+    public Node(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
         super(parent, model, position, rotation, scale);
     }
 
@@ -135,6 +133,7 @@ public class QFSNode extends Entity {
     @Override
     public void initPosition(Vector3d position) {
         super.setPosition(position);
+        if (baseField == null) baseField = new Vector3d();
         baseField.set(position);
         if (fixedPos == null) fixedPos = new Vector3d();
         fixedPos.set(position);
@@ -144,11 +143,11 @@ public class QFSNode extends Entity {
         getBField().pBuf.set(position);
     }
 
-    public QFSNode[] getNeighbors() {
+    public Node[] getNeighbors() {
         return neighbors;
     }
 
-    public void setNeighbor(Neighbor neighbor, QFSNode node) {
+    public void setNeighbor(Neighbor neighbor, Node node) {
         this.neighbors[neighbor.ordinal()] = node;
                                              hasNeighbors = true;
     }
@@ -163,7 +162,7 @@ public class QFSNode extends Entity {
 
     @Override
     public boolean isVisible() {
-        return isVisible || isWall && qfsModel.isWallVisible();
+        return isVisible || isWall && REMModel.isWallVisible();
     }
 
     public boolean isFixed() {
@@ -219,7 +218,7 @@ public class QFSNode extends Entity {
      * <p>
      * Custom scale will be reset after updateMatrix() is called.
      *
-     * @param customScale
+     * @param customScale the custom scale
      */
     public void setCustomScale(double customScale) {
         this.customScale = customScale;
@@ -230,7 +229,7 @@ public class QFSNode extends Entity {
      * <p>
      * Custom color will be null after calcNewPosition() is called.
      *
-     * @param color
+     * @param color the custom color
      */
     public void setCustomColor(Vector4f color) {
         customColor = color;
@@ -248,6 +247,23 @@ public class QFSNode extends Entity {
         if (parent != null) parent.getTransformMatrix().mul(getTransformMatrix(), getTransformMatrix());
         transformMatrixfList[swapBufIndex].set(getTransformMatrix());
         customScale = -1;
+    }
+
+    public void updateNodeProperties(NodeFormulaVersion nodeFormulaVersion) {
+        // If set to false then the node stops updating its position
+        if (!REMModel.isSimulating()) return;
+
+        switch (nodeFormulaVersion) {
+            case v_0_3:
+                updateNodeProperties_v0_3();
+                break;
+            case v_0_2:
+                updateNodeProperties_v0_2();
+                break;
+            default:
+                updateNodeProperties_v0_1();
+                break;
+        }
     }
 
     private synchronized void setEMFieldColor(Vector3d emf) {
@@ -333,6 +349,14 @@ public class QFSNode extends Entity {
         customColor = null;
     }
 
+    private Vector3d getNeighborEFieldPosition(int index) {
+        return neighbors[index] == null ? new Vector3d() : neighbors[index].eField.p;
+    }
+
+    private Vector3d getNeighborBFieldPosition(int index) {
+        return neighbors[index] == null ? new Vector3d() : neighbors[index].bField.p;
+    }
+
     /**
      * Note that this is not the full quantum field formula, only the electric field is simulated
      * .<br/>
@@ -381,201 +405,168 @@ public class QFSNode extends Entity {
      *
      */
     public void updateNodeProperties_v0_1() {
-        // If set to false then the node stops updating its position
-        if (qfsModel.isSimulating()) {
-            double cws   = qfsProject.getConstantWaveSpeed() / 6;
-            double gamma = qfsProject.getConstantElectricFactor();
-            double beta  = qfsProject.getConstantMagneticFactor();
-            double f     = 0.1;
+        double cws   = qfsProject.getConstantWaveSpeed() / 6;
+        double gamma = qfsProject.getConstantElectricFactor();
 
-            ef.set(0);
-            mf.set(0);
+        ef.set(0);
 
-            for (QFSNode neighbor : neighbors) {
-                if (neighbor != null) {
-                    if (isFixed || isWall) {
-                        double alpha = isWall ? 0.00 : (1.0 - appSettings.getReflectionFixedNodes());
+        for (Node neighbor : neighbors) {
+            if (neighbor != null) {
+                if (isFixed || isWall) {
+                    double alpha = isWall ? 0.00 : (1.0 - appSettings.getReflectionFixedNodes());
 
-                        if (alpha == 0) {
-                            velocity.set(0);
-                            posBuff.set(fixedPos);
-                        }
-
-                        if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
-                            ef.y += (neighbor.position.y - position.y) * alpha;
-                            ef.z += (neighbor.position.z - position.z) * alpha;
-                        }
-                        if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
-                            ef.x += (neighbor.position.x - position.x) * alpha;
-                            ef.z += (neighbor.position.z - position.z) * alpha;
-                        }
-                        if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
-                            ef.x += (neighbor.position.x - position.x) * alpha;
-                            ef.y += (neighbor.position.y - position.y) * alpha;
-                        }
-                    } else {
-                        ef.add(neighbor.position).sub(position);
+                    if (alpha == 0) {
+                        velocity.set(0);
+                        posBuff.set(fixedPos);
                     }
+
+                    if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                        ef.y += (neighbor.position.y - position.y) * alpha;
+                        ef.z += (neighbor.position.z - position.z) * alpha;
+                    }
+                    if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                        ef.x += (neighbor.position.x - position.x) * alpha;
+                        ef.z += (neighbor.position.z - position.z) * alpha;
+                    }
+                    if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                        ef.x += (neighbor.position.x - position.x) * alpha;
+                        ef.y += (neighbor.position.y - position.y) * alpha;
+                    }
+                } else {
+                    ef.add(neighbor.position).sub(position);
                 }
             }
-
-            Vector3d nLeft = neighbors[NEIGHBOR_LEFT] == null ? new Vector3d()
-                                                              : neighbors[NEIGHBOR_LEFT].velocity;
-            Vector3d nRight = neighbors[NEIGHBOR_RIGHT] == null ? new Vector3d()
-                                                                : neighbors[NEIGHBOR_RIGHT].velocity;
-            Vector3d nTop = neighbors[NEIGHBOR_TOP] == null ? new Vector3d()
-                                                            : neighbors[NEIGHBOR_TOP].velocity;
-            Vector3d nBottom = neighbors[NEIGHBOR_BOTTOM] == null ? new Vector3d()
-                                                                  : neighbors[NEIGHBOR_BOTTOM].velocity;
-            Vector3d nFront = neighbors[NEIGHBOR_FRONT] == null ? new Vector3d()
-                                                                : neighbors[NEIGHBOR_FRONT].velocity;
-            Vector3d nBack = neighbors[NEIGHBOR_BACK] == null ? new Vector3d()
-                                                              : neighbors[NEIGHBOR_BACK].velocity;
-
-            mf.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
-            mf.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
-            mf.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
-
-            Vector3d e_f = ef.mul(gamma);
-            Vector3d m_f = mf.mul(beta);
-
-            acceleration.set(e_f.add(m_f));
-
-            // Note that the result of the addition or multiplication is stored in the object
-            // variable itself.
-            //positionBuff.add(velocity.add(e_f)).add(e_f.mul(0.5));
-            posBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul(0.5));
-
-            //			positionBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul
-            //			(0.5));
-
-            if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.x = fixedPos.x;
-            if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;
-            if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.z = fixedPos.z;
         }
+
+        acceleration.set(ef.mul(gamma));
+
+        // Note that the result of the addition or multiplication is stored in the object
+        // variable itself.
+        posBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul(0.5));
+
+        if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.x = fixedPos.x;
+        if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;
+        if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.z = fixedPos.z;
 
         setEMFieldColor(isFixed ? FIXED_COLOR : ef);
     }
 
-    private Vector3d getNeighborEFieldPosition(int index) {
-        return neighbors[index] == null ? new Vector3d() : neighbors[index].eField.p;
-    }
-
-    private Vector3d getNeighborBFieldPosition(int index) {
-        return neighbors[index] == null ? new Vector3d() : neighbors[index].bField.p;
-    }
-
     public void updateNodeProperties_v0_2() {
-        // If set to false then the node stops updating its position
-        if (qfsModel.isSimulating()) {
-            double cws   = qfsProject.getConstantWaveSpeed() / 6;
-            double gamma = qfsProject.getConstantElectricFactor();
-            double beta  = qfsProject.getConstantMagneticFactor();
-            double f     = 0.1;
+        double cws   = qfsProject.getConstantWaveSpeed() / 6;
+        double gamma = qfsProject.getConstantElectricFactor();
+        double beta  = qfsProject.getConstantMagneticFactor();
+        double f     = 0.1;
 
-            ef.set(0);
-            mf.set(0);
+        ef.set(0);
+        mf.set(0);
 
-            Vector3d nLeft   = getNeighborEFieldPosition(NEIGHBOR_LEFT);
-            Vector3d nRight  = getNeighborEFieldPosition(NEIGHBOR_RIGHT);
-            Vector3d nTop    = getNeighborEFieldPosition(NEIGHBOR_TOP);
-            Vector3d nBottom = getNeighborEFieldPosition(NEIGHBOR_BOTTOM);
-            Vector3d nFront  = getNeighborEFieldPosition(NEIGHBOR_FRONT);
-            Vector3d nBack   = getNeighborEFieldPosition(NEIGHBOR_BACK);
+        for (Node neighbor : neighbors) {
+            if (neighbor != null) {
+                if (isFixed || isWall) {
+                    double alpha = isWall ? 0.00 : (1.0 - appSettings.getReflectionFixedNodes());
 
-            mf.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
-            mf.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
-            mf.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
+                    if (alpha == 0) {
+                        velocity.set(0);
+                        posBuff.set(fixedPos);
+                    }
 
-            bField.a.set(mf.mul(beta));
-            bField.p.add(bField.v.add(bField.a.mul(cws))).add(bField.a.mul(0.5));
-
-
-            nLeft   = getNeighborBFieldPosition(NEIGHBOR_LEFT);
-            nRight  = getNeighborBFieldPosition(NEIGHBOR_RIGHT);
-            nTop    = getNeighborBFieldPosition(NEIGHBOR_TOP);
-            nBottom = getNeighborBFieldPosition(NEIGHBOR_BOTTOM);
-            nFront  = getNeighborBFieldPosition(NEIGHBOR_FRONT);
-            nBack   = getNeighborBFieldPosition(NEIGHBOR_BACK);
-
-            ef.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
-            ef.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
-            ef.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
-
-            eField.a.set(ef.mul(gamma));
-            eField.p.add(eField.v.add(eField.a.mul(cws))).add(eField.a.mul(0.5));
-
-            acceleration = eField.a;
-            velocity     = eField.v;
-            //position     = eField.p;
-            posBuff = eField.p;
+                    if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                        ef.y += (neighbor.position.y - position.y) * alpha;
+                        ef.z += (neighbor.position.z - position.z) * alpha;
+                    }
+                    if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                        ef.x += (neighbor.position.x - position.x) * alpha;
+                        ef.z += (neighbor.position.z - position.z) * alpha;
+                    }
+                    if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                        ef.x += (neighbor.position.x - position.x) * alpha;
+                        ef.y += (neighbor.position.y - position.y) * alpha;
+                    }
+                } else {
+                    ef.add(neighbor.position).sub(position);
+                }
+            }
         }
+
+        Vector3d nLeft = neighbors[NEIGHBOR_LEFT] == null ? new Vector3d()
+                                                          : neighbors[NEIGHBOR_LEFT].velocity;
+        Vector3d nRight = neighbors[NEIGHBOR_RIGHT] == null ? new Vector3d()
+                                                            : neighbors[NEIGHBOR_RIGHT].velocity;
+        Vector3d nTop = neighbors[NEIGHBOR_TOP] == null ? new Vector3d()
+                                                        : neighbors[NEIGHBOR_TOP].velocity;
+        Vector3d nBottom = neighbors[NEIGHBOR_BOTTOM] == null ? new Vector3d()
+                                                              : neighbors[NEIGHBOR_BOTTOM].velocity;
+        Vector3d nFront = neighbors[NEIGHBOR_FRONT] == null ? new Vector3d()
+                                                            : neighbors[NEIGHBOR_FRONT].velocity;
+        Vector3d nBack = neighbors[NEIGHBOR_BACK] == null ? new Vector3d()
+                                                          : neighbors[NEIGHBOR_BACK].velocity;
+
+        mf.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
+        mf.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
+        mf.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
+
+        Vector3d e_f = ef.mul(gamma);
+        Vector3d m_f = mf.mul(beta);
+
+        acceleration.set(e_f.add(m_f));
+
+        // Note that the result of the addition or multiplication is stored in the object
+        // variable itself.
+        //positionBuff.add(velocity.add(e_f)).add(e_f.mul(0.5));
+        posBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul(0.5));
+
+        //			positionBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul
+        //			(0.5));
+
+        if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.x = fixedPos.x;
+        if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;
+        if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.z = fixedPos.z;
 
         setEMFieldColor(isFixed ? FIXED_COLOR : ef);
     }
 
     public void updateNodeProperties_v0_3() {
-        // If set to false then the node stops updating its position
-        if (qfsModel.isSimulating()) {
-            double cws   = qfsProject.getConstantWaveSpeed() / 6;
-            double gamma = qfsProject.getConstantElectricFactor();
-            double beta  = qfsProject.getConstantMagneticFactor();
-            double f     = 0.1;
+        double cws   = qfsProject.getConstantWaveSpeed() / 6;
+        double gamma = qfsProject.getConstantElectricFactor();
+        double beta  = qfsProject.getConstantMagneticFactor();
+        double f     = 0.1;
 
-            ef.set(0);
-            mf.set(0);
+        ef.set(0);
+        mf.set(0);
 
-            for (QFSNode neighbor : neighbors) {
-                if (neighbor != null) {
-                    if (isFixed || isWall) {
-                        double alpha = isWall ? 0.00 : (1.0 - appSettings.getReflectionFixedNodes());
+        Vector3d nLeft   = getNeighborEFieldPosition(NEIGHBOR_LEFT);
+        Vector3d nRight  = getNeighborEFieldPosition(NEIGHBOR_RIGHT);
+        Vector3d nTop    = getNeighborEFieldPosition(NEIGHBOR_TOP);
+        Vector3d nBottom = getNeighborEFieldPosition(NEIGHBOR_BOTTOM);
+        Vector3d nFront  = getNeighborEFieldPosition(NEIGHBOR_FRONT);
+        Vector3d nBack   = getNeighborEFieldPosition(NEIGHBOR_BACK);
 
-                        if (alpha == 0) {
-                            velocity.set(0);
-                            posBuff.set(fixedPos);
-                        }
+        mf.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
+        mf.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
+        mf.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
 
-                        Vector3d d = new Vector3d(neighbor.bField.p).sub(bField.p);
-                        Vector3d v1 = new Vector3d(neighbor.eField.p).sub(baseField);
-                        mf.add(d.cross(v1));
-                    }
-                }
-            }
+        bField.a.set(mf.mul(beta));
+        bField.p.add(bField.v.add(bField.a.mul(cws))).add(bField.a.mul(0.5));
 
-            Vector3d nLeft = neighbors[NEIGHBOR_LEFT] == null ? new Vector3d()
-                                                              : neighbors[NEIGHBOR_LEFT].velocity;
-            Vector3d nRight = neighbors[NEIGHBOR_RIGHT] == null ? new Vector3d()
-                                                                : neighbors[NEIGHBOR_RIGHT].velocity;
-            Vector3d nTop = neighbors[NEIGHBOR_TOP] == null ? new Vector3d()
-                                                            : neighbors[NEIGHBOR_TOP].velocity;
-            Vector3d nBottom = neighbors[NEIGHBOR_BOTTOM] == null ? new Vector3d()
-                                                                  : neighbors[NEIGHBOR_BOTTOM].velocity;
-            Vector3d nFront = neighbors[NEIGHBOR_FRONT] == null ? new Vector3d()
-                                                                : neighbors[NEIGHBOR_FRONT].velocity;
-            Vector3d nBack = neighbors[NEIGHBOR_BACK] == null ? new Vector3d()
-                                                              : neighbors[NEIGHBOR_BACK].velocity;
 
-            mf.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
-            mf.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
-            mf.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
+        nLeft   = getNeighborBFieldPosition(NEIGHBOR_LEFT);
+        nRight  = getNeighborBFieldPosition(NEIGHBOR_RIGHT);
+        nTop    = getNeighborBFieldPosition(NEIGHBOR_TOP);
+        nBottom = getNeighborBFieldPosition(NEIGHBOR_BOTTOM);
+        nFront  = getNeighborBFieldPosition(NEIGHBOR_FRONT);
+        nBack   = getNeighborBFieldPosition(NEIGHBOR_BACK);
 
-            Vector3d e_f = ef.mul(gamma);
-            Vector3d m_f = mf.mul(beta);
+        ef.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
+        ef.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
+        ef.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
 
-            acceleration.set(e_f.add(m_f));
+        eField.a.set(ef.mul(gamma));
+        eField.p.add(eField.v.add(eField.a.mul(cws))).add(eField.a.mul(0.5));
 
-            // Note that the result of the addition or multiplication is stored in the object
-            // variable itself.
-            //positionBuff.add(velocity.add(e_f)).add(e_f.mul(0.5));
-            posBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul(0.5));
-
-            //			positionBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul
-            //			(0.5));
-
-            if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.x = fixedPos.x;
-            if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;
-            if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.z = fixedPos.z;
-        }
+        acceleration = eField.a;
+        velocity     = eField.v;
+        //position     = eField.p;
+        posBuff = eField.p;
 
         setEMFieldColor(isFixed ? FIXED_COLOR : ef);
     }

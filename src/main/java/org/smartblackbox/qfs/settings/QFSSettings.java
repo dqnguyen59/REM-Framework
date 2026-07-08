@@ -90,7 +90,7 @@ public class QFSSettings extends AbstractSettings implements ISettings {
     }
 
     public enum NodeFormulaVersion {
-        v_0_1, v_0_2;
+        v_0_1, v_0_2, v_0_3;
 
         private static String[] strEnums;
 
@@ -127,8 +127,8 @@ public class QFSSettings extends AbstractSettings implements ISettings {
     private SliceType          lastSliceType          = SliceType.sliceZ;
     private ColorMode          colorMode              = ColorMode.normal;
     private ColorMode          lastColorMode          = ColorMode.normal;
-    private NodeFormulaVersion nodeFormulaVersion     = NodeFormulaVersion.v_0_2;
-    private NodeFormulaVersion lastNodeFormulaVersion = NodeFormulaVersion.v_0_2;
+    private NodeFormulaVersion nodeFormulaVersion     = NodeFormulaVersion.v_0_1;
+    private NodeFormulaVersion lastNodeFormulaVersion = NodeFormulaVersion.v_0_1;
     private int                visibleIndexX;
     private int                visibleIndexY;
     private int                visibleIndexZ;

@@ -24,14 +24,14 @@ import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.gui.model.Theme;
 import org.smartblackbox.qfs.opengl.model.DetectorModel;
-import org.smartblackbox.qfs.opengl.model.QFSModel;
-import org.smartblackbox.qfs.opengl.model.QFSModel.NodeSelectionMode;
+import org.smartblackbox.qfs.opengl.model.REMModel;
+import org.smartblackbox.qfs.opengl.model.REMModel.NodeSelectionMode;
 import org.smartblackbox.qfs.settings.QFSProject;
 
 public class FrameDetector extends AbstractFrame {
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private QFSModel qfsModel = qfsProject.getQfsModel(); 
+	private QFSProject    qfsProject    = QFSProject.getInstance();
+	private REMModel      REMModel      = qfsProject.getQfsModel();
 	private DetectorModel detectorModel = qfsProject.detectorModel;
 
 	private int width = 400;
@@ -75,7 +75,7 @@ public class FrameDetector extends AbstractFrame {
 			popTextColor(ctx);
 			
 	        if (nk_button_label(ctx, "Select Ignitor Node")) {
-	        	qfsModel.setNodeSelectionMode(NodeSelectionMode.ignitionNode);
+	        	REMModel.setNodeSelectionMode(NodeSelectionMode.ignitionNode);
 				close();
 			}
 	        
@@ -94,7 +94,7 @@ public class FrameDetector extends AbstractFrame {
 			popTextColor(ctx);
 			
 	        if (nk_button_label(ctx, "Select Detector Node")) {
-	        	qfsModel.setNodeSelectionMode(NodeSelectionMode.detectorNode);
+	        	REMModel.setNodeSelectionMode(NodeSelectionMode.detectorNode);
 				close();
 			}
 	        

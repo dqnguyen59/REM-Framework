@@ -20,11 +20,12 @@ package org.smartblackbox.qfs.opengl.model;
 
 import org.joml.Vector2d;
 import org.joml.Vector3i;
-import org.smartblackbox.qfs.opengl.model.entity.QFSNode;
+import org.smartblackbox.qfs.opengl.model.entity.Identity;
+import org.smartblackbox.qfs.opengl.model.entity.Node;
 import org.smartblackbox.qfs.opengl.model.lights.Light;
 import org.smartblackbox.qfs.settings.QFSProject;
 
-public class QFSModel {
+public class REMModel {
 	
 	public enum Mode {
 		normal,
@@ -63,12 +64,12 @@ public class QFSModel {
 
 	private double progress;
 	private Vector2d mousePos = new Vector2d();
-	private QFSNode currentMouseNode;
+	private Node     currentMouseNode;
 	private Vector3i currentMouseNodeIndex = new Vector3i();
 	
 	private NodeSelectionMode nodeSelectionMode = NodeSelectionMode.none;
-	public Oscillator selectedOscillator;
-	private Light selectedLight;
+	public  Identity          selectedIdentity;
+	private Light             selectedLight;
 	
 	public String getBtnSimulatingLabel() {
 		return isSimulating()? "Stop" : "Run";
@@ -157,11 +158,11 @@ public class QFSModel {
 		this.mousePos = mousePos;
 	}
 
-	public QFSNode getCurrentMouseNode() {
+	public Node getCurrentMouseNode() {
 		return currentMouseNode;
 	}
 
-	public void setCurrentMouseNode(QFSNode currentMouseNode) {
+	public void setCurrentMouseNode(Node currentMouseNode) {
 		this.currentMouseNode = currentMouseNode;
 	}
 
@@ -181,12 +182,12 @@ public class QFSModel {
 		this.nodeSelectionMode = mode;
 	}
 
-	public Oscillator getSelectedOscillator() {
-		return selectedOscillator;
+	public Identity getSelectedOscillator() {
+		return selectedIdentity;
 	}
 
-	public void setSelectedOscillator(Oscillator selectedOscillator) {
-		this.selectedOscillator = selectedOscillator;
+	public void setSelectedOscillator(Identity selectedIdentity) {
+		this.selectedIdentity = selectedIdentity;
 	}
 
 	public Light getSelectedLight() {

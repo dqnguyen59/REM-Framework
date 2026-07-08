@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
- * 
+ *
  * File created on 01/01/2023
  */
 package org.smartblackbox.qfs.gui.view.frames;
@@ -22,54 +22,58 @@ import org.lwjgl.PointerBuffer;
 import org.lwjgl.nuklear.NkColor;
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
+import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
-import org.smartblackbox.qfs.opengl.model.QFSModel;
+import org.smartblackbox.qfs.opengl.model.REMModel;
 import org.smartblackbox.qfs.settings.QFSProject;
 
 public class FrameProgress extends AbstractFrame {
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private QFSModel qfsModel = qfsProject.getQfsModel(); 
+    private QFSProject qfsProject = QFSProject.getInstance();
+    private REMModel   REMModel   = qfsProject.getQfsModel();
 
-	PointerBuffer progress = PointerBuffer.allocateDirect(1);
+    PointerBuffer progress = PointerBuffer.allocateDirect(1);
 
-	public FrameProgress(NuklearModel frames) {
-		super(frames);
-		windowOptions = Nuklear.NK_WINDOW_NO_SCROLLBAR;
-	}
+    public FrameProgress(NuklearModel frames) {
+        super(frames);
+        windowOptions = Nuklear.NK_WINDOW_NO_SCROLLBAR;
+    }
 
-	@Override
-	public String getTitle() {
-		return "Progress";
-	}
+    @Override
+    public String getTitle() {
+        return "Progress";
+    }
 
-	@Override
-	public void render(long windowHandle, NkContext ctx) {
-		super.render(windowHandle, ctx);
+    @Override
+    public void render(long windowHandle, NkContext ctx) {
+        super.render(windowHandle, ctx);
 
-		NkColor color = ctx.style().window().fixed_background().data().color();
-		NkColor tempColor = NkColor.create()
-				.r(color.r())
-				.g(color.g())
-				.b(color.b())
-				.a(color.a());
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            NkColor color = ctx.style().window().fixed_background().data().color();
 
-		ctx.style().window().fixed_background().data().color(Constants.TRANSPARENT_BG_COLOR);
+            NkColor tempColor = NkColor.malloc(stack)
+                                       .r(color.r())
+                                       .g(color.g())
+                                       .b(color.b())
+                                       .a(color.a());
 
-		createLayoutCentered(ctx, 300, 40);
+            ctx.style().window().fixed_background().data().color(Constants.TRANSPARENT_BG_COLOR);
 
-		ctx.style().window().fixed_background().data().color(tempColor);
-	}
+            createLayoutCentered(ctx, 300, 40);
 
-	@Override
-	protected void layout(NkContext ctx, int x, int y, int width, int height) {
+            ctx.style().window().fixed_background().data().color(tempColor);
+        }
+    }
 
-		progress.put(0, (long) qfsModel.getProgress());
+    @Override
+    protected void layout(NkContext ctx, int x, int y, int width, int height) {
 
-		Nuklear.nk_layout_row_dynamic(ctx, 30, 1);
-		Nuklear.nk_progress(ctx, progress, 100, true);
+        progress.put(0, (long) REMModel.getProgress());
 
-	}
+        Nuklear.nk_layout_row_dynamic(ctx, 30, 1);
+        Nuklear.nk_progress(ctx, progress, 100, true);
+
+    }
 
 }

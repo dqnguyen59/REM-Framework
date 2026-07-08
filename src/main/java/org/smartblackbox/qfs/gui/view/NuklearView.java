@@ -18,44 +18,11 @@
  */
 package org.smartblackbox.qfs.gui.view;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
-import java.util.Objects;
-
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
-import org.lwjgl.nuklear.NkAllocator;
-import org.lwjgl.nuklear.NkBuffer;
-import org.lwjgl.nuklear.NkContext;
-import org.lwjgl.nuklear.NkConvertConfig;
-import org.lwjgl.nuklear.NkDrawCommand;
-import org.lwjgl.nuklear.NkDrawNullTexture;
-import org.lwjgl.nuklear.NkDrawVertexLayoutElement;
-import org.lwjgl.nuklear.NkMouse;
-import org.lwjgl.nuklear.NkUserFont;
-import org.lwjgl.nuklear.NkUserFontGlyph;
-import org.lwjgl.nuklear.Nuklear;
-import org.lwjgl.opengl.ARBDebugOutput;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL12C;
-import org.lwjgl.opengl.GL13C;
-import org.lwjgl.opengl.GL14C;
-import org.lwjgl.opengl.GL15C;
-import org.lwjgl.opengl.GL20C;
-import org.lwjgl.opengl.GL30C;
-import org.lwjgl.opengl.GL43;
-import org.lwjgl.opengl.GLCapabilities;
-import org.lwjgl.opengl.KHRDebug;
-import org.lwjgl.stb.STBTTAlignedQuad;
-import org.lwjgl.stb.STBTTFontinfo;
-import org.lwjgl.stb.STBTTPackContext;
-import org.lwjgl.stb.STBTTPackedchar;
-import org.lwjgl.stb.STBTruetype;
+import org.lwjgl.nuklear.*;
+import org.lwjgl.opengl.*;
+import org.lwjgl.stb.*;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Platform;
@@ -64,6 +31,13 @@ import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.gui.model.Theme;
 import org.smartblackbox.qfs.settings.AppSettings;
 import org.smartblackbox.utils.Utils;
+
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.util.Objects;
 
 /**
  * This class is a modified version to fit the needs of this project.
@@ -208,6 +182,8 @@ public class NuklearView {
 		initFont(nuklearModel.getDefaultFontBold(), ttfBold, appSettings.getFontSize());
 		initFont(nuklearModel.getDefaultFontItalic(), ttfItalic, appSettings.getFontSize());
 
+		Theme.init(context);
+
 		Nuklear.nk_style_set_font(context, nuklearModel.getDefaultFont());
 	}
 
@@ -311,15 +287,10 @@ public class NuklearView {
 		.texture(it -> it.id(fontTexID));
 	}
 	
-	public void initTheme() {
-		Theme.init(context);
-	}
-
 	public void render() {
 		if (windowHandle == 0) return;
 
 		newFrame();
-		initTheme();
 
 		nuklearModel.render(windowHandle, context);
 
@@ -498,7 +469,6 @@ public class NuklearView {
 					.vertex_size(20)
 					.vertex_alignment(4)
 					.tex_null(null_texture)
-					//.null_texture(null_texture)
 					.circle_segment_count(22)
 					.curve_segment_count(22)
 					.arc_segment_count(22)
@@ -546,6 +516,7 @@ public class NuklearView {
 		GL15C.glBindBuffer(GL15C.GL_ELEMENT_ARRAY_BUFFER, 0);
 		GL30C.glBindVertexArray(0);
 		GL11C.glDisable(GL11C.GL_SCISSOR_TEST);
+
 	}
 
 	private void destroy() {

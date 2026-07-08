@@ -22,14 +22,14 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
-import org.smartblackbox.qfs.opengl.model.QFSModel;
+import org.smartblackbox.qfs.opengl.model.REMModel;
 import org.smartblackbox.qfs.settings.QFSProject;
 import org.smartblackbox.qfs.settings.SlitWallSettings;
 
 public class FrameSlitWall extends AbstractFrame {
 
 	private QFSProject qfsProject = QFSProject.getInstance();
-	private QFSModel qfsModel = qfsProject.getQfsModel(); 
+	private REMModel   REMModel   = qfsProject.getQfsModel();
 
 	private int width = 300;
 	private int height = 310;
@@ -79,7 +79,7 @@ public class FrameSlitWall extends AbstractFrame {
 			Nuklear.nk_layout_row_dynamic(ctx, spacer1 , 1);
 			Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 2);
 			if (nk_button_label(ctx, "Clear All Walls")) {
-				qfsModel.clearWalls();
+				REMModel.clearWalls();
 			}
 			if (nk_button_label(ctx, "Add")) {
 				slitWall.setUpdated(true);

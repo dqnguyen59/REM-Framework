@@ -25,14 +25,14 @@ import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.gui.model.NuklearModel.Frame;
 import org.smartblackbox.qfs.gui.model.Theme;
-import org.smartblackbox.qfs.opengl.model.QFSModel;
-import org.smartblackbox.qfs.opengl.model.QFSModel.Mode;
+import org.smartblackbox.qfs.opengl.model.REMModel;
+import org.smartblackbox.qfs.opengl.model.REMModel.Mode;
 import org.smartblackbox.qfs.settings.QFSProject;
 
 public class FrameStatusBar extends AbstractFrame {
 
 	private QFSProject qfsProject = QFSProject.getInstance();
-	private QFSModel qfsModel = qfsProject.getQfsModel(); 
+	private REMModel   REMModel   = qfsProject.getQfsModel();
 
 	private int width;
 	private int height;
@@ -71,19 +71,19 @@ public class FrameStatusBar extends AbstractFrame {
 		Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, 30, 10);
 		Nuklear.nk_layout_row_push(ctx, col[i++] / width);
 		Nuklear.nk_label(ctx, String.format(" CurrentNode.xyz: (%d, %d, %d);",
-				qfsModel.getCurrentMouseNodeIndex().x,
-				qfsModel.getCurrentMouseNodeIndex().y,
-				qfsModel.getCurrentMouseNodeIndex().z
+		                                    REMModel.getCurrentMouseNodeIndex().x,
+		                                    REMModel.getCurrentMouseNodeIndex().y,
+		                                    REMModel.getCurrentMouseNodeIndex().z
         		), Nuklear.NK_TEXT_LEFT);
 
 		Nuklear.nk_layout_row_push(ctx, col[i++] / width);
 		Nuklear.nk_label(ctx, String.format(" Simulation: "), Nuklear.NK_TEXT_LEFT);
 
-		ctx.style().button().normal().data().color(qfsModel.isSimulating()? Theme.blue1 : savedCol);
+		ctx.style().button().normal().data().color(REMModel.isSimulating() ? Theme.blue1 : savedCol);
 		
 		Nuklear.nk_layout_row_push(ctx, col[i++] / width);
-		if (nk_button_label(ctx, qfsModel.getBtnSimulatingLabel()))
-			qfsModel.toggleSimulation();
+		if (nk_button_label(ctx, REMModel.getBtnSimulatingLabel()))
+			REMModel.toggleSimulation();
 
 		ctx.style().button().normal().data().color(Theme.blue1);
 		Nuklear.nk_layout_row_push(ctx, col[i++] / width);
@@ -102,7 +102,7 @@ public class FrameStatusBar extends AbstractFrame {
 		for (Mode m : Mode.values()) {
 			Nuklear.nk_layout_row_push(ctx, col[i++] / width);
 
-			ctx.style().button().normal().data().color(m == qfsModel.getMode()? Theme.blue1 : savedCol);
+			ctx.style().button().normal().data().color(m == REMModel.getMode() ? Theme.blue1 : savedCol);
 			
 			switch (m) {
 			case normal:
@@ -132,7 +132,7 @@ public class FrameStatusBar extends AbstractFrame {
 			
 			tooltip(ctx, tip);
 			if (nk_button_label(ctx, s)) {
-				qfsModel.setMode(m);
+				REMModel.setMode(m);
 				if (m == Mode.rain)
 					nuklearModel.toggleFrame(Frame.rain);
 			}

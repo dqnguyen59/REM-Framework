@@ -27,14 +27,14 @@ import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.gui.model.GroupModel;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.opengl.model.Material;
-import org.smartblackbox.qfs.opengl.model.QFSModel;
+import org.smartblackbox.qfs.opengl.model.REMModel;
 import org.smartblackbox.qfs.opengl.model.lights.Light;
 import org.smartblackbox.qfs.settings.QFSProject;
 
 public class FrameLights extends AbstractFrame {
 
 	private QFSProject qfsProject = QFSProject.getInstance();
-	private QFSModel qfsModel = qfsProject.getQfsModel(); 
+	private REMModel   REMModel   = qfsProject.getQfsModel();
 
 	private int groupNoScroll = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_NO_SCROLLBAR | Nuklear.NK_WINDOW_BORDER;
 	private int autoHideScroll = Nuklear.NK_WINDOW_SCROLL_AUTO_HIDE;
@@ -104,9 +104,9 @@ public class FrameLights extends AbstractFrame {
 				Nuklear.nk_group_end(ctx);
 			}
 
-			float f = qfsModel.getSelectedLight() != null && qfsModel.getSelectedLight().isSpotLight()? 0.5f : 1f;
+			float f = REMModel.getSelectedLight() != null && REMModel.getSelectedLight().isSpotLight() ? 0.5f : 1f;
 			Nuklear.nk_layout_row_push(ctx, f);
-			if (qfsModel.getSelectedLight() != null && Nuklear.nk_group_begin(ctx, "Group Properties", Nuklear.NK_WINDOW_NO_SCROLLBAR)) {
+			if (REMModel.getSelectedLight() != null && Nuklear.nk_group_begin(ctx, "Group Properties", Nuklear.NK_WINDOW_NO_SCROLLBAR)) {
 				Nuklear.nk_layout_row_dynamic(ctx, contentHeight * f - 2, 1);
 				layoutRightSide(ctx, stack);
 				Nuklear.nk_group_end(ctx);
@@ -129,29 +129,29 @@ public class FrameLights extends AbstractFrame {
 
 				Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
 				for (Light light : qfsProject.getLights()) {
-					boolean selected = qfsModel.getSelectedLight() == light;
+					boolean selected = REMModel.getSelectedLight() == light;
 					selected = Nuklear.nk_select_label(ctx, light.getName(), Nuklear.NK_TEXT_ALIGN_LEFT, selected);
 					if (selected)
-						qfsModel.setSelectedLight(light);
+						REMModel.setSelectedLight(light);
 				}
 				Nuklear.nk_group_end(ctx);
 			}
 
 			Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 3);
 			if (nk_button_label(ctx, "Add")) {
-				qfsModel.setSelectedLight(qfsProject.createLight());
-				qfsModel.getSelectedLight().setName("Light" + indexLight);
+				REMModel.setSelectedLight(qfsProject.createLight());
+				REMModel.getSelectedLight().setName("Light" + indexLight);
 				indexLight++;
 			}
 
 			if (nk_button_label(ctx, "Remove")) {
-				int i = qfsProject.getLights().indexOf(qfsModel.getSelectedLight());
-				qfsProject.getLights().remove(qfsModel.getSelectedLight());
+				int i = qfsProject.getLights().indexOf(REMModel.getSelectedLight());
+				qfsProject.getLights().remove(REMModel.getSelectedLight());
 
 				if (i >= qfsProject.getLights().size())
 					i = qfsProject.getLights().size() - 1;
 				
-				qfsModel.setSelectedLight(qfsProject.getLights().size() > 0? qfsProject.getLights().get(i) : null);
+				REMModel.setSelectedLight(qfsProject.getLights().size() > 0 ? qfsProject.getLights().get(i) : null);
 			}
 
 			if (nk_button_label(ctx, "Close"))
@@ -173,7 +173,7 @@ public class FrameLights extends AbstractFrame {
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	private void layoutRightSide(NkContext ctx, MemoryStack stack) {
-		Light light = qfsModel.getSelectedLight();
+		Light light = REMModel.getSelectedLight();
 
 		if (nk_group_begin(ctx, stack, groupModelProperties, windowAutoHideScroll)) {
 			

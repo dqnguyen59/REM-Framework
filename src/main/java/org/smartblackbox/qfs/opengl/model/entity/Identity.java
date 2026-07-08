@@ -16,7 +16,7 @@
  * 
  * File created on 01/01/2023
  */
-package org.smartblackbox.qfs.opengl.model;
+package org.smartblackbox.qfs.opengl.model.entity;
 
 import org.ini4j.Wini;
 import org.joml.Vector3d;
@@ -27,7 +27,7 @@ import org.smartblackbox.qfs.opengl.utils.VectorOscillatorType;
 import org.smartblackbox.utils.AbstractSettings;
 import org.smartblackbox.utils.ISettings;
 
-public class Oscillator extends AbstractSettings implements ISettings {
+public class Identity extends AbstractSettings implements ISettings {
 	
 	private String name = "";
 	private Vector3b active = new Vector3b();
@@ -41,7 +41,7 @@ public class Oscillator extends AbstractSettings implements ISettings {
 	private Vector3d vOscillator = new Vector3d();
 	public Vector3i nodeIndex = new Vector3i(-1, -1, -1);
 	
-	public Oscillator(String name, Vector3i nodeIndex) {
+	public Identity(String name, Vector3i nodeIndex) {
 		this.name = name;
 		this.nodeIndex = nodeIndex;
 	}
@@ -51,17 +51,17 @@ public class Oscillator extends AbstractSettings implements ISettings {
 		this.nodeInitPosition.set(nodeInitPosition);
 	}
 
-	public Oscillator clone() {
-		Oscillator oscillator = new Oscillator(name, nodeIndex);
-		oscillator.active = new Vector3b(active);
-		oscillator.oscillatorType = new VectorOscillatorType(oscillatorType);
-		oscillator.startAngle = new Vector3d(startAngle);
-		oscillator.angle = new Vector3d(angle);
-		oscillator.angleIncrement = new Vector3d(angleIncrement);
-		oscillator.amplitude = new Vector3d(amplitude);
-		oscillator.vOscillator = new Vector3d(vOscillator);
-		oscillator.nodeInitPosition = new Vector3d(nodeInitPosition);
-		return oscillator;
+	public Identity clone() {
+		Identity identity = new Identity(name, nodeIndex);
+		identity.active           = new Vector3b(active);
+		identity.oscillatorType   = new VectorOscillatorType(oscillatorType);
+		identity.startAngle       = new Vector3d(startAngle);
+		identity.angle            = new Vector3d(angle);
+		identity.angleIncrement   = new Vector3d(angleIncrement);
+		identity.amplitude        = new Vector3d(amplitude);
+		identity.vOscillator      = new Vector3d(vOscillator);
+		identity.nodeInitPosition = new Vector3d(nodeInitPosition);
+		return identity;
 	}
 	
 	/**
