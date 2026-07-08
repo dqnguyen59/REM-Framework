@@ -40,6 +40,7 @@ public class Entity {
 	// Swap between two positions buffers. One for reading and the other for writing.
 	// So data will not be messed up when doing some interacting calculations.
 	// After all has been nodes has been calculated, then copy the positionBuff to position.
+	protected Vector3d basePosition = new Vector3d();
 	protected Vector3d position = new Vector3d();
 	protected Vector3d posBuff  = new Vector3d();
 	// swapBufIndex can only be 0 or 1
@@ -60,6 +61,7 @@ public class Entity {
 		this.parent   = parent;
 		this.model    = model;
 		this.position = new Vector3d(position);
+		this.basePosition = new Vector3d(position);
 		initPosition(new Vector3d(position));
 		this.rotation = new Vector3d(rotation);
 		this.scale = scale;
@@ -104,7 +106,7 @@ public class Entity {
 	}
 
 	public void setPosition(Vector3d position) {
-		posBuff.set(position);
+		//posBuff.set(position);
 	}
 
 	public void initPosition(Vector3d position) {
@@ -112,7 +114,7 @@ public class Entity {
 	}
 
 	public void setPosition(double x, double y, double z) {
-		posBuff.set(x, y, z);
+		//posBuff.set(x, y, z);
 	}
 	
 	public void incPosition(Vector3d p) {

@@ -53,8 +53,8 @@ public class QFSProject extends AbstractSettings implements ISettings {
 	
 	private double constantFrequency = 1.00;
 	private double constantWaveSpeed = 1.00;
-    private double constantElectricFactor = 0.12;
-    private double constantMagneticFactor = 0.94;
+    private double constantElectricFactor = 0.60;
+    private double constantMagneticFactor = 0.23;
 
 	// Don't set the glSwapInterval below 1! It will cause instability of the application and freeze.
 	private int glSwapInterval = 2;
