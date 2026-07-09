@@ -25,14 +25,14 @@ import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.gui.model.NuklearModel.Frame;
-import org.smartblackbox.qfs.opengl.model.REMModel;
-import org.smartblackbox.qfs.opengl.model.REMModel.EditMode;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.opengl.model.RemModel;
+import org.smartblackbox.qfs.opengl.model.RemModel.EditMode;
+import org.smartblackbox.qfs.settings.Project;
 
 public class FrameMenu extends AbstractFrame {
 
-    private QFSProject qfsProject = QFSProject.getInstance();
-    private REMModel   REMModel   = qfsProject.getQfsModel();
+    private Project  project  = Project.getInstance();
+    private RemModel REMModel = project.getQfsModel();
 
     private int menuWidth = 150;
 
@@ -68,17 +68,17 @@ public class FrameMenu extends AbstractFrame {
                 Nuklear.nk_layout_row_dynamic(ctx, menuItemHeight, 1);
 
                 if (nk_menu_item_label(ctx, "Open Project", stack)) {
-                    qfsProject.loadFromFile();
+                    project.loadFromFile(true);
                     Nuklear.nk_menu_close(ctx);
                 }
 
                 if (nk_menu_item_label(ctx, "Save Project As ...", stack)) {
-                    qfsProject.saveAs();
+                    project.saveAs();
                     Nuklear.nk_menu_close(ctx);
                 }
 
                 if (nk_menu_item_label(ctx, "Save Project", stack)) {
-                    qfsProject.saveToFile();
+                    project.saveToFile();
                     Nuklear.nk_menu_close(ctx);
                 }
 
@@ -89,14 +89,14 @@ public class FrameMenu extends AbstractFrame {
                 Nuklear.nk_menu_end(ctx);
             }
 
-            qfsProject.performFileDialog(appSettings.getProjectFilePath());
+            project.performFileDialog(appSettings.getProjectFilePath());
 
             if (Nuklear.nk_menu_begin_label(ctx, "Edit", Nuklear.NK_TEXT_LEFT, fileVec2)) {
                 isSubMenuVisible = true;
                 Nuklear.nk_layout_row_dynamic(ctx, menuItemHeight, 1);
 
                 if (nk_menu_item_label(ctx, "Dimension", stack)) {
-                    nuklearModel.toggleFrame(Frame.qfsDimension);
+                    nuklearModel.toggleFrame(Frame.dimension);
                     Nuklear.nk_menu_close(ctx);
                 }
 
@@ -111,19 +111,19 @@ public class FrameMenu extends AbstractFrame {
                 }
 
                 if (nk_menu_item_label(ctx, "QFS Colors", stack)) {
-                    nuklearModel.toggleFrame(Frame.qfsColors);
+                    nuklearModel.toggleFrame(Frame.colors);
                     Nuklear.nk_menu_close(ctx);
                 }
 
                 if (nk_menu_item_label(ctx, "Oscillators", stack)) {
                     REMModel.setEditMode(EditMode.none);
-                    nuklearModel.toggleFrame(Frame.oscillator);
+                    nuklearModel.toggleFrame(Frame.identity);
                     Nuklear.nk_menu_close(ctx);
                 }
 
                 if (nk_menu_item_label(ctx, "slit wall", stack)) {
                     nuklearModel.toggleFrame(Frame.slitWall);
-                    qfsProject.slitWall.setChanged(true);
+                    project.slitWall.setChanged(true);
                     Nuklear.nk_menu_close(ctx);
                 }
 
@@ -142,13 +142,13 @@ public class FrameMenu extends AbstractFrame {
                     Nuklear.nk_menu_close(ctx);
                 }
 
-                if (nk_menu_item_label(ctx, "QFS Terrain Settings", stack)) {
-                    nuklearModel.toggleFrame(Frame.qfsTerrainSettings);
+                if (nk_menu_item_label(ctx, "Terrain Settings", stack)) {
+                    nuklearModel.toggleFrame(Frame.terrainSettings);
                     Nuklear.nk_menu_close(ctx);
                 }
 
-                if (nk_menu_item_label(ctx, "QFS Settings", stack)) {
-                    nuklearModel.toggleFrame(Frame.qfsSettings);
+                if (nk_menu_item_label(ctx, "Settings", stack)) {
+                    nuklearModel.toggleFrame(Frame.settings);
                     Nuklear.nk_menu_close(ctx);
                 }
 
@@ -169,7 +169,7 @@ public class FrameMenu extends AbstractFrame {
                 }
 
                 if (nk_menu_item_label(ctx, "Reset", stack)) {
-                    qfsProject.reset();
+                    project.reset();
                     Nuklear.nk_menu_close(ctx);
                 }
 

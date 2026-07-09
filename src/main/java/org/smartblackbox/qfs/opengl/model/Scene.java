@@ -18,28 +18,33 @@
  */
 package org.smartblackbox.qfs.opengl.model;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.joml.*;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
 import org.smartblackbox.qfs.opengl.model.entity.Identity;
 import org.smartblackbox.qfs.opengl.model.entity.Node;
+import org.smartblackbox.qfs.opengl.model.entity.Occupancy;
 import org.smartblackbox.qfs.opengl.model.lights.DirectionalLight;
 import org.smartblackbox.qfs.settings.AppSettings;
-import org.smartblackbox.qfs.settings.QFSProject;
-import org.smartblackbox.qfs.settings.QFSSettings;
+import org.smartblackbox.qfs.settings.Project;
+import org.smartblackbox.qfs.settings.Settings;
 import org.smartblackbox.qfs.settings.SlitWallSettings;
 
 import java.lang.Math;
 import java.util.ArrayList;
 import java.util.List;
 
+@Getter
+@Setter
 public class Scene {
 
 	private AppSettings appSettings = AppSettings.getInstance();
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private QFSSettings settings = qfsProject.settings;
-	private SlitWallSettings slitWall = qfsProject.slitWall;
-	private REMModel         REMModel = qfsProject.getQfsModel();
+	private Project          project  = Project.getInstance();
+	private Settings         settings = project.settings;
+	private SlitWallSettings slitWall = project.slitWall;
+	private RemModel         REMModel = project.getQfsModel();
 
 	private List<Terrain> terrains;
 	private List<Entity> entities;
@@ -47,14 +52,14 @@ public class Scene {
 	private Object[] nodeArray;
 	private Object[] entityArray;
 
-	private REMFields REMFields;
+	private Lattice Lattice;
 
-	private ArrayList<Vector3i> wallNodeIndexList = new ArrayList<Vector3i>();
-	private ArrayList<Node>     hiLightedNodes    = new ArrayList<Node>();
+	private ArrayList<Vector3i> wallNodeIndexList = new ArrayList<>();
+	private ArrayList<Node>     hiLightedNodes    = new ArrayList<>();
 	private Node                firstHiLightedNode;
 
-	private Object tasks = new Object();
-	private int numTask;
+	private final Object tasks = new Object();
+	private       int    numTask;
 
 	private DirectionalLight directionalLight;
 
@@ -68,38 +73,27 @@ public class Scene {
 	
 	public Scene() {
 		entities = new ArrayList<>();
-		terrains  = new ArrayList<>();
-		REMFields = new REMFields(this);
+		terrains = new ArrayList<>();
+		Lattice  = new Lattice(this);
 	}
 
 	public Entity createEntity(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
 		return addEntity(new Entity(parent, model, position, rotation, scale));
 	}
 	
-	public Node createQFSNode(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
+	public Node createNode(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
 		return (Node) addEntity(new Node(parent, model, position, rotation, scale));
 	}
 	
-	public Identity createOscillator(String name, Node entity) {
-		Identity identity = new Identity(name, entity.getIndex());
-		QFSProject.getInstance().identities.add(identity);
+	public Identity createOscillator(String name, Node node) {
+		Identity identity = new Identity(name);
+		Occupancy occupancy = new Occupancy(identity, node);
+		Project.getInstance().occupancies.add(occupancy);
 		return identity;
-	}
-
-	public List<Terrain> getTerrains() {
-		return terrains;
-	}
-
-	public void setTerrains(List<Terrain> terrains) {
-		this.terrains = terrains;
 	}
 
 	public void addTerrain(Terrain terrain) {
 		terrains.add(terrain);
-	}
-
-	public List<Entity> getEntities() {
-		return entities;
 	}
 
 	public List<Entity> getNodes() {
@@ -112,12 +106,8 @@ public class Scene {
 		return nodes;
 	}
 
-	public ArrayList<Vector3i> getWallNodeIndexList() {
-		return wallNodeIndexList;
-	}
-
 	public Node getNodeByIndex(Vector3i nodeIndex) {
-		int index = nodeIndex.z * qfsProject.getDimensionY() * qfsProject.getDimensionX() + nodeIndex.y * qfsProject.getDimensionX() + nodeIndex.x;
+		int index = nodeIndex.z * project.getDimensionY() * project.getDimensionX() + nodeIndex.y * project.getDimensionX() + nodeIndex.x;
 		if (index >= 0 && index < nodeArray.length)
 			return (Node) nodeArray[index];
 		else
@@ -128,22 +118,6 @@ public class Scene {
 	public Entity addEntity(Entity entity) {
 		entities.add(entity);
 		return entity;
-	}
-
-	public REMFields getQfsFields() {
-		return REMFields;
-	}
-
-	public void setQfsFields(REMFields REMFields) {
-		this.REMFields = REMFields;
-	}
-
-	public DirectionalLight getDirectionalLight() {
-		return directionalLight;
-	}
-
-	public void setDirectionalLight(DirectionalLight directionalLight) {
-		this.directionalLight = directionalLight;
 	}
 
 	public void update() {
@@ -160,13 +134,13 @@ public class Scene {
 	}
 	
 	public void addNodeHiLight(int x, int y, int z) {
-		Node node = (Node) nodeArray[z * qfsProject.getDimensionX() * qfsProject.getDimensionY() + y * qfsProject.getDimensionX() + x];
+		Node node = (Node) nodeArray[z * project.getDimensionX() * project.getDimensionY() + y * project.getDimensionX() + x];
 		node.setHiLighted(true);
 		hiLightedNodes.add(node);
 	}
 	
 	public void removeNodeHiLight(int x, int y, int z) {
-		Node node = (Node) nodeArray[z * qfsProject.getDimensionX() * qfsProject.getDimensionY() + y * qfsProject.getDimensionX() + x];
+		Node node = (Node) nodeArray[z * project.getDimensionX() * project.getDimensionY() + y * project.getDimensionX() + x];
 		node.setHiLighted(false);
 		hiLightedNodes.remove(node);
 	}
@@ -207,8 +181,8 @@ public class Scene {
 		int x = node.getIndex().x;
 		int y = node.getIndex().y;
 
-		for (int z = 0; z < qfsProject.getDimensionZ(); z++) {
-			node = (Node) nodeArray[z * qfsProject.getDimensionX() * qfsProject.getDimensionY() + y * qfsProject.getDimensionX() + x];
+		for (int z = 0; z < project.getDimensionZ(); z++) {
+			node = (Node) nodeArray[z * project.getDimensionX() * project.getDimensionY() + y * project.getDimensionX() + x];
 			swapNodeWall(node);
 		} 
 	}
@@ -219,8 +193,8 @@ public class Scene {
 
 	public void eraseWallZ(Node node) {
 		Vector3i index = node.getIndex();
-		for (int z = 0; z < qfsProject.getDimensionZ(); z++) {
-			int i = z * qfsProject.getDimensionX() * qfsProject.getDimensionY() + index.y * qfsProject.getDimensionX() + index.x;
+		for (int z = 0; z < project.getDimensionZ(); z++) {
+			int i = z * project.getDimensionX() * project.getDimensionY() + index.y * project.getDimensionX() + index.x;
 			node = (Node) nodeArray[i];
 			eraseWall(node);
 		}
@@ -265,11 +239,11 @@ public class Scene {
 		
 		switch(slitWall.direction) {
 		case x:
-			p = (int) (qfsProject.slitWall.getPosition() * qfsProject.getDimensionX());
+			p = (int) (project.slitWall.getPosition() * project.getDimensionX());
 			if (p < 1) p = 1;
-			if (p > qfsProject.getDimensionX() - 2) p = qfsProject.getDimensionX() - 2;
-			iSize = qfsProject.getDimensionY();
-			jSize = qfsProject.getDimensionZ();
+			if (p > project.getDimensionX() - 2) p = project.getDimensionX() - 2;
+			iSize = project.getDimensionY();
+			jSize = project.getDimensionZ();
 			ic = iSize / 2;
 			jc = jSize / 2;
 			d = slitWall.getSlitDistance();
@@ -370,7 +344,7 @@ public class Scene {
 			yEnd = y1;
 		}
 		
-		for (int z = 0; z < qfsProject.getDimensionZ(); z++) {
+		for (int z = 0; z < project.getDimensionZ(); z++) {
 			if (Math.abs(xD) >= Math.abs(yD)) {
 				yStart = x1 <= x2? y1 : y2;
 				for (int x = xStart; x <= xEnd; x++) {
@@ -395,9 +369,9 @@ public class Scene {
 
 	public Node getNodeFromMousePos(double xPos, double yPos) {
 		if (nodeArray == null) return null;
-		Matrix4f projectionMatrix = qfsProject.camera.getProjectionMatrix();
-		Matrix4f viewMatrix = qfsProject.camera.getViewMatrix();
-		Vector3f cameraPos = qfsProject.camera.getPosition();
+		Matrix4f projectionMatrix = project.camera.getProjectionMatrix();
+		Matrix4f viewMatrix = project.camera.getViewMatrix();
+		Vector3f cameraPos = project.camera.getPosition();
 		
 		float x = (float) ((2 * (xPos - 0)) / appSettings.getWindowWidth() - 1);
 		float y = (float) ((2 * (appSettings.getWindowHeight() - (yPos + 0))) / appSettings.getWindowHeight() - 1);
@@ -415,16 +389,16 @@ public class Scene {
         Vector2f result = new Vector2f();
 		Vector3f scale = new Vector3f();
 		
-        int iMin = settings.getVisibleIndexZ() * qfsProject.getDimensionX() * qfsProject.getDimensionY();
-        int iMax = (settings.getVisibleIndexZ() + 1) * qfsProject.getDimensionX() * qfsProject.getDimensionY();
+        int iMin = settings.getVisibleIndexZ() * project.getDimensionX() * project.getDimensionY();
+        int iMax = (settings.getVisibleIndexZ() + 1) * project.getDimensionX() * project.getDimensionY();
 
         // FPS drops when using large number of nodes.
         // TODO: use BSP to improve performance.
         for (int i = iMin; i >= 0 && i < iMax && i < nodeArray.length; i++) {
         	Node node = (Node) nodeArray[i];
 	    	if (node.isVisible() && (!node.isFixed() || node.isWall())) {
-	    		node.getTransformMatrixf().transform(0, 0, 0, 1, nodePos);
-				node.getTransformMatrixf().getScale(scale);
+	    		node.getTransformMatrix4f().transform(0, 0, 0, 1, nodePos);
+				node.getTransformMatrix4f().getScale(scale);
 	    		
 				double radius = settings.scale * node.getScale() * 0.5;
 		        
@@ -498,16 +472,12 @@ public class Scene {
 		for (int i = 0; i < numThreads; i++) {
 			int start = i * segmentSize;
 			int end = start + segmentSize;
-			end = end >= nodeArray.length? nodeArray.length : end;
+			end = Math.min(end, nodeArray.length);
 			threadCalcPhysics(start, end);
 		}
 	}
-	
-	public int getNumTask() {
-		return numTask;
-	}
 
-	public synchronized void setNumTask(int numTask) {
+    public synchronized void setNumTask(int numTask) {
 		this.numTask = numTask;
 	}
 
@@ -519,9 +489,9 @@ public class Scene {
 		numTask++;
 	}
 
-	public synchronized void taskCompleted() {
-		numTask--;
+	public void taskCompleted() {
 		synchronized(tasks) {
+			numTask--;
 			if (numTask <= 0) {
 				tasks.notifyAll();
 				numTask = 0;
@@ -534,20 +504,13 @@ public class Scene {
 			try {
 				tasks.wait();
 			} catch(InterruptedException e) {
+				e.printStackTrace();
 			}
 		}			
 		numTask = 0;
 	}
 
-	public boolean isAnimated() {
-		return animated;
-	}
-
-	public void setAnimated(boolean animated) {
-		this.animated = animated;
-	}
-
-	public void startAnimation() {
+    public void startAnimation() {
 		setAnimated(true);
 	}
 
@@ -557,7 +520,7 @@ public class Scene {
 
 	public void runAnimation() {
 		if (animated) {
-			double z = getQfsFields().getBaseField().getRotation().z;
+			double z = getLattice().getBaseField().getRotation().z;
 			
 			if (animateDirection == -1 && z <= -170) {
 				animateDirection = 1;
@@ -566,7 +529,7 @@ public class Scene {
 				animateDirection = -1;
 			}
 			
-			getQfsFields().getBaseField().incRotation(0.0f, 0.0f, 0.5 * animateDirection);
+			getLattice().getBaseField().incRotation(0.0f, 0.0f, 0.5 * animateDirection);
 		}
 	}
 

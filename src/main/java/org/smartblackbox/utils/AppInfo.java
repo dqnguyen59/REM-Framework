@@ -26,7 +26,7 @@ public class AppInfo {
 
 			while (resEnum.hasMoreElements()) {
 				try {
-					URL url = (URL)resEnum.nextElement();
+					URL url = resEnum.nextElement();
 
 					if (url.getPath().contains(containsName)) {
 						System.out.println("URL: " + url.getPath());

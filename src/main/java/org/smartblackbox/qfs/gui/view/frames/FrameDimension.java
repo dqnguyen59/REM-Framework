@@ -23,13 +23,13 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
-import org.smartblackbox.qfs.settings.QFSProject;
-import org.smartblackbox.qfs.settings.QFSSettings;
+import org.smartblackbox.qfs.settings.Project;
+import org.smartblackbox.qfs.settings.Settings;
 
-public class FrameQFSDimension extends AbstractFrame {
+public class FrameDimension extends AbstractFrame {
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private QFSSettings settings = qfsProject.settings;
+	private Project  project  = Project.getInstance();
+	private Settings settings = project.settings;
 
 	private StringBuffer dimensionx = new StringBuffer();
 	private StringBuffer dimensionY = new StringBuffer();
@@ -42,9 +42,9 @@ public class FrameQFSDimension extends AbstractFrame {
 	
 	private Vector3i dimension = new Vector3i();
 
-	public FrameQFSDimension(NuklearModel frames) {
+	public FrameDimension(NuklearModel frames) {
 		super(frames);
-		dimension.set(qfsProject.getDimensionX(), qfsProject.getDimensionY(), qfsProject.getDimensionZ());
+		dimension.set(project.getDimensionX(), project.getDimensionY(), project.getDimensionZ());
 	}
 
 	@Override
@@ -83,9 +83,9 @@ public class FrameQFSDimension extends AbstractFrame {
 	}
 
 	private void update() {
-		qfsProject.setDimension(dimension);
-		settings.setVisibleIndexZ(qfsProject.getDimensionZ() / 2);
-        qfsProject.reset();
+		project.setDimension(dimension);
+		settings.setVisibleIndexZ(project.getDimensionZ() / 2);
+        project.reset();
 		close();
 	}
 

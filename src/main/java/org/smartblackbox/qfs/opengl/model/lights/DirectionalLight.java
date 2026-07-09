@@ -18,8 +18,12 @@
  */
 package org.smartblackbox.qfs.opengl.model.lights;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.joml.Vector3f;
 
+@Getter
+@Setter
 public class DirectionalLight {
 
 	private Vector3f color, direction;
@@ -32,30 +36,9 @@ public class DirectionalLight {
 		this.intensity = intensity;
 	}
 
-	public Vector3f getColor() {
-		return color;
-	}
-
-	public void setColor(Vector3f color) {
-		this.color = color;
-	}
-
-	public Vector3f getDirection() {
-		return direction;
-	}
-
-	public void setDirection(Vector3f direction) {
+    public void setDirection(Vector3f direction) {
 		this.direction = direction.normalize();
 	}
 
-	public float getIntensity() {
-		return intensity;
-	}
 
-	public void setIntensity(float intensity) {
-		this.intensity = intensity;
-	}
-
-	
-	
 }

@@ -18,13 +18,17 @@
  */
 package org.smartblackbox.utils;
 
-import java.io.File;
-import java.io.IOException;
-
+import lombok.Getter;
+import lombok.Setter;
 import org.ini4j.Wini;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 
+import java.io.File;
+import java.io.IOException;
+
+@Getter
+@Setter
 public abstract class AbstractSettings implements ISettings {
 
 	protected NuklearModel nuklearModel;
@@ -36,14 +40,6 @@ public abstract class AbstractSettings implements ISettings {
 	}
 	
 	abstract public AbstractSettings clone();
-
-	public NuklearModel getNuklearModel() {
-		return nuklearModel;
-	}
-
-	public void setNuklearModel(NuklearModel nuklearModel) {
-		this.nuklearModel = nuklearModel;
-	}
 
 	public void loadFromFile(String filename) {
 		currentFilename = filename;
@@ -63,13 +59,17 @@ public abstract class AbstractSettings implements ISettings {
 		this.ini = ini;
 	}
 
-	public void loadFromFile() {
-		if (currentFilename.isEmpty()) {
+	public void loadFromFile(boolean forced) {
+		if (forced || currentFilename.isEmpty()) {
 			getNuklearModel().setDialogFileModel(nuklearModel.showOpenFileDialog("Open Project File"));
 		}
 		else {
 			loadFromFile(currentFilename);
 		}
+	}
+
+	public void loadFromFile() {
+		loadFromFile(false);
 	}
 
 	public void openFile() {
@@ -111,11 +111,7 @@ public abstract class AbstractSettings implements ISettings {
 		getNuklearModel().setDialogFileModel(nuklearModel.showSaveFileDialog("Save Project File As"));
 	}
 
-	public String getCurrentFilename() {
-		return currentFilename;
-	}
-
-	protected void put(String sectionName, String optionName, Object value) {
+    protected void put(String sectionName, String optionName, Object value) {
 		ini.put(sectionName, optionName, value);
 	}
 

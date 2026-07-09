@@ -23,7 +23,7 @@ import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.opengl.model.RainModel;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.Project;
 
 public class FramePreferences extends AbstractFrame {
 
@@ -32,8 +32,8 @@ public class FramePreferences extends AbstractFrame {
 	private float leftCol = 0.6f;
 	private float rightCol = 0.4f;
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private RainModel rainModel = qfsProject.rainModel;
+	private Project   project   = Project.getInstance();
+	private RainModel rainModel = project.rainModel;
 	
 	private StringBuffer bufNumThreads = new StringBuffer();
 	private StringBuffer bufSwapInterval = new StringBuffer();
@@ -76,7 +76,7 @@ public class FramePreferences extends AbstractFrame {
 				nk_spacer(ctx, spacer1, 1);
 			}
 			
-			qfsProject.setGlSwapInterval(nk_label_edit(ctx, stack, " GLSwap Interval:", bufSwapInterval, qfsProject.getGlSwapInterval(), leftCol, rightCol));
+			project.setGlSwapInterval(nk_label_edit(ctx, stack, " GLSwap Interval:", bufSwapInterval, project.getGlSwapInterval(), leftCol, rightCol));
 			nk_spacer(ctx, spacer1, 1);
 			
 			rainModel.setForce(nk_label_edit(ctx, stack, " Force:", bufForce, rainModel.getForce(), leftCol, rightCol));

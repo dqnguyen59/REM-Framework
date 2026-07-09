@@ -21,20 +21,20 @@ package org.smartblackbox.qfs.gui.view.frames;
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
-import org.smartblackbox.qfs.settings.QFSProject;
-import org.smartblackbox.qfs.settings.QFSSettings;
+import org.smartblackbox.qfs.settings.Project;
+import org.smartblackbox.qfs.settings.Settings;
 
-public class FrameQFSColors extends AbstractFrame {
+public class FrameColors extends AbstractFrame {
 
 	private int width = 300;
 	private int height = 174;
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private QFSSettings settings = qfsProject.settings;
-	private double leftCol = 0.5;
+	private Project  project  = Project.getInstance();
+	private Settings settings = project.settings;
+	private double   leftCol  = 0.5;
 	private double rightCol = 0.5;
 
-	public FrameQFSColors(NuklearModel frames) {
+	public FrameColors(NuklearModel frames) {
 		super(frames);
 	}
 

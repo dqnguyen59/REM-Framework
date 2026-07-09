@@ -27,14 +27,14 @@ import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.gui.model.GroupModel;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.opengl.model.Material;
-import org.smartblackbox.qfs.opengl.model.REMModel;
+import org.smartblackbox.qfs.opengl.model.RemModel;
 import org.smartblackbox.qfs.opengl.model.lights.Light;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.Project;
 
 public class FrameLights extends AbstractFrame {
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private REMModel   REMModel   = qfsProject.getQfsModel();
+	private Project  project  = Project.getInstance();
+	private RemModel REMModel = project.getQfsModel();
 
 	private int groupNoScroll = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_NO_SCROLLBAR | Nuklear.NK_WINDOW_BORDER;
 	private int autoHideScroll = Nuklear.NK_WINDOW_SCROLL_AUTO_HIDE;
@@ -128,7 +128,7 @@ public class FrameLights extends AbstractFrame {
 			if (Nuklear.nk_group_begin(ctx, "Light List View", autoHideScroll)) {
 
 				Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
-				for (Light light : qfsProject.getLights()) {
+				for (Light light : project.getLights()) {
 					boolean selected = REMModel.getSelectedLight() == light;
 					selected = Nuklear.nk_select_label(ctx, light.getName(), Nuklear.NK_TEXT_ALIGN_LEFT, selected);
 					if (selected)
@@ -139,19 +139,19 @@ public class FrameLights extends AbstractFrame {
 
 			Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 3);
 			if (nk_button_label(ctx, "Add")) {
-				REMModel.setSelectedLight(qfsProject.createLight());
+				REMModel.setSelectedLight(project.createLight());
 				REMModel.getSelectedLight().setName("Light" + indexLight);
 				indexLight++;
 			}
 
 			if (nk_button_label(ctx, "Remove")) {
-				int i = qfsProject.getLights().indexOf(REMModel.getSelectedLight());
-				qfsProject.getLights().remove(REMModel.getSelectedLight());
+				int i = project.getLights().indexOf(REMModel.getSelectedLight());
+				project.getLights().remove(REMModel.getSelectedLight());
 
-				if (i >= qfsProject.getLights().size())
-					i = qfsProject.getLights().size() - 1;
+				if (i >= project.getLights().size())
+					i = project.getLights().size() - 1;
 				
-				REMModel.setSelectedLight(qfsProject.getLights().size() > 0 ? qfsProject.getLights().get(i) : null);
+				REMModel.setSelectedLight(project.getLights().size() > 0 ? project.getLights().get(i) : null);
 			}
 
 			if (nk_button_label(ctx, "Close"))

@@ -22,15 +22,15 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.opengl.model.Camera;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.Project;
 
 public class FrameCameraSettings extends AbstractFrame {
 
 	private int width = 300;
 	private int height = 100;
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private Camera camera = qfsProject.camera; 
+	private Project      project        = Project.getInstance();
+	private Camera       camera         = project.camera;
 	private StringBuffer bufFieldOfView = new StringBuffer();
 
 	public FrameCameraSettings(NuklearModel frames) {

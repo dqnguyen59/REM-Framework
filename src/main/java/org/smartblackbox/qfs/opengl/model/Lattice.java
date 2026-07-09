@@ -14,10 +14,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  * 
- * File created on 01/01/2023
+ * File created on 09/07/2026
  */
 package org.smartblackbox.qfs.opengl.model;
 
+import lombok.Getter;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
 import org.joml.Vector4f;
@@ -27,22 +28,23 @@ import org.smartblackbox.qfs.opengl.model.entity.Node;
 import org.smartblackbox.qfs.opengl.utils.Neighbor;
 import org.smartblackbox.qfs.opengl.utils.OBJFormatLoader;
 import org.smartblackbox.qfs.settings.AppSettings;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.Project;
 
-public class REMFields {
+public class Lattice {
 
-	private AppSettings appSettings = AppSettings.getInstance();
-	private QFSProject  qfsProject  = QFSProject.getInstance();
-	private REMModel    REMModel    = qfsProject.getQfsModel();
-	private Scene       scene;
-	
-	private Entity baseField;
+	private final AppSettings appSettings = AppSettings.getInstance();
+	private final Project  project  = Project.getInstance();
+	private final RemModel REMModel = project.getQfsModel();
+	private final Scene    scene;
 
-	private OBJFormatLoader loader;
-	public  Node            nForce;
-	public  Node            nVelocity;
+    @Getter
+    private Entity baseField;
 
-	public REMFields(Scene scene) {
+	private Node[][][] nodeMatrix;
+
+	private final OBJFormatLoader loader;
+
+	public Lattice(Scene scene) {
 		loader = new OBJFormatLoader();
 		this.scene = scene;  
 	}
@@ -52,7 +54,7 @@ public class REMFields {
 		float scale = 0.5f;
 		
 		Entity arrowC = scene.createEntity(baseField, modelSphere,
-				new Vector3d(-(sizeI + 1) / 2 * step, -(sizeJ / 2 + 1) * step, -(sizeK / 2 + 1) * step),
+				new Vector3d(-(sizeI + 1.0) / 2 * step, -(sizeJ / 2.0 + 1) * step, -(sizeK / 2.0 + 1) * step),
 				new Vector3d(0, 0, 0), scale);
 		arrowC.setOverrideModelMaterial(true);
 		arrowC.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
@@ -60,7 +62,7 @@ public class REMFields {
 		arrowC.getMaterial().setShininess(0.0f);
 
 		Entity arrowX = scene.createEntity(baseField, modelArrow,
-				new Vector3d(-(sizeI + 1) / 2 * step, -(sizeJ / 2 + 1) * step, -(sizeK / 2 + 1) * step),
+				new Vector3d(-(sizeI + 1.0) / 2 * step, -(sizeJ / 2.0 + 1) * step, -(sizeK / 2.0 + 1) * step),
 				new Vector3d(0, 90, 0), scale);
 		arrowX.setOverrideModelMaterial(true);
 		arrowX.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
@@ -68,7 +70,7 @@ public class REMFields {
 		arrowX.getMaterial().setShininess(0.0f);
 		
 		Entity arrowY = scene.createEntity(baseField, modelArrow, 
-				new Vector3d(-(sizeI + 1) / 2 * step, -(sizeJ / 2 + 1) * step, -(sizeK / 2 + 1) * step),
+				new Vector3d(-(sizeI + 1.0) / 2 * step, -(sizeJ / 2.0 + 1) * step, -(sizeK / 2.0 + 1) * step),
 				new Vector3d(0, 0, 0), scale);
 		arrowY.setOverrideModelMaterial(true);
 		arrowY.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
@@ -76,7 +78,7 @@ public class REMFields {
 		arrowY.getMaterial().setShininess(0.0f);
 		
 		Entity arrowZ = scene.createEntity(baseField, modelArrow,
-				new Vector3d(-(sizeI + 1) / 2 * step, -(sizeJ / 2 + 1) * step, -(sizeK / 2 + 1) * step),
+				new Vector3d(-(sizeI + 1.0) / 2 * step, -(sizeJ / 2.0 + 1) * step, -(sizeK / 2.0 + 1) * step),
 				new Vector3d(-90, 0, 0), scale);
 		arrowZ.setOverrideModelMaterial(true);
 		arrowZ.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
@@ -105,8 +107,8 @@ public class REMFields {
 		
 		// Draw xyz arrows on entity baseField.
 		//drawArrows(baseField, step, modelSphere, sizeI, sizeJ, sizeK);
-		
-		Node[][][] fieldMatrix = new Node[sizeK][sizeJ][sizeI];
+
+		nodeMatrix = new Node[sizeK][sizeJ][sizeI];
 
 		int NumNodes = sizeI * sizeJ * sizeK;
 		
@@ -121,15 +123,15 @@ public class REMFields {
 				for (int k = 0; k < sizeK; k++) {
 					for (int j = 0; j < sizeJ; j++) {
 						for (int i = 0; i < sizeI; i++) {
-							Node n = scene.createQFSNode(baseField, modelSphere,
-							                             new Vector3d((i - sizeI / 2) * step, (j - sizeJ / 2) * step, (k - sizeK / 2) * step),
-							                             new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
+							Node n = scene.createNode(baseField, modelSphere,
+							                          new Vector3d((i - sizeI / 2.0) * step, (j - sizeJ / 2.0) * step, (k - sizeK / 2.0) * step),
+							                          new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
 							n.setIndex(i, j, k);
 							
 							n.setOverrideModelMaterial(true);
 							n.getMaterial().setDiffuseColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
 							n.getMaterial().setAmbientColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
-							fieldMatrix[k][j][i] = n;
+							nodeMatrix[k][j][i] = n;
 							
 							boolean isEdgeX = (sizeI > 1 && (i == 0 || i == sizeI - 1)); 
 							boolean isEdgeY = (sizeJ > 1 && (j == 0 || j == sizeJ - 1)); 
@@ -161,31 +163,31 @@ public class REMFields {
 					for (int j = 0; j < sizeJ; j++) {
 						for (int i = 0; i < sizeI; i++) {
 							if (i > 0)
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.LEFT, fieldMatrix[k][j][i - 1]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][i - 1]);
 							else if (appSettings.isUseLoop())
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.LEFT, fieldMatrix[k][j][sizeI - 1]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][sizeI - 1]);
 							if (i < sizeI - 1)
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, fieldMatrix[k][j][i + 1]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][i + 1]);
 							else if (appSettings.isUseLoop())
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, fieldMatrix[k][j][0]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][0]);
 
 							if (j > 0)
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, fieldMatrix[k][j - 1][i]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][j - 1][i]);
 							else if (appSettings.isUseLoop())
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, fieldMatrix[k][sizeJ - 1][i]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][sizeJ - 1][i]);
 							if (j < sizeJ - 1)
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.TOP, fieldMatrix[k][j + 1][i]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][j + 1][i]);
 							else if (appSettings.isUseLoop())
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.TOP, fieldMatrix[k][0][i]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][0][i]);
 
 							if (k > 0)
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.BACK, fieldMatrix[k - 1][j][i]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[k - 1][j][i]);
 							else if (appSettings.isUseLoop())
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.BACK, fieldMatrix[sizeK - 1][j][i]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[sizeK - 1][j][i]);
 							if (k < sizeK - 1)
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.FRONT, fieldMatrix[k + 1][j][i]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[k + 1][j][i]);
 							else if (appSettings.isUseLoop())
-								fieldMatrix[k][j][i].setNeighbor(Neighbor.FRONT, fieldMatrix[0][j][i]);
+								nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[0][j][i]);
 						}
 					}
 				}
@@ -197,22 +199,12 @@ public class REMFields {
 	
 	public void build() {
 		Vector3i dimension = new Vector3i();
-		qfsProject.getDimension(dimension);
-		build(dimension, qfsProject.baseRotation);
+		project.getDimension(dimension);
+		build(dimension, project.baseRotation);
 	}
 
-	public Entity getBaseField() {
-		return baseField;
-	}
-
-	public Node getNode(int x, int y, int z) {
-		for (Entity entity : scene.getEntities()) {
-			if (entity.getClass() == Node.class) {
-				if (((Node) entity).isIndex(x, y, z))
-					return (Node) entity;
-			}
-		}
-		return null;
+    public Node getNode(int x, int y, int z) {
+		return nodeMatrix[z][y][x];
 	}
 
 	public Node getNode(Vector3i node) {

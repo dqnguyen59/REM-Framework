@@ -32,7 +32,7 @@ import org.smartblackbox.utils.ISettings;
  * @author dqnguyen
  *
  */
-public class QFSSettings extends AbstractSettings implements ISettings {
+public class Settings extends AbstractSettings implements ISettings {
 
     public enum SliceType {
         sliceX,
@@ -133,29 +133,29 @@ public class QFSSettings extends AbstractSettings implements ISettings {
     private int                visibleIndexY;
     private int                visibleIndexZ;
 
-    public QFSSettings() {
+    public Settings() {
         super();
     }
 
-    public QFSSettings(QFSSettings qfsSettings) {
+    public Settings(Settings settings) {
         super();
-        set(qfsSettings);
+        set(settings);
     }
 
-    public void set(QFSSettings qfsSettings) {
-        isChanged       = qfsSettings.isChanged;
-        scale           = qfsSettings.scale;
-        depthVisibility = qfsSettings.depthVisibility;
-        alphaSlice      = qfsSettings.alphaSlice;
-        alphaAll        = qfsSettings.alphaAll;
-        intensitySlice  = qfsSettings.intensitySlice;
-        intensityAll    = qfsSettings.intensityAll;
-        shininess       = qfsSettings.shininess;
+    public void set(Settings settings) {
+        isChanged       = settings.isChanged;
+        scale           = settings.scale;
+        depthVisibility = settings.depthVisibility;
+        alphaSlice      = settings.alphaSlice;
+        alphaAll        = settings.alphaAll;
+        intensitySlice  = settings.intensitySlice;
+        intensityAll    = settings.intensityAll;
+        shininess       = settings.shininess;
     }
 
     @Override
     public AbstractSettings clone() {
-        return new QFSSettings(this);
+        return new Settings(this);
     }
 
     public Float getDepthVisibility() {
@@ -300,8 +300,8 @@ public class QFSSettings extends AbstractSettings implements ISettings {
     public void setVisibleIndexX(int visibleIndexX) {
         if (visibleIndexX < 0)
             visibleIndexX = 0;
-        else if (visibleIndexX > QFSProject.getInstance().getDimensionX() - 1)
-            visibleIndexX = QFSProject.getInstance().getDimensionX() - 1;
+        else if (visibleIndexX > Project.getInstance().getDimensionX() - 1)
+            visibleIndexX = Project.getInstance().getDimensionX() - 1;
         if (this.visibleIndexX != visibleIndexX) {
             this.visibleIndexX = visibleIndexX;
             isChanged          = true;
@@ -315,8 +315,8 @@ public class QFSSettings extends AbstractSettings implements ISettings {
     public void setVisibleIndexY(int visibleIndexY) {
         if (visibleIndexY < 0)
             visibleIndexY = 0;
-        else if (visibleIndexY > QFSProject.getInstance().getDimensionY() - 1)
-            visibleIndexY = QFSProject.getInstance().getDimensionY() - 1;
+        else if (visibleIndexY > Project.getInstance().getDimensionY() - 1)
+            visibleIndexY = Project.getInstance().getDimensionY() - 1;
         if (this.visibleIndexY != visibleIndexY) {
             this.visibleIndexY = visibleIndexY;
             isChanged          = true;
@@ -330,8 +330,8 @@ public class QFSSettings extends AbstractSettings implements ISettings {
     public void setVisibleIndexZ(int visibleIndexZ) {
         if (visibleIndexZ < 0)
             visibleIndexZ = 0;
-        else if (visibleIndexZ > QFSProject.getInstance().getDimensionZ() - 1)
-            visibleIndexZ = QFSProject.getInstance().getDimensionZ() - 1;
+        else if (visibleIndexZ > Project.getInstance().getDimensionZ() - 1)
+            visibleIndexZ = Project.getInstance().getDimensionZ() - 1;
         if (this.visibleIndexZ != visibleIndexZ) {
             this.visibleIndexZ = visibleIndexZ;
             isChanged          = true;

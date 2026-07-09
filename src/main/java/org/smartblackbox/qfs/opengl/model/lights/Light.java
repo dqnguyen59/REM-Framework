@@ -18,14 +18,17 @@
  */
 package org.smartblackbox.qfs.opengl.model.lights;
 
-import org.joml.Matrix4d;
-import org.joml.Vector3d;
-import org.joml.Vector3f;
-import org.joml.Vector4f;
+import lombok.Getter;
+import lombok.Setter;
+import org.joml.*;
 import org.smartblackbox.qfs.opengl.model.Material;
 import org.smartblackbox.qfs.opengl.model.ObjFileModel;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
 
+import java.lang.Math;
+
+@Getter
+@Setter
 public class Light extends Entity {
 
 	private Vector3f color;
@@ -61,14 +64,13 @@ public class Light extends Entity {
 		getTransformMatrix()
 		.identity()
 		.translate(position)
-		.setRotationXYZ(rotationRad.x, rotationRad.y, rotationRad.z)
+		.setRotationXYZ((float) rotationRad.x, (float) rotationRad.y, rotationRad.z)
 		.scale(scale)
-		.mul(lookM)
-		;
+		.mul(lookM);
 		
 		if (parent != null)
 			parent.getTransformMatrix().mul(getTransformMatrix(), getTransformMatrix());
-		transformMatrixfList[swapBufIndex].set(getTransformMatrix());
+		transformMatrix4fList[swapBufIndex].set(getTransformMatrix());
 		
 		if (spotLightHolder != null)
 			spotLightHolder.updateMatrix();
@@ -83,104 +85,32 @@ public class Light extends Entity {
 		setCutOff(cutOff);
 	}
 
-	public Entity getSpotLightHolder() {
-		return spotLightHolder;
-	}
-
-	public void setSpotLightHolder(Entity spotLightHolder) {
-		this.spotLightHolder = spotLightHolder;
-	}
-
-	public ObjFileModel getModelLightBulb() {
-		return modelLightBulb;
-	}
-
-	public void setModelLightBulb(ObjFileModel modelLightBulb) {
-		this.modelLightBulb = modelLightBulb;
-	}
-
-	public ObjFileModel getModelSpotLight() {
-		return modelSpotLight;
-	}
-
-	public void setModelSpotLight(ObjFileModel modelSpotLight) {
-		this.modelSpotLight = modelSpotLight;
-	}
-
-	@Override
+    @Override
 	public Material getMaterial() {
 		if (overrideModelMaterial || getModel() == null) return material;
 		else return getModel().getMaterial();
 	}
 
-	public Vector3f getColor() {
-		return color;
-	}
-
-	public void setColor(Vector3f color) {
+    public void setColor(Vector3f color) {
 		if (color != null) {
 			modelLightBulb.getMaterial().setAmbientColor(new Vector4f(color, 1));
 			this.color = color;
 		}
 	}
 
-	public float getIntensity() {
-		return intensity;
-	}
-
-	public void setIntensity(float intensity) {
+    public void setIntensity(float intensity) {
 		this.intensity = intensity;
 		modelLightBulb.getMaterial().setAmbientIntensity(Math.max(intensity * 6.0, 1.0));
 	}
 
-	public double getConstant() {
-		return constant;
-	}
 
-	public void setConstant(double constant) {
-		this.constant = constant;
-	}
-
-	public double getLinear() {
-		return linear;
-	}
-
-	public void setLinear(double linear) {
-		this.linear = linear;
-	}
-
-	public double getExponent() {
-		return exponent;
-	}
-
-	public void setExponent(double exponent) {
-		this.exponent = exponent;
-	}
-	
-	public boolean isSpotLight() {
-		return isSpotLight;
-	}
-	
-	public void setSpotLight(boolean isSpotLight) {
-		this.isSpotLight = isSpotLight;
-	}
-	
-	public float getCutOff() {
-		return cutOff;
-	}
-
-	public float getCutOffRad() {
+    public float getCutOffRad() {
 		return (float) Math.cos(Math.toRadians(cutOff));
 	}
 
-	public void setCutOff(float cutOff) {
-		this.cutOff = cutOff;
-	}
-
-	/**
+    /**
 	 * Return the model based on whether it is a spotlight or not.
-	 * 
-	 * If it is a {@link #isSpotlight()}, then returns {@link #getModelSpotLight()) otherwise returns  {@link #getModelLightBulb()).
+	 * If it is a , then returns {@link #getModelSpotLight()) otherwise returns  {@link #getModelLightBulb()).
 	 * 
 	 */
 	@Override
@@ -190,8 +120,6 @@ public class Light extends Entity {
 
 	/**
 	 * This method has no effect, because it is already defined by methods
-	 * {@link #setModelSpotLight()} and {@link #setModelPointLight()}.
-	 * 
 	 * See {@link #getModel()}.
 	 */
 	public void setModel(ObjFileModel model) {

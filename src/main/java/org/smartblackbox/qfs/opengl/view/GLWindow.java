@@ -13,169 +13,179 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
- * 
+ *
  * File created on 01/01/2023
  */
 package org.smartblackbox.qfs.opengl.view;
 
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.glfw.GLFWErrorCallback;
-import org.lwjgl.glfw.GLFWVidMode;
+import lombok.Getter;
+import lombok.Setter;
+import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 //import org.lwjgl.opengles.GLES20;
 import org.lwjgl.system.MemoryUtil;
 import org.smartblackbox.qfs.settings.AppSettings;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.Project;
 
+@Getter
+@Setter
 public class GLWindow {
 
-	private AppSettings appSettings = AppSettings.getInstance();
-	
-	private QFSProject qfsProject = QFSProject.getInstance();
+    private AppSettings appSettings = AppSettings.getInstance();
 
-	private final String title;
-	private int left, top, width, height;
-	private long windowHandle;
-	private boolean resize;
+    private Project project = Project.getInstance();
 
-	public GLWindow(String title) {
-		this.title = title;
-		
-		this.left = appSettings.getWindowLeft();
-		this.top = appSettings.getWindowTop();
-		this.width = appSettings.getWindowWidth();
-		this.height = appSettings.getWindowHeight();
-	}
+    private final String title;
 
-	public void init() {
-		GLFWErrorCallback.createPrint(System.err).set();
+    private int left, top, width, height;
+    private long    windowHandle;
+    private boolean resize;
 
-		if (!GLFW.glfwInit()) {
-			throw new IllegalStateException("Unable to initialize GLFW");
-		}
+    private GLFWFramebufferSizeCallback framebufferCallback;
+    private GLFWKeyCallback             keyCallback;
+    private GLFWErrorCallback errorCallback;
 
-		GLFW.glfwDefaultWindowHints();
-		GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GL11.GL_FALSE);
-		GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GL11.GL_TRUE);
-		GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
-		GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
-		GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
-		GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GL11.GL_TRUE);
-		GLFW.glfwWindowHint(GLFW.GLFW_DOUBLEBUFFER, GL11.GL_TRUE);
-		GLFW.glfwWindowHint(GLFW.GLFW_REFRESH_RATE, GLFW.GLFW_DONT_CARE);
+    public GLWindow(String title) {
+        this.title = title;
 
-		GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, appSettings.getAntiAliasing());
-		
-		boolean maximized = appSettings.getMaximized() == 1;
+        this.left   = appSettings.getWindowLeft();
+        this.top    = appSettings.getWindowTop();
+        this.width  = appSettings.getWindowWidth();
+        this.height = appSettings.getWindowHeight();
+    }
 
-		if (maximized) {
-			GLFW.glfwWindowHint(GLFW.GLFW_MAXIMIZED, GL11.GL_TRUE);
-		}
+    public void init() {
+        errorCallback = GLFWErrorCallback.createPrint(System.err);
+        errorCallback.set();
 
-		windowHandle = GLFW.glfwCreateWindow(width, height, title, MemoryUtil.NULL, MemoryUtil.NULL);
+        if (!GLFW.glfwInit()) {
+            throw new IllegalStateException("Unable to initialize GLFW");
+        }
 
-		if (windowHandle == MemoryUtil.NULL) {
-			throw new RuntimeException("Error: Failed to create GLFW window!");
-		}
+        GLFW.glfwDefaultWindowHints();
+        GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GL11.GL_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GL11.GL_TRUE);
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
+        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
+        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GL11.GL_TRUE);
+        GLFW.glfwWindowHint(GLFW.GLFW_DOUBLEBUFFER, GL11.GL_TRUE);
+        GLFW.glfwWindowHint(GLFW.GLFW_REFRESH_RATE, GLFW.GLFW_DONT_CARE);
 
-		GLFW.glfwSetFramebufferSizeCallback(windowHandle, (window, width, height) -> {
-			this.width = width;
-			this.height = height;
-			this.setResize(true);
-		});
+        GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, appSettings.getAntiAliasing());
 
-		GLFW.glfwSetKeyCallback(windowHandle, (window, key, scancode, action, mods) -> {
-			if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_RELEASE)
-				GLFW.glfwSetWindowShouldClose(window, true);
-		});
+        boolean maximized = appSettings.getMaximized() == 1;
 
-		if (maximized) {
-			GLFW.glfwMaximizeWindow(windowHandle);
-		}
-		else {
-			GLFWVidMode vidMode = GLFW.glfwGetVideoMode(GLFW.glfwGetPrimaryMonitor());
-			
-			if (left != -9999 && top != -9999)
-				GLFW.glfwSetWindowPos(windowHandle, left, top);
-			else
-				GLFW.glfwSetWindowPos(windowHandle, (vidMode.width() - width) / 2, (vidMode.height() - height) / 2);
-		}
+        if (maximized) {
+            GLFW.glfwWindowHint(GLFW.GLFW_MAXIMIZED, GL11.GL_TRUE);
+        }
 
-		GLFW.glfwMakeContextCurrent(windowHandle);
+        windowHandle = GLFW.glfwCreateWindow(width, height, title, MemoryUtil.NULL, MemoryUtil.NULL);
 
-		GLFW.glfwShowWindow(windowHandle);
-		
-		GL.createCapabilities();
-        GL11.glClearColor(0.0f,  0.0f, 0.0f, 0.0f);
-		
-		if (appSettings.getAntiAliasing() > 0) 
-			GL11.glEnable(GL30.GL_MULTISAMPLE);
-		else
-			GL11.glDisable(GL30.GL_MULTISAMPLE);
+        if (windowHandle == MemoryUtil.NULL) {
+            throw new RuntimeException("Error: Failed to create GLFW window!");
+        }
 
-		GL11.glEnable(GL11.GL_LIGHTING);
-		GLFW.glfwSwapInterval(qfsProject.getGlSwapInterval());
-	}
+//        GLFW.glfwSetFramebufferSizeCallback(windowHandle, (window, width, height) -> {
+//            this.width  = width;
+//            this.height = height;
+//            this.setResize(true);
+//        });
+//
+//        GLFW.glfwSetKeyCallback(windowHandle, (window, key, scancode, action, mods) -> {
+//            if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_RELEASE) GLFW.glfwSetWindowShouldClose(
+//                    window, true);
+//        });
 
-	public void update() {
-		//GL11.glFinish();
-		GLFW.glfwSwapBuffers(windowHandle);
-		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-	}
-	
-	public void cleanUp() {
-		GLFW.glfwDestroyWindow(windowHandle);
-		windowHandle = 0;
-	}
-	
-	public void setClearColor(float r, float g, float b, float a) {
-		GL11.glClearColor(r, g, b, a);
-	}
-	
-	public boolean isKeyPressed(int keyCode) {
-		return GLFW.glfwGetKey(windowHandle, keyCode) == GLFW.GLFW_PRESS;
-	}
-	
-	public boolean windowShouldClose() {
-		return GLFW.glfwWindowShouldClose(windowHandle);
-	}
-	
-	public String getTitle() {
-		return title;
-	}
+        framebufferCallback = GLFWFramebufferSizeCallback.create((window, width, height) -> {
+            this.width = width;
+            this.height = height;
+            this.setResize(true);
+        });
 
-	public void setTitle(String title) {
-		GLFW.glfwSetWindowTitle(windowHandle, title);
-	}
-	
-	public boolean isResize() {
-		return resize;
-	}
+        GLFW.glfwSetFramebufferSizeCallback(windowHandle, framebufferCallback);
 
-	public void setResize(boolean resize) {
-		this.resize = resize;
-	}
+        keyCallback = GLFWKeyCallback.create((window, key, scancode, action, mods) -> {
+            if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_RELEASE) {
+                GLFW.glfwSetWindowShouldClose(window, true);
+            }
+        });
 
-	public int getWidth() {
-		return width;
-	}
+        GLFW.glfwSetKeyCallback(windowHandle, keyCallback);
 
-	public void setWidth(int width) {
-		this.width = width;
-	}
+        if (maximized) {
+            GLFW.glfwMaximizeWindow(windowHandle);
+        } else {
+            GLFWVidMode vidMode = GLFW.glfwGetVideoMode(GLFW.glfwGetPrimaryMonitor());
 
-	public int getHeight() {
-		return height;
-	}
+            if (left != -9999 && top != -9999) GLFW.glfwSetWindowPos(windowHandle, left, top);
+            else GLFW.glfwSetWindowPos(windowHandle, (vidMode.width() - width) / 2,
+                                       (vidMode.height() - height) / 2);
+        }
 
-	public void setHeight(int height) {
-		this.height = height;
-	}
+        GLFW.glfwMakeContextCurrent(windowHandle);
 
-	public long getWindowHandle() {
-		return windowHandle;
-	}
-	
+        GLFW.glfwShowWindow(windowHandle);
+
+        GL.createCapabilities();
+        GL11.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
+        if (appSettings.getAntiAliasing() > 0) GL11.glEnable(GL30.GL_MULTISAMPLE);
+        else GL11.glDisable(GL30.GL_MULTISAMPLE);
+
+        GL11.glEnable(GL11.GL_LIGHTING);
+        GLFW.glfwSwapInterval(project.getGlSwapInterval());
+    }
+
+    public void update() {
+        //GL11.glFinish();
+        GLFW.glfwSwapBuffers(windowHandle);
+        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+    }
+
+    public void cleanUp() {
+//        GLFW.glfwDestroyWindow(windowHandle);
+//        windowHandle = 0;
+        System.out.println("GLWindows.cleanUp()");
+
+        errorCallback.free();
+
+        if (windowHandle != 0) {
+            //GLFW.glfwFreeCallbacks(windowHandle);
+            GLFW.glfwDestroyWindow(windowHandle);
+            windowHandle = 0;
+        }
+
+        if (framebufferCallback != null) {
+            framebufferCallback.free();
+            framebufferCallback = null;
+        }
+
+        if (keyCallback != null) {
+            keyCallback.free();
+            keyCallback = null;
+        }
+
+        GLFW.glfwTerminate();
+
+    }
+
+    public void setClearColor(float r, float g, float b, float a) {
+        GL11.glClearColor(r, g, b, a);
+    }
+
+    public boolean isKeyPressed(int keyCode) {
+        return GLFW.glfwGetKey(windowHandle, keyCode) == GLFW.GLFW_PRESS;
+    }
+
+    public boolean windowShouldClose() {
+        return GLFW.glfwWindowShouldClose(windowHandle);
+    }
+
+    public void setTitle(String title) {
+        GLFW.glfwSetWindowTitle(windowHandle, title);
+    }
+
 }

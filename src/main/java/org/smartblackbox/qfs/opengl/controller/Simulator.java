@@ -25,11 +25,11 @@ import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.IMouseAndKeyboardEvents;
 import org.smartblackbox.qfs.gui.model.NuklearModel.Frame;
 import org.smartblackbox.qfs.opengl.model.*;
-import org.smartblackbox.qfs.opengl.model.REMModel.Mode;
-import org.smartblackbox.qfs.opengl.model.REMModel.NodeSelectionMode;
+import org.smartblackbox.qfs.opengl.model.RemModel.Mode;
+import org.smartblackbox.qfs.opengl.model.RemModel.NodeSelectionMode;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
-import org.smartblackbox.qfs.opengl.model.entity.Identity;
 import org.smartblackbox.qfs.opengl.model.entity.Node;
+import org.smartblackbox.qfs.opengl.model.entity.Occupancy;
 import org.smartblackbox.qfs.opengl.model.lights.DirectionalLight;
 import org.smartblackbox.qfs.opengl.model.lights.Light;
 import org.smartblackbox.qfs.opengl.utils.OBJFormatLoader;
@@ -37,9 +37,9 @@ import org.smartblackbox.qfs.opengl.utils.Screenshot;
 import org.smartblackbox.qfs.opengl.view.GLWindow;
 import org.smartblackbox.qfs.opengl.view.renderer.Renderer;
 import org.smartblackbox.qfs.settings.AppSettings;
-import org.smartblackbox.qfs.settings.QFSProject;
-import org.smartblackbox.qfs.settings.QFSSettings;
-import org.smartblackbox.qfs.settings.QFSSettings.SliceType;
+import org.smartblackbox.qfs.settings.Project;
+import org.smartblackbox.qfs.settings.Settings;
+import org.smartblackbox.qfs.settings.Settings.SliceType;
 import org.smartblackbox.qfs.settings.SlitWallSettings;
 import org.smartblackbox.utils.PerformanceMonitor;
 import org.smartblackbox.utils.PerformanceMonitor.Measurement;
@@ -48,46 +48,44 @@ import org.smartblackbox.utils.Utils;
 import java.lang.Math;
 import java.util.ArrayList;
 
-public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents {
+public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     /// ///////////////////////////////////////////////////////////////////////////////
     /// Project Settings /////////////////////////////////////////////////////////////
-    private AppSettings appSettings = AppSettings.getInstance();
-    private QFSProject qfsProject = QFSProject.getInstance();
-    private REMModel   REMModel   = qfsProject.getQfsModel();
-    private Scene      scene      = qfsProject.scene;
-    private QFSSettings settings = qfsProject.settings;
-    private SlitWallSettings slitWall = qfsProject.slitWall;
-    private DetectorModel detectorModel = qfsProject.detectorModel;
+    private final AppSettings      appSettings   = AppSettings.getInstance();
+    private final Project  project  = Project.getInstance();
+    private final RemModel remModel = project.getQfsModel();
+    private final Scene    scene    = project.scene;
+    private final Settings         settings      = project.settings;
+    private final SlitWallSettings slitWall      = project.slitWall;
+    private final DetectorModel    detectorModel = project.detectorModel;
     /// Project Settings /////////////////////////////////////////////////////////////
     /// ///////////////////////////////////////////////////////////////////////////////
 
-    private final Renderer renderer;
-    private final OBJFormatLoader loader;
+    private final Renderer         renderer;
+    private final OBJFormatLoader  loader;
 
     private       Node     selectedNode;
     private final Vector2d lastMousePos = new Vector2d();
 
-    private boolean leftButtonPressed = false;
-    private boolean rightButtonPress = false;
-    private boolean isReleased;
-    private boolean leftButtonReleased;
-    private boolean isDrawing;
-    private boolean isCalcNextPhysicsReady = true;
-    private boolean isRenderingReady;
-    private boolean isLoadingStarted;
-    private boolean isNodesUpdateRequired;
-    private   KeyEvents       keyEvents;
-    private   ArrayList<Node> customNodeFixed = new ArrayList<Node>();
-    private   int             waitAfterReset  = 0;
-    private   Node            lastSelectedNode;
-    protected long            currentTime;
+    private          boolean         leftButtonPressed      = false;
+    private          boolean         rightButtonPress       = false;
+    private          boolean         isDrawing;
+    //private volatile boolean         isCalcNextPhysicsReady = true;
+    private volatile boolean         isRenderingReady;
+    private          boolean         isLoadingStarted;
+    private          boolean         isNodesUpdateRequired;
+    private          KeyEvents       keyEvents;
+    private final    ArrayList<Node> customNodeFixed        = new ArrayList<Node>();
+    private          int             waitAfterReset         = 0;
+    private          Node            lastSelectedNode;
+    protected        long            currentTime;
 
-    public REMFieldSimulator(GLWindow glWindow) {
+    public Simulator(GLWindow glWindow) {
         super(glWindow);
 
         renderer = new Renderer();
-        loader = new OBJFormatLoader();
+        loader   = new OBJFormatLoader();
     }
 
     @Override
@@ -101,11 +99,11 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
         initDefaultScene();
         updateNodesProperties();
         startMonitoringDeadThreads();
-        REMModel.startSimulation();
+        remModel.startSimulation();
     }
 
     public void initDefaultLights() {
-        ObjFileModel modelSphere = loader.loadOBJModel(Constants.MODEL_LIGHT_BULB);
+        ObjFileModel modelSphere    = loader.loadOBJModel(Constants.MODEL_LIGHT_BULB);
         ObjFileModel modelSpotLight = loader.loadOBJModel(Constants.MODEL_LIGHT_CAP);
 
         modelSpotLight.getMaterial().setAmbientColor(0.0f, 1.0f, 0.0f, 1.0f);
@@ -114,13 +112,14 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
         modelSpotLight.getMaterial().setDiffuseIntensity(0.8);
 
         //Point light
-        float lightIntensity = 0.8f;
-        Vector3d lightPosition = new Vector3d(30, 200, 175);
-        Vector3d lightRotation = new Vector3d(0, 0, 0);
-        Vector3f lightColor = new Vector3f(0.67f, 0.8f, 1.0f);
+        float    lightIntensity = 0.8f;
+        Vector3d lightPosition  = new Vector3d(30, 200, 175);
+        Vector3d lightRotation  = new Vector3d(0, 0, 0);
+        Vector3f lightColor     = new Vector3f(0.67f, 0.8f, 1.0f);
         Vector3d lightDirection = new Vector3d(0, 0, 1);
-        float cutOff = 90;
-        Light pointLight = qfsProject.createLight(null, modelSphere, modelSpotLight, lightPosition, lightRotation, 1.0);
+        float    cutOff         = 90;
+        Light pointLight = project.createLight(null, modelSphere, modelSpotLight, lightPosition,
+                                               lightRotation, 1.0);
         pointLight.set(lightColor, lightIntensity, 0.3, 0.003, 0.0, cutOff);
         pointLight.setDirection(lightDirection);
         pointLight.setName("DefaultPointLight");
@@ -128,12 +127,13 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
 
         //Spot light
         lightIntensity = 1.0f;
-        lightPosition = new Vector3d(25.0f, 40.0f, -10.0f);
-        lightRotation = new Vector3d(0, 0, 0);
+        lightPosition  = new Vector3d(25.0f, 40.0f, -10.0f);
+        lightRotation  = new Vector3d(0, 0, 0);
         lightDirection = new Vector3d(-0.3, -1, 0.1);
-        cutOff = 25;
-        lightColor = new Vector3f(0.5f, 1.0f, 0.5f);
-        Light spotLight = qfsProject.createLight(null, modelSphere, modelSpotLight, lightPosition, lightRotation, 1.0);
+        cutOff         = 25;
+        lightColor     = new Vector3f(0.5f, 1.0f, 0.5f);
+        Light spotLight = project.createLight(null, modelSphere, modelSpotLight, lightPosition, lightRotation,
+                                              1.0);
         spotLight.set(lightColor, lightIntensity, 0.1, 0.03, 0.0007, cutOff);
         spotLight.setDirection(lightDirection);
         spotLight.setName("DefaultSpotLight");
@@ -141,31 +141,34 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
 
         // Directional light
         lightIntensity = 0.0f;
-        lightColor = new Vector3f(1.0f, 1.0f, 1.0f);
-        DirectionalLight directionalLight = new DirectionalLight(lightColor, new Vector3f(0, 100, 0), lightIntensity);
+        lightColor     = new Vector3f(1.0f, 1.0f, 1.0f);
+        DirectionalLight directionalLight = new DirectionalLight(lightColor, new Vector3f(0, 100, 0),
+                                                                 lightIntensity);
         scene.setDirectionalLight(directionalLight);
     }
 
     public void initDefaultScene() {
-        qfsProject.camera.movePosition(0, 0, 120);
-        qfsProject.camera.updateProjectionMatrix();
+        project.camera.movePosition(0, 0, 120);
+        project.camera.updateProjectionMatrix();
 
         // Create a default scene with xyz nodes.
-        qfsProject.setDimension(appSettings.getDefaultDimensionX(), appSettings.getDefaultDimensionY(), appSettings.getDefaultDimensionZ());
+        project.setDimension(appSettings.getDefaultDimensionX(), appSettings.getDefaultDimensionY(),
+                             appSettings.getDefaultDimensionZ());
         // The scene is (re)build when settings has been changed and reset, see checksettingsChanged().
-        qfsProject.reset();
+        project.reset();
     }
 
     public void initDefaultTerrain() throws Exception {
-        qfsProject.terrain = new Terrain(
+        project.terrain = new Terrain(
                 new Vector3f(-Terrain.SIZE / 2, -150, -Terrain.SIZE / 2),
                 loader,
                 new Material());
-        qfsProject.terrain.setTerrainTexturePath(Constants.TEXTURE_FILE_PATH);
-        qfsProject.terrain.setTerrainTextureFile(Constants.TEXTURE_DEFAULT_FILE);
-        Texture texture = new Texture(loader.loadTexture(Constants.BASE_PATH + qfsProject.terrain.getTerrainTextureFilePath()));
-        qfsProject.terrain.getMaterial().setTexture(texture);
-        scene.addTerrain(qfsProject.terrain);
+        project.terrain.setTerrainTexturePath(Constants.TEXTURE_FILE_PATH);
+        project.terrain.setTerrainTextureFile(Constants.TEXTURE_DEFAULT_FILE);
+        Texture texture = new Texture(
+                loader.loadTexture(Constants.BASE_PATH + project.terrain.getTerrainTextureFilePath()));
+        project.terrain.getMaterial().setTexture(texture);
+        scene.addTerrain(project.terrain);
     }
 
     private void updateNodesProperties() {
@@ -177,32 +180,34 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
                 int  i    = node.getIndex().x;
                 int  j    = node.getIndex().y;
                 int  k    = node.getIndex().z;
-                int  dimX = qfsProject.getDimensionX();
-                int  dimY = qfsProject.getDimensionY();
-                int  dimZ = qfsProject.getDimensionZ();
+                int  dimX = project.getDimensionX();
+                int  dimY = project.getDimensionY();
+                int  dimZ = project.getDimensionZ();
 
                 if (i != -1 || j != -1 || k != -1) {
                     boolean isBoundingLine =
                             i == 0 && j == 0 ||
-                                    i == 0 && j == qfsProject.getDimensionY() - 1 ||
-                                    i == qfsProject.getDimensionX() - 1 && j == 0 ||
-                                    i == qfsProject.getDimensionX() - 1 && j == qfsProject.getDimensionY() - 1 ||
+                            i == 0 && j == project.getDimensionY() - 1 ||
+                            i == project.getDimensionX() - 1 && j == 0 ||
+                            i == project.getDimensionX() - 1 && j == project.getDimensionY() - 1 ||
 
-                                    i == 0 && k == 0 ||
-                                    i == 0 && k == qfsProject.getDimensionZ() - 1 ||
-                                    i == qfsProject.getDimensionX() - 1 && k == 0 ||
-                                    i == qfsProject.getDimensionX() - 1 && k == qfsProject.getDimensionZ() - 1 ||
+                            i == 0 && k == 0 ||
+                            i == 0 && k == project.getDimensionZ() - 1 ||
+                            i == project.getDimensionX() - 1 && k == 0 ||
+                            i == project.getDimensionX() - 1 && k == project.getDimensionZ() - 1 ||
 
-                                    j == 0 && k == 0 ||
-                                    j == 0 && k == qfsProject.getDimensionZ() - 1 ||
-                                    j == qfsProject.getDimensionY() - 1 && k == 0 ||
-                                    j == qfsProject.getDimensionY() - 1 && k == qfsProject.getDimensionZ() - 1;
+                            j == 0 && k == 0 ||
+                            j == 0 && k == project.getDimensionZ() - 1 ||
+                            j == project.getDimensionY() - 1 && k == 0 ||
+                            j == project.getDimensionY() - 1 && k == project.getDimensionZ() - 1;
 
                     boolean isVisible = false;
 
                     switch (settings.getSliceType()) {
                         case none:
-                            isVisible = isBoundingLine || (i > 0 && i < dimX - 1 && j > 0 && j < dimY - 1 && k > 0 && k < dimZ - 1);
+                            isVisible = isBoundingLine ||
+                                        (i > 0 && i < dimX - 1 && j > 0 && j < dimY - 1 && k > 0 &&
+                                         k < dimZ - 1);
                             break;
                         case sliceX:
                             isVisible = isBoundingLine || (i == settings.getVisibleIndexX());
@@ -214,13 +219,16 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
                             isVisible = isBoundingLine || (k == settings.getVisibleIndexZ());
                             break;
                         case sliceXZ:
-                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX() && k == settings.getVisibleIndexZ());
+                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX() &&
+                                                           k == settings.getVisibleIndexZ());
                             break;
                         case sliceYZ:
-                            isVisible = isBoundingLine || (j == settings.getVisibleIndexY() && k == settings.getVisibleIndexZ());
+                            isVisible = isBoundingLine || (j == settings.getVisibleIndexY() &&
+                                                           k == settings.getVisibleIndexZ());
                             break;
                         case sliceXY:
-                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX() && j == settings.getVisibleIndexY());
+                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX() &&
+                                                           j == settings.getVisibleIndexY());
                             break;
                     }
 
@@ -234,26 +242,26 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
     }
 
     private void updateNodesArray() {
-        if (REMModel.isLoadingReady()) {
+        if (remModel.isLoadingReady()) {
             updateNodesProperties();
             scene.update();
             nuklearModel.closeFrame(Frame.progress);
 
-            settings.setVisibleIndexX(qfsProject.getDimensionX() / 2);
-            settings.setVisibleIndexY(qfsProject.getDimensionY() / 2);
-            settings.setVisibleIndexZ(qfsProject.getDimensionZ() / 2);
+            settings.setVisibleIndexX(project.getDimensionX() / 2);
+            settings.setVisibleIndexY(project.getDimensionY() / 2);
+            settings.setVisibleIndexZ(project.getDimensionZ() / 2);
 
-            REMModel.getCurrentMouseNodeIndex().x = qfsProject.getDimensionX() / 2;
-            REMModel.getCurrentMouseNodeIndex().y = qfsProject.getDimensionY() / 2;
-            REMModel.getCurrentMouseNodeIndex().z = qfsProject.getDimensionZ() / 2;
-            REMModel.setCurrentMouseNode(scene.getNodeByIndex(REMModel.getCurrentMouseNodeIndex()));
+            remModel.getCurrentMouseNodeIndex().x = project.getDimensionX() / 2;
+            remModel.getCurrentMouseNodeIndex().y = project.getDimensionY() / 2;
+            remModel.getCurrentMouseNodeIndex().z = project.getDimensionZ() / 2;
+            remModel.setCurrentMouseNode(scene.getNodeByIndex(remModel.getCurrentMouseNodeIndex()));
 
             isLoadingStarted = false;
         }
     }
 
     private void mouseReleaseWall(Node node) {
-        switch (REMModel.getEditMode()) {
+        switch (remModel.getEditMode()) {
             case swapNode:
                 scene.swapNodeWall(node);
                 isNodesUpdateRequired = true;
@@ -272,7 +280,7 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
                 } else {
                     scene.makeWallFromHiLightNodes();
                     isNodesUpdateRequired = true;
-                    isDrawing = false;
+                    isDrawing             = false;
                 }
                 break;
             default:
@@ -282,7 +290,7 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
     }
 
     public void mouseDrawWall(Node node) {
-        switch (REMModel.getEditMode()) {
+        switch (remModel.getEditMode()) {
             case drawLine:
                 scene.drawLine(node);
                 isNodesUpdateRequired = true;
@@ -297,7 +305,7 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
     }
 
     public void checkAndErase(Node node) {
-        switch (REMModel.getEditMode()) {
+        switch (remModel.getEditMode()) {
             case eraseNode:
                 scene.eraseWall(node);
                 isNodesUpdateRequired = true;
@@ -313,16 +321,16 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
 
     @Override
     public boolean mouseCursorPosCallback(long handle, double xPos, double yPos) {
-        REMModel.getMousePos().x = xPos;
-        REMModel.getMousePos().y = yPos;
+        remModel.getMousePos().x = xPos;
+        remModel.getMousePos().y = yPos;
 
         Node node = scene.getNodeFromMousePos(xPos, yPos);
         if (node != null) {
             if (selectedNode != null) selectedNode.setSelected(false);
             selectedNode = node;
             selectedNode.setSelected(true);
-            REMModel.getCurrentMouseNodeIndex().set(selectedNode.getIndex());
-            REMModel.setCurrentMouseNode(selectedNode);
+            remModel.getCurrentMouseNodeIndex().set(selectedNode.getIndex());
+            remModel.setCurrentMouseNode(selectedNode);
 
             if (isDrawing)
                 mouseDrawWall(node);
@@ -335,8 +343,8 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
         float deltaY = 0;
 
         if (lastMousePos.x > 0 && lastMousePos.y > 0) {
-            double x = xPos - lastMousePos.x;
-            double y = yPos - lastMousePos.y;
+            double  x       = xPos - lastMousePos.x;
+            double  y       = yPos - lastMousePos.y;
             boolean rotateX = x != 0;
             boolean rotateY = y != 0;
 
@@ -346,7 +354,8 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
                 deltaX = (float) y;
         }
         if (rightButtonPress) {
-            qfsProject.camera.moveRotation(deltaX * Constants.MOUSE_SENSITIVITY, deltaY * Constants.MOUSE_SENSITIVITY, 0);
+            project.camera.moveRotation(deltaX * Constants.MOUSE_SENSITIVITY,
+                                        deltaY * Constants.MOUSE_SENSITIVITY, 0);
         }
 
         lastMousePos.x = xPos;
@@ -357,36 +366,37 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
 
     @Override
     public boolean mouseButtonCallback(long handle, int button, int action, int mods) {
+        boolean leftButtonReleased;
         if (nuklearModel.getFocusedFrame() == null) {
-            leftButtonPressed = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_PRESS;
+            leftButtonPressed  = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_PRESS;
             leftButtonReleased = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_RELEASE;
-            rightButtonPress = button == GLFW.GLFW_MOUSE_BUTTON_2 && action == GLFW.GLFW_PRESS;
+            rightButtonPress   = button == GLFW.GLFW_MOUSE_BUTTON_2 && action == GLFW.GLFW_PRESS;
 
-            Node node = scene.getNodeFromMousePos(REMModel.getMousePos().x, REMModel.getMousePos().y);
+            Node node = scene.getNodeFromMousePos(remModel.getMousePos().x, remModel.getMousePos().y);
 
             if (node != null) {
                 if (leftButtonPressed)
                     checkAndErase(node);
 
                 if (leftButtonReleased) {
-                    switch (REMModel.getNodeSelectionMode()) {
+                    switch (remModel.getNodeSelectionMode()) {
                         case none:
-                            if (REMModel.isSimulating() && selectedNode != null)
-                                selectedNode.incPosition(new Vector3d(0, 0, qfsProject.rainModel.getForce()));
+                            if (remModel.isSimulating() && selectedNode != null)
+                                selectedNode.incPosition(new Vector3d(0, 0, project.rainModel.getForce()));
                             break;
-                        case oscillator:
-                            REMModel.setNodeSelectionMode(NodeSelectionMode.none);
-                            REMModel.selectedIdentity.setNode(node.getIndex(), node.getPosition());
-                            nuklearModel.showFrame(Frame.oscillator);
+                        case occupancy:
+                            remModel.setNodeSelectionMode(NodeSelectionMode.none);
+                            remModel.getSelectedOccupancy().setNode(node);
+                            nuklearModel.showFrame(Frame.identity);
                             break;
                         case ignitionNode:
-                            REMModel.setNodeSelectionMode(NodeSelectionMode.none);
-                            qfsProject.detectorModel.setIgnitorNode(node.getIndex());
+                            remModel.setNodeSelectionMode(NodeSelectionMode.none);
+                            project.detectorModel.setIgnitorNode(node.getIndex());
                             nuklearModel.showFrame(Frame.detector);
                             break;
                         case detectorNode:
-                            REMModel.setNodeSelectionMode(NodeSelectionMode.none);
-                            qfsProject.detectorModel.setDetectorNode(node.getIndex());
+                            remModel.setNodeSelectionMode(NodeSelectionMode.none);
+                            project.detectorModel.setDetectorNode(node.getIndex());
                             nuklearModel.showFrame(Frame.detector);
                             break;
                         default:
@@ -397,9 +407,9 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
                 }
             }
         } else {
-            leftButtonPressed = false;
+            leftButtonPressed  = false;
             leftButtonReleased = false;
-            rightButtonPress = false;
+            rightButtonPress   = false;
         }
         return false;
     }
@@ -407,11 +417,11 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
     @Override
     public boolean mouseScrollCallback(long handle, double xOffset, double yOffset) {
         float incCamera = keyEvents != null && keyEvents.isCtrlPressed ? 2 : 12;
-        qfsProject.camera.movePosition(
+        project.camera.movePosition(
                 (float) (incCamera * xOffset * Constants.CAMERA_MOVE_SPEED),
                 0,
                 (float) (incCamera * yOffset * Constants.CAMERA_MOVE_SPEED)
-        );
+                                   );
 
         return false;
     }
@@ -432,7 +442,7 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
         this.keyEvents = keyEvents;
 
         float incCamera = keyEvents.isShiftPressed ? 2 : 8;
-        float inc = keyEvents.isCtrlPressed ? (keyEvents.isShiftPressed ? 0.2f : 1.0f) : 0f;
+        float inc       = keyEvents.isCtrlPressed ? (keyEvents.isShiftPressed ? 0.2f : 1.0f) : 0f;
 
         if (!(keyEvents.isCtrlPressed || keyEvents.isAltPressed || keyEvents.isShiftPressed)) {
             switch (key) {
@@ -459,100 +469,101 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
 
         switch (key) {
             case GLFW.GLFW_KEY_LEFT:
-                switch (REMModel.getMode()) {
+                switch (remModel.getMode()) {
                     case light:
-                        if (REMModel.getSelectedLight() != null)
-                            REMModel.getSelectedLight().getPosBuff().x -= inc;
+                        if (remModel.getSelectedLight() != null)
+                            remModel.getSelectedLight().getPosBuff().x -= inc;
                         break;
                     default:
                         break;
                 }
                 break;
             case GLFW.GLFW_KEY_RIGHT:
-                switch (REMModel.getMode()) {
+                switch (remModel.getMode()) {
                     case light:
-                        if (REMModel.getSelectedLight() != null)
-                            REMModel.getSelectedLight().getPosBuff().x += inc;
+                        if (remModel.getSelectedLight() != null)
+                            remModel.getSelectedLight().getPosBuff().x += inc;
                         break;
                     default:
                         break;
                 }
                 break;
             case GLFW.GLFW_KEY_UP:
-                switch (REMModel.getMode()) {
+                switch (remModel.getMode()) {
                     case normal:
                         if (keyEvents.isCtrlPressed) {
-                            REMModel.getCurrentMouseNodeIndex().z++;
-                            if (REMModel.getCurrentMouseNodeIndex().z >= qfsProject.getDimensionZ() - 2)
-                                REMModel.getCurrentMouseNodeIndex().z = qfsProject.getDimensionZ() - 2;
+                            remModel.getCurrentMouseNodeIndex().z++;
+                            if (remModel.getCurrentMouseNodeIndex().z >= project.getDimensionZ() - 2)
+                                remModel.getCurrentMouseNodeIndex().z = project.getDimensionZ() - 2;
                             updateSelectedNode();
 
-                            if (qfsProject.getDimensionZ() > 1) {
+                            if (project.getDimensionZ() > 1) {
                                 settings.setVisibleIndexZ(settings.getVisibleIndexZ() + 1);
-                                if (settings.getVisibleIndexZ() >= qfsProject.getDimensionZ() - 2)
-                                    settings.setVisibleIndexZ(qfsProject.getDimensionZ() - 2);
+                                if (settings.getVisibleIndexZ() >= project.getDimensionZ() - 2)
+                                    settings.setVisibleIndexZ(project.getDimensionZ() - 2);
                                 isNodesUpdateRequired = true;
                             }
                         }
                         break;
-                    case alhpa:
+                    case alpha:
                         settings.incAlpha();
                         break;
                     case intensity:
                         settings.incIntensity();
                         break;
                     case light:
-                        if (REMModel.getSelectedLight() != null)
-                            REMModel.getSelectedLight().getPosBuff().z -= inc;
+                        if (remModel.getSelectedLight() != null)
+                            remModel.getSelectedLight().getPosBuff().z -= inc;
                         break;
                     default:
                         break;
                 }
                 break;
             case GLFW.GLFW_KEY_DOWN:
-                switch (REMModel.getMode()) {
+                switch (remModel.getMode()) {
                     case normal:
                         if (keyEvents.isCtrlPressed) {
-                            REMModel.getCurrentMouseNodeIndex().z--;
-                            if (REMModel.getCurrentMouseNodeIndex().z < 1) REMModel.getCurrentMouseNodeIndex().z = 1;
+                            remModel.getCurrentMouseNodeIndex().z--;
+                            if (remModel.getCurrentMouseNodeIndex().z < 1)
+                                remModel.getCurrentMouseNodeIndex().z = 1;
                             updateSelectedNode();
 
-                            if (qfsProject.getDimensionZ() > 1) {
+                            if (project.getDimensionZ() > 1) {
                                 settings.setVisibleIndexZ(settings.getVisibleIndexZ() - 1);
                                 if (settings.getVisibleIndexZ() < 1) settings.setVisibleIndexZ(1);
                                 isNodesUpdateRequired = true;
                             }
                         }
                         break;
-                    case alhpa:
+                    case alpha:
                         settings.decAlpha();
                         break;
                     case intensity:
                         settings.decIntensity();
                         break;
                     case light:
-                        if (REMModel.getSelectedLight() != null)
-                            REMModel.getSelectedLight().getPosBuff().z += inc;
+                        if (remModel.getSelectedLight() != null)
+                            remModel.getSelectedLight().getPosBuff().z += inc;
                         break;
                     default:
                         break;
                 }
                 break;
             case GLFW.GLFW_KEY_PAGE_UP:
-                switch (REMModel.getMode()) {
+                switch (remModel.getMode()) {
                     case light:
-                        if (REMModel.getSelectedLight() != null)
-                            REMModel.getSelectedLight().getPosBuff().y += inc;
+                        if (remModel.getSelectedLight() != null)
+                            remModel.getSelectedLight().getPosBuff().y += inc;
                         break;
                     default:
                         break;
                 }
                 break;
             case GLFW.GLFW_KEY_PAGE_DOWN:
-                switch (REMModel.getMode()) {
+                switch (remModel.getMode()) {
                     case light:
-                        if (REMModel.getSelectedLight() != null)
-                            REMModel.getSelectedLight().getPosBuff().y -= inc;
+                        if (remModel.getSelectedLight() != null)
+                            remModel.getSelectedLight().getPosBuff().y -= inc;
                         break;
                     default:
                         break;
@@ -560,43 +571,44 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
                 break;
             case GLFW.GLFW_KEY_KP_4:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getQfsFields().getBaseField().incRotation(0.0f, inc, 0.0f);
+                    scene.getLattice().getBaseField().incRotation(0.0f, inc, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_6:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getQfsFields().getBaseField().incRotation(0.0f, -inc, 0.0f);
+                    scene.getLattice().getBaseField().incRotation(0.0f, -inc, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_2:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getQfsFields().getBaseField().incRotation(-inc, 0.0f, 0.0f);
+                    scene.getLattice().getBaseField().incRotation(-inc, 0.0f, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_8:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getQfsFields().getBaseField().incRotation(inc, 0.0f, 0.0f);
+                    scene.getLattice().getBaseField().incRotation(inc, 0.0f, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_3:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getQfsFields().getBaseField().incRotation(0.0f, 0.0f, inc);
+                    scene.getLattice().getBaseField().incRotation(0.0f, 0.0f, inc);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_1:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getQfsFields().getBaseField().incRotation(0.0f, 0.0f, -inc);
+                    scene.getLattice().getBaseField().incRotation(0.0f, 0.0f, -inc);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_5:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getQfsFields().getBaseField().setRotation(0, 0, 0);
+                    scene.getLattice().getBaseField().setRotation(0, 0, 0);
                 }
                 break;
             case GLFW.GLFW_KEY_SPACE:
-                if (REMModel.isSimulating() && selectedNode != null)
-                    selectedNode.incPosition(new Vector3d(0, 0, qfsProject.rainModel.getForce()));
-//                    selectedNode.addForce(new Vector3d(0, 0, qfsProject.rainModel.getForce()));
+                if (remModel.isSimulating() && selectedNode != null)
+                    selectedNode.incPosition(new Vector3d(0, 0, project.rainModel.getForce()));
+                //                    selectedNode.addForce(new Vector3d(0, 0, qfsProject.rainModel
+                //                    .getForce()));
                 break;
         }
 
@@ -606,7 +618,7 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
 
     @Override
     public boolean keyCallback(long handle, int key, int scanCode, int action, int mods) {
-        isReleased = action == GLFW.GLFW_RELEASE;
+        boolean isReleased = action == GLFW.GLFW_RELEASE;
 
         boolean isShiftPressed = (mods & GLFW.GLFW_MOD_SHIFT) == GLFW.GLFW_MOD_SHIFT;
 
@@ -614,29 +626,29 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
             switch (key) {
                 case GLFW.GLFW_KEY_O:
                     if (keyEvents.isCtrlPressed) {
-                        qfsProject.openFile();
+                        project.openFile();
                     }
                     break;
                 case GLFW.GLFW_KEY_S:
                     if (keyEvents.isCtrlPressed) {
-                        qfsProject.saveToFile();
+                        project.saveToFile();
                     }
                     break;
                 case GLFW.GLFW_KEY_N:
-                    REMModel.setMode(Mode.normal);
+                    remModel.setMode(Mode.normal);
                     break;
                 case GLFW.GLFW_KEY_R:
-                    REMModel.setMode(Mode.rain);
+                    remModel.setMode(Mode.rain);
                     nuklearModel.toggleFrame(Frame.rain);
                     break;
                 case GLFW.GLFW_KEY_G:
-                    REMModel.setMode(Mode.alhpa);
+                    remModel.setMode(Mode.alpha);
                     break;
                 case GLFW.GLFW_KEY_I:
-                    REMModel.setMode(Mode.intensity);
+                    remModel.setMode(Mode.intensity);
                     break;
                 case GLFW.GLFW_KEY_L:
-                    REMModel.setMode(Mode.light);
+                    remModel.setMode(Mode.light);
                     break;
                 case GLFW.GLFW_KEY_F4:
                     scene.toggleAnimation();
@@ -653,7 +665,7 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
                     } else {
                         if (!selectedNode.isFixed()) {
                             // Set the node position and make it fixed.
-                            selectedNode.getPosBuff().z = qfsProject.rainModel.getForce();
+                            selectedNode.getPosBuff().z = project.rainModel.getForce();
                             selectedNode.setFixed(true);
                             // Remember that this node is set fixed.
                             customNodeFixed.add(selectedNode);
@@ -664,38 +676,38 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
                     }
                     break;
                 case GLFW.GLFW_KEY_F8:
-                    REMModel.toggleSimulation();
+                    remModel.toggleSimulation();
                     break;
                 case GLFW.GLFW_KEY_F10:
-                    qfsProject.reset();
+                    project.reset();
                     slitWall.reset();
                     break;
                 case GLFW.GLFW_KEY_F11:
                     Screenshot.prepareScreenshot(4, 4, 0xFF);
                     break;
                 case GLFW.GLFW_KEY_F12:
-                    settings.setSliceType(settings.getSliceType() == SliceType.none ? SliceType.sliceZ : SliceType.none);
+                    settings.setSliceType(
+                            settings.getSliceType() == SliceType.none ? SliceType.sliceZ : SliceType.none);
                     updateNodesProperties();
                     break;
                 case GLFW.GLFW_KEY_F7:
                     if (lastSelectedNode != null) {
                         lastSelectedNode.setFixed(false);
                         lastSelectedNode = null;
-                    } else if (REMModel.isSimulating() && selectedNode != null) {
+                    } else if (remModel.isSimulating() && selectedNode != null) {
                         Vector3d p = selectedNode.getPosition();
-                        selectedNode.setPosition(new Vector3d(p.x, p.y, qfsProject.rainModel.getForce()));
+                        selectedNode.setPosition(new Vector3d(p.x, p.y, project.rainModel.getForce()));
                         selectedNode.setFixed(true);
                         lastSelectedNode = selectedNode;
                     }
                     break;
                 case GLFW.GLFW_KEY_P:
-                    if (REMModel.isSimulating() && selectedNode != null) {
+                    if (remModel.isSimulating() && selectedNode != null) {
                         if (selectedNode.isFixed()) {
                             selectedNode.setFixed(false);
-                        }
-                        else {
+                        } else {
                             selectedNode.setFixed(true);
-                            selectedNode.setPosition(new Vector3d(0, 0, qfsProject.rainModel.getForce()));
+                            selectedNode.setPosition(new Vector3d(0, 0, project.rainModel.getForce()));
                         }
                     }
                     break;
@@ -706,11 +718,11 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
     }
 
     private void moveCamera(float x, float y, float z) {
-        qfsProject.camera.movePosition(
+        project.camera.movePosition(
                 x * Constants.CAMERA_MOVE_SPEED,
                 y * Constants.CAMERA_MOVE_SPEED,
                 z * Constants.CAMERA_MOVE_SPEED
-        );
+                                   );
     }
 
     private void updateSelectedNode() {
@@ -718,43 +730,46 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
             selectedNode.setSelected(false);
         }
 
-        selectedNode = scene.getQfsFields().getNode(REMModel.getCurrentMouseNodeIndex());
+        selectedNode = scene.getLattice().getNode(remModel.getCurrentMouseNodeIndex());
         if (selectedNode != null) {
             selectedNode.setSelected(true);
         }
     }
 
     private void updateTerrain() {
-        if (qfsProject.terrain.isVisible())
-            qfsProject.terrain.updateTransformationMatrix();
+        if (project.terrain.isVisible())
+            project.terrain.updateTransformationMatrix();
     }
 
     private void checkSettingsChanged() {
-        if (qfsProject.isChanged() || appSettings.isChanged()) {
-            setCustomTitle(qfsProject.getCurrentFilename());
+        if (project.isChanged() || appSettings.isChanged()) {
+            setCustomTitle(project.getCurrentFilename());
             nuklearModel.showFrame(Frame.progress);
             try {
-                qfsProject.terrain.getMaterial().setTexture(new Texture(loader.loadTexture(Constants.BASE_PATH + qfsProject.terrain.getTerrainTextureFilePath())));
-            } catch (Exception e) {
-                String message = String.format("Texture file '%s' not found!", qfsProject.terrain.getTerrainTextureFilePath());
+                project.terrain.getMaterial().setTexture(new Texture(loader.loadTexture(
+                        Constants.BASE_PATH + project.terrain.getTerrainTextureFilePath())));
+            }
+            catch (Exception e) {
+                String message = String.format("Texture file '%s' not found!",
+                                               project.terrain.getTerrainTextureFilePath());
                 nuklearModel.showErrorDialog("Loading terrain texture", message);
             }
             scene.getEntities().clear();
             isLoadingStarted = true;
-            REMModel.setLoadingReady(false);
+            remModel.setLoadingReady(false);
             // Build the Quantum Fields.
-            scene.getQfsFields().build();
+            scene.getLattice().build();
             waitAfterReset = 0;
         }
 
         if (!isLoadingStarted) {
-            if (qfsProject.isFileSaved()) {
-                qfsProject.setFileSaved(false);
-                setCustomTitle(qfsProject.getCurrentFilename());
+            if (project.isFileSaved()) {
+                project.setFileSaved(false);
+                setCustomTitle(project.getCurrentFilename());
             }
 
-            if (REMModel.isChanged()) {
-                REMModel.setChanged(false);
+            if (remModel.isChanged()) {
+                remModel.setChanged(false);
                 isNodesUpdateRequired = true;
             }
 
@@ -786,54 +801,51 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
 
     private void waitForRenderingReady() {
         while (!isRenderingReady) {
+            System.out.println("waitForRenderingReady()");
             Utils.sleepMS(1);
         }
     }
 
     private void calcNextPhysicsFrame() {
-        isCalcNextPhysicsReady = false;
+        //isCalcNextPhysicsReady = false;
         // While the GPU is rendering on the current buffer,
         // swap the buffer to calculate physics on another buffer.
         Node.swapBuffer();
 
-        Thread thread = new Thread(new Runnable() {
+        Thread thread = new Thread(() -> {
+            PerformanceMonitor.start(Measurement.totalCPURenderTime);
+            scene.resetTasks();
 
-            @Override
-            public void run() {
-                PerformanceMonitor.start(Measurement.totalCPURenderTime);
-                scene.resetTasks();
+            int numThreads  = appSettings.getNumThreads();
+            int numNodes    = scene.getEntities().size();
+            int segmentSize = numNodes > numThreads ? numNodes / numThreads + 1 : numNodes;
 
-                int numThreads = appSettings.getNumThreads();
-                int numNodes = scene.getEntities().size();
-                int segmentSize = numNodes > numThreads ? numNodes / numThreads + 1 : numNodes;
+            PerformanceMonitor.start(Measurement.physics);
 
-                PerformanceMonitor.start(Measurement.physics);
-
-                if (waitAfterReset <= 0) {
-                    simulateRain();
-                    oscillateSelectedNodes();
-                } else {
-                    waitAfterReset--;
-                }
-                detector();
-                scene.processPhysicsTasks(numThreads, segmentSize);
-                scene.waitForAllTasksReady();
-
-                if (REMModel.isSimulating())
-                    PerformanceMonitor.stop(Measurement.physics);
-                else
-                    PerformanceMonitor.reset(Measurement.physics);
-
-                PerformanceMonitor.start(Measurement.updateMatrix);
-                scene.processMatrixUpdateTasks(numThreads, segmentSize);
-                scene.waitForAllTasksReady();
-                PerformanceMonitor.stop(Measurement.updateMatrix);
-
-                PerformanceMonitor.stop(Measurement.totalCPURenderTime);
-
-                isCalcNextPhysicsReady = true;
+            if (waitAfterReset <= 0) {
+                simulateRain();
+                oscillateSelectedNodes();
+            } else {
+                waitAfterReset--;
             }
+            detector();
+            scene.processPhysicsTasks(numThreads, segmentSize);
+            scene.waitForAllTasksReady();
 
+            if (remModel.isSimulating())
+                PerformanceMonitor.stop(Measurement.physics);
+            else
+                PerformanceMonitor.reset(Measurement.physics);
+            PerformanceMonitor.reset(Measurement.physics);
+
+            PerformanceMonitor.start(Measurement.updateMatrix);
+            scene.processMatrixUpdateTasks(numThreads, segmentSize);
+            scene.waitForAllTasksReady();
+            PerformanceMonitor.stop(Measurement.updateMatrix);
+
+            PerformanceMonitor.stop(Measurement.totalCPURenderTime);
+
+            //isCalcNextPhysicsReady = true;
         });
         thread.start();
     }
@@ -845,7 +857,7 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
                 node.setCustomScale(2.0);
                 node.setCustomColor(new Vector4f(0f, 1f, 0f, 1f));
                 if (detectorModel.isIgnited())
-                    detectorModel.ignite(node, qfsProject.rainModel.getForce());
+                    detectorModel.ignite(node, project.rainModel.getForce());
             }
 
             node = scene.getNodeByIndex(detectorModel.getDetectorNode());
@@ -858,42 +870,46 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
     }
 
     private void simulateRain() {
-        if (REMModel.isSimulating() && qfsProject.rainModel.isActive()) {
+        if (remModel.isSimulating() && project.rainModel.isActive()) {
             Vector3i index = new Vector3i();
 
-            for (int i = 0; i < qfsProject.rainModel.getIterations(); i++) {
-                index.x = (int) (Math.max(2, Math.min(Math.random() * qfsProject.getDimensionX(), qfsProject.getDimensionX() - 2)));
-                index.y = (int) (Math.max(2, Math.min(Math.random() * qfsProject.getDimensionY(), qfsProject.getDimensionY() - 2)));
+            for (int i = 0; i < project.rainModel.getIterations(); i++) {
+                index.x = (int) (Math.max(2, Math.min(Math.random() * project.getDimensionX(),
+                                                      project.getDimensionX() - 2)));
+                index.y = (int) (Math.max(2, Math.min(Math.random() * project.getDimensionY(),
+                                                      project.getDimensionY() - 2)));
                 index.z = settings.getVisibleIndexZ();
 
                 Node node = scene.getNodeByIndex(index);
                 if (node != null)
-                    node.incPosition(new Vector3d(0, 0, Math.random() * qfsProject.rainModel.getForce()));
+                    node.incPosition(new Vector3d(0, 0, Math.random() * project.rainModel.getForce()));
             }
 
         }
     }
 
     private void oscillateSelectedNodes() {
-        if (REMModel.isSimulating()) {
-            for (Identity identity : qfsProject.identities) {
-                Node node = scene.getNodeByIndex(identity.nodeIndex);
+        if (remModel.isSimulating()) {
+            for (Occupancy occupancy : project.occupancies) {
+                //Node node = scene.getNodeByIndex(occupancy.getNode().getIndex());
+                Node node = occupancy.getNode();
 
-                Vector3d o = identity.oscillate();
-
-                if (node != null && o != null) {
-                    node.setPosition(identity.getNodeInitPosition());
-                    node.getPosBuff().add(o);
+                if (node != null) {
+                    Vector3d o = occupancy.getIdentity().oscillate();
+                    if (o != null) {
+                        node.getPosBuff().add(o);
+                    }
                 }
             }
         }
     }
 
-    private void waitForCalcNextPhysicsReady() {
-        while (!isCalcNextPhysicsReady) {
-            Utils.sleepMS(1);
-        }
-    }
+//    private void waitForCalcNextPhysicsReady() {
+//        while (!isCalcNextPhysicsReady) {
+//            System.out.println("waitForCalcNextPhysicsReady()");
+//            Utils.sleepMS(1);
+//        }
+//    }
 
     public void resetMonitoringDeadThreads() {
         currentTime = System.currentTimeMillis();
@@ -903,37 +919,37 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
      * This should never occur and should not be needed.
      */
     public void startMonitoringDeadThreads() {
-//		new Thread(new Runnable() {
-//
-//			private int lastNumTask = -1;
-//			private int lastNumTask2 = -1;
-//
-//			@Override
-//			public void run() {
-//				while (glWindow.getWindowHandle() != 0) {
-//					try {
-//						Thread.sleep(100);
-//					} catch (InterruptedException e) {
-//					}
-//
-//					if (System.currentTimeMillis() - currentTime > 10000) {
-//						if (scene.getNumTask() == lastNumTask2) {
-//							System.out.println(
-//								"numTask: " + scene.getNumTask() +
-//								" == lastNumTask: " + lastNumTask2 + 
-//								" - dead threads found! This should never happens!");
-//							System.out.println("Status: " + scene.status);
-//							scene.taskCompleted();
-//							isCalcNextPhysicsReady = true;
-//							isRenderingReady = false;
-//						}
-//						resetMonitoringDeadThreads();
-//						lastNumTask = scene.getNumTask();
-//						lastNumTask2 = lastNumTask;
-//					}
-//				}
-//			}
-//		}).start();
+        //		new Thread(new Runnable() {
+        //
+        //			private int lastNumTask = -1;
+        //			private int lastNumTask2 = -1;
+        //
+        //			@Override
+        //			public void run() {
+        //				while (glWindow.getWindowHandle() != 0) {
+        //					try {
+        //						Thread.sleep(100);
+        //					} catch (InterruptedException e) {
+        //					}
+        //
+        //					if (System.currentTimeMillis() - currentTime > 10000) {
+        //						if (scene.getNumTask() == lastNumTask2) {
+        //							System.out.println(
+        //								"numTask: " + scene.getNumTask() +
+        //								" == lastNumTask: " + lastNumTask2 +
+        //								" - dead threads found! This should never happens!");
+        //							System.out.println("Status: " + scene.status);
+        //							scene.taskCompleted();
+        //							isCalcNextPhysicsReady = true;
+        //							isRenderingReady = false;
+        //						}
+        //						resetMonitoringDeadThreads();
+        //						lastNumTask = scene.getNumTask();
+        //						lastNumTask2 = lastNumTask;
+        //					}
+        //				}
+        //			}
+        //		}).start();
     }
 
     @Override
@@ -952,7 +968,8 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
             GL11.glViewport(0, 0, glWindow.getWidth(), glWindow.getHeight());
         }
 
-        waitForCalcNextPhysicsReady();
+        // !!! This is causing everything to hang, probably we do not need this !!!
+        //waitForCalcNextPhysicsReady();
 
         checkSettingsChanged();
 
@@ -968,9 +985,9 @@ public class REMFieldSimulator extends Engine implements IMouseAndKeyboardEvents
 
         PerformanceMonitor.start(Measurement.sendToGPU);
         isRenderingReady = false;
-        if (qfsProject.terrain.isVisible())
-            renderer.processTerrain(qfsProject.terrain);
-        renderer.render(qfsProject.camera, scene);
+        if (project.terrain.isVisible())
+            renderer.processTerrain(project.terrain);
+        renderer.render(project.camera, scene);
         isRenderingReady = true;
         PerformanceMonitor.stop(Measurement.sendToGPU);
 

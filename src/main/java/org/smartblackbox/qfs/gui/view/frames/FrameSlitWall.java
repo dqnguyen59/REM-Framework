@@ -22,21 +22,21 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
-import org.smartblackbox.qfs.opengl.model.REMModel;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.opengl.model.RemModel;
+import org.smartblackbox.qfs.settings.Project;
 import org.smartblackbox.qfs.settings.SlitWallSettings;
 
 public class FrameSlitWall extends AbstractFrame {
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private REMModel   REMModel   = qfsProject.getQfsModel();
+	private Project  project  = Project.getInstance();
+	private RemModel REMModel = project.getQfsModel();
 
 	private int width = 300;
 	private int height = 310;
 	private double leftCol = 0.50;
 	private double rightCol = 0.50;
 
-	private SlitWallSettings slitWall = QFSProject.getInstance().slitWall;
+	private SlitWallSettings slitWall = Project.getInstance().slitWall;
 
 	public FrameSlitWall(NuklearModel frames) {
 		super(frames);

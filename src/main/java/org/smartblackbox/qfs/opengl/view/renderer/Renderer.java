@@ -18,15 +18,19 @@
  */
 package org.smartblackbox.qfs.opengl.view.renderer;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import lombok.Getter;
+import lombok.Setter;
 import org.lwjgl.opengl.GL11;
 import org.smartblackbox.qfs.opengl.model.Camera;
 import org.smartblackbox.qfs.opengl.model.Scene;
 import org.smartblackbox.qfs.opengl.model.Terrain;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
+@Getter
+@Setter
 public class Renderer {
 	
 	private EntityRenderer nodeRenderer;
@@ -72,14 +76,6 @@ public class Renderer {
 		nodeRenderer.getEntities().clear();
 	}
 
-	public static boolean isCulling() {
-		return isCulling;
-	}
-
-	public static void setCulling(boolean isCulling) {
-		Renderer.isCulling = isCulling;
-	}
-	
 	public static void enableCulling() {
 		if (!isCulling) {
 			GL11.glEnable(GL11.GL_CULL_FACE);

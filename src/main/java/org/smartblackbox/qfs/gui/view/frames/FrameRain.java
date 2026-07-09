@@ -22,12 +22,12 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.opengl.model.RainModel;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.Project;
 
 public class FrameRain extends AbstractFrame {
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private RainModel rainModel = qfsProject.rainModel;
+	private Project   project   = Project.getInstance();
+	private RainModel rainModel = project.rainModel;
 
 	private int width = 300;
 	private int height = 290;
@@ -59,8 +59,8 @@ public class FrameRain extends AbstractFrame {
 		try (MemoryStack stack = MemoryStack.stackPush()) {
 			rainModel.setActive(nk_check_label(ctx, "Active", rainModel.isActive(), 0.5, 0.5));
 
-			qfsProject.setConstantFrequency(nk_label_edit(ctx, stack, " Constant Frequency:", bufConstantFrequency, qfsProject.getConstantFrequency(), leftCol, rightCol));
-			qfsProject.setConstantFrequency(nk_slider(ctx, 0, qfsProject.getConstantFrequency(), 1, 0.0001));
+			project.setConstantFrequency(nk_label_edit(ctx, stack, " Constant Frequency:", bufConstantFrequency, project.getConstantFrequency(), leftCol, rightCol));
+			project.setConstantFrequency(nk_slider(ctx, 0, project.getConstantFrequency(), 1, 0.0001));
 			nk_spacer(ctx, spacer1, 1);
 
 			rainModel.setForce(nk_label_edit(ctx, stack, " Force:", bufRainForce, rainModel.getForce(), leftCol, rightCol));

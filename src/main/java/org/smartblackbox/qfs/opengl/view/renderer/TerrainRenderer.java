@@ -32,12 +32,12 @@ import org.smartblackbox.qfs.opengl.model.Scene;
 import org.smartblackbox.qfs.opengl.model.Terrain;
 import org.smartblackbox.qfs.opengl.model.lights.DirectionalLight;
 import org.smartblackbox.qfs.opengl.model.lights.Light;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.Project;
 import org.smartblackbox.utils.Utils;
 
 public class TerrainRenderer implements IRenderer {
 
-	QFSProject qfsProject = QFSProject.getInstance();
+	Project project = Project.getInstance();
 	
 	Shader shader;
 	private List<Terrain> terrains;
@@ -109,14 +109,14 @@ public class TerrainRenderer implements IRenderer {
 			ObjFileModel model = light.getModel();
 			bind(model);
 			shader.setUniform("material", light.getMaterial());
-			shader.setUniform("transformationMatrix", light.getTransformMatrixf());
+			shader.setUniform("transformationMatrix", light.getTransformMatrix4f());
 			GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(), GL11.GL_UNSIGNED_INT, 0);
 
 			if (light.isSpotLight()) {
 				model = light.getModelSpotLight();
 				bind(model);
 				shader.setUniform("material", light.getSpotLightHolder().getMaterial());
-				shader.setUniform("transformationMatrix", light.getSpotLightHolder().getTransformMatrixf());
+				shader.setUniform("transformationMatrix", light.getSpotLightHolder().getTransformMatrix4f());
 				GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(), GL11.GL_UNSIGNED_INT, 0);
 			}
 		}
@@ -129,9 +129,9 @@ public class TerrainRenderer implements IRenderer {
 			shader.setUniform("textureSampler", 0);
 			shader.setUniform("projectionMatrix", camera.getProjectionMatrix());
 			shader.setUniform("viewMatrix", camera.getViewMatrix());
-			shader.setUniform("depthVisibility", qfsProject.terrain.getDepthVisibilityFactor());
+			shader.setUniform("depthVisibility", project.terrain.getDepthVisibilityFactor());
 
-			renderLights(scene.getDirectionalLight(), qfsProject.getLights(), shader);
+			renderLights(scene.getDirectionalLight(), project.getLights(), shader);
 			
 			for (Terrain terrain : terrains) {
 				bind(terrain.getModel());

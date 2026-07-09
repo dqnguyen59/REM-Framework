@@ -18,9 +18,8 @@
  */
 package org.smartblackbox.qfs.opengl.controller;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import lombok.Getter;
+import lombok.Setter;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.nuklear.NkRect;
@@ -35,10 +34,15 @@ import org.smartblackbox.qfs.gui.model.NuklearModel.Frame;
 import org.smartblackbox.qfs.gui.view.NuklearView;
 import org.smartblackbox.qfs.opengl.utils.Screenshot;
 import org.smartblackbox.qfs.opengl.view.GLWindow;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.Project;
 import org.smartblackbox.utils.PerformanceMonitor;
 import org.smartblackbox.utils.PerformanceMonitor.Measurement;
 
+import java.util.ArrayList;
+import java.util.List;
+
+@Getter
+@Setter
 public abstract class Engine {
 
 	private String customTitle;
@@ -58,12 +62,10 @@ public abstract class Engine {
 
 	private long tKeyboardInterval;
 	private boolean lastButtonDown;
-	private List<MouseButtonEvent> mouseButtonEvents = new ArrayList<MouseButtonEvent>();
+	private List<MouseButtonEvent> mouseButtonEvents = new ArrayList<>();
 
 	private int clickCount;
 	private long tDoubleClickInterval;
-	//private int menuIndex;
-	//private boolean isMenuActive;
 	private long handle;
 	private int renderCounter;
     private long currentTime;
@@ -72,14 +74,6 @@ public abstract class Engine {
 		this.glWindow = glWindow;
 	}
 
-	public String getCustomTitle() {
-		return customTitle;
-	}
-
-	public void setCustomTitle(String customTitle) {
-		this.customTitle = customTitle;
-	}
-	
 	public void init() throws Exception {
 		GLFW.glfwSetErrorCallback(errorCallback = GLFWErrorCallback.createPrint(System.err));
 		glWindow.init();
@@ -99,7 +93,7 @@ public abstract class Engine {
     	
     	nuklearController.unfocusAllFrames();
 
-		QFSProject.getInstance().setNuklearModel(nuklearModel);
+		Project.getInstance().setNuklearModel(nuklearModel);
 	}
 	
 	protected void addMouseAndKeyboardListener(IMouseAndKeyboardEvents listener) {
@@ -141,15 +135,6 @@ public abstract class Engine {
 		}
 		else
 			nuklearModel.setSubMenuActive(false);
-	}
-
-	private void menuMouseActions() {
-//		if (isMenuActive && handle != 0 && renderCounter % 2 == 0) {
-//			if (menuIndex != nuklearModel.getMenuIndex()) {
-//				simulateMouseClick();
-//				menuIndex = nuklearModel.getMenuIndex();
-//			}
-//		}
 	}
 
 	private void simulateMouseClick() {
@@ -330,8 +315,6 @@ public abstract class Engine {
 
 		processKeyboardInput();
 		processGuiMouseInput();
-
-		menuMouseActions();
 
 		performMouseActions();
 

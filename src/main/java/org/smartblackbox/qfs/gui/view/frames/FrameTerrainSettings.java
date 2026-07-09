@@ -23,23 +23,23 @@ import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.opengl.model.Terrain;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.Project;
 
-public class FrameQFSTerrainSettings extends AbstractFrame {
+public class FrameTerrainSettings extends AbstractFrame {
 
 	private int width = 300;
 	private int height = 326;
 	private float leftCol = 0.6f;
 	private float rightCol = 0.4f;
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private Terrain terrain = qfsProject.terrain;
+	private Project project = Project.getInstance();
+	private Terrain terrain = project.terrain;
 	
 	private StringBuffer bufTerrainScale = new StringBuffer();
 	private StringBuffer bufTerrainShininess = new StringBuffer();
 	private StringBuffer bufTerrainDepthVisibility = new StringBuffer();
 
-	public FrameQFSTerrainSettings(NuklearModel frames) {
+	public FrameTerrainSettings(NuklearModel frames) {
 		super(frames);
 	}
 

@@ -25,14 +25,14 @@ import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.gui.model.NuklearModel.Frame;
 import org.smartblackbox.qfs.gui.model.Theme;
-import org.smartblackbox.qfs.opengl.model.REMModel;
-import org.smartblackbox.qfs.opengl.model.REMModel.Mode;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.opengl.model.RemModel;
+import org.smartblackbox.qfs.opengl.model.RemModel.Mode;
+import org.smartblackbox.qfs.settings.Project;
 
 public class FrameStatusBar extends AbstractFrame {
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private REMModel   REMModel   = qfsProject.getQfsModel();
+	private Project  project  = Project.getInstance();
+	private RemModel REMModel = project.getQfsModel();
 
 	private int width;
 	private int height;
@@ -88,7 +88,7 @@ public class FrameStatusBar extends AbstractFrame {
 		ctx.style().button().normal().data().color(Theme.blue1);
 		Nuklear.nk_layout_row_push(ctx, col[i++] / width);
 		if (nk_button_label(ctx, "Reset")) {
-			qfsProject.reset();
+			project.reset();
 		}
 
 		Nuklear.nk_layout_row_push(ctx, col[i++] / width);
@@ -113,7 +113,7 @@ public class FrameStatusBar extends AbstractFrame {
 				s = "R";
 				tip = "Rain mode: click on a node to simulate a rain drop";
 				break;
-			case alhpa:
+			case alpha:
 				s = "A";
 				tip = "Alpha mode: keys [up | down ]";
 				break;

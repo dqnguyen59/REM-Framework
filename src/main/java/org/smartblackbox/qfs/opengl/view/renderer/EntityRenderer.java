@@ -29,7 +29,7 @@ import org.smartblackbox.qfs.opengl.model.Scene;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
 import org.smartblackbox.qfs.opengl.model.lights.DirectionalLight;
 import org.smartblackbox.qfs.opengl.model.lights.Light;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.settings.Project;
 import org.smartblackbox.utils.Utils;
 
 import java.util.HashMap;
@@ -38,7 +38,7 @@ import java.util.Map;
 
 public class EntityRenderer implements IRenderer {
 
-	QFSProject qfsProject = QFSProject.getInstance();
+	Project project = Project.getInstance();
 	
 	Shader shader;
 	private Map<ObjFileModel, List<Entity>> entities = new  HashMap<>();
@@ -108,14 +108,14 @@ public class EntityRenderer implements IRenderer {
 			ObjFileModel model = light.getModel();
 			bind(model);
 			shader.setUniform("material", light.getMaterial());
-			shader.setUniform("transformationMatrix", light.getTransformMatrixf());
+			shader.setUniform("transformationMatrix", light.getTransformMatrix4f());
 			GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(), GL11.GL_UNSIGNED_INT, 0);
 
 			if (light.isSpotLight()) {
 				model = light.getModelSpotLight();
 				bind(model);
 				shader.setUniform("material", light.getSpotLightHolder().getMaterial());
-				shader.setUniform("transformationMatrix", light.getSpotLightHolder().getTransformMatrixf());
+				shader.setUniform("transformationMatrix", light.getSpotLightHolder().getTransformMatrix4f());
 				GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(), GL11.GL_UNSIGNED_INT, 0);
 			}
 		}
@@ -127,9 +127,9 @@ public class EntityRenderer implements IRenderer {
 		shader.setUniform("textureSampler", 0);
 		shader.setUniform("projectionMatrix", camera.getProjectionMatrix());
 		shader.setUniform("viewMatrix", camera.getViewMatrix());
-		shader.setUniform("depthVisibility", qfsProject.settings.getDepthVisibilityFactor());
+		shader.setUniform("depthVisibility", project.settings.getDepthVisibilityFactor());
 
-		renderLights(scene.getDirectionalLight(), qfsProject.getLights(), shader);
+		renderLights(scene.getDirectionalLight(), project.getLights(), shader);
 		
 		for (ObjFileModel model : entities.keySet()) {
 			if (model != null) {
@@ -142,7 +142,7 @@ public class EntityRenderer implements IRenderer {
 					if (entity.isOverrideModelMaterial()) {
 						shader.setUniform("material", entity.getMaterial());
 					}
-					shader.setUniform("transformationMatrix", entity.getTransformMatrixf());
+					shader.setUniform("transformationMatrix", entity.getTransformMatrix4f());
 					GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(), GL11.GL_UNSIGNED_INT, 0);
 				}
 			}

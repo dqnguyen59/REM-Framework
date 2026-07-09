@@ -18,51 +18,27 @@
  */
 package org.smartblackbox.qfs.gui.model;
 
+import lombok.Getter;
+import lombok.Setter;
+import org.lwjgl.nuklear.NkContext;
+import org.lwjgl.nuklear.NkRect;
+import org.lwjgl.nuklear.NkUserFont;
+import org.lwjgl.nuklear.Nuklear;
+import org.smartblackbox.qfs.gui.model.AbstractDialogModel.ConfirmState;
+import org.smartblackbox.qfs.gui.view.frames.*;
+import org.smartblackbox.qfs.gui.view.frames.dialogs.FrameConfirmDialog;
+import org.smartblackbox.qfs.gui.view.frames.dialogs.FrameOpenFileDialog;
+import org.smartblackbox.qfs.gui.view.frames.dialogs.FrameSaveFileDialog;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.lwjgl.nuklear.NkContext;
-import org.lwjgl.nuklear.NkRect;
-import org.lwjgl.nuklear.NkUserFont;
-import org.lwjgl.nuklear.Nuklear;
-import org.smartblackbox.qfs.gui.model.AbstractDialogModel.ConfirmState;
-import org.smartblackbox.qfs.gui.view.frames.AbstractFrame;
-import org.smartblackbox.qfs.gui.view.frames.FrameAbout;
-import org.smartblackbox.qfs.gui.view.frames.FrameCameraSettings;
-import org.smartblackbox.qfs.gui.view.frames.FrameDetector;
-import org.smartblackbox.qfs.gui.view.frames.FrameEditWall;
-import org.smartblackbox.qfs.gui.view.frames.FrameKeyboardShortcuts;
-import org.smartblackbox.qfs.gui.view.frames.FrameLights;
-import org.smartblackbox.qfs.gui.view.frames.FrameMenu;
-import org.smartblackbox.qfs.gui.view.frames.FrameOscillator;
-import org.smartblackbox.qfs.gui.view.frames.FramePreferences;
-import org.smartblackbox.qfs.gui.view.frames.FrameProgress;
-import org.smartblackbox.qfs.gui.view.frames.FrameProperties;
-import org.smartblackbox.qfs.gui.view.frames.FrameQFSColors;
-import org.smartblackbox.qfs.gui.view.frames.FrameQFSDimension;
-import org.smartblackbox.qfs.gui.view.frames.FrameQFSSettings;
-import org.smartblackbox.qfs.gui.view.frames.FrameQFSTerrainSettings;
-import org.smartblackbox.qfs.gui.view.frames.FrameRain;
-import org.smartblackbox.qfs.gui.view.frames.FrameSlitWall;
-import org.smartblackbox.qfs.gui.view.frames.FramePerformance;
-import org.smartblackbox.qfs.gui.view.frames.FrameStatusBar;
-import org.smartblackbox.qfs.gui.view.frames.IFrame;
-import org.smartblackbox.qfs.gui.view.frames.dialogs.FrameConfirmDialog;
-import org.smartblackbox.qfs.gui.view.frames.dialogs.FrameOpenFileDialog;
-import org.smartblackbox.qfs.gui.view.frames.dialogs.FrameSaveFileDialog;
-
+@Getter
+@Setter
 public class NuklearModel {
-
-    public DialogFileModel getDialogFileModel() {
-        return dialogFileModel;
-    }
-
-    public void setDialogFileModel(DialogFileModel dialogFileModel) {
-        this.dialogFileModel = dialogFileModel;
-    }
 
     public enum Frame {
 		menu,
@@ -75,13 +51,13 @@ public class NuklearModel {
 		openFileDialog,
 		saveFileDialog,
 		confirmDialog,
-		qfsDimension,
+		dimension,
 		lights,
-		qfsColors,
+		colors,
 		cameraSettings,
-		qfsSettings,
-		qfsTerrainSettings,
-		oscillator,
+		settings,
+		terrainSettings,
+		identity,
 		slitWall,
 		editWall,
 		rain,
@@ -114,38 +90,6 @@ public class NuklearModel {
 	private NkUserFont defaultFont = NkUserFont.create();
 	private NkUserFont defaultFontBold = NkUserFont.create();
 	private NkUserFont defaultFontItalic = NkUserFont.create();
-	
-	public double getMouseX() {
-		return mouseX;
-	}
-
-	public void setMouseX(double mouseX) {
-		this.mouseX = mouseX;
-	}
-
-	public double getMouseY() {
-		return mouseY;
-	}
-
-	public void setMouseY(double mouseY) {
-		this.mouseY = mouseY;
-	}
-
-	public boolean isNkButtonDown() {
-		return nkButtonDown;
-	}
-
-	public void setNkButtonDown(boolean nkButtonDown) {
-		this.nkButtonDown = nkButtonDown;
-	}
-
-	public int getNkButton() {
-		return nkButton;
-	}
-
-	public void setNkButton(int nkButton) {
-		this.nkButton = nkButton;
-	}
 
 	public boolean isDoubleClicked() {
 		if (isDoubleClicked) {
@@ -153,14 +97,6 @@ public class NuklearModel {
 			return true;
 		}
 		return false;
-	}
-
-	public void setDoubleClicked(boolean isDoubleClicked) {
-		this.isDoubleClicked = isDoubleClicked;
-	}
-
-	public AbstractFrame getFocusedFrame() {
-		return focusedFrame;
 	}
 
 	public void setFocusedFrame(AbstractFrame focusedFrame) {
@@ -234,21 +170,21 @@ public class NuklearModel {
 			return new FrameProgress(this);
 		case confirmDialog:
 			return new FrameConfirmDialog(this);
-		case qfsDimension:
-			return new FrameQFSDimension(this);
-		case qfsColors:
-			return new FrameQFSColors(this);
+		case dimension:
+			return new FrameDimension(this);
+		case colors:
+			return new FrameColors(this);
 		case lights:
 			return new FrameLights(this);
 		case cameraSettings:
 			return new FrameCameraSettings(this);
-		case qfsSettings:
-			return new FrameQFSSettings(this);
+		case settings:
+			return new FrameSettings(this);
 		case preferences:
 			return new FramePreferences(this);
-		case qfsTerrainSettings:
-			return new FrameQFSTerrainSettings(this);
-		case oscillator:
+		case terrainSettings:
+			return new FrameTerrainSettings(this);
+		case identity:
 			return new FrameOscillator(this);
 		case slitWall:
 			return new FrameSlitWall(this);
@@ -270,14 +206,14 @@ public class NuklearModel {
 	}
 
 	public void render(long windowHandle, NkContext context) {
-		if (frames2Add.size() > 0) {
-			while (frames2Add.size() > 0) {
+		if (!frames2Add.isEmpty()) {
+			while (!frames2Add.isEmpty()) {
 				addToVisibleFrames(frames2Add.get(0));
 				frames2Add.remove(0);
 			}
 		}
 		else {
-			while (frames2Remove.size() > 0) {
+			while (!frames2Remove.isEmpty()) {
 				removeFromVisibleFrames(frames2Remove.get(0));
 				frames2Remove.remove(0);
 			}
@@ -377,70 +313,6 @@ public class NuklearModel {
 		DialogFileModel dlgMessage = dialogModelStack.pushDialogFileModel(DialogFileModel.CANCEL_SAVE,  title, "");
 		showFrame(Frame.saveFileDialog);
 		return dlgMessage;
-	}
-
-	public boolean isSubMenuActive() {
-		return subMenuActive;
-	}
-
-	public void setSubMenuActive(boolean subMenuActive) {
-		this.subMenuActive = subMenuActive;
-	}
-
-	public boolean isSubMenuVisible() {
-		return subMenuVisible;
-	}
-
-	public void setSubMenuVisible(boolean subMenuVisible) {
-		this.subMenuVisible = subMenuVisible;
-	}
-
-	public int getMenuIndex() {
-		return menuIndex;
-	}
-
-	public void setMenuIndex(int menuIndex) {
-		this.menuIndex = menuIndex;
-	}
-
-	public int getMenuBarHeight() {
-		return menuBarHeight;
-	}
-
-	public void setMenuBarHeight(int menuBarHeight) {
-		this.menuBarHeight = menuBarHeight;
-	}
-
-	public int getMenuItemWidth() {
-		return menuItemWidth;
-	}
-
-	public void setMenuItemWidth(int menuItemWidth) {
-		this.menuItemWidth = menuItemWidth;
-	}
-
-	public NkUserFont getDefaultFont() {
-		return defaultFont;
-	}
-
-	public void setDefaultFont(NkUserFont default_font) {
-		this.defaultFont = default_font;
-	}
-
-	public NkUserFont getDefaultFontBold() {
-		return defaultFontBold;
-	}
-
-	public void setDefaultFontBold(NkUserFont default_font_bold) {
-		this.defaultFontBold = default_font_bold;
-	}
-
-	public NkUserFont getDefaultFontItalic() {
-		return defaultFontItalic;
-	}
-
-	public void setDefaultFontItalic(NkUserFont defaultFontItalic) {
-		this.defaultFontItalic = defaultFontItalic;
 	}
 
 }

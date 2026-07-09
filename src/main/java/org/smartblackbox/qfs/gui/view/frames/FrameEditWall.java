@@ -22,14 +22,14 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
-import org.smartblackbox.qfs.opengl.model.REMModel;
-import org.smartblackbox.qfs.opengl.model.REMModel.EditMode;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.opengl.model.RemModel;
+import org.smartblackbox.qfs.opengl.model.RemModel.EditMode;
+import org.smartblackbox.qfs.settings.Project;
 
 public class FrameEditWall extends AbstractFrame {
 
-	private QFSProject qfsProject = QFSProject.getInstance();
-	private REMModel   REMModel   = qfsProject.getQfsModel();
+	private Project  project  = Project.getInstance();
+	private RemModel REMModel = project.getQfsModel();
 
 	private int width = 300;
 	private int height = 312;

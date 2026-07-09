@@ -18,23 +18,27 @@
  */
 package org.smartblackbox.qfs.opengl.model.entity;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
 import org.joml.Vector4f;
 import org.smartblackbox.qfs.opengl.model.*;
 import org.smartblackbox.qfs.opengl.utils.Neighbor;
 import org.smartblackbox.qfs.settings.AppSettings;
-import org.smartblackbox.qfs.settings.QFSProject;
-import org.smartblackbox.qfs.settings.QFSSettings.NodeFormulaVersion;
+import org.smartblackbox.qfs.settings.Project;
+import org.smartblackbox.qfs.settings.Settings.NodeFormulaVersion;
 
+@Getter
+@Setter
 public class Node extends Entity {
 
     private static final Vector3d FIXED_COLOR = new Vector3d(1f, 1f, 1f);
 
     private final AppSettings appSettings = AppSettings.getInstance();
-    private final QFSProject qfsProject = QFSProject.getInstance();
-    private final REMModel   REMModel   = qfsProject.getQfsModel();
-    private final Scene      scene      = qfsProject.scene;
+    private final Project  project  = Project.getInstance();
+    private final RemModel REMModel = project.getQfsModel();
+    private final Scene    scene    = project.scene;
 
     private static final int NEIGHBOR_RIGHT  = 0;
     private static final int NEIGHBOR_TOP    = 1;
@@ -53,11 +57,11 @@ public class Node extends Entity {
      */
     private final Node[]  neighbors = new Node[6];
     private       boolean hasNeighbors;
-    private       boolean   isFixed;
-    private       boolean   isXFixed;
-    private       boolean   isYFixed;
-    private       boolean   isZFixed;
-    private       boolean   isWall;
+    private       boolean isFixed;
+    private       boolean isXFixed;
+    private       boolean isYFixed;
+    private       boolean isZFixed;
+    private       boolean isWall;
 
     private Vector3d fixedPos;
 
@@ -71,21 +75,27 @@ public class Node extends Entity {
      */
     private AVP bField;
 
-    private       Vector3d baseField    = new Vector3d();
-    private final Vector3d ef           = new Vector3d();
+    private final Vector3d ef              = new Vector3d();
     private final Vector3d mf           = new Vector3d();
     private       Vector3d acceleration = new Vector3d();
     private       Vector3d velocity     = new Vector3d();
     private       Vector3i index        = new Vector3i(-1);
+    /**
+     * -- SETTER --
+     * Custom scale must be set before calling updateMatrix().
+     * <p>
+     * Custom scale will be reset after updateMatrix() is called.
+     */
     private       double   customScale  = -1;
+    /**
+     * -- SETTER --
+     * Custom color must be set before calling calcNewPosition().
+     * Custom color will be null after calcNewPosition() is called.
+     */
     private       Vector4f customColor;
 
     public Node(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
         super(parent, model, position, rotation, scale);
-    }
-
-    public Vector3i getIndex() {
-        return index;
     }
 
     public void setIndex(Vector3i index) {
@@ -133,18 +143,12 @@ public class Node extends Entity {
     @Override
     public void initPosition(Vector3d position) {
         super.setPosition(position);
-        if (baseField == null) baseField = new Vector3d();
-        baseField.set(position);
         if (fixedPos == null) fixedPos = new Vector3d();
         fixedPos.set(position);
         getEField().p.set(position);
         getEField().pBuf.set(position);
         getBField().p.set(position);
         getBField().pBuf.set(position);
-    }
-
-    public Node[] getNeighbors() {
-        return neighbors;
     }
 
     public void setNeighbor(Neighbor neighbor, Node node) {
@@ -156,83 +160,9 @@ public class Node extends Entity {
         return hasNeighbors;
     }
 
-    public void setHasNeighbors(boolean hasNeighbors) {
-        this.hasNeighbors = hasNeighbors;
-    }
-
     @Override
     public boolean isVisible() {
         return isVisible || isWall && REMModel.isWallVisible();
-    }
-
-    public boolean isFixed() {
-        return isFixed;
-    }
-
-    public void setFixed(boolean isFixed) {
-        this.isFixed = isFixed;
-    }
-
-    public boolean isXFixed() {
-        return isXFixed;
-    }
-
-    public void setXFixed(boolean isXFixed) {
-        this.isXFixed = isXFixed;
-    }
-
-    public boolean isYFixed() {
-        return isYFixed;
-    }
-
-    public void setYFixed(boolean isYFixed) {
-        this.isYFixed = isYFixed;
-    }
-
-    public boolean isZFixed() {
-        return isZFixed;
-    }
-
-    public void setZFixed(boolean isZFixed) {
-        this.isZFixed = isZFixed;
-    }
-
-    public boolean isWall() {
-        return isWall;
-    }
-
-    public void setWall(boolean isWall) {
-        this.isWall = isWall;
-    }
-
-    public Vector3d getVelocity() {
-        return velocity;
-    }
-
-    public void setVelocity(Vector3d velocity) {
-        this.velocity = velocity;
-    }
-
-    /**
-     * Custom scale must be set before calling updateMatrix().
-     * <p>
-     * Custom scale will be reset after updateMatrix() is called.
-     *
-     * @param customScale the custom scale
-     */
-    public void setCustomScale(double customScale) {
-        this.customScale = customScale;
-    }
-
-    /**
-     * Custom color must be set before calling calcNewPosition().
-     * <p>
-     * Custom color will be null after calcNewPosition() is called.
-     *
-     * @param color the custom color
-     */
-    public void setCustomColor(Vector4f color) {
-        customColor = color;
     }
 
     @Override
@@ -245,7 +175,7 @@ public class Node extends Entity {
                 settings.scale).scale(customScale > 0 ? customScale : scale);
 
         if (parent != null) parent.getTransformMatrix().mul(getTransformMatrix(), getTransformMatrix());
-        transformMatrixfList[swapBufIndex].set(getTransformMatrix());
+        transformMatrix4fList[swapBufIndex].set(getTransformMatrix());
         customScale = -1;
     }
 
@@ -405,8 +335,8 @@ public class Node extends Entity {
      *
      */
     public void updateNodeProperties_v0_1() {
-        double cws   = qfsProject.getConstantWaveSpeed() / 6;
-        double gamma = qfsProject.getConstantElectricFactor();
+        double cws   = project.getConstantWaveSpeed() / 6;
+        double gamma = project.getConstantElectricFactor();
 
         ef.set(0);
 
@@ -452,9 +382,9 @@ public class Node extends Entity {
     }
 
     public void updateNodeProperties_v0_2() {
-        double cws   = qfsProject.getConstantWaveSpeed() / 6;
-        double gamma = qfsProject.getConstantElectricFactor();
-        double beta  = qfsProject.getConstantMagneticFactor();
+        double cws   = project.getConstantWaveSpeed() / 6;
+        double gamma = project.getConstantElectricFactor();
+        double beta  = project.getConstantMagneticFactor();
         double f     = 0.1;
 
         ef.set(0);
@@ -492,8 +422,7 @@ public class Node extends Entity {
                                                           : neighbors[NEIGHBOR_LEFT].velocity;
         Vector3d nRight = neighbors[NEIGHBOR_RIGHT] == null ? new Vector3d()
                                                             : neighbors[NEIGHBOR_RIGHT].velocity;
-        Vector3d nTop = neighbors[NEIGHBOR_TOP] == null ? new Vector3d()
-                                                        : neighbors[NEIGHBOR_TOP].velocity;
+        Vector3d nTop = neighbors[NEIGHBOR_TOP] == null ? new Vector3d() : neighbors[NEIGHBOR_TOP].velocity;
         Vector3d nBottom = neighbors[NEIGHBOR_BOTTOM] == null ? new Vector3d()
                                                               : neighbors[NEIGHBOR_BOTTOM].velocity;
         Vector3d nFront = neighbors[NEIGHBOR_FRONT] == null ? new Vector3d()
@@ -526,9 +455,9 @@ public class Node extends Entity {
     }
 
     public void updateNodeProperties_v0_3() {
-        double cws   = qfsProject.getConstantWaveSpeed() / 6;
-        double gamma = qfsProject.getConstantElectricFactor();
-        double beta  = qfsProject.getConstantMagneticFactor();
+        double cws   = project.getConstantWaveSpeed() / 6;
+        double gamma = project.getConstantElectricFactor();
+        double beta  = project.getConstantMagneticFactor();
         double f     = 0.1;
 
         ef.set(0);

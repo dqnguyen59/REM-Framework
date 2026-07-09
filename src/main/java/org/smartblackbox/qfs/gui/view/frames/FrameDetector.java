@@ -24,15 +24,15 @@ import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.gui.model.Theme;
 import org.smartblackbox.qfs.opengl.model.DetectorModel;
-import org.smartblackbox.qfs.opengl.model.REMModel;
-import org.smartblackbox.qfs.opengl.model.REMModel.NodeSelectionMode;
-import org.smartblackbox.qfs.settings.QFSProject;
+import org.smartblackbox.qfs.opengl.model.RemModel;
+import org.smartblackbox.qfs.opengl.model.RemModel.NodeSelectionMode;
+import org.smartblackbox.qfs.settings.Project;
 
 public class FrameDetector extends AbstractFrame {
 
-	private QFSProject    qfsProject    = QFSProject.getInstance();
-	private REMModel      REMModel      = qfsProject.getQfsModel();
-	private DetectorModel detectorModel = qfsProject.detectorModel;
+	private Project       project       = Project.getInstance();
+	private RemModel      REMModel      = project.getQfsModel();
+	private DetectorModel detectorModel = project.detectorModel;
 
 	private int width = 400;
 	private int height = 400;
@@ -118,7 +118,7 @@ public class FrameDetector extends AbstractFrame {
 			Nuklear.nk_label(ctx, "", Nuklear.NK_TEXT_LEFT);
 	        if (nk_button_label(ctx, "Reset")) {
 	        	detectorModel.reset();
-	        	qfsProject.reset();
+	        	project.reset();
 			}
 	        if (nk_button_label(ctx, "Ignite")) {
 	        	detectorModel.ignite();
