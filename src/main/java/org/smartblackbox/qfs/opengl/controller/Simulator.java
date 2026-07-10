@@ -174,7 +174,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private void updateNodesProperties() {
         renderer.cleanupNodes();
 
-        for (Entity entity : scene.getEntities()) {
+        for (Entity entity : scene.getLattice().getEntities()) {
             if (entity.getClass() == Node.class) {
                 Node node = (Node) entity;
                 int  i    = node.getIndex().x;
@@ -254,7 +254,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             remModel.getCurrentMouseNodeIndex().x = project.getDimensionX() / 2;
             remModel.getCurrentMouseNodeIndex().y = project.getDimensionY() / 2;
             remModel.getCurrentMouseNodeIndex().z = project.getDimensionZ() / 2;
-            remModel.setCurrentMouseNode(scene.getNodeByIndex(remModel.getCurrentMouseNodeIndex()));
+            remModel.setCurrentMouseNode(scene.getLattice().getNodeByIndex(remModel.getCurrentMouseNodeIndex()));
 
             isLoadingStarted = false;
         }
@@ -571,37 +571,37 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 break;
             case GLFW.GLFW_KEY_KP_4:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseField().incRotation(0.0f, inc, 0.0f);
+                    scene.getLattice().getBaseEntity().incRotation(0.0f, inc, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_6:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseField().incRotation(0.0f, -inc, 0.0f);
+                    scene.getLattice().getBaseEntity().incRotation(0.0f, -inc, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_2:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseField().incRotation(-inc, 0.0f, 0.0f);
+                    scene.getLattice().getBaseEntity().incRotation(-inc, 0.0f, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_8:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseField().incRotation(inc, 0.0f, 0.0f);
+                    scene.getLattice().getBaseEntity().incRotation(inc, 0.0f, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_3:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseField().incRotation(0.0f, 0.0f, inc);
+                    scene.getLattice().getBaseEntity().incRotation(0.0f, 0.0f, inc);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_1:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseField().incRotation(0.0f, 0.0f, -inc);
+                    scene.getLattice().getBaseEntity().incRotation(0.0f, 0.0f, -inc);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_5:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseField().setRotation(0, 0, 0);
+                    scene.getLattice().getBaseEntity().setRotation(0, 0, 0);
                 }
                 break;
             case GLFW.GLFW_KEY_SPACE:
@@ -754,11 +754,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                                                project.terrain.getTerrainTextureFilePath());
                 nuklearModel.showErrorDialog("Loading terrain texture", message);
             }
-            scene.getEntities().clear();
+            scene.getLattice().getEntities().clear();
             isLoadingStarted = true;
             remModel.setLoadingReady(false);
-            // Build the Quantum Fields.
-            scene.getLattice().build();
+            // Build the Lattice 3D Matrices of Nodes
+            scene.build();
             waitAfterReset = 0;
         }
 
@@ -817,14 +817,14 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             scene.resetTasks();
 
             int numThreads  = appSettings.getNumThreads();
-            int numNodes    = scene.getEntities().size();
+            int numNodes    = scene.getLattice().getEntities().size();
             int segmentSize = numNodes > numThreads ? numNodes / numThreads + 1 : numNodes;
 
             PerformanceMonitor.start(Measurement.physics);
 
             if (waitAfterReset <= 0) {
                 simulateRain();
-                oscillateSelectedNodes();
+                oscillateIdentities();
             } else {
                 waitAfterReset--;
             }
@@ -852,7 +852,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private void detector() {
         if (nuklearModel.isFrameVisible(Frame.detector)) {
-            Node node = scene.getNodeByIndex(detectorModel.getIgnitorNode());
+            Node node = scene.getLattice().getNodeByIndex(detectorModel.getIgnitorNode());
             if (node != null) {
                 node.setCustomScale(2.0);
                 node.setCustomColor(new Vector4f(0f, 1f, 0f, 1f));
@@ -860,7 +860,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     detectorModel.ignite(node, project.rainModel.getForce());
             }
 
-            node = scene.getNodeByIndex(detectorModel.getDetectorNode());
+            node = scene.getLattice().getNodeByIndex(detectorModel.getDetectorNode());
             if (node != null) {
                 node.setCustomScale(2.0);
                 node.setCustomColor(new Vector4f(1f, 1f, 0f, 1f));
@@ -880,7 +880,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                                                       project.getDimensionY() - 2)));
                 index.z = settings.getVisibleIndexZ();
 
-                Node node = scene.getNodeByIndex(index);
+                Node node = scene.getLattice().getNodeByIndex(index);
                 if (node != null)
                     node.incPosition(new Vector3d(0, 0, Math.random() * project.rainModel.getForce()));
             }
@@ -888,11 +888,10 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         }
     }
 
-    private void oscillateSelectedNodes() {
+    private void oscillateIdentities() {
         if (remModel.isSimulating()) {
             for (Occupancy occupancy : project.occupancies) {
-                //Node node = scene.getNodeByIndex(occupancy.getNode().getIndex());
-                Node node = occupancy.getNode();
+                Node node = scene.getLattice().getNodeByIndex(occupancy.getNode().getIndex());
 
                 if (node != null) {
                     Vector3d o = occupancy.getIdentity().oscillate();

@@ -20,7 +20,12 @@ package org.smartblackbox.qfs.opengl.model.entity;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.ini4j.Wini;
 import org.joml.Vector3d;
+import org.joml.Vector3i;
+import org.smartblackbox.qfs.settings.Project;
+import org.smartblackbox.utils.AbstractSettings;
+import org.smartblackbox.utils.ISettings;
 
 /**
  * Represents the relationship between an Identity and a Node.
@@ -55,7 +60,7 @@ import org.joml.Vector3d;
  */
 @Getter
 @Setter
-public class Occupancy {
+public class Occupancy extends AbstractSettings implements ISettings {
 
     /**
      * The Identity currently occupying this node.
@@ -63,7 +68,7 @@ public class Occupancy {
      * Identity contains the oscillator behaviour and is the source/receiver
      * of field interaction.
      */
-    private Identity identity;
+    private Identity identity = new Identity("");
 
 
     /**
@@ -136,6 +141,37 @@ public class Occupancy {
     public Occupancy() {
     }
 
+    @Override
+    public AbstractSettings clone() {
+        return null;
+    }
+
+    @Override
+    public void loadFromFile(String filename) {
+    }
+
+    @Override
+    public void saveToFile(String filename) {
+    }
+
+    @Override
+    public void loadFromFile(Wini ini, String section, int index) {
+        super.loadFromFile(ini, section, index);
+        identity.loadFromFile(ini, section, index);
+        int x = getInt(section + index, "nodeIndex.x", 0);
+        int y = getInt(section + index, "nodeIndex.y", 0);
+        int z = getInt(section + index, "nodeIndex.z", 0);
+        node = Project.getInstance().scene.getLattice().getNodeByIndex(new Vector3i(x, y, z));
+    }
+
+    @Override
+    public void saveToFile(Wini ini, String section, int index) {
+        super.saveToFile(ini, section, index);
+        identity.saveToFile(ini, section, index);
+        put(section + index, "nodeIndex.x", node.getIndex().x);
+        put(section + index, "nodeIndex.y", node.getIndex().y);
+        put(section + index, "nodeIndex.z", node.getIndex().z);
+    }
 
     /**
      * Creates an occupancy relation between an Identity and a Node.

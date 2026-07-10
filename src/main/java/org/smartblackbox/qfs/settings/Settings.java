@@ -18,11 +18,15 @@
  */
 package org.smartblackbox.qfs.settings;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.ini4j.Wini;
 import org.joml.Vector4f;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.utils.AbstractSettings;
 import org.smartblackbox.utils.ISettings;
+
+import java.util.Objects;
 
 /**
  * To increase the performance, some have public variables to avoid calling getters and setters.
@@ -32,6 +36,8 @@ import org.smartblackbox.utils.ISettings;
  * @author dqnguyen
  *
  */
+@Getter
+@Setter
 public class Settings extends AbstractSettings implements ISettings {
 
     public enum SliceType {
@@ -55,13 +61,6 @@ public class Settings extends AbstractSettings implements ISettings {
                 }
             }
             return strEnums;
-        }
-
-        public static boolean contains(String value) {
-            for (String item : getValues()) {
-                if (item.equals(value)) return true;
-            }
-            return false;
         }
     }
 
@@ -158,41 +157,15 @@ public class Settings extends AbstractSettings implements ISettings {
         return new Settings(this);
     }
 
-    public Float getDepthVisibility() {
-        return depthVisibility;
-    }
-
-    public void setDepthVisibility(Float value) {
-        this.depthVisibility = value;
-    }
-
     public float getDepthVisibilityFactor() {
         return (1 - depthVisibility) * Constants.DEPTH_FADING_FACTOR;
     }
 
-    public float getAlphaSlice() {
-        return alphaSlice;
-    }
-
-    public void setAlphaSlice(float alphaIntensitySlice) {
-        this.alphaSlice = alphaIntensitySlice;
-    }
-
-    public float getAlphaAll() {
-        return alphaAll;
-    }
-
-    public void setAlphaAll(float alphaIntensiityAll) {
-        this.alphaAll = alphaIntensiityAll;
-    }
-
     public float getAlpha() {
-        switch (sliceType) {
-            case none:
-                return getAlphaAll();
-            default:
-                return getAlphaSlice();
+        if (Objects.requireNonNull(sliceType) == SliceType.none) {
+            return getAlphaAll();
         }
+        return getAlphaSlice();
     }
 
     public void incAlpha() {
@@ -211,29 +184,11 @@ public class Settings extends AbstractSettings implements ISettings {
         }
     }
 
-    public float getIntensitySlice() {
-        return intensitySlice;
-    }
-
-    public void setIntensitySlice(float intensitySlice) {
-        this.intensitySlice = intensitySlice;
-    }
-
-    public float getIntensityAll() {
-        return intensityAll;
-    }
-
-    public void setIntensityAll(float intensiityAll) {
-        this.intensityAll = intensiityAll;
-    }
-
     public float getIntensity() {
-        switch (sliceType) {
-            case none:
-                return getIntensityAll();
-            default:
-                return getIntensitySlice();
+        if (Objects.requireNonNull(sliceType) == SliceType.none) {
+            return getIntensityAll();
         }
+        return getIntensitySlice();
     }
 
     public void incIntensity() {
@@ -252,27 +207,11 @@ public class Settings extends AbstractSettings implements ISettings {
         }
     }
 
-    public float getShininess() {
-        return shininess;
-    }
-
-    public void setShininess(float shininess) {
-        this.shininess = shininess;
-    }
-
-    public SliceType getSliceType() {
-        return sliceType;
-    }
-
     public void setSliceType(SliceType sliceType) {
         if (lastSliceType != sliceType)
             isChanged = true;
         this.sliceType = sliceType;
         lastSliceType  = sliceType;
-    }
-
-    public ColorMode getColorMode() {
-        return colorMode;
     }
 
     public void setColorMode(ColorMode colorMode) {
@@ -282,19 +221,11 @@ public class Settings extends AbstractSettings implements ISettings {
         lastColorMode = colorMode;
     }
 
-    public NodeFormulaVersion getNodeFormulaVersion() {
-        return nodeFormulaVersion;
-    }
-
     public void setNodeFormulaVersion(NodeFormulaVersion nodeFormulaVersion) {
         this.nodeFormulaVersion = nodeFormulaVersion;
         if (lastNodeFormulaVersion != nodeFormulaVersion)
             isChanged = true;
         lastNodeFormulaVersion = nodeFormulaVersion;
-    }
-
-    public int getVisibleIndexX() {
-        return visibleIndexX;
     }
 
     public void setVisibleIndexX(int visibleIndexX) {
@@ -308,10 +239,6 @@ public class Settings extends AbstractSettings implements ISettings {
         }
     }
 
-    public int getVisibleIndexY() {
-        return visibleIndexY;
-    }
-
     public void setVisibleIndexY(int visibleIndexY) {
         if (visibleIndexY < 0)
             visibleIndexY = 0;
@@ -323,10 +250,6 @@ public class Settings extends AbstractSettings implements ISettings {
         }
     }
 
-    public int getVisibleIndexZ() {
-        return visibleIndexZ;
-    }
-
     public void setVisibleIndexZ(int visibleIndexZ) {
         if (visibleIndexZ < 0)
             visibleIndexZ = 0;
@@ -336,14 +259,6 @@ public class Settings extends AbstractSettings implements ISettings {
             this.visibleIndexZ = visibleIndexZ;
             isChanged          = true;
         }
-    }
-
-    public boolean isChanged() {
-        return isChanged;
-    }
-
-    public void setChanged(boolean isChanged) {
-        this.isChanged = isChanged;
     }
 
     @Override

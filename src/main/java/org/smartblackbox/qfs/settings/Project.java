@@ -28,7 +28,6 @@ import org.lwjgl.glfw.GLFW;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.opengl.model.*;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
-import org.smartblackbox.qfs.opengl.model.entity.Identity;
 import org.smartblackbox.qfs.opengl.model.entity.Node;
 import org.smartblackbox.qfs.opengl.model.entity.Occupancy;
 import org.smartblackbox.qfs.opengl.model.lights.Light;
@@ -159,10 +158,11 @@ public class Project extends AbstractSettings implements ISettings {
         int size = getInt("Oscillators", "Size", 0);
         occupancies.clear();
         for (int i = 0; i < size; i++) {
-            Identity identity = new Identity("");
-            identity.loadFromFile(ini, "Oscillator", i);
-            // TODO: add node
-            occupancies.add(new Occupancy(identity, null));
+//            Identity identity = new Identity("");
+//            identity.loadFromFile(ini, "Oscillator", i);
+            Occupancy occupancy = new Occupancy();
+            occupancy.loadFromFile(ini, "Oscillator", i);
+            occupancies.add(occupancy);
         }
 
         rainModel.loadFromFile(ini, "Rain", index);
@@ -225,7 +225,7 @@ public class Project extends AbstractSettings implements ISettings {
 
         saveLights(ini);
 
-        baseRotation = scene.getLattice().getBaseField().getRotation();
+        baseRotation = scene.getLattice().getBaseEntity().getRotation();
 
         put("Camera", "fieldOfFiew", camera.getFieldOfFiew());
         put("Camera", "position.x", camera.getPosition().x);
@@ -252,8 +252,7 @@ public class Project extends AbstractSettings implements ISettings {
         int size = occupancies.size();
         put("Oscillators", "Size", size);
         for (int i = 0; i < size; i++) {
-            occupancies.get(i).getIdentity().saveToFile(ini, "Oscillator", i);
-            // TODO: save occupancy to file
+            occupancies.get(i).saveToFile(ini, "Oscillator", i);
         }
 
         rainModel.saveToFile(ini, "Rain", index);
@@ -275,7 +274,7 @@ public class Project extends AbstractSettings implements ISettings {
             nodeIndex.x = getInt("Wall" + i, "index.x", -1);
             nodeIndex.y = getInt("Wall" + i, "index.y", -1);
             nodeIndex.z = getInt("Wall" + i, "index.z", -1);
-            Node node = scene.getNodeByIndex(nodeIndex);
+            Node node = scene.getLattice().getNodeByIndex(nodeIndex);
             if (node != null) {
                 scene.getWallNodeIndexList().add(nodeIndex);
             }

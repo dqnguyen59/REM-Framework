@@ -22,11 +22,11 @@ import org.ini4j.Wini;
 
 public interface ISettings {
 
-	public AbstractSettings clone();
+	AbstractSettings clone();
 
-	public void loadFromFile(Wini ini, String section, int index);
+	void loadFromFile(Wini ini, String section, int index);
 	
-	public void saveToFile(Wini ini, String section, int index);
+	void saveToFile(Wini ini, String section, int index);
 	
 }
 

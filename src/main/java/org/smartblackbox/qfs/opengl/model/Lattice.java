@@ -19,6 +19,7 @@
 package org.smartblackbox.qfs.opengl.model;
 
 import lombok.Getter;
+import lombok.Setter;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
 import org.joml.Vector4f;
@@ -30,63 +31,76 @@ import org.smartblackbox.qfs.opengl.utils.OBJFormatLoader;
 import org.smartblackbox.qfs.settings.AppSettings;
 import org.smartblackbox.qfs.settings.Project;
 
+import java.util.ArrayList;
+import java.util.List;
+
+@Getter
+@Setter
 public class Lattice {
 
 	private final AppSettings appSettings = AppSettings.getInstance();
 	private final Project  project  = Project.getInstance();
-	private final RemModel REMModel = project.getQfsModel();
-	private final Scene    scene;
+	private final RemModel remModel = project.getQfsModel();
 
-    @Getter
-    private Entity baseField;
+    private Entity baseEntity;
+	private ObjFileModel modelSphere;
 
-	private Node[][][] nodeMatrix;
+	private Node[][][]   nodeMatrix;
+	private List<Entity> entities;
 
-	private final OBJFormatLoader loader;
+	private Object[] nodeArray;
+	private Object[] entityArray;
 
-	public Lattice(Scene scene) {
-		loader = new OBJFormatLoader();
-		this.scene = scene;  
+	public Lattice() {
+		entities = new ArrayList<>();
 	}
 
-	public void drawArrows(Entity baseField, float step, ObjFileModel modelSphere, int sizeI, int sizeJ, int sizeK) {
-		ObjFileModel modelArrow = loader.loadOBJModel(Constants.MODEL_ARROW);
-		float scale = 0.5f;
-		
-		Entity arrowC = scene.createEntity(baseField, modelSphere,
-				new Vector3d(-(sizeI + 1.0) / 2 * step, -(sizeJ / 2.0 + 1) * step, -(sizeK / 2.0 + 1) * step),
-				new Vector3d(0, 0, 0), scale);
-		arrowC.setOverrideModelMaterial(true);
-		arrowC.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
-		arrowC.getMaterial().setAmbientColor(new Vector4f(10.0f, 10.0f, 10.0f, 1.0f));
-		arrowC.getMaterial().setShininess(0.0f);
-
-		Entity arrowX = scene.createEntity(baseField, modelArrow,
-				new Vector3d(-(sizeI + 1.0) / 2 * step, -(sizeJ / 2.0 + 1) * step, -(sizeK / 2.0 + 1) * step),
-				new Vector3d(0, 90, 0), scale);
-		arrowX.setOverrideModelMaterial(true);
-		arrowX.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
-		arrowX.getMaterial().setAmbientColor(new Vector4f(10.0f, 4.5f, 4.5f, 1.0f));
-		arrowX.getMaterial().setShininess(0.0f);
-		
-		Entity arrowY = scene.createEntity(baseField, modelArrow, 
-				new Vector3d(-(sizeI + 1.0) / 2 * step, -(sizeJ / 2.0 + 1) * step, -(sizeK / 2.0 + 1) * step),
-				new Vector3d(0, 0, 0), scale);
-		arrowY.setOverrideModelMaterial(true);
-		arrowY.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
-		arrowY.getMaterial().setAmbientColor(new Vector4f(4.5f, 4.5f, 10.0f, 1.0f));
-		arrowY.getMaterial().setShininess(0.0f);
-		
-		Entity arrowZ = scene.createEntity(baseField, modelArrow,
-				new Vector3d(-(sizeI + 1.0) / 2 * step, -(sizeJ / 2.0 + 1) * step, -(sizeK / 2.0 + 1) * step),
-				new Vector3d(-90, 0, 0), scale);
-		arrowZ.setOverrideModelMaterial(true);
-		arrowZ.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
-		arrowZ.getMaterial().setAmbientColor(new Vector4f(4.5f, 10.0f, 4.5f, 1.0f));
-		arrowZ.getMaterial().setShininess(0.0f);
+	public Node getNode(int x, int y, int z) {
+		return nodeMatrix[z][y][x];
 	}
-	
-	public void build(Vector3i dimension, Vector3d rotation) {
+
+	public Node getNode(Vector3i node) {
+		return getNode(node.x, node.y, node.z);
+	}
+
+	public Entity addEntity(Entity entity) {
+		entities.add(entity);
+		return entity;
+	}
+
+	public Entity createEntity(
+			Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
+		return addEntity(new Entity(parent, model, position, rotation, scale));
+	}
+
+	public Node createNode(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
+		return (Node) addEntity(new Node(parent, model, position, rotation, scale));
+	}
+
+	public List<Entity> getNodes() {
+		List<Entity> nodes = new ArrayList<>();
+		for (Entity entity : getEntities()) {
+			if (Node.class.isAssignableFrom(entity.getClass())) {
+				nodes.add(entity);
+			}
+		}
+		return nodes;
+	}
+
+	public Node getNodeByIndex(Vector3i nodeIndex) {
+		int index = nodeIndex.z * project.getDimensionY() * project.getDimensionX() +
+		            nodeIndex.y * project.getDimensionX() + nodeIndex.x;
+		if (index >= 0 && index < getNodeArray().length)
+			return (Node) getNodeArray()[index];
+		else
+			return null;
+
+	}
+
+	public Entity build() {
+		Vector3i dimension = new Vector3i();
+		project.getDimension(dimension);
+
 		int sizeI = dimension.x;
 		int sizeJ = dimension.y;
 		int sizeK = dimension.z;
@@ -96,24 +110,24 @@ public class Lattice {
 		Performance.numNodesY = sizeJ;
 		Performance.numNodesZ = sizeK;
 
-		ObjFileModel modelSphere = loader.loadOBJModel(Constants.MODEL_NODE);
+		modelSphere = new OBJFormatLoader().loadOBJModel(Constants.MODEL_NODE);
 
-		baseField = new Entity(null, null, new Vector3d(), new Vector3d(), 1.0f);
-		baseField.setPosition(0, 0, 0);
-		baseField.setRotation(rotation.x, rotation.y, rotation.z);
-		scene.addEntity(baseField);
+		baseEntity = new Entity(null, null, new Vector3d(), new Vector3d(), 1.0f);
+		baseEntity.setPosition(0, 0, 0);
+		baseEntity.setRotation(project.baseRotation.x, project.baseRotation.y, project.baseRotation.z);
+		addEntity(baseEntity);
 
 		float step = Constants.EP_DEFAULT_DISTANCE;
 		
 		// Draw xyz arrows on entity baseField.
-		//drawArrows(baseField, step, modelSphere, sizeI, sizeJ, sizeK);
+		//drawArrows(baseField, Constants.EP_DEFAULT_DISTANCE, modelSphere, sizeI, sizeJ, sizeK);
 
 		nodeMatrix = new Node[sizeK][sizeJ][sizeI];
 
 		int NumNodes = sizeI * sizeJ * sizeK;
 		
-		REMModel.setLoadingReady(false);
-		REMModel.setProgress(0.0);
+		remModel.setLoadingReady(false);
+		remModel.setProgress(0.0);
 		
 		new Thread(new Runnable() {
 			
@@ -123,9 +137,9 @@ public class Lattice {
 				for (int k = 0; k < sizeK; k++) {
 					for (int j = 0; j < sizeJ; j++) {
 						for (int i = 0; i < sizeI; i++) {
-							Node n = scene.createNode(baseField, modelSphere,
-							                          new Vector3d((i - sizeI / 2.0) * step, (j - sizeJ / 2.0) * step, (k - sizeK / 2.0) * step),
-							                          new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
+							Node n = createNode(baseEntity, modelSphere,
+							                    new Vector3d((i - sizeI / 2.0) * step, (j - sizeJ / 2.0) * step, (k - sizeK / 2.0) * step),
+							                    new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
 							n.setIndex(i, j, k);
 							
 							n.setOverrideModelMaterial(true);
@@ -153,7 +167,7 @@ public class Lattice {
 
 
 							countNode++;
-							REMModel.setProgress((double) countNode / (double) NumNodes * 100);
+							remModel.setProgress((double) countNode / (double) NumNodes * 100);
 						}
 					}
 				}
@@ -191,24 +205,15 @@ public class Lattice {
 						}
 					}
 				}
-				REMModel.setLoadingReady(true);
+				remModel.setLoadingReady(true);
 			}
 		}).start();
-		
+
+		return baseEntity;
 	}
 	
-	public void build() {
-		Vector3i dimension = new Vector3i();
-		project.getDimension(dimension);
-		build(dimension, project.baseRotation);
+	public void update() {
+		setNodeArray(getNodes().toArray());
+		setEntityArray(entities.toArray());
 	}
-
-    public Node getNode(int x, int y, int z) {
-		return nodeMatrix[z][y][x];
-	}
-
-	public Node getNode(Vector3i node) {
-		return getNode(node.x, node.y, node.z);
-	}
-	
 }
