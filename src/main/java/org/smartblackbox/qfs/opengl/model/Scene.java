@@ -55,9 +55,6 @@ public class Scene {
     private ArrayList<Node>     hiLightedNodes    = new ArrayList<>();
     private Node                firstHiLightedNode;
 
-    private final Object tasks = new Object();
-    private       int    numTask;
-
     private DirectionalLight directionalLight;
 
     private boolean animated;
@@ -67,6 +64,8 @@ public class Scene {
     private int animateDirection = -1;
 
     public String status = "";
+
+    List<Thread> threads = new ArrayList<>();
 
     public Scene() {
         terrains = new ArrayList<>();
@@ -239,7 +238,6 @@ public class Scene {
         for (Vector3i nodeIndex : wallNodeIndexList) {
             Node node = lattice.getNodeByIndex(nodeIndex);
             if (node != null) {
-                //node.setWall(true);
                 node.setType(EntityType.WALL);
             }
         }
@@ -423,8 +421,7 @@ public class Scene {
                         ray.x, ray.y, ray.z,
                         nodePos.x, nodePos.y, nodePos.z,
                         (float) (radius * radius),
-                        result
-                                                    )) {
+                        result)) {
                     return node;
                 }
             }
@@ -432,26 +429,17 @@ public class Scene {
         return null;
     }
 
-    public void threadUpdateMatrix(final int start, final int end) {
-        incTask();
-        status = "threadUpdateMatrix(" + start + ", " + end + "); TaskNo.:" + numTask;
-        new Thread(new Runnable() {
-
+    private void threadUpdateMatrix(final int start, final int end) {
+        threads.add(Thread.startVirtualThread(() -> {
             int i = start;
 
-            @Override
-            public void run() {
-                while (i < end) {
-                    ((Entity) lattice.getEntityArray()[i++]).updateMatrix();
-                }
-                taskCompleted();
+            while (i < end) {
+                ((Entity) lattice.getEntityArray()[i++]).updateMatrix();
             }
-        }).start();
+        }));
     }
 
-    public void processMatrixUpdateTasks(int numThreads, int segmentSize) {
-        resetTasks();
-
+    public void updateMatrix(int numThreads, int segmentSize) {
         for (int i = 0; i < numThreads; i++) {
             int start = i * segmentSize;
             int end   = start + segmentSize;
@@ -460,72 +448,40 @@ public class Scene {
         }
     }
 
-    public void threadCalcPhysics(final int start, final int end) {
-        incTask();
-        status = "threadCalcPhysics(" + start + ", " + end + "); TaskNo.:" + numTask;
-        new Thread(new Runnable() {
-
-            //volatile int i = start;
+    private void threadCalcRemField(final int start, final int end) {
+        threads.add(Thread.startVirtualThread(() -> {
             int i = start;
 
-            @Override
-            public void run() {
-                // If set to false then the node stops updating its position
-                if (REMModel.isSimulating()) {
-                    while (i < end) {
-                        ((Node) lattice.getNodeArray()[i++]).updateNodeProperties(
-                                settings.getNodeFormulaVersion());
-                    }
+            // If set to false then the node stops updating its position
+            if (REMModel.isSimulating()) {
+                while (i < end) {
+                    ((Node) lattice.getNodeArray()[i++]).updateNodeProperties(
+                            settings.getNodeFormulaVersion());
                 }
-
-                taskCompleted();
             }
-        }).start();
+        }));
     }
 
-    public void processPhysicsTasks(int numThreads, int segmentSize) {
-        resetTasks();
-
+    public void processRemFieldEngine(int numThreads, int segmentSize) {
         for (int i = 0; i < numThreads; i++) {
             int start = i * segmentSize;
             int end   = start + segmentSize;
             end = Math.min(end, lattice.getNodeArray().length);
-            threadCalcPhysics(start, end);
-        }
-    }
-
-    public synchronized void setNumTask(int numTask) {
-        this.numTask = numTask;
-    }
-
-    public synchronized void resetTasks() {
-        numTask = 0;
-    }
-
-    public synchronized void incTask() {
-        numTask++;
-    }
-
-    public void taskCompleted() {
-        synchronized (tasks) {
-            numTask--;
-            if (numTask <= 0) {
-                tasks.notifyAll();
-                numTask = 0;
-            }
+            threadCalcRemField(start, end);
         }
     }
 
     public void waitForAllTasksReady() {
-        synchronized (tasks) {
+        for (Thread thread : threads) {
             try {
-                tasks.wait();
+                thread.join();
             }
             catch (InterruptedException e) {
                 e.printStackTrace();
+                throw new RuntimeException(e);
             }
         }
-        numTask = 0;
+        threads.clear();
     }
 
     public void startAnimation() {

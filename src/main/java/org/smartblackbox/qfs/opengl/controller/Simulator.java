@@ -59,11 +59,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private final Scene            scene           = project.scene;
     private final Settings         settings        = project.settings;
     private final SlitWallSettings slitWall        = project.slitWall;
-    private final DetectorModel    detectorModel   = project.detectorModel;
+    private final DetectorModel   detectorModel   = project.detectorModel;
     /// Project Settings /////////////////////////////////////////////////////////////
     /// ///////////////////////////////////////////////////////////////////////////////
 
-    private       TransportSystem  transportSystem = new TransportSystem();
+    private final TransportSystem transportSystem = new TransportSystem();
 
     private final Renderer        renderer;
     private final OBJFormatLoader loader;
@@ -71,22 +71,20 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private       Node     selectedNode;
     private final Vector2d lastMousePos = new Vector2d();
 
-    private          boolean         leftButtonPressed = false;
-    private          boolean         rightButtonPress  = false;
-    private          boolean         isDrawing;
+    private              boolean         leftButtonPressed             = false;
+    private              boolean         rightButtonPress              = false;
+    private              boolean         isDrawing;
     //private volatile boolean         isCalcNextPhysicsReady = true;
-    private volatile boolean         isRenderingReady;
-    private          boolean         isLoadingStarted;
-    private          boolean         isNodesUpdateRequired;
-    private          KeyEvents       keyEvents;
-    private final    ArrayList<Node> customNodeFixed   = new ArrayList<Node>();
-    private          int             waitAfterReset    = 0;
-    private          Node            lastSelectedNode;
-    protected        long    currentTime;
-    private int              numFrameCalculation;
-    private static final int FRAME_CALCULATION_MAX_TIMEOUT = 10000;
-    private int              frameTimeoutCalcation         = FRAME_CALCULATION_MAX_TIMEOUT;
-    private Thread thread;
+    private volatile     boolean         isRenderingReady;
+    private              boolean         isLoadingStarted;
+    private              boolean         isNodesUpdateRequired;
+    private              KeyEvents       keyEvents;
+    private final        ArrayList<Node> customNodeFixed               = new ArrayList<>();
+    private              int             waitAfterReset                = 0;
+    private              Node            lastSelectedNode;
+    protected            long            currentTime;
+    private              int             numFrameCalculation;
+    private              Thread          thread;
 
     public Simulator(GLWindow glWindow) {
         super(glWindow);
@@ -768,19 +766,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             if (thread != null) {
                 thread.join();
             }
-        } catch (InterruptedException e) {
+        }
+        catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             System.out.println("Something's wrong");
         }
-//        while (numFrameCalculation > 0) {
-//            Utils.sleepMS(1);
-//            frameTimeoutCalcation--;
-//            if (frameTimeoutCalcation <= 0){
-//                frameTimeoutCalcation = FRAME_CALCULATION_MAX_TIMEOUT;
-//                numFrameCalculation = 0;
-//                System.out.println("Timeout during calculation of a frame");
-//            }
-//        }
     }
 
     private void calcNextFrame() {
@@ -793,7 +783,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         //thread = new Thread(() -> {
         thread = Thread.startVirtualThread(() -> {
             PerformanceMonitor.start(Measurement.totalCPURenderTime);
-            scene.resetTasks();
 
             int numThreads  = appSettings.getNumThreads();
             int numNodes    = scene.getLattice().getEntities().size();
@@ -808,7 +797,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 waitAfterReset--;
             }
             simulateDetection();
-            scene.processPhysicsTasks(numThreads, segmentSize);
+            scene.processRemFieldEngine(numThreads, segmentSize);
             scene.waitForAllTasksReady();
 
             if (remModel.isSimulating())
@@ -818,7 +807,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             PerformanceMonitor.reset(Measurement.physics);
 
             PerformanceMonitor.start(Measurement.updateMatrix);
-            scene.processMatrixUpdateTasks(numThreads, segmentSize);
+            scene.updateMatrix(numThreads, segmentSize);
             scene.waitForAllTasksReady();
             PerformanceMonitor.stop(Measurement.updateMatrix);
 
@@ -879,10 +868,10 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             Vector3i index = new Vector3i();
 
             for (int i = 0; i < project.rainModel.getIterations(); i++) {
-                index.x = (int) (Math.max(2, Math.min(Math.random() * project.getDimensionX(),
-                                                      project.getDimensionX() - 2)));
-                index.y = (int) (Math.max(2, Math.min(Math.random() * project.getDimensionY(),
-                                                      project.getDimensionY() - 2)));
+                index.x = (int) (Math.clamp(Math.random() * project.getDimensionX(), 2,
+                                            project.getDimensionX() - 2));
+                index.y = (int) (Math.clamp(Math.random() * project.getDimensionY(), 2,
+                                            project.getDimensionY() - 2));
                 index.z = settings.getVisibleIndexZ();
 
                 Node node = scene.getLattice().getNodeByIndex(index);
