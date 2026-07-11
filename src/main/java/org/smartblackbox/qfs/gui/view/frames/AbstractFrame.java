@@ -178,11 +178,11 @@ public abstract class AbstractFrame implements IFrame {
 		else {
 
 			NkRect r = appSettings.getFrameRectMap().get(title);
-            if (title.equals("Statusbar")) {
-                r.y(getWindowHeight() - r.h());
-            }
 
             if (r != null) {
+				if (title.equals("Statusbar")) {
+					r.y(getWindowHeight() - r.h());
+				}
 				x = (int) r.x();
 				y = (int) r.y();
 				if (lastHeight == height && lastWidth == width) {
