@@ -41,6 +41,8 @@ public abstract class AbstractSettings implements ISettings {
 	
 	abstract public AbstractSettings clone();
 
+	abstract public void reset();
+
 	public void loadFromFile(String filename) {
 		currentFilename = filename;
 		try {
