@@ -32,7 +32,7 @@ import org.smartblackbox.qfs.settings.Project;
 public class FrameStatusBar extends AbstractFrame {
 
 	private Project  project  = Project.getInstance();
-	private RemModel REMModel = project.getQfsModel();
+	private RemModel REMModel = project.getRemModel();
 
 	private int width;
 	private int height;

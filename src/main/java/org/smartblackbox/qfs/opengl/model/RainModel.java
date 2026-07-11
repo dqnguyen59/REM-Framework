@@ -45,6 +45,11 @@ public class RainModel extends AbstractSettings  {
 		return new RainModel(this);
 	}
 
+	@Override
+	public void reset() {
+		// Do nothing
+	}
+
 	public boolean isActive() {
 		return isActive;
 	}

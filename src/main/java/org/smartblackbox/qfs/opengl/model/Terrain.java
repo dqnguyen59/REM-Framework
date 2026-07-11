@@ -191,8 +191,12 @@ public class Terrain extends AbstractSettings {
 
 	@Override
 	public AbstractSettings clone() {
-		// TODO Auto-generated method stub
 		return null;
+	}
+
+	@Override
+	public void reset() {
+		// Do nothing
 	}
 
 }

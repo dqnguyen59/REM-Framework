@@ -1,7 +1,7 @@
 package org.smartblackbox.qfs.opengl.controller;
 
-import org.joml.Vector3d;
-import org.smartblackbox.qfs.opengl.model.entity.Node;
+import lombok.Getter;
+import lombok.Setter;
 import org.smartblackbox.qfs.opengl.model.entity.Occupancy;
 
 /**
@@ -41,166 +41,72 @@ import org.smartblackbox.qfs.opengl.model.entity.Occupancy;
  * asymmetry and not the result of direct identity-to-identity interaction.
  * </p>
  */
+@Getter
+@Setter
 public class TransportSystem {
 
-    /**
-     * Universal REM-FIELD transport constant.
-     *
-     * <p>
-     * Determines how strongly the measured local gradient modifies the
-     * transport vector during each simulation update.
-     * </p>
-     *
-     * <p>
-     * Larger values produce stronger acceleration.
-     * Smaller values produce slower acceleration.
-     * </p>
-     */
-    private static final double TRANSPORT_CONSTANT = 1.0;
+    private double velocityGain = 1.0;
 
     /**
      * Updates the transport state of a single occupancy.
      *
-     * <p>
-     * This method performs one complete transport update for the current
-     * simulation step.
-     * </p>
-     *
      * @param occupancy the occupancy to update
      */
     public void update(Occupancy occupancy) {
-
-        Vector3d gradient = measureGradient(occupancy.getNode());
-
-        updateTransport(occupancy, gradient);
-
-        updateTransferPhase(occupancy);
-
+        measureGradient(occupancy);
+        updateVelocity(occupancy);
+        updatePressure(occupancy);
         transferOccupancy(occupancy);
     }
 
     /**
      * Measures the local recursive field gradient around the occupied node.
-     *
-     * <p>
-     * The occupancy only measures the positions of the six neighboring nodes.
-     * It has no knowledge of identities or their locations.
-     * </p>
-     *
-     * <p>
-     * The returned vector represents the local asymmetry of the recursive field.
-     * A zero vector indicates perfect local symmetry.
-     * </p>
-     *
-     * <pre>
-     * Dx = Right.position - Left.position
-     * Dy = Top.position   - Bottom.position
-     * Dz = Front.position - Back.position
-     * </pre>
-     *
-     * <p>
-     * Only position differences are measured. Absolute node positions are
-     * ignored because transport depends only on the local geometry of the
-     * recursive field.
-     * </p>
-     *
-     * @param node occupied node
-     * @return local transport gradient
      */
-    private Vector3d measureGradient(Node node) {
-
-        return new Vector3d();
+    private void measureGradient(Occupancy occupancy) {
+        occupancy.getGradient().set(occupancy.getNode().measureGradient());
     }
 
     /**
-     * Updates the persistent transport vector.
-     *
-     * <p>
-     * The transport vector represents the accumulated history of local
-     * recursive field measurements.
-     * </p>
-     *
-     * <p>
-     * Transport update rule:
-     * </p>
-     *
-     * <pre>
-     * T = T + k · D
-     * </pre>
-     *
-     * where:
-     *
-     * <ul>
-     *     <li>T = transport vector</li>
-     *     <li>D = local transport gradient</li>
-     *     <li>k = transport constant</li>
-     * </ul>
-     *
-     * <p>
-     * If the gradient is zero, the transport vector remains unchanged,
-     * resulting in persistent motion.
-     * </p>
+     * Updates the persistent transport velocity.
+     * <br>
+     * The local lattice gradient acts as the transport acceleration.
+     * A constant gain controls how strongly the measured gradient
+     * changes the current transport velocity.
      */
-    private void updateTransport(
-            Occupancy occupancy,
-            Vector3d gradient) {
-
+    private void updateVelocity(Occupancy occupancy) {
+        occupancy.getTransportVelocity().fma(velocityGain, occupancy.getGradient());
     }
 
     /**
-     * Advances the transfer phase.
-     *
-     * <p>
-     * The transfer phase converts continuous transport into discrete occupancy
-     * transfers on the node lattice.
-     * </p>
-     *
-     * <pre>
-     * phase = phase + |transport|
-     * </pre>
-     *
-     * <p>
-     * The transport vector determines how quickly the phase accumulates.
-     * </p>
+     * Accumulates transport pressure.
+     * <br>
+     * Transport velocity contributes continuously to the pressure.
+     * When pressure reaches the transport threshold,
+     * a node transfer may occur.
      */
-    private void updateTransferPhase(
-            Occupancy occupancy) {
-
+    private void updatePressure(Occupancy occupancy) {
+        occupancy.getPressure().add(occupancy.getTransportVelocity());
     }
+
 
     /**
-     * Transfers the occupancy whenever sufficient transport phase has
-     * accumulated.
-     *
-     * <p>
-     * Whenever:
-     *
-     * <pre>
-     * phase >= 1
-     * </pre>
-     *
-     * one occupancy transfer occurs in the direction determined by the
-     * transport vector.
-     * </p>
-     *
-     * <p>
-     * After every transfer:
-     *
-     * <pre>
-     * phase = phase - 1
-     * </pre>
-     *
-     * preserving any remaining fractional phase.
-     * </p>
-     *
-     * <p>
-     * Multiple transfers during one simulation update are permitted whenever
-     * sufficient phase has accumulated.
-     * </p>
+     * Transfers the occupancy whenever sufficient transport phase has accumulated.
      */
-    private void transferOccupancy(
-            Occupancy occupancy) {
+    private void transferOccupancy(Occupancy occupancy) {
 
     }
 
+    public void print(Occupancy occupancy) {
+        String s = String.format("[%s]: " + //
+                                 "GX: %12.8f; GY: %12.8f; GZ: %12.8f === " + //
+                                 "VX: %12.8f; VY: %12.8f; VZ: %12.8f === " + //
+                                 "PX: %12.8f; PY: %12.8f; PZ: %12.8f; ", //
+                                 occupancy.getIdentity().getName(),
+                                 occupancy.getGradient().x, occupancy.getGradient().y, occupancy.getGradient().z, //
+                                 occupancy.getTransportVelocity().x, occupancy.getTransportVelocity().y, occupancy.getTransportVelocity().z, //
+                                 occupancy.getPressure().x, occupancy.getPressure().y, occupancy.getPressure().z //
+                                );
+        System.out.println(s);
+
+    }
 }

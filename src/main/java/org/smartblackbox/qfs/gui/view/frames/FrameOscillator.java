@@ -34,7 +34,7 @@ import org.smartblackbox.qfs.settings.Project;
 public class FrameOscillator extends AbstractFrame {
 
     private final Project  project  = Project.getInstance();
-    private final RemModel remModel = project.getQfsModel();
+    private final RemModel remModel = project.getRemModel();
 
     private final int optionsNoScroll = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_NO_SCROLLBAR;
     private final int groupNoScroll   = optionsNoScroll | Nuklear.NK_WINDOW_BORDER;

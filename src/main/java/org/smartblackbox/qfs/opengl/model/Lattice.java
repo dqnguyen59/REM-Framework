@@ -25,6 +25,7 @@ import org.joml.Vector3i;
 import org.joml.Vector4f;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
+import org.smartblackbox.qfs.opengl.model.entity.EntityType;
 import org.smartblackbox.qfs.opengl.model.entity.Node;
 import org.smartblackbox.qfs.opengl.utils.Neighbor;
 import org.smartblackbox.qfs.opengl.utils.OBJFormatLoader;
@@ -40,7 +41,7 @@ public class Lattice {
 
 	private final AppSettings appSettings = AppSettings.getInstance();
 	private final Project  project  = Project.getInstance();
-	private final RemModel remModel = project.getQfsModel();
+	private final RemModel remModel = project.getRemModel();
 
     private Entity baseEntity;
 	private ObjFileModel modelSphere;
@@ -50,6 +51,15 @@ public class Lattice {
 
 	private Object[] nodeArray;
 	private Object[] entityArray;
+
+	private static Lattice latticeInstance;
+
+	public static Lattice getInstance() {
+		if (latticeInstance == null) {
+			latticeInstance = new Lattice();
+		}
+		return latticeInstance;
+	}
 
 	public Lattice() {
 		entities = new ArrayList<>();
@@ -63,18 +73,36 @@ public class Lattice {
 		return getNode(node.x, node.y, node.z);
 	}
 
-	public Entity addEntity(Entity entity) {
+	private Entity addEntity(Entity entity) {
 		entities.add(entity);
 		return entity;
 	}
 
 	public Entity createEntity(
 			Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
-		return addEntity(new Entity(parent, model, position, rotation, scale));
+		return addEntity(new Entity(parent, model, position, rotation, scale, EntityType.ENTITY));
+	}
+
+	public Entity createEntity(Vector3d position, Vector3d rotation, double scale) {
+		if (baseEntity == null) {
+			System.out.println("Warning, baseEntity is null!");
+			return null;
+		}
+		if (modelSphere == null) {
+			System.out.println("Warning, modelSphere is null!");
+			return null;
+		}
+		return addEntity(new Entity(baseEntity, modelSphere, position, rotation, scale, EntityType.ENTITY));
 	}
 
 	public Node createNode(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
 		return (Node) addEntity(new Node(parent, model, position, rotation, scale));
+	}
+
+	public void deleteEntity(Node node) {
+		if (node != null) {
+			entities.remove(node);
+		}
 	}
 
 	public List<Entity> getNodes() {
@@ -112,10 +140,9 @@ public class Lattice {
 
 		modelSphere = new OBJFormatLoader().loadOBJModel(Constants.MODEL_NODE);
 
-		baseEntity = new Entity(null, null, new Vector3d(), new Vector3d(), 1.0f);
+		baseEntity = createEntity(null, null, new Vector3d(), new Vector3d(), 1.0f);
 		baseEntity.setPosition(0, 0, 0);
 		baseEntity.setRotation(project.baseRotation.x, project.baseRotation.y, project.baseRotation.z);
-		addEntity(baseEntity);
 
 		float step = Constants.EP_DEFAULT_DISTANCE;
 		
@@ -151,7 +178,8 @@ public class Lattice {
 							boolean isEdgeY = (sizeJ > 1 && (j == 0 || j == sizeJ - 1)); 
 							boolean isEdgeZ = (sizeK > 1 && (k == 0 || k == sizeK - 1)); 
 
-							n.setFixed(isEdgeX || isEdgeY || isEdgeZ);
+							if (isEdgeX || isEdgeY || isEdgeZ) n.setType(EntityType.FIXED);
+//							n.setFixed(isEdgeX || isEdgeY || isEdgeZ);
 							n.setXFixed(isEdgeX);
 							n.setYFixed(isEdgeY);
 							n.setZFixed(isEdgeZ);
@@ -216,4 +244,5 @@ public class Lattice {
 		setNodeArray(getNodes().toArray());
 		setEntityArray(entities.toArray());
 	}
+
 }

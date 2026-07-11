@@ -34,6 +34,7 @@ import org.smartblackbox.qfs.opengl.model.lights.Light;
 import org.smartblackbox.qfs.opengl.utils.OBJFormatLoader;
 import org.smartblackbox.utils.AbstractSettings;
 import org.smartblackbox.utils.ISettings;
+import org.smartblackbox.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -63,8 +64,8 @@ public class Project extends AbstractSettings implements ISettings {
     // Don't set the glSwapInterval below 1! It will cause instability of the application and freeze.
     private int glSwapInterval = 2;
 
-    private RemModel REMModel = new RemModel();
-    public  Camera   camera   = new Camera();
+    private RemModel remModel     = new RemModel();
+    public  Camera   camera       = new Camera();
     public  Scene    scene;
     public  Terrain  terrain;
     public  Vector3d baseRotation = new Vector3d(-66.6, 0, 0);
@@ -158,8 +159,6 @@ public class Project extends AbstractSettings implements ISettings {
         int size = getInt("Oscillators", "Size", 0);
         occupancies.clear();
         for (int i = 0; i < size; i++) {
-//            Identity identity = new Identity("");
-//            identity.loadFromFile(ini, "Oscillator", i);
             Occupancy occupancy = new Occupancy();
             occupancy.loadFromFile(ini, "Oscillator", i);
             occupancies.add(occupancy);
@@ -169,7 +168,7 @@ public class Project extends AbstractSettings implements ISettings {
         detectorModel.loadFromFile(ini, "Detector", index);
 
         if (!occupancies.isEmpty())
-            REMModel.setSelectedOccupancy(occupancies.get(0));
+            remModel.setSelectedOccupancy(occupancies.get(0));
 
         if (settings.getVisibleIndexX() >= dimension.x) {
             settings.setVisibleIndexX(dimension.x / 2);
@@ -183,33 +182,20 @@ public class Project extends AbstractSettings implements ISettings {
             settings.setVisibleIndexZ(dimension.z / 2);
         }
 
-        REMModel.getCurrentMouseNodeIndex().x = dimension.x / 2;
-        REMModel.getCurrentMouseNodeIndex().y = dimension.y / 2;
-        REMModel.getCurrentMouseNodeIndex().z = dimension.z / 2;
+        remModel.getCurrentMouseNodeIndex().x = dimension.x / 2;
+        remModel.getCurrentMouseNodeIndex().y = dimension.y / 2;
+        remModel.getCurrentMouseNodeIndex().z = dimension.z / 2;
 
         reset();
-        REMModel.setLoadingReady(false);
-        new Thread(new Runnable() {
-
-            @Override
-            public void run() {
-                while (!REMModel.isLoadingReady()) {
-                    try {
-                        System.out.println("loadFromFile.run()");
-                        Thread.sleep(100);
-                    }
-                    catch (InterruptedException ignored) {
-                    }
-                }
-                try {
-                    Thread.sleep(200);
-                }
-                catch (InterruptedException ignored) {
-                }
-                loadWalls(ini);
+        remModel.setLoadingReady(false);
+        new Thread(() -> {
+            while (!remModel.isLoadingReady()) {
+                System.out.println("loadFromFile.run()");
+                Utils.sleepMS(100);
             }
+            Utils.sleepMS(200);
+            loadWalls(ini);
         }).start();
-
     }
 
     @Override
@@ -398,13 +384,14 @@ public class Project extends AbstractSettings implements ISettings {
      * Use {@link #isChanged()} to check if reset is required.
      * If true, then define your customized reset.
      */
+    @Override
     public void reset() {
         isChanged = true;
         setConstantFrequency(constantFrequency);
         slitWall.reset();
-        for (Occupancy occupancy : occupancies) {
-            occupancy.getIdentity().reset();
-        }
+//        for (Occupancy occupancy : occupancies) {
+//            occupancy.reset();
+//        }
     }
 
     /**
@@ -480,8 +467,8 @@ public class Project extends AbstractSettings implements ISettings {
     public Light createLight() {
         ObjFileModel modelLightBulb = new OBJFormatLoader().loadOBJModel(Constants.MODEL_LIGHT_BULB);
         ObjFileModel modelSpotLight = new OBJFormatLoader().loadOBJModel(Constants.MODEL_LIGHT_CAP);
-        Light        light          = createLight(null, modelLightBulb, modelSpotLight,
-                                                  new Vector3d(0, 10, 0), new Vector3d(0, 0, 0), 1.0);
+        Light light = createLight(null, modelLightBulb, modelSpotLight,
+                                  new Vector3d(0, 10, 0), new Vector3d(0, 0, 0), 1.0);
         light.set(new Vector3f(1.0f, 1.0f, 1.0f), 1.0f, 1.0f, 0.001f, 0.00001f, 60);
         light.setDirection(new Vector3d(0, -1, 0));
         return light;
@@ -489,18 +476,6 @@ public class Project extends AbstractSettings implements ISettings {
 
     public void addLight(Light light) {
         lights.add(light);
-    }
-
-    public void removeLight(Light light) {
-        lights.remove(light);
-    }
-
-    public RemModel getQfsModel() {
-        return REMModel;
-    }
-
-    public void setQfsModel(RemModel REMModel) {
-        this.REMModel = REMModel;
     }
 
 }

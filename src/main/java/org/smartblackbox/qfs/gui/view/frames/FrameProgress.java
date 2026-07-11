@@ -31,7 +31,7 @@ import org.smartblackbox.qfs.settings.Project;
 public class FrameProgress extends AbstractFrame {
 
     private Project  project  = Project.getInstance();
-    private RemModel REMModel = project.getQfsModel();
+    private RemModel REMModel = project.getRemModel();
 
     PointerBuffer progress = PointerBuffer.allocateDirect(1);
 

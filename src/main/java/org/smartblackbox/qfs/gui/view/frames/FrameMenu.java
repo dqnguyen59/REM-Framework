@@ -32,7 +32,7 @@ import org.smartblackbox.qfs.settings.Project;
 public class FrameMenu extends AbstractFrame {
 
     private Project  project  = Project.getInstance();
-    private RemModel REMModel = project.getQfsModel();
+    private RemModel REMModel = project.getRemModel();
 
     private int menuWidth = 150;
 

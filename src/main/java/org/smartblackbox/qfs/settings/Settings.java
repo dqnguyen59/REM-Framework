@@ -157,6 +157,11 @@ public class Settings extends AbstractSettings implements ISettings {
         return new Settings(this);
     }
 
+    @Override
+    public void reset() {
+        // Do nothing
+    }
+
     public float getDepthVisibilityFactor() {
         return (1 - depthVisibility) * Constants.DEPTH_FADING_FACTOR;
     }

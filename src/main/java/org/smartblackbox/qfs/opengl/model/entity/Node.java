@@ -22,22 +22,19 @@ import lombok.Getter;
 import lombok.Setter;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
-import org.joml.Vector4f;
-import org.smartblackbox.qfs.opengl.model.*;
+import org.smartblackbox.qfs.opengl.model.ObjFileModel;
+import org.smartblackbox.qfs.opengl.model.RemModel;
+import org.smartblackbox.qfs.opengl.model.Scene;
 import org.smartblackbox.qfs.opengl.utils.Neighbor;
 import org.smartblackbox.qfs.settings.AppSettings;
-import org.smartblackbox.qfs.settings.Project;
 import org.smartblackbox.qfs.settings.Settings.NodeFormulaVersion;
 
 @Getter
 @Setter
 public class Node extends Entity {
 
-    private static final Vector3d FIXED_COLOR = new Vector3d(1f, 1f, 1f);
-
     private final AppSettings appSettings = AppSettings.getInstance();
-    private final Project  project  = Project.getInstance();
-    private final RemModel REMModel = project.getQfsModel();
+    private final RemModel remModel = project.getRemModel();
     private final Scene    scene    = project.scene;
 
     private static final int NEIGHBOR_RIGHT  = 0;
@@ -56,14 +53,17 @@ public class Node extends Entity {
      * 5: neighbors back
      */
     private final Node[]  neighbors = new Node[6];
-    private       boolean hasNeighbors;
-    private       boolean isFixed;
+//    private       boolean isFixed;
     private       boolean isXFixed;
     private       boolean isYFixed;
     private       boolean isZFixed;
-    private       boolean isWall;
+//    private       boolean isWall;
 
     private Vector3d fixedPos;
+
+    private Vector3d[] deltaPositions      = new Vector3d[6];
+    private double[]   deltaPositionLength = new double[6];
+    private Vector3d   gradient            = new Vector3d();
 
     /**
      * Electric Field
@@ -75,27 +75,17 @@ public class Node extends Entity {
      */
     private AVP bField;
 
-    private final Vector3d ef              = new Vector3d();
+    private final Vector3d ef           = new Vector3d();
     private final Vector3d mf           = new Vector3d();
     private       Vector3d acceleration = new Vector3d();
     private       Vector3d velocity     = new Vector3d();
-    private       Vector3i index        = new Vector3i(-1);
-    /**
-     * -- SETTER --
-     * Custom scale must be set before calling updateMatrix().
-     * <p>
-     * Custom scale will be reset after updateMatrix() is called.
-     */
-    private       double   customScale  = -1;
-    /**
-     * -- SETTER --
-     * Custom color must be set before calling calcNewPosition().
-     * Custom color will be null after calcNewPosition() is called.
-     */
-    private       Vector4f customColor;
 
     public Node(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
-        super(parent, model, position, rotation, scale);
+        super(parent, model, position, rotation, scale, EntityType.NODE);
+
+        for (int i = 0; i < deltaPositions.length; i++) {
+            deltaPositions[i] = new Vector3d();
+        }
     }
 
     public void setIndex(Vector3i index) {
@@ -153,35 +143,30 @@ public class Node extends Entity {
 
     public void setNeighbor(Neighbor neighbor, Node node) {
         this.neighbors[neighbor.ordinal()] = node;
-                                             hasNeighbors = true;
-    }
-
-    public boolean isHasNeightbors() {
-        return hasNeighbors;
     }
 
     @Override
     public boolean isVisible() {
-        return isVisible || isWall && REMModel.isWallVisible();
+        return isVisible || (type == EntityType.WALL) && remModel.isWallVisible();
     }
 
-    @Override
-    public void updateMatrix() {
-        updatePosition();
-        updateRotation();
+    public Vector3d measureGradient() {
 
-        getTransformMatrix().identity().translate(position).setRotationXYZ(rotationRad.x, rotationRad.y,
-                                                                           rotationRad.z).scale(
-                settings.scale).scale(customScale > 0 ? customScale : scale);
+        for (int i = 0; i < deltaPositions.length; i++) {
+            if (neighbors[i] != null) {
+                deltaPositions[i].set(neighbors[i].position).sub(position);
+                deltaPositionLength[i] = deltaPositions[i].length();
+            }
+        }
 
-        if (parent != null) parent.getTransformMatrix().mul(getTransformMatrix(), getTransformMatrix());
-        transformMatrix4fList[swapBufIndex].set(getTransformMatrix());
-        customScale = -1;
+        return gradient.set(deltaPositionLength[NEIGHBOR_RIGHT] - deltaPositionLength[NEIGHBOR_LEFT],
+                            deltaPositionLength[NEIGHBOR_TOP] - deltaPositionLength[NEIGHBOR_BOTTOM],
+                            deltaPositionLength[NEIGHBOR_FRONT] - deltaPositionLength[NEIGHBOR_BACK]);
     }
 
     public void updateNodeProperties(NodeFormulaVersion nodeFormulaVersion) {
         // If set to false then the node stops updating its position
-        if (!REMModel.isSimulating()) return;
+        if (!remModel.isSimulating()) return;
 
         switch (nodeFormulaVersion) {
             case v_0_3:
@@ -194,89 +179,6 @@ public class Node extends Entity {
                 updateNodeProperties_v0_1();
                 break;
         }
-    }
-
-    private synchronized void setEMFieldColor(Vector3d emf) {
-        Material m = getMaterial();
-
-        Vector4f color          = m.getDiffuseColor();
-        float    alpha          = 0;
-        float    intensity      = settings.getIntensity();
-        float    intensity2     = intensity * intensity;
-        float    intensity3     = intensity2 * intensity;
-        float    alphaIntensity = settings.getAlpha();
-
-        if (customColor != null) {
-            color.set(customColor).mul(2.0f);
-            alpha = 1.0f;
-        } else if (isSelected && !scene.isAnimated()) {
-            color.set(settings.selectedColor).mul(2.0f);
-            alpha = 1.0f;
-        } else if (isHiLighted) {
-            color.set(settings.hiLightColor).mul(2.0f);
-            alpha = color.w;
-        } else if (isWall) {
-            color.set(settings.wallColor).mul(2.0f);
-            alpha = color.w;
-        } else if (isFixed) {
-            color = settings.fixedColor;
-            alpha = color.w;
-        } else {
-            switch (settings.getColorMode()) {
-                case zColor:
-                    color.x = (float) (Math.max(0, -emf.z) * intensity);
-                    color.y = (float) (Math.abs(emf.y) * intensity);
-                    color.z = (float) (Math.max(0, emf.z) * intensity);
-                    color.w = 0;
-                    break;
-                case zColor2:
-                    color.x = (float) (Math.max(0, -emf.z) * intensity2);
-                    color.y = (float) (Math.abs(emf.y) * intensity2);
-                    color.z = (float) (Math.max(0, emf.z) * intensity2);
-                    color.w = 0;
-                    break;
-                case zColor3:
-                    color.x = (float) (Math.max(0, -emf.z) * Math.max(0, -emf.z) * intensity3);
-                    color.y = (float) (Math.abs(emf.y * emf.y) * intensity3);
-                    color.z = (float) (Math.max(0, emf.z) * Math.max(0, emf.z) * intensity3);
-                    color.w = 0;
-                    break;
-                case xyzColor:
-                    color.x = (float) (Math.abs(emf.x)) * intensity;
-                    color.y = (float) (Math.abs(emf.y)) * intensity;
-                    color.z = (float) (Math.abs(emf.z)) * intensity;
-                    color.w = 0;
-                    break;
-                case xyzColor2:
-                    color.x = (float) (Math.abs(emf.x) * intensity2);
-                    color.y = (float) (Math.abs(emf.y) * intensity2);
-                    color.z = (float) (Math.abs(emf.z) * intensity2);
-                    color.w = 0;
-                    break;
-                case xyzColor3:
-                    color.x = (float) (emf.x * emf.x) * intensity3;
-                    color.y = (float) (emf.y * emf.y) * intensity3;
-                    color.z = (float) (emf.z * emf.z) * intensity3;
-                    color.w = 0;
-                    break;
-                case normal:
-                default:
-                    color.x = settings.defaultNodeColor.x * intensity / 100.0f;
-                    color.y = settings.defaultNodeColor.y * intensity / 100.0f;
-                    color.z = settings.defaultNodeColor.z * intensity / 100.0f;
-                    color.w = settings.defaultNodeColor.w * alphaIntensity;
-                    alphaIntensity = color.w;
-                    break;
-            }
-            alpha = (alphaIntensity * (m.getDiffuseColor().length()));
-        }
-
-        m.setAmbientColor(color);
-        m.getDiffuseColor().w = alpha;
-        m.getAmbientColor().w = m.getDiffuseColor().w;
-        m.setShininess(settings.getShininess() * alpha);
-
-        customColor = null;
     }
 
     private Vector3d getNeighborEFieldPosition(int index) {
@@ -335,6 +237,8 @@ public class Node extends Entity {
      *
      */
     public void updateNodeProperties_v0_1() {
+        boolean isFixed = type == EntityType.FIXED;
+        boolean isWall = type == EntityType.WALL;
         double cws   = project.getConstantWaveSpeed() / 6;
         double gamma = project.getConstantElectricFactor();
 
@@ -342,7 +246,7 @@ public class Node extends Entity {
 
         for (Node neighbor : neighbors) {
             if (neighbor != null) {
-                if (isFixed || isWall) {
+                if (isXFixed || isWall) {
                     double alpha = isWall ? 0.00 : (1.0 - appSettings.getReflectionFixedNodes());
 
                     if (alpha == 0) {
@@ -378,10 +282,12 @@ public class Node extends Entity {
         if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;
         if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.z = fixedPos.z;
 
-        setEMFieldColor(isFixed ? FIXED_COLOR : ef);
+        setColor(isFixed ? FIXED_COLOR : ef);
     }
 
     public void updateNodeProperties_v0_2() {
+        boolean isFixed = type == EntityType.FIXED;
+        boolean isWall = type == EntityType.WALL;
         double cws   = project.getConstantWaveSpeed() / 6;
         double gamma = project.getConstantElectricFactor();
         double beta  = project.getConstantMagneticFactor();
@@ -451,10 +357,11 @@ public class Node extends Entity {
         if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;
         if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.z = fixedPos.z;
 
-        setEMFieldColor(isFixed ? FIXED_COLOR : ef);
+        setColor(isFixed ? FIXED_COLOR : ef);
     }
 
     public void updateNodeProperties_v0_3() {
+        boolean isFixed = type == EntityType.FIXED;
         double cws   = project.getConstantWaveSpeed() / 6;
         double gamma = project.getConstantElectricFactor();
         double beta  = project.getConstantMagneticFactor();
@@ -497,7 +404,7 @@ public class Node extends Entity {
         //position     = eField.p;
         posBuff = eField.p;
 
-        setEMFieldColor(isFixed ? FIXED_COLOR : ef);
+        setColor(isFixed ? FIXED_COLOR : ef);
     }
 
 }

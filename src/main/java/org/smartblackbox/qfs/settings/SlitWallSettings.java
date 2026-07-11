@@ -21,6 +21,7 @@ package org.smartblackbox.qfs.settings;
 import org.ini4j.Wini;
 import org.smartblackbox.utils.AbstractSettings;
 import org.smartblackbox.utils.ISettings;
+import org.smartblackbox.utils.Utils;
 
 public class SlitWallSettings extends AbstractSettings implements ISettings {
 
@@ -173,19 +174,13 @@ public class SlitWallSettings extends AbstractSettings implements ISettings {
 		}
 	}
 
+	@Override
 	public void reset() {
-		new Thread(new Runnable() {
-			
-			@Override
-			public void run() {
-				try {
-					Thread.sleep(500);
-				} catch (InterruptedException e) {
-				}
-				isChanged = true;
-				isUpdated = true;
-			}
-		}).start();
+		new Thread(() -> {
+			Utils.sleepMS(500);
+            isChanged = true;
+            isUpdated = true;
+        }).start();
 	}
 
 	@Override

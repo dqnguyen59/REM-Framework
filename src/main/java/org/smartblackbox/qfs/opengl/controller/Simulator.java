@@ -28,6 +28,7 @@ import org.smartblackbox.qfs.opengl.model.*;
 import org.smartblackbox.qfs.opengl.model.RemModel.Mode;
 import org.smartblackbox.qfs.opengl.model.RemModel.NodeSelectionMode;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
+import org.smartblackbox.qfs.opengl.model.entity.EntityType;
 import org.smartblackbox.qfs.opengl.model.entity.Node;
 import org.smartblackbox.qfs.opengl.model.entity.Occupancy;
 import org.smartblackbox.qfs.opengl.model.lights.DirectionalLight;
@@ -52,34 +53,40 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     /// ///////////////////////////////////////////////////////////////////////////////
     /// Project Settings /////////////////////////////////////////////////////////////
-    private final AppSettings      appSettings   = AppSettings.getInstance();
-    private final Project  project  = Project.getInstance();
-    private final RemModel remModel = project.getQfsModel();
-    private final Scene    scene    = project.scene;
-    private final Settings         settings      = project.settings;
-    private final SlitWallSettings slitWall      = project.slitWall;
-    private final DetectorModel    detectorModel = project.detectorModel;
+    private final AppSettings      appSettings     = AppSettings.getInstance();
+    private final Project          project         = Project.getInstance();
+    private final RemModel         remModel        = project.getRemModel();
+    private final Scene            scene           = project.scene;
+    private final Settings         settings        = project.settings;
+    private final SlitWallSettings slitWall        = project.slitWall;
+    private final DetectorModel    detectorModel   = project.detectorModel;
     /// Project Settings /////////////////////////////////////////////////////////////
     /// ///////////////////////////////////////////////////////////////////////////////
 
-    private final Renderer         renderer;
-    private final OBJFormatLoader  loader;
+    private       TransportSystem  transportSystem = new TransportSystem();
+
+    private final Renderer        renderer;
+    private final OBJFormatLoader loader;
 
     private       Node     selectedNode;
     private final Vector2d lastMousePos = new Vector2d();
 
-    private          boolean         leftButtonPressed      = false;
-    private          boolean         rightButtonPress       = false;
+    private          boolean         leftButtonPressed = false;
+    private          boolean         rightButtonPress  = false;
     private          boolean         isDrawing;
     //private volatile boolean         isCalcNextPhysicsReady = true;
     private volatile boolean         isRenderingReady;
     private          boolean         isLoadingStarted;
     private          boolean         isNodesUpdateRequired;
     private          KeyEvents       keyEvents;
-    private final    ArrayList<Node> customNodeFixed        = new ArrayList<Node>();
-    private          int             waitAfterReset         = 0;
+    private final    ArrayList<Node> customNodeFixed   = new ArrayList<Node>();
+    private          int             waitAfterReset    = 0;
     private          Node            lastSelectedNode;
-    protected        long            currentTime;
+    protected        long    currentTime;
+    private int              numFrameCalculation;
+    private static final int FRAME_CALCULATION_MAX_TIMEOUT = 10000;
+    private int              frameTimeoutCalcation         = FRAME_CALCULATION_MAX_TIMEOUT;
+    private Thread thread;
 
     public Simulator(GLWindow glWindow) {
         super(glWindow);
@@ -98,7 +105,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         initDefaultTerrain();
         initDefaultScene();
         updateNodesProperties();
-        startMonitoringDeadThreads();
         remModel.startSimulation();
     }
 
@@ -242,22 +248,21 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void updateNodesArray() {
-        if (remModel.isLoadingReady()) {
-            updateNodesProperties();
-            scene.update();
-            nuklearModel.closeFrame(Frame.progress);
+        //resetOccupancies();
+        updateNodesProperties();
+        //resetOccupancies();
+        scene.update();
+        //resetOccupancies();
+        nuklearModel.closeFrame(Frame.progress);
 
-            settings.setVisibleIndexX(project.getDimensionX() / 2);
-            settings.setVisibleIndexY(project.getDimensionY() / 2);
-            settings.setVisibleIndexZ(project.getDimensionZ() / 2);
+        settings.setVisibleIndexX(project.getDimensionX() / 2);
+        settings.setVisibleIndexY(project.getDimensionY() / 2);
+        settings.setVisibleIndexZ(project.getDimensionZ() / 2);
 
-            remModel.getCurrentMouseNodeIndex().x = project.getDimensionX() / 2;
-            remModel.getCurrentMouseNodeIndex().y = project.getDimensionY() / 2;
-            remModel.getCurrentMouseNodeIndex().z = project.getDimensionZ() / 2;
-            remModel.setCurrentMouseNode(scene.getLattice().getNodeByIndex(remModel.getCurrentMouseNodeIndex()));
-
-            isLoadingStarted = false;
-        }
+        remModel.getCurrentMouseNodeIndex().x = project.getDimensionX() / 2;
+        remModel.getCurrentMouseNodeIndex().y = project.getDimensionY() / 2;
+        remModel.getCurrentMouseNodeIndex().z = project.getDimensionZ() / 2;
+        remModel.setCurrentMouseNode(scene.getLattice().getNodeByIndex(remModel.getCurrentMouseNodeIndex()));
     }
 
     private void mouseReleaseWall(Node node) {
@@ -660,18 +665,21 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     if (isShiftPressed) {
                         // Release all nodes that was fixed by the list of customNodeFixed.
                         for (Node node : customNodeFixed) {
-                            node.setFixed(false);
+                            //node.setFixed(false);
+                            node.setType(EntityType.NODE);
                         }
                     } else {
                         if (!selectedNode.isFixed()) {
                             // Set the node position and make it fixed.
                             selectedNode.getPosBuff().z = project.rainModel.getForce();
-                            selectedNode.setFixed(true);
+                            //selectedNode.setFixed(true);
+                            selectedNode.setType(EntityType.FIXED);
                             // Remember that this node is set fixed.
                             customNodeFixed.add(selectedNode);
                         } else {
                             // Release the node.
-                            selectedNode.setFixed(false);
+                            //selectedNode.setFixed(false);
+                            selectedNode.setType(EntityType.NODE);
                         }
                     }
                     break;
@@ -692,21 +700,25 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     break;
                 case GLFW.GLFW_KEY_F7:
                     if (lastSelectedNode != null) {
-                        lastSelectedNode.setFixed(false);
+                        //lastSelectedNode.setFixed(false);
+                        lastSelectedNode.setType(EntityType.NODE);
                         lastSelectedNode = null;
                     } else if (remModel.isSimulating() && selectedNode != null) {
                         Vector3d p = selectedNode.getPosition();
                         selectedNode.setPosition(new Vector3d(p.x, p.y, project.rainModel.getForce()));
-                        selectedNode.setFixed(true);
+                        //selectedNode.setFixed(true);
+                        selectedNode.setType(EntityType.FIXED);
                         lastSelectedNode = selectedNode;
                     }
                     break;
                 case GLFW.GLFW_KEY_P:
                     if (remModel.isSimulating() && selectedNode != null) {
                         if (selectedNode.isFixed()) {
-                            selectedNode.setFixed(false);
+                            ///selectedNode.setFixed(false);
+                            selectedNode.setType(EntityType.NODE);
                         } else {
-                            selectedNode.setFixed(true);
+                            //selectedNode.setFixed(true);
+                            selectedNode.setType(EntityType.FIXED);
                             selectedNode.setPosition(new Vector3d(0, 0, project.rainModel.getForce()));
                         }
                     }
@@ -741,6 +753,150 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             project.terrain.updateTransformationMatrix();
     }
 
+    private void waitForRenderingReady() {
+        while (!isRenderingReady) {
+            System.out.println("waitForRenderingReady()");
+            Utils.sleepMS(1);
+        }
+    }
+
+    /**
+     * Preventing calculating next frame
+     */
+    private void waitForNextFrameIsReady() {
+        try {
+            if (thread != null) {
+                thread.join();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.println("Something's wrong");
+        }
+//        while (numFrameCalculation > 0) {
+//            Utils.sleepMS(1);
+//            frameTimeoutCalcation--;
+//            if (frameTimeoutCalcation <= 0){
+//                frameTimeoutCalcation = FRAME_CALCULATION_MAX_TIMEOUT;
+//                numFrameCalculation = 0;
+//                System.out.println("Timeout during calculation of a frame");
+//            }
+//        }
+    }
+
+    private void calcNextFrame() {
+        //isCalcNextPhysicsReady = false;
+        numFrameCalculation++;
+        // While the GPU is rendering on the current buffer,
+        // swap the buffer to calculate physics on another buffer.
+        Node.swapBuffer();
+
+        //thread = new Thread(() -> {
+        thread = Thread.startVirtualThread(() -> {
+            PerformanceMonitor.start(Measurement.totalCPURenderTime);
+            scene.resetTasks();
+
+            int numThreads  = appSettings.getNumThreads();
+            int numNodes    = scene.getLattice().getEntities().size();
+            int segmentSize = numNodes > numThreads ? numNodes / numThreads + 1 : numNodes;
+
+            PerformanceMonitor.start(Measurement.physics);
+
+            if (waitAfterReset <= 0) {
+                simulateRain();
+                simulateOccupancies();
+            } else {
+                waitAfterReset--;
+            }
+            simulateDetection();
+            scene.processPhysicsTasks(numThreads, segmentSize);
+            scene.waitForAllTasksReady();
+
+            if (remModel.isSimulating())
+                PerformanceMonitor.stop(Measurement.physics);
+            else
+                PerformanceMonitor.reset(Measurement.physics);
+            PerformanceMonitor.reset(Measurement.physics);
+
+            PerformanceMonitor.start(Measurement.updateMatrix);
+            scene.processMatrixUpdateTasks(numThreads, segmentSize);
+            scene.waitForAllTasksReady();
+            PerformanceMonitor.stop(Measurement.updateMatrix);
+
+            PerformanceMonitor.stop(Measurement.totalCPURenderTime);
+
+            //isCalcNextPhysicsReady = true;
+            numFrameCalculation--;
+            if (numFrameCalculation != 0) {
+                System.out.println("Error: numPhysicsFrameCalculation: " + numFrameCalculation);
+            }
+        });
+    }
+
+    private void resetOccupancies() {
+        for (Occupancy occupancy : project.occupancies) {
+            occupancy.reset();
+        }
+    }
+
+    private void simulateOccupancies() {
+        if (remModel.isSimulating()) {
+            for (Occupancy occupancy : project.occupancies) {
+                if (occupancy.isOccupied()) {
+                    Node node = Lattice.getInstance().getNodeByIndex(occupancy.getNodeIndex());
+                    occupancy.setNode(node);
+
+                    if (node != null) {
+                        transportSystem.update(occupancy);
+                        transportSystem.print(occupancy);
+                        occupancy.update();
+                    }
+                }
+            }
+        }
+    }
+
+    private void simulateDetection() {
+        if (nuklearModel.isFrameVisible(Frame.detector)) {
+            Node node = scene.getLattice().getNodeByIndex(detectorModel.getIgnitorNode());
+            if (node != null) {
+                node.setCustomScale(2.0);
+                node.setCustomColor(new Vector4f(0f, 1f, 0f, 1f));
+                if (detectorModel.isIgnited())
+                    detectorModel.ignite(node, project.rainModel.getForce());
+            }
+
+            node = scene.getLattice().getNodeByIndex(detectorModel.getDetectorNode());
+            if (node != null) {
+                node.setCustomScale(2.0);
+                node.setCustomColor(new Vector4f(1f, 1f, 0f, 1f));
+                detectorModel.detect(node);
+            }
+        }
+    }
+
+    private void simulateRain() {
+        if (remModel.isSimulating() && project.rainModel.isActive()) {
+            Vector3i index = new Vector3i();
+
+            for (int i = 0; i < project.rainModel.getIterations(); i++) {
+                index.x = (int) (Math.max(2, Math.min(Math.random() * project.getDimensionX(),
+                                                      project.getDimensionX() - 2)));
+                index.y = (int) (Math.max(2, Math.min(Math.random() * project.getDimensionY(),
+                                                      project.getDimensionY() - 2)));
+                index.z = settings.getVisibleIndexZ();
+
+                Node node = scene.getLattice().getNodeByIndex(index);
+                if (node != null)
+                    node.incPosition(new Vector3d(0, 0, Math.random() * project.rainModel.getForce()));
+            }
+
+        }
+    }
+
+    public void resetMonitoringDeadThreads() {
+        currentTime = System.currentTimeMillis();
+    }
+
     private void checkSettingsChanged() {
         if (project.isChanged() || appSettings.isChanged()) {
             setCustomTitle(project.getCurrentFilename());
@@ -759,6 +915,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             remModel.setLoadingReady(false);
             // Build the Lattice 3D Matrices of Nodes
             scene.build();
+            resetOccupancies();
             waitAfterReset = 0;
         }
 
@@ -799,158 +956,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         }
     }
 
-    private void waitForRenderingReady() {
-        while (!isRenderingReady) {
-            System.out.println("waitForRenderingReady()");
-            Utils.sleepMS(1);
-        }
-    }
-
-    private void calcNextPhysicsFrame() {
-        //isCalcNextPhysicsReady = false;
-        // While the GPU is rendering on the current buffer,
-        // swap the buffer to calculate physics on another buffer.
-        Node.swapBuffer();
-
-        Thread thread = new Thread(() -> {
-            PerformanceMonitor.start(Measurement.totalCPURenderTime);
-            scene.resetTasks();
-
-            int numThreads  = appSettings.getNumThreads();
-            int numNodes    = scene.getLattice().getEntities().size();
-            int segmentSize = numNodes > numThreads ? numNodes / numThreads + 1 : numNodes;
-
-            PerformanceMonitor.start(Measurement.physics);
-
-            if (waitAfterReset <= 0) {
-                simulateRain();
-                oscillateIdentities();
-            } else {
-                waitAfterReset--;
-            }
-            detector();
-            scene.processPhysicsTasks(numThreads, segmentSize);
-            scene.waitForAllTasksReady();
-
-            if (remModel.isSimulating())
-                PerformanceMonitor.stop(Measurement.physics);
-            else
-                PerformanceMonitor.reset(Measurement.physics);
-            PerformanceMonitor.reset(Measurement.physics);
-
-            PerformanceMonitor.start(Measurement.updateMatrix);
-            scene.processMatrixUpdateTasks(numThreads, segmentSize);
-            scene.waitForAllTasksReady();
-            PerformanceMonitor.stop(Measurement.updateMatrix);
-
-            PerformanceMonitor.stop(Measurement.totalCPURenderTime);
-
-            //isCalcNextPhysicsReady = true;
-        });
-        thread.start();
-    }
-
-    private void detector() {
-        if (nuklearModel.isFrameVisible(Frame.detector)) {
-            Node node = scene.getLattice().getNodeByIndex(detectorModel.getIgnitorNode());
-            if (node != null) {
-                node.setCustomScale(2.0);
-                node.setCustomColor(new Vector4f(0f, 1f, 0f, 1f));
-                if (detectorModel.isIgnited())
-                    detectorModel.ignite(node, project.rainModel.getForce());
-            }
-
-            node = scene.getLattice().getNodeByIndex(detectorModel.getDetectorNode());
-            if (node != null) {
-                node.setCustomScale(2.0);
-                node.setCustomColor(new Vector4f(1f, 1f, 0f, 1f));
-                detectorModel.detect(node);
-            }
-        }
-    }
-
-    private void simulateRain() {
-        if (remModel.isSimulating() && project.rainModel.isActive()) {
-            Vector3i index = new Vector3i();
-
-            for (int i = 0; i < project.rainModel.getIterations(); i++) {
-                index.x = (int) (Math.max(2, Math.min(Math.random() * project.getDimensionX(),
-                                                      project.getDimensionX() - 2)));
-                index.y = (int) (Math.max(2, Math.min(Math.random() * project.getDimensionY(),
-                                                      project.getDimensionY() - 2)));
-                index.z = settings.getVisibleIndexZ();
-
-                Node node = scene.getLattice().getNodeByIndex(index);
-                if (node != null)
-                    node.incPosition(new Vector3d(0, 0, Math.random() * project.rainModel.getForce()));
-            }
-
-        }
-    }
-
-    private void oscillateIdentities() {
-        if (remModel.isSimulating()) {
-            for (Occupancy occupancy : project.occupancies) {
-                Node node = scene.getLattice().getNodeByIndex(occupancy.getNode().getIndex());
-
-                if (node != null) {
-                    Vector3d o = occupancy.getIdentity().oscillate();
-                    if (o != null) {
-                        node.getPosBuff().add(o);
-                    }
-                }
-            }
-        }
-    }
-
-//    private void waitForCalcNextPhysicsReady() {
-//        while (!isCalcNextPhysicsReady) {
-//            System.out.println("waitForCalcNextPhysicsReady()");
-//            Utils.sleepMS(1);
-//        }
-//    }
-
-    public void resetMonitoringDeadThreads() {
-        currentTime = System.currentTimeMillis();
-    }
-
-    /**
-     * This should never occur and should not be needed.
-     */
-    public void startMonitoringDeadThreads() {
-        //		new Thread(new Runnable() {
-        //
-        //			private int lastNumTask = -1;
-        //			private int lastNumTask2 = -1;
-        //
-        //			@Override
-        //			public void run() {
-        //				while (glWindow.getWindowHandle() != 0) {
-        //					try {
-        //						Thread.sleep(100);
-        //					} catch (InterruptedException e) {
-        //					}
-        //
-        //					if (System.currentTimeMillis() - currentTime > 10000) {
-        //						if (scene.getNumTask() == lastNumTask2) {
-        //							System.out.println(
-        //								"numTask: " + scene.getNumTask() +
-        //								" == lastNumTask: " + lastNumTask2 +
-        //								" - dead threads found! This should never happens!");
-        //							System.out.println("Status: " + scene.status);
-        //							scene.taskCompleted();
-        //							isCalcNextPhysicsReady = true;
-        //							isRenderingReady = false;
-        //						}
-        //						resetMonitoringDeadThreads();
-        //						lastNumTask = scene.getNumTask();
-        //						lastNumTask2 = lastNumTask;
-        //					}
-        //				}
-        //			}
-        //		}).start();
-    }
-
     @Override
     public void cleanUp() {
         scene.stopAnimation();
@@ -967,19 +972,21 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             GL11.glViewport(0, 0, glWindow.getWidth(), glWindow.getHeight());
         }
 
-        // !!! This is causing everything to hang, probably we do not need this !!!
-        //waitForCalcNextPhysicsReady();
-
         checkSettingsChanged();
+
+        waitForNextFrameIsReady();
 
         if (isLoadingStarted) {
             // Make sure it is not doing any calculation while updating new scene.
-            updateNodesArray();
+            if (remModel.isLoadingReady()) {
+                updateNodesArray();
+                isLoadingStarted = false;
+            }
         } else {
             waitForRenderingReady();
             resetMonitoringDeadThreads();
             // Meanwhile, start calculating the next frame while rendering.
-            calcNextPhysicsFrame();
+            calcNextFrame();
         }
 
         PerformanceMonitor.start(Measurement.sendToGPU);

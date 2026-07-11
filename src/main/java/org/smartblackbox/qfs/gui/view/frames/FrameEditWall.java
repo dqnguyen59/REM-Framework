@@ -29,7 +29,7 @@ import org.smartblackbox.qfs.settings.Project;
 public class FrameEditWall extends AbstractFrame {
 
 	private Project  project  = Project.getInstance();
-	private RemModel REMModel = project.getQfsModel();
+	private RemModel REMModel = project.getRemModel();
 
 	private int width = 300;
 	private int height = 312;

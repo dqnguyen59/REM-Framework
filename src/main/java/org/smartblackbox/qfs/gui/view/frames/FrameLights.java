@@ -34,7 +34,7 @@ import org.smartblackbox.qfs.settings.Project;
 public class FrameLights extends AbstractFrame {
 
 	private Project  project  = Project.getInstance();
-	private RemModel REMModel = project.getQfsModel();
+	private RemModel REMModel = project.getRemModel();
 
 	private int groupNoScroll = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_NO_SCROLLBAR | Nuklear.NK_WINDOW_BORDER;
 	private int autoHideScroll = Nuklear.NK_WINDOW_SCROLL_AUTO_HIDE;

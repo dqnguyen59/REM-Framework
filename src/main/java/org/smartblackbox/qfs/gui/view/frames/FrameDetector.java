@@ -31,7 +31,7 @@ import org.smartblackbox.qfs.settings.Project;
 public class FrameDetector extends AbstractFrame {
 
 	private Project       project       = Project.getInstance();
-	private RemModel      REMModel      = project.getQfsModel();
+	private RemModel      REMModel      = project.getRemModel();
 	private DetectorModel detectorModel = project.detectorModel;
 
 	private int width = 400;

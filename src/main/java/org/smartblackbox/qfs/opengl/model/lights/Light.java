@@ -24,6 +24,7 @@ import org.joml.*;
 import org.smartblackbox.qfs.opengl.model.Material;
 import org.smartblackbox.qfs.opengl.model.ObjFileModel;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
+import org.smartblackbox.qfs.opengl.model.entity.EntityType;
 
 import java.lang.Math;
 
@@ -41,11 +42,11 @@ public class Light extends Entity {
 	private ObjFileModel modelSpotLight;
 	
 	public Light(Entity parent, ObjFileModel modelLightBulb, ObjFileModel modelSpotLight, Vector3d position, Vector3d rotation, double scale) {
-		super(parent, null, position, rotation, scale);
+		super(parent, null, position, rotation, scale, EntityType.LIGHT);
 		this.setModelLightBulb(modelLightBulb);
 		this.setModelSpotLight(modelSpotLight);
 		
-		setSpotLightHolder(new Entity(this, modelSpotLight, new Vector3d(0, 0, -1.5), new Vector3d(0, 0, 0), 1.0));
+		setSpotLightHolder(new Entity(this, modelSpotLight, new Vector3d(0, 0, -1.5), new Vector3d(0, 0, 0), 1.0, EntityType.ENTITY));
 		
 		modelLightBulb.getMaterial().setDiffuseIntensity(0);
 	}

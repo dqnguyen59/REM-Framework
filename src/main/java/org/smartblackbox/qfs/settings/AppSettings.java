@@ -108,6 +108,11 @@ public class AppSettings extends AbstractSettings implements ISettings {
     }
 
     @Override
+    public void reset() {
+        // Do nothing
+    }
+
+    @Override
     public void loadFromFile(Wini ini, String section, int index) {
         super.loadFromFile(ini, section, index);
 

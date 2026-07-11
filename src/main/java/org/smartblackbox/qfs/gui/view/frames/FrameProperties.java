@@ -28,7 +28,7 @@ import org.smartblackbox.qfs.settings.Project;
 public class FrameProperties extends AbstractFrame {
 
 	private Project  project  = Project.getInstance();
-	private RemModel REMModel = project.getQfsModel();
+	private RemModel REMModel = project.getRemModel();
 
 	private float leftCol = 0.6f;
 	private float rightCol = 0.4f;

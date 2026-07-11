@@ -70,6 +70,8 @@ public class Identity extends AbstractSettings implements ISettings {
      */
     private String name = "";
 
+    private Entity entity;
+
     /**
      * Indicates which spatial axes are active.
      */
@@ -205,6 +207,7 @@ public class Identity extends AbstractSettings implements ISettings {
     /**
      * Resets the oscillator to its initial state.
      */
+    @Override
     public void reset() {
         oscillation.set(0);
         phase.set(0);

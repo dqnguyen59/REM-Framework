@@ -23,6 +23,7 @@ import lombok.Setter;
 import org.joml.*;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
+import org.smartblackbox.qfs.opengl.model.entity.EntityType;
 import org.smartblackbox.qfs.opengl.model.entity.Node;
 import org.smartblackbox.qfs.opengl.model.lights.DirectionalLight;
 import org.smartblackbox.qfs.opengl.utils.OBJFormatLoader;
@@ -44,7 +45,7 @@ public class Scene {
     private Project          project  = Project.getInstance();
     private Settings         settings = project.settings;
     private SlitWallSettings slitWall = project.slitWall;
-    private RemModel         REMModel = project.getQfsModel();
+    private RemModel         REMModel = project.getRemModel();
 
     private List<Terrain> terrains;
 
@@ -69,7 +70,7 @@ public class Scene {
 
     public Scene() {
         terrains = new ArrayList<>();
-        lattice  = new Lattice();
+        lattice  = Lattice.getInstance();
     }
 
     public void build() {
@@ -181,10 +182,10 @@ public class Scene {
     }
 
     private void setNodeWall(Node node, boolean value) {
-        node.setWall(value);
-        if (node.isWall())
+        if (value) {
+            node.setType(EntityType.WALL);
             addWallNode(node);
-        else
+        } else
             removeWallNode(node);
     }
 
@@ -220,9 +221,7 @@ public class Scene {
     public void clearAllWalls() {
         for (Vector3i nodeIndex : wallNodeIndexList) {
             Node node = lattice.getNodeByIndex(nodeIndex);
-            if (node != null) {
-                node.setWall(false);
-            }
+            lattice.deleteEntity(node);
         }
         wallNodeIndexList.clear();
     }
@@ -240,7 +239,8 @@ public class Scene {
         for (Vector3i nodeIndex : wallNodeIndexList) {
             Node node = lattice.getNodeByIndex(nodeIndex);
             if (node != null) {
-                node.setWall(true);
+                //node.setWall(true);
+                node.setType(EntityType.WALL);
             }
         }
     }

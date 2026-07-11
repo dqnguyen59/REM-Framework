@@ -18,11 +18,15 @@
  */
 package org.smartblackbox.qfs.opengl.model;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.ini4j.Wini;
 import org.joml.Vector4f;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.utils.AbstractSettings;
 
+@Getter
+@Setter
 public class Material extends AbstractSettings {
 
 	private Vector4f ambientColor = new Vector4f(Constants.DEFAULT_COLOUR);
@@ -80,20 +84,13 @@ public class Material extends AbstractSettings {
 		return null;
 	}
 
-	public void setTexture(Texture texture) {
-		this.texture = texture;
-	}
-	
-	public Texture getTexture() {
-		return texture;
+	@Override
+	public void reset() {
+		// Do nothing
 	}
 
 	public boolean hasTexture() {
 		return texture != null;
-	}
-
-	public Vector4f getAmbientColor() {
-		return ambientColor;
 	}
 
 	public void setAmbientColor(Vector4f ambientColor) {
@@ -107,20 +104,8 @@ public class Material extends AbstractSettings {
 		ambientColor.w = w;
 	}
 
-	public double getAmbientIntensity() {
-		return ambientIntensity;
-	}
-
-	public void setAmbientIntensity(double ambientIntensity) {
-		this.ambientIntensity = ambientIntensity;
-	}
-
 	public Vector4f getAmbientIntensityColor() {
 		return ambientIntensityColor.set(ambientColor).mul((float) ambientIntensity);
-	}
-
-	public Vector4f getDiffuseColor() {
-		return diffuseColor;
 	}
 
 	public void setDiffuseColor(Vector4f diffuseColor) {
@@ -134,52 +119,12 @@ public class Material extends AbstractSettings {
 		diffuseColor.w = w;
 	}
 
-	public double getDiffuseIntensity() {
-		return diffuseIntensity;
-	}
-
-	public void setDiffuseIntensity(double diffuseIntensity) {
-		this.diffuseIntensity = diffuseIntensity;
-	}
-
 	public Vector4f getDiffuseIntensityColor() {
 		return diffuseIntensityColor.set(diffuseColor).mul((float) diffuseIntensity);
 	}
 
-	public double getSpecularIntensity() {
-		return specularIntensity;
-	}
-
-	public void setSpecularIntensity(double specularIntensity) {
-		this.specularIntensity = specularIntensity;
-	}
-
-	public Vector4f getSpecularColor() {
-		return specularColor;
-	}
-
-	public void setSpecularColor(Vector4f specularColor) {
-		this.specularColor = specularColor;
-	}
-
 	public Vector4f getSpecularIntensityColor() {
 		return specularIntensityColor.set(specularColor).mul((float) specularIntensity);
-	}
-
-	public double getShininess() {
-		return shininess;
-	}
-
-	public void setShininess(double shininess) {
-		this.shininess = shininess;
-	}
-
-	public boolean isDisableCulling() {
-		return disableCulling;
-	}
-
-	public void setDisableCulling(boolean disableCulling) {
-		this.disableCulling = disableCulling;
 	}
 
 	@Override
