@@ -74,7 +74,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private              boolean         leftButtonPressed             = false;
     private              boolean         rightButtonPress              = false;
     private              boolean         isDrawing;
-    //private volatile boolean         isCalcNextPhysicsReady = true;
     private volatile     boolean         isRenderingReady;
     private              boolean         isLoadingStarted;
     private              boolean         isNodesUpdateRequired;
@@ -95,6 +94,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     @Override
     public void init() throws Exception {
+        System.out.println("Simulator.init()");
         super.init();
         addMouseAndKeyboardListener(this);
         renderer.init();
@@ -102,11 +102,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         initDefaultLights();
         initDefaultTerrain();
         initDefaultScene();
-        updateNodesProperties();
+        //updateNodesProperties();
         remModel.startSimulation();
     }
 
     public void initDefaultLights() {
+        System.out.println("Simulator.initDefaultLights()");
         ObjFileModel modelSphere    = loader.loadOBJModel(Constants.MODEL_LIGHT_BULB);
         ObjFileModel modelSpotLight = loader.loadOBJModel(Constants.MODEL_LIGHT_CAP);
 
@@ -152,6 +153,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     public void initDefaultScene() {
+        System.out.println("Simulator.initDefaultScene()");
         project.camera.movePosition(0, 0, 120);
         project.camera.updateProjectionMatrix();
 
@@ -163,6 +165,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     public void initDefaultTerrain() throws Exception {
+        System.out.println("Simulator.initDefaultTerrain()");
         project.terrain = new Terrain(
                 new Vector3f(-Terrain.SIZE / 2, -150, -Terrain.SIZE / 2),
                 loader,
@@ -173,94 +176,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 loader.loadTexture(Constants.BASE_PATH + project.terrain.getTerrainTextureFilePath()));
         project.terrain.getMaterial().setTexture(texture);
         scene.addTerrain(project.terrain);
-    }
-
-    private void updateNodesProperties() {
-        renderer.cleanupNodes();
-
-        for (Entity entity : scene.getLattice().getEntities()) {
-            if (entity.getClass() == Node.class) {
-                Node node = (Node) entity;
-                int  i    = node.getIndex().x;
-                int  j    = node.getIndex().y;
-                int  k    = node.getIndex().z;
-                int  dimX = project.getDimensionX();
-                int  dimY = project.getDimensionY();
-                int  dimZ = project.getDimensionZ();
-
-                if (i != -1 || j != -1 || k != -1) {
-                    boolean isBoundingLine =
-                            i == 0 && j == 0 ||
-                            i == 0 && j == project.getDimensionY() - 1 ||
-                            i == project.getDimensionX() - 1 && j == 0 ||
-                            i == project.getDimensionX() - 1 && j == project.getDimensionY() - 1 ||
-
-                            i == 0 && k == 0 ||
-                            i == 0 && k == project.getDimensionZ() - 1 ||
-                            i == project.getDimensionX() - 1 && k == 0 ||
-                            i == project.getDimensionX() - 1 && k == project.getDimensionZ() - 1 ||
-
-                            j == 0 && k == 0 ||
-                            j == 0 && k == project.getDimensionZ() - 1 ||
-                            j == project.getDimensionY() - 1 && k == 0 ||
-                            j == project.getDimensionY() - 1 && k == project.getDimensionZ() - 1;
-
-                    boolean isVisible = false;
-
-                    switch (settings.getSliceType()) {
-                        case none:
-                            isVisible = isBoundingLine ||
-                                        (i > 0 && i < dimX - 1 && j > 0 && j < dimY - 1 && k > 0 &&
-                                         k < dimZ - 1);
-                            break;
-                        case sliceX:
-                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX());
-                            break;
-                        case sliceY:
-                            isVisible = isBoundingLine || (j == settings.getVisibleIndexY());
-                            break;
-                        case sliceZ:
-                            isVisible = isBoundingLine || (k == settings.getVisibleIndexZ());
-                            break;
-                        case sliceXZ:
-                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX() &&
-                                                           k == settings.getVisibleIndexZ());
-                            break;
-                        case sliceYZ:
-                            isVisible = isBoundingLine || (j == settings.getVisibleIndexY() &&
-                                                           k == settings.getVisibleIndexZ());
-                            break;
-                        case sliceXY:
-                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX() &&
-                                                           j == settings.getVisibleIndexY());
-                            break;
-                    }
-
-                    node.setVisible(isVisible || node.isHiLighted());
-
-                }
-
-            }
-            renderer.processEntity(entity);
-        }
-    }
-
-    private void updateNodesArray() {
-        //resetOccupancies();
-        updateNodesProperties();
-        //resetOccupancies();
-        scene.update();
-        //resetOccupancies();
-        nuklearModel.closeFrame(Frame.progress);
-
-        settings.setVisibleIndexX(project.getDimensionX() / 2);
-        settings.setVisibleIndexY(project.getDimensionY() / 2);
-        settings.setVisibleIndexZ(project.getDimensionZ() / 2);
-
-        remModel.getCurrentMouseNodeIndex().x = project.getDimensionX() / 2;
-        remModel.getCurrentMouseNodeIndex().y = project.getDimensionY() / 2;
-        remModel.getCurrentMouseNodeIndex().z = project.getDimensionZ() / 2;
-        remModel.setCurrentMouseNode(scene.getLattice().getNodeByIndex(remModel.getCurrentMouseNodeIndex()));
     }
 
     private void mouseReleaseWall(Node node) {
@@ -834,11 +749,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     Node node = Lattice.getInstance().getNodeByIndex(occupancy.getNodeIndex());
                     occupancy.setNode(node);
 
-                    if (node != null) {
-                        transportSystem.update(occupancy);
-                        transportSystem.print(occupancy);
-                        occupancy.update();
-                    }
+                    transportSystem.update(occupancy);
+                    transportSystem.print(occupancy);
+                    occupancy.update();
                 }
             }
         }
@@ -886,8 +799,101 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         currentTime = System.currentTimeMillis();
     }
 
+    private void updateNodesProperties() {
+        System.out.println("Simulator.updateNodesProperties()");
+        renderer.cleanupNodes();
+
+        for (Entity entity : scene.getLattice().getEntities()) {
+            if (entity.getClass() == Node.class) {
+                Node node = (Node) entity;
+                int  i    = node.getIndex().x;
+                int  j    = node.getIndex().y;
+                int  k    = node.getIndex().z;
+                int  dimX = project.getDimensionX();
+                int  dimY = project.getDimensionY();
+                int  dimZ = project.getDimensionZ();
+
+                if (i != -1 || j != -1 || k != -1) {
+                    boolean isBoundingLine =
+                            i == 0 && j == 0 ||
+                            i == 0 && j == project.getDimensionY() - 1 ||
+                            i == project.getDimensionX() - 1 && j == 0 ||
+                            i == project.getDimensionX() - 1 && j == project.getDimensionY() - 1 ||
+
+                            i == 0 && k == 0 ||
+                            i == 0 && k == project.getDimensionZ() - 1 ||
+                            i == project.getDimensionX() - 1 && k == 0 ||
+                            i == project.getDimensionX() - 1 && k == project.getDimensionZ() - 1 ||
+
+                            j == 0 && k == 0 ||
+                            j == 0 && k == project.getDimensionZ() - 1 ||
+                            j == project.getDimensionY() - 1 && k == 0 ||
+                            j == project.getDimensionY() - 1 && k == project.getDimensionZ() - 1;
+
+                    boolean isVisible = false;
+
+                    switch (settings.getSliceType()) {
+                        case none:
+                            isVisible = isBoundingLine ||
+                                        (i > 0 && i < dimX - 1 && j > 0 && j < dimY - 1 && k > 0 &&
+                                         k < dimZ - 1);
+                            break;
+                        case sliceX:
+                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX());
+                            break;
+                        case sliceY:
+                            isVisible = isBoundingLine || (j == settings.getVisibleIndexY());
+                            break;
+                        case sliceZ:
+                            isVisible = isBoundingLine || (k == settings.getVisibleIndexZ());
+                            break;
+                        case sliceXZ:
+                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX() &&
+                                                           k == settings.getVisibleIndexZ());
+                            break;
+                        case sliceYZ:
+                            isVisible = isBoundingLine || (j == settings.getVisibleIndexY() &&
+                                                           k == settings.getVisibleIndexZ());
+                            break;
+                        case sliceXY:
+                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX() &&
+                                                           j == settings.getVisibleIndexY());
+                            break;
+                    }
+
+                    node.setVisible(isVisible || node.isHiLighted());
+
+                }
+
+            }
+            renderer.processEntity(entity);
+        }
+    }
+
+    private void updateNodesArray() {
+        System.out.println("simulator.updateNodesArray();");
+        //resetOccupancies();
+        updateNodesProperties();
+        //resetOccupancies();
+        scene.update();
+//        resetOccupancies();
+        nuklearModel.closeFrame(Frame.progress);
+
+        settings.setVisibleIndexX(project.getDimensionX() / 2);
+        settings.setVisibleIndexY(project.getDimensionY() / 2);
+        settings.setVisibleIndexZ(project.getDimensionZ() / 2);
+
+        remModel.getCurrentMouseNodeIndex().x = project.getDimensionX() / 2;
+        remModel.getCurrentMouseNodeIndex().y = project.getDimensionY() / 2;
+        remModel.getCurrentMouseNodeIndex().z = project.getDimensionZ() / 2;
+        remModel.setCurrentMouseNode(scene.getLattice().getNodeByIndex(remModel.getCurrentMouseNodeIndex()));
+    }
+
     private void checkSettingsChanged() {
         if (project.isChanged() || appSettings.isChanged()) {
+            System.out.println("simulator.projectChanged: " + project.isChanged());
+            System.out.println("simulator.appSettingsChanged: " + appSettings.isChanged());
+
             setCustomTitle(project.getCurrentFilename());
             nuklearModel.showFrame(Frame.progress);
             try {
@@ -899,10 +905,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                                                project.terrain.getTerrainTextureFilePath());
                 nuklearModel.showErrorDialog("Loading terrain texture", message);
             }
-            scene.getLattice().getEntities().clear();
             isLoadingStarted = true;
+            System.out.println("isLoadingStarted: " + isLoadingStarted);
             remModel.setLoadingReady(false);
             // Build the Lattice 3D Matrices of Nodes
+            scene.getLattice().getEntities().clear();
             scene.build();
             resetOccupancies();
             waitAfterReset = 0;
@@ -947,6 +954,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     @Override
     public void cleanUp() {
+        System.out.println("simulator.cleanUp();");
         scene.stopAnimation();
         renderer.cleanup();
         loader.cleanup();
@@ -970,6 +978,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             if (remModel.isLoadingReady()) {
                 updateNodesArray();
                 isLoadingStarted = false;
+                System.out.println("isLoadingStarted: " + isLoadingStarted);
             }
         } else {
             waitForRenderingReady();

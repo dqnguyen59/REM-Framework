@@ -68,11 +68,13 @@ public class Scene {
     List<Thread> threads = new ArrayList<>();
 
     public Scene() {
+        System.out.println("Scene.Scene()");
         terrains = new ArrayList<>();
         lattice  = Lattice.getInstance();
     }
 
     public void build() {
+        System.out.println("Scene.build()");
         Entity baseEntity = lattice.build();
         // Draw xyz arrows on entity baseField.
         Vector3i dimension = new Vector3i();
@@ -81,16 +83,18 @@ public class Scene {
         int sizeI = dimension.x;
         int sizeJ = dimension.y;
         int sizeK = dimension.z;
-        drawArrows(baseEntity, Constants.EP_DEFAULT_DISTANCE, lattice.getModelSphere(), sizeI, sizeJ, sizeK);
+        createArrows(baseEntity, Constants.EP_DEFAULT_DISTANCE, lattice.getModelSphere(), sizeI, sizeJ, sizeK);
     }
 
     public void update() {
+        System.out.println("Scene.update()");
         lattice.update();
         updateWalls();
     }
 
-    public void drawArrows(
+    public void createArrows(
             Entity baseField, float step, ObjFileModel modelSphere, int sizeI, int sizeJ, int sizeK) {
+        System.out.println("Scene.createArrows()");
         ObjFileModel modelArrow = new OBJFormatLoader().loadOBJModel(Constants.MODEL_ARROW);
         float        scale      = 0.5f;
 

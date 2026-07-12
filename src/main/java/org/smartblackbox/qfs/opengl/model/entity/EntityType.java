@@ -5,5 +5,6 @@ public enum EntityType {
     NODE,
     FIXED,
     WALL,
-    ANIMATED, LIGHT,
+    ANIMATED,
+    LIGHT,
 }

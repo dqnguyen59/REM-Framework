@@ -39,11 +39,11 @@ public class Entity {
     protected Project  project  = Project.getInstance();
     protected Settings settings = project.settings;
 
-    protected String       name   = "";
+    protected String       name  = "";
     protected Entity       parent;
     protected ObjFileModel model;
-    protected Material material;
-    protected Vector3i index = new Vector3i(-1);
+    protected Material     material;
+    protected Vector3i     index = new Vector3i(-1);
 
     /**
      * If overrideModelMaterial is true then use the entity material,
@@ -92,9 +92,11 @@ public class Entity {
     protected boolean isSelected  = false;
     protected boolean isHiLighted = false;
 
-    public Entity(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale, EntityType type) {
+    public Entity(
+            Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale,
+            EntityType type) {
         this.parent = parent;
-        this.type = type;
+        this.type   = type;
         this.model  = model;
         this.equilibriumPosition.set(position);
         this.position.set(position);
@@ -127,8 +129,8 @@ public class Entity {
     public void setColor(Vector3d emf) {
         Material m = getMaterial();
 
-        Vector4f color = m.getDiffuseColor();
-        float    alpha = 0;
+        Vector4f color          = m.getDiffuseColor();
+        float    alpha          = 0;
         float    intensity      = settings.getIntensity();
         float    intensity2     = intensity * intensity;
         float    intensity3     = intensity2 * intensity;

@@ -108,22 +108,69 @@ public class Identity extends AbstractSettings implements ISettings {
     /**
      * Cached oscillation output for the current simulation update.
      */
-    private Vector3d oscillation = new Vector3d();
+    private Vector3d excitation = new Vector3d();
 
     public Identity(String name) {
-        this.name      = name;
+        this.name = name;
     }
 
     public Identity clone() {
         Identity identity = new Identity(name);
-        identity.active           = new Vector3b(active);
-        identity.oscillatorType   = new VectorOscillatorType(oscillatorType);
-        identity.phaseAngle       = new Vector3d(phaseAngle);
-        identity.phase            = new Vector3d(phase);
-        identity.phaseIncrement   = new Vector3d(phaseIncrement);
-        identity.amplitude        = new Vector3d(amplitude);
-        identity.oscillation      = new Vector3d(oscillation);
+        identity.active         = new Vector3b(active);
+        identity.oscillatorType = new VectorOscillatorType(oscillatorType);
+        identity.phaseAngle     = new Vector3d(phaseAngle);
+        identity.phase          = new Vector3d(phase);
+        identity.phaseIncrement = new Vector3d(phaseIncrement);
+        identity.amplitude      = new Vector3d(amplitude);
+        identity.excitation     = new Vector3d(excitation);
         return identity;
+    }
+
+    private double oscillateAxis(
+            boolean active,
+            OscillatorType oscillatorType,
+            Vector3d phase,
+            Vector3d phaseAngle,
+            Vector3d phaseIncrement,
+            int axis) {
+
+        if (!active) {
+            return 0.0;
+        }
+
+        // Advance phase
+        switch (axis) {
+            case 0 -> phase.x += phaseIncrement.x;
+            case 1 -> phase.y += phaseIncrement.y;
+            case 2 -> phase.z += phaseIncrement.z;
+        }
+
+        // Wrap phase
+        double p;
+        switch (axis) {
+            case 0 -> {
+                if (phase.x >= 360) phase.x -= 360;
+                else if (phase.x <= -360) phase.x += 360;
+                p = phaseAngle.x + phase.x;
+            }
+            case 1 -> {
+                if (phase.y >= 360) phase.y -= 360;
+                else if (phase.y <= -360) phase.y += 360;
+                p = phaseAngle.y + phase.y;
+            }
+            case 2 -> {
+                if (phase.z >= 360) phase.z -= 360;
+                else if (phase.z <= -360) phase.z += 360;
+                p = phaseAngle.z + phase.z;
+            }
+            default -> throw new IllegalArgumentException("Invalid axis");
+        }
+
+        return switch (oscillatorType) {
+            case sin -> Math.sin(Math.toRadians(p));
+            case cos -> Math.cos(Math.toRadians(p));
+            case square -> (p >= 0 && p < 180) ? 1.0 : -1.0;
+        };
     }
 
     /**
@@ -146,62 +193,18 @@ public class Identity extends AbstractSettings implements ISettings {
      * @return Oscillation vector, or {@code null} if the identity is inactive.
      */
     public Vector3d oscillate() {
-        oscillation.zero();
+        excitation.zero();
 
-        if (active.x) {
-            phase.x += phaseIncrement.x;
-            if (phase.x >= 360) phase.x = 0;
-            else if (phase.x <= -360) phase.x = 0;
+        excitation.x = oscillateAxis(active.x, oscillatorType.x, phase, phaseAngle, phaseIncrement, 0);
+        excitation.y = oscillateAxis(active.y, oscillatorType.y, phase, phaseAngle, phaseIncrement, 1);
+        excitation.z = oscillateAxis(active.z, oscillatorType.z, phase, phaseAngle, phaseIncrement, 2);
 
-            if (oscillatorType.x == OscillatorType.sin)
-                oscillation.x = Math.sin(Math.toRadians(phaseAngle.x + phase.x));
-            else if (oscillatorType.x == OscillatorType.cos)
-                oscillation.x = Math.cos(Math.toRadians(phaseAngle.x + phase.x));
-            else if (oscillatorType.x == OscillatorType.square) {
-                if (phaseAngle.x + phase.x >= 0 && phaseAngle.x + phase.x < 180)
-                    oscillation.x = 1;
-                else
-                    oscillation.x = -1;
-            }
-        }
+        if (!isActive())
+            return null;
 
-        if (active.y) {
-            phase.y += phaseIncrement.y;
-            if (phase.y >= 360) phase.y = 0;
-            else if (phase.y <= -360) phase.y = 0;
+        excitation.mul(amplitude);
 
-            if (oscillatorType.y == OscillatorType.sin)
-                oscillation.y = Math.sin(Math.toRadians(phaseAngle.y + phase.y));
-            else if (oscillatorType.y == OscillatorType.cos)
-                oscillation.y = Math.cos(Math.toRadians(phaseAngle.y + phase.y));
-            else if (oscillatorType.y == OscillatorType.square) {
-                if (phaseAngle.y + phase.y >= 0 && phaseAngle.y + phase.y < 180)
-                    oscillation.y = 1;
-                else
-                    oscillation.y = -1;
-            }
-        }
-
-        if (active.z) {
-            phase.z += phaseIncrement.z;
-            if (phase.z >= 360) phase.z = 0;
-            else if (phase.z <= -360) phase.z = 0;
-
-            if (oscillatorType.z == OscillatorType.sin)
-                oscillation.z = Math.sin(Math.toRadians(phaseAngle.z + phase.z));
-            else if (oscillatorType.z == OscillatorType.cos)
-                oscillation.z = Math.cos(Math.toRadians(phaseAngle.z + phase.z));
-            else if (oscillatorType.z == OscillatorType.square) {
-                if (phaseAngle.z + phase.z >= 0 && phaseAngle.z + phase.z < 180)
-                    oscillation.z = 1;
-                else
-                    oscillation.z = -1;
-            }
-        }
-
-        if (active.x || active.y || active.z) {
-            return oscillation.mul(amplitude);
-        } else return null;
+        return excitation;
     }
 
     /**
@@ -209,7 +212,7 @@ public class Identity extends AbstractSettings implements ISettings {
      */
     @Override
     public void reset() {
-        oscillation.set(0);
+        excitation.set(0);
         phase.set(0);
     }
 
@@ -222,8 +225,6 @@ public class Identity extends AbstractSettings implements ISettings {
 
     @Override
     public void loadFromFile(String filename) {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -232,27 +233,28 @@ public class Identity extends AbstractSettings implements ISettings {
 
     @Override
     public void loadFromFile(Wini ini, String section, int index) {
+        System.out.println("Identity.loadFromFile()");
         super.loadFromFile(ini, section, index);
         String s;
-        name               = ini.get(section + index, "name");
-        active.x           = getBool(section + index, "active.x", false);
-        active.y           = getBool(section + index, "active.y", false);
-        active.z           = getBool(section + index, "active.z", false);
-        oscillatorType.x   = (s = getString(section + index, "OscillatorType.x", "")).isEmpty()
-                             ? OscillatorType.sin : OscillatorType.valueOf(s);
-        oscillatorType.y   = (s = getString(section + index, "OscillatorType.y", "")).isEmpty()
-                             ? OscillatorType.sin : OscillatorType.valueOf(s);
-        oscillatorType.z   = (s = getString(section + index, "OscillatorType.z", "")).isEmpty()
-                             ? OscillatorType.sin : OscillatorType.valueOf(s);
-        phaseAngle.x       = getDouble(section + index, "startAngle.x", 0);
-        phaseAngle.y       = getDouble(section + index, "startAngle.y", 0);
-        phaseAngle.z       = getDouble(section + index, "startAngle.z", 0);
-        phaseIncrement.x   = getDouble(section + index, "angleIncrement.x", 0);
-        phaseIncrement.y   = getDouble(section + index, "angleIncrement.y", 0);
-        phaseIncrement.z   = getDouble(section + index, "angleIncrement.z", 0);
-        amplitude.x        = getDouble(section + index, "amplitude.x", 0);
-        amplitude.y        = getDouble(section + index, "amplitude.y", 0);
-        amplitude.z        = getDouble(section + index, "amplitude.z", 0);
+        name             = ini.get(section + index, "name");
+        active.x         = getBool(section + index, "active.x", false);
+        active.y         = getBool(section + index, "active.y", false);
+        active.z         = getBool(section + index, "active.z", false);
+        oscillatorType.x = (s = getString(section + index, "OscillatorType.x", "")).isEmpty()
+                           ? OscillatorType.sin : OscillatorType.valueOf(s);
+        oscillatorType.y = (s = getString(section + index, "OscillatorType.y", "")).isEmpty()
+                           ? OscillatorType.sin : OscillatorType.valueOf(s);
+        oscillatorType.z = (s = getString(section + index, "OscillatorType.z", "")).isEmpty()
+                           ? OscillatorType.sin : OscillatorType.valueOf(s);
+        phaseAngle.x     = getDouble(section + index, "startAngle.x", 0);
+        phaseAngle.y     = getDouble(section + index, "startAngle.y", 0);
+        phaseAngle.z     = getDouble(section + index, "startAngle.z", 0);
+        phaseIncrement.x = getDouble(section + index, "angleIncrement.x", 0);
+        phaseIncrement.y = getDouble(section + index, "angleIncrement.y", 0);
+        phaseIncrement.z = getDouble(section + index, "angleIncrement.z", 0);
+        amplitude.x      = getDouble(section + index, "amplitude.x", 0);
+        amplitude.y      = getDouble(section + index, "amplitude.y", 0);
+        amplitude.z      = getDouble(section + index, "amplitude.z", 0);
     }
 
     @Override

@@ -62,6 +62,7 @@ public class Lattice {
 	}
 
 	public Lattice() {
+		System.out.println("Lattice.Lattice()");
 		entities = new ArrayList<>();
 	}
 
@@ -126,6 +127,7 @@ public class Lattice {
 	}
 
 	public Entity build() {
+		System.out.println("Lattice.build()");
 		Vector3i dimension = new Vector3i();
 		project.getDimension(dimension);
 
@@ -241,6 +243,7 @@ public class Lattice {
 	}
 	
 	public void update() {
+		System.out.println("Lattice.update()");
 		setNodeArray(getNodes().toArray());
 		setEntityArray(entities.toArray());
 	}

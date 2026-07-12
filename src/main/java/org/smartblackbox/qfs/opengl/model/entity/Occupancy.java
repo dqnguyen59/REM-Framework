@@ -25,7 +25,6 @@ import org.joml.Vector3d;
 import org.joml.Vector3i;
 import org.joml.Vector4f;
 import org.smartblackbox.qfs.opengl.model.Lattice;
-import org.smartblackbox.qfs.settings.Project;
 import org.smartblackbox.utils.AbstractSettings;
 import org.smartblackbox.utils.ISettings;
 
@@ -83,7 +82,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
      * Pressure increases every update until one component exceeds the
      * transport threshold, causing a node transfer.
      */
-    private Vector3d pressure = new Vector3d();
+    private final Vector3d pressure = new Vector3d();
 
 
     /**
@@ -95,14 +94,26 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
 
     /**
-     * Persistent transport velocity.
+     * Persistent transport momentum.
      * <br>
      * This stores the current motion state.
      * It is preserved across node transfers and is responsible for
-     * momentum-like behaviour.
+     * momentum-like behavior.
      */
-    private final Vector3d transportVelocity = new Vector3d();
+    private final Vector3d transportMomentum = new Vector3d();
 
+    private final Vector3d initialTransportMomentum = new Vector3d();
+
+    private static final int GRADIENT_HISTORY = 50;
+
+    private final Vector3d[] gradientHistory = new Vector3d[GRADIENT_HISTORY];
+
+    private final Vector3d gradientSum = new Vector3d();
+
+    private final Vector3d averageGradient = new Vector3d();
+
+    private int gradientIndex = 0;
+    private int gradientCount = 0;
 
     /**
      * Creates an empty occupancy.
@@ -110,6 +121,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
      * The identity and node can be assigned later.
      */
     public Occupancy() {
+        init();
     }
 
     /**
@@ -124,11 +136,18 @@ public class Occupancy extends AbstractSettings implements ISettings {
         if (node != null) {
             nodeIndex.set(node.getIndex());
         }
+        init();
     }
 
     @Override
     public AbstractSettings clone() {
         return null;
+    }
+
+    private void init() {
+        for (int i = 0; i < GRADIENT_HISTORY; i++) {
+            gradientHistory[i] = new Vector3d();
+        }
     }
 
     @Override
@@ -141,11 +160,18 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     @Override
     public void loadFromFile(Wini ini, String section, int index) {
+        System.out.println("Occupancy.loadFromFile()");
         super.loadFromFile(ini, section, index);
         int x = getInt(section + index, "nodeIndex.x", 0);
         int y = getInt(section + index, "nodeIndex.y", 0);
         int z = getInt(section + index, "nodeIndex.z", 0);
         nodeIndex = new Vector3i(x, y, z);
+
+        x = getInt(section + index, "initialTransportMomentum.x", 0);
+        y = getInt(section + index, "initialTransportMomentum.y", 0);
+        z = getInt(section + index, "initialTransportMomentum.z", 0);
+        initialTransportMomentum.set(x, y, z);
+
         identity = new Identity("");
         identity.loadFromFile(ini, section, index);
     }
@@ -157,21 +183,28 @@ public class Occupancy extends AbstractSettings implements ISettings {
         put(section + index, "nodeIndex.x", nodeIndex.x);
         put(section + index, "nodeIndex.y", nodeIndex.y);
         put(section + index, "nodeIndex.z", nodeIndex.z);
+        put(section + index, "initialTransportMomentum.x", initialTransportMomentum.x);
+        put(section + index, "initialTransportMomentum.y", initialTransportMomentum.y);
+        put(section + index, "initialTransportMomentum.z", initialTransportMomentum.z);
     }
 
     public boolean isOccupied() {
         return identity != null && nodeIndex != null;// && node != null;
     }
 
+    public void setNode(Node node) {
+        this.node = node;
+        nodeIndex.set(node.getIndex());
+    }
+
     @Override
     public void reset() {
+        System.out.println("Occupancy.reset()");
         identity.reset();
         pressure.zero();
         gradient.zero();
-        transportVelocity.zero();
-        node = Project.getInstance().scene.getLattice().getNodeByIndex(nodeIndex);
-
-        Entity entity = Lattice.getInstance().createEntity(node.equilibriumPosition, new Vector3d(), 4.0f);
+        transportMomentum.zero();
+        Entity entity = Lattice.getInstance().createEntity(new Vector3d(), new Vector3d(), 4.0f);
         entity.setOverrideModelMaterial(true);
         entity.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
         entity.getMaterial().setAmbientColor(new Vector4f(10.0f, 10.0f, 10.0f, 1.0f));
@@ -180,22 +213,69 @@ public class Occupancy extends AbstractSettings implements ISettings {
         identity.setEntity(entity);
     }
 
+    public void updateAverageGradient() {
+
+        // Remove the oldest sample
+        gradientSum.sub(gradientHistory[gradientIndex]);
+
+        // Store the newest sample
+        gradientHistory[gradientIndex].set(gradient);
+
+        // Add the new sample
+        gradientSum.add(gradient);
+
+        // Advance circular buffer
+        gradientIndex = (gradientIndex + 1) % GRADIENT_HISTORY;
+
+        if (gradientCount < GRADIENT_HISTORY)
+            gradientCount++;
+
+        // Compute average
+        averageGradient.set(gradientSum).div(gradientCount);
+    }
+
+    public void updateAverageGradient_v1_0(Vector3d gradient) {
+
+        gradientHistory[gradientIndex].set(gradient);
+
+        gradientIndex = (gradientIndex + 1) % GRADIENT_HISTORY;
+
+        if (gradientCount < GRADIENT_HISTORY)
+            gradientCount++;
+
+        averageGradient.zero();
+
+        for (int i = 0; i < gradientCount; i++) {
+            averageGradient.add(gradientHistory[i]);
+        }
+
+        averageGradient.div(gradientCount);
+    }
+
+    public void updateVisualization() {
+        Entity entity = identity.getEntity();
+        if (entity != null) {
+            entity.setEquilibriumPosition(node.getEquilibriumPosition());
+            entity.setPosition(node.getEquilibriumPosition());
+            entity.setScale(4.0);
+            entity.setCustomColor(new Vector4f(1f, 1f, 0f, 1f));
+        }
+    }
+
+    public void updateOscillation() {
+        Vector3d o = identity.oscillate();
+        if (o != null) {
+            node.getPosBuff().add(o);
+        }
+    }
+
     public void update() {
         if (node != null) {
             node.setCustomColor(new Vector4f(0f, 1f, 0f, 1f));
 
             if (identity != null) {
-                Entity entity = identity.getEntity();
-                if (entity != null) {
-                    entity.setEquilibriumPosition(node.getEquilibriumPosition());
-                    entity.setPosition(node.getEquilibriumPosition());
-                    entity.setScale(4.0);
-                    entity.setCustomColor(new Vector4f(1f, 1f, 0f, 1f));
-                }
-                Vector3d o = identity.oscillate();
-                if (o != null) {
-                    node.getPosBuff().add(o);
-                }
+                updateVisualization();
+                updateOscillation();
             }
         }
     }

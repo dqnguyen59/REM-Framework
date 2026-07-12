@@ -39,6 +39,7 @@ public class Renderer {
 	private static boolean isCulling = false;
 	
 	public void init() throws Exception {
+		System.out.println("Renderer.init()");
 		terrainRenderer = new TerrainRenderer();
 		nodeRenderer = new EntityRenderer();
 		terrainRenderer.init();
@@ -68,11 +69,13 @@ public class Renderer {
 	}
 	
 	public void cleanup() {
+		System.out.println("Renderer.cleanup()");
 		nodeRenderer.cleanup();
 		terrainRenderer.cleanup();
 	}
 
 	public void cleanupNodes() {
+		System.out.println("Renderer.cleanupNodes()");
 		nodeRenderer.getEntities().clear();
 	}
 

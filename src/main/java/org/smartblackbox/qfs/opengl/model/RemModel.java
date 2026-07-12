@@ -58,6 +58,8 @@ public class RemModel {
         detectorNode,
     }
 
+    private String customStatus = "";
+
     private boolean isSimulating;
 
     private boolean isLoadingReady = false;

@@ -34,8 +34,8 @@ import org.smartblackbox.qfs.settings.Settings.NodeFormulaVersion;
 public class Node extends Entity {
 
     private final AppSettings appSettings = AppSettings.getInstance();
-    private final RemModel remModel = project.getRemModel();
-    private final Scene    scene    = project.scene;
+    private final RemModel    remModel    = project.getRemModel();
+    private final Scene       scene       = project.scene;
 
     private static final int NEIGHBOR_RIGHT  = 0;
     private static final int NEIGHBOR_TOP    = 1;
@@ -53,17 +53,18 @@ public class Node extends Entity {
      * 5: neighbors back
      */
     private final Node[]  neighbors = new Node[6];
-//    private       boolean isFixed;
+    //    private       boolean isFixed;
     private       boolean isXFixed;
     private       boolean isYFixed;
     private       boolean isZFixed;
-//    private       boolean isWall;
+    //    private       boolean isWall;
 
     private Vector3d fixedPos;
 
     private Vector3d[] deltaPositions      = new Vector3d[6];
-    private double[]   deltaPositionLength = new double[6];
-    private Vector3d   gradient            = new Vector3d();
+    private Vector3d[] deltaVelocity = new Vector3d[6];
+    private double[]   flow          = new double[6];
+    private Vector3d   gradient      = new Vector3d();
 
     /**
      * Electric Field
@@ -80,11 +81,16 @@ public class Node extends Entity {
     private       Vector3d acceleration = new Vector3d();
     private       Vector3d velocity     = new Vector3d();
 
+    private static final Vector3d ZERO = new Vector3d();
+
     public Node(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
         super(parent, model, position, rotation, scale, EntityType.NODE);
 
         for (int i = 0; i < deltaPositions.length; i++) {
             deltaPositions[i] = new Vector3d();
+        }
+        for (int i = 0; i < deltaVelocity.length; i++) {
+            deltaVelocity[i] = new Vector3d();
         }
     }
 
@@ -155,13 +161,15 @@ public class Node extends Entity {
         for (int i = 0; i < deltaPositions.length; i++) {
             if (neighbors[i] != null) {
                 deltaPositions[i].set(neighbors[i].position).sub(position);
-                deltaPositionLength[i] = deltaPositions[i].length();
+                deltaVelocity[i].set(neighbors[i].velocity).sub(velocity);
+                flow[i] = deltaPositions[i].dot(deltaVelocity[i]);
             }
         }
 
-        return gradient.set(deltaPositionLength[NEIGHBOR_RIGHT] - deltaPositionLength[NEIGHBOR_LEFT],
-                            deltaPositionLength[NEIGHBOR_TOP] - deltaPositionLength[NEIGHBOR_BOTTOM],
-                            deltaPositionLength[NEIGHBOR_FRONT] - deltaPositionLength[NEIGHBOR_BACK]);
+
+        return gradient.set(flow[NEIGHBOR_RIGHT] - flow[NEIGHBOR_LEFT],
+                            flow[NEIGHBOR_TOP] - flow[NEIGHBOR_BOTTOM],
+                            flow[NEIGHBOR_FRONT] - flow[NEIGHBOR_BACK]);
     }
 
     public void updateNodeProperties(NodeFormulaVersion nodeFormulaVersion) {
@@ -182,15 +190,14 @@ public class Node extends Entity {
     }
 
     private Vector3d getNeighborEFieldPosition(int index) {
-        return neighbors[index] == null ? new Vector3d() : neighbors[index].eField.p;
+        return neighbors[index] == null ? ZERO : neighbors[index].eField.p;
     }
 
     private Vector3d getNeighborBFieldPosition(int index) {
-        return neighbors[index] == null ? new Vector3d() : neighbors[index].bField.p;
+        return neighbors[index] == null ? ZERO : neighbors[index].bField.p;
     }
 
     /**
-     * Note that this is not the full quantum field formula, only the electric field is simulated
      * .<br/>
      * <br/>
      * Some definitions:<br/>
@@ -238,9 +245,9 @@ public class Node extends Entity {
      */
     public void updateNodeProperties_v0_1() {
         boolean isFixed = type == EntityType.FIXED;
-        boolean isWall = type == EntityType.WALL;
-        double cws   = project.getConstantWaveSpeed() / 6;
-        double gamma = project.getConstantElectricFactor();
+        boolean isWall  = type == EntityType.WALL;
+        double  cws     = project.getConstantWaveSpeed() / 6;
+        double  gamma   = project.getConstantElectricFactor();
 
         ef.set(0);
 
@@ -287,11 +294,11 @@ public class Node extends Entity {
 
     public void updateNodeProperties_v0_2() {
         boolean isFixed = type == EntityType.FIXED;
-        boolean isWall = type == EntityType.WALL;
-        double cws   = project.getConstantWaveSpeed() / 6;
-        double gamma = project.getConstantElectricFactor();
-        double beta  = project.getConstantMagneticFactor();
-        double f     = 0.1;
+        boolean isWall  = type == EntityType.WALL;
+        double  cws     = project.getConstantWaveSpeed() / 6;
+        double  gamma   = project.getConstantElectricFactor();
+        double  beta    = project.getConstantMagneticFactor();
+        double  f       = 0.1;
 
         ef.set(0);
         mf.set(0);
@@ -324,16 +331,16 @@ public class Node extends Entity {
             }
         }
 
-        Vector3d nLeft = neighbors[NEIGHBOR_LEFT] == null ? new Vector3d()
+        Vector3d nLeft = neighbors[NEIGHBOR_LEFT] == null ? ZERO
                                                           : neighbors[NEIGHBOR_LEFT].velocity;
-        Vector3d nRight = neighbors[NEIGHBOR_RIGHT] == null ? new Vector3d()
+        Vector3d nRight = neighbors[NEIGHBOR_RIGHT] == null ? ZERO
                                                             : neighbors[NEIGHBOR_RIGHT].velocity;
-        Vector3d nTop = neighbors[NEIGHBOR_TOP] == null ? new Vector3d() : neighbors[NEIGHBOR_TOP].velocity;
-        Vector3d nBottom = neighbors[NEIGHBOR_BOTTOM] == null ? new Vector3d()
+        Vector3d nTop = neighbors[NEIGHBOR_TOP] == null ? ZERO : neighbors[NEIGHBOR_TOP].velocity;
+        Vector3d nBottom = neighbors[NEIGHBOR_BOTTOM] == null ? ZERO
                                                               : neighbors[NEIGHBOR_BOTTOM].velocity;
-        Vector3d nFront = neighbors[NEIGHBOR_FRONT] == null ? new Vector3d()
+        Vector3d nFront = neighbors[NEIGHBOR_FRONT] == null ? ZERO
                                                             : neighbors[NEIGHBOR_FRONT].velocity;
-        Vector3d nBack = neighbors[NEIGHBOR_BACK] == null ? new Vector3d()
+        Vector3d nBack = neighbors[NEIGHBOR_BACK] == null ? ZERO
                                                           : neighbors[NEIGHBOR_BACK].velocity;
 
         mf.x = (nFront.y - nBack.y) * f - (nTop.z - nBottom.z) * f;
@@ -362,10 +369,10 @@ public class Node extends Entity {
 
     public void updateNodeProperties_v0_3() {
         boolean isFixed = type == EntityType.FIXED;
-        double cws   = project.getConstantWaveSpeed() / 6;
-        double gamma = project.getConstantElectricFactor();
-        double beta  = project.getConstantMagneticFactor();
-        double f     = 0.1;
+        double  cws     = project.getConstantWaveSpeed() / 6;
+        double  gamma   = project.getConstantElectricFactor();
+        double  beta    = project.getConstantMagneticFactor();
+        double  f       = 0.1;
 
         ef.set(0);
         mf.set(0);

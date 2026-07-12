@@ -127,6 +127,7 @@ public class Project extends AbstractSettings implements ISettings {
 
     @Override
     public void loadFromFile(Wini ini, String section, int index) {
+        System.out.println("Project.loadFromFile() started");
         super.loadFromFile(ini, section, index);
 
         setConstantFrequency(getDouble("QuantumField", "constantFrequency", 1.0));
@@ -168,7 +169,7 @@ public class Project extends AbstractSettings implements ISettings {
         detectorModel.loadFromFile(ini, "Detector", index);
 
         if (!occupancies.isEmpty())
-            remModel.setSelectedOccupancy(occupancies.get(0));
+            remModel.setSelectedOccupancy(occupancies.getFirst());
 
         if (settings.getVisibleIndexX() >= dimension.x) {
             settings.setVisibleIndexX(dimension.x / 2);
@@ -188,14 +189,14 @@ public class Project extends AbstractSettings implements ISettings {
 
         reset();
         remModel.setLoadingReady(false);
-        new Thread(() -> {
+        Thread.startVirtualThread(() -> {
             while (!remModel.isLoadingReady()) {
-                System.out.println("loadFromFile.run()");
                 Utils.sleepMS(100);
             }
             Utils.sleepMS(200);
             loadWalls(ini);
-        }).start();
+            System.out.println("Project loadFromFile() ready");
+        });
     }
 
     @Override
@@ -249,6 +250,7 @@ public class Project extends AbstractSettings implements ISettings {
     }
 
     private void loadWalls(Wini ini) {
+        System.out.println("Project.loadWalls()");
         Vector3i nodeIndex;
 
         scene.clearAllWalls();
@@ -389,9 +391,6 @@ public class Project extends AbstractSettings implements ISettings {
         isChanged = true;
         setConstantFrequency(constantFrequency);
         slitWall.reset();
-//        for (Occupancy occupancy : occupancies) {
-//            occupancy.reset();
-//        }
     }
 
     /**
