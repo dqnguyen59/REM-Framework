@@ -61,10 +61,12 @@ public class Node extends Entity {
 
     private Vector3d fixedPos;
 
-    private Vector3d[] deltaPositions      = new Vector3d[6];
-    private Vector3d[] deltaVelocity = new Vector3d[6];
-    private double[]   flow          = new double[6];
-    private Vector3d   gradient      = new Vector3d();
+    private final Vector3d[] deltaPositions = new Vector3d[6];
+    private final Vector3d[] deltaVelocity  = new Vector3d[6];
+    private final double[]   flow           = new double[6];
+    private final double[] previousFlow = new double[6];
+    private final double[] deltaFlow = new double[6];
+    private final Vector3d   gradient       = new Vector3d();
 
     /**
      * Electric Field

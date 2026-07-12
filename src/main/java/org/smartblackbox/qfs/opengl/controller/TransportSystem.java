@@ -53,7 +53,7 @@ public class TransportSystem {
     private final Project  project       = Project.getInstance();
     private final RemModel remModel      = project.getRemModel();
 
-    private       double gradientGain = 0.0001;
+    private       double gradientGain = 0.00001;
 
 
     /**
@@ -61,7 +61,7 @@ public class TransportSystem {
      */
     private double transferThreshold = 0.00001;
 
-    private double f = 0.05;
+    private double f = 0.01;
 
     /**
      * Updates the transport state of a single occupancy.
@@ -88,7 +88,7 @@ public class TransportSystem {
      * Measures the local recursive field gradient around the occupied node.
      */
     private void measureGradient(Occupancy occupancy) {
-        occupancy.getGradient().mul(0.98).fma(gradientGain, occupancy.getNode().measureGradient());
+        occupancy.getGradient().mul(0.2).fma(gradientGain, occupancy.getNode().measureGradient());
     }
 
     /**
@@ -99,7 +99,7 @@ public class TransportSystem {
      * changes the current transport momentum.
      */
     private void updateTransportMomentum(Occupancy occupancy) {
-        occupancy.getTransportMomentum().fma(gradientGain, occupancy.getAverageGradient());
+        occupancy.getTransportMomentum().fma(0.00001, occupancy.getAverageGradient());
         double x = Math.clamp(occupancy.getTransportMomentum().x, -transferThreshold * f, transferThreshold * f);
         double y = Math.clamp(occupancy.getTransportMomentum().y, -transferThreshold * f, transferThreshold * f);
         double z = Math.clamp(occupancy.getTransportMomentum().z, -transferThreshold * f, transferThreshold * f);
