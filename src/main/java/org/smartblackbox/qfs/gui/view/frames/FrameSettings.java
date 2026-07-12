@@ -37,14 +37,14 @@ public class FrameSettings extends AbstractFrame {
     private final StringBuffer bufElectricField = new StringBuffer();
     private final StringBuffer bufMagneticField = new StringBuffer();
 
-    private final StringBuffer bufScale           = new StringBuffer();
-    private final StringBuffer bufDepthVisibility = new StringBuffer();
-    private final StringBuffer bufAlphaSlice      = new StringBuffer();
-    private final StringBuffer bufIntensitySlice = new StringBuffer();
-    private final StringBuffer bufVisibleIndexX = new StringBuffer();
-    private final StringBuffer bufVisibleIndexY = new StringBuffer();
-    private final StringBuffer bufVisibleIndexZ = new StringBuffer();
-    private final StringBuffer bufAlphaAll      = new StringBuffer();
+    private final StringBuffer bufScale             = new StringBuffer();
+    private final StringBuffer bufDepthVisibility   = new StringBuffer();
+    private final StringBuffer bufAlphaSlice        = new StringBuffer();
+    private final StringBuffer bufIntensitySlice    = new StringBuffer();
+    private final StringBuffer bufVisibleIndexX     = new StringBuffer();
+    private final StringBuffer bufVisibleIndexY     = new StringBuffer();
+    private final StringBuffer bufVisibleIndexZ     = new StringBuffer();
+    private final StringBuffer bufAlphaAll          = new StringBuffer();
     private final StringBuffer bufIntensityAll      = new StringBuffer();
     private final StringBuffer bufShininess         = new StringBuffer();
     private final StringBuffer bufConstantFrequency = new StringBuffer();
@@ -53,11 +53,13 @@ public class FrameSettings extends AbstractFrame {
         super(frames);
     }
 
-    @Override public String getTitle() {
+    @Override
+    public String getTitle() {
         return "Settings";
     }
 
-    @Override public void render(long windowHandle, NkContext ctx) {
+    @Override
+    public void render(long windowHandle, NkContext ctx) {
         super.render(windowHandle, ctx);
 
         int heightAdjust = switch (settings.getSliceType()) {
@@ -69,15 +71,16 @@ public class FrameSettings extends AbstractFrame {
             heightAdjust += 70;
         }
 
-        int width = 300;
+        int width  = 300;
         int height = 720;
         createLayout(ctx, 0, nuklearModel.getMenuBarHeight() + 120, width, height + heightAdjust);
     }
 
-    @Override protected void layout(NkContext ctx, int x, int y, int width, int height) {
+    @Override
+    protected void layout(NkContext ctx, int x, int y, int width, int height) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
 
-            float leftCol = 0.6f;
+            float leftCol  = 0.6f;
             float rightCol = 0.4f;
             settings.scale = nk_label_edit(ctx, stack, " Scale:", bufScale, settings.scale, leftCol,
                                            rightCol);
