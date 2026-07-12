@@ -31,64 +31,54 @@ import java.util.Objects;
 
 public class FrameSettings extends AbstractFrame {
 
-    private int   width        = 300;
-    private int   height       = 720;
-    private int   heightAdjust = 0;
-    private float leftCol      = 0.6f;
-    private float rightCol     = 0.4f;
+    private final Project project = Project.getInstance();
 
-    private Project project = Project.getInstance();
+    private final Settings     settings         = project.settings;
+    private final StringBuffer bufElectricField = new StringBuffer();
+    private final StringBuffer bufMagneticField = new StringBuffer();
 
-    private Settings     settings         = project.settings;
-    private StringBuffer bufElectricField = new StringBuffer();
-    private StringBuffer bufMagneticField = new StringBuffer();
-
-    private StringBuffer bufScale             = new StringBuffer();
-    private StringBuffer bufDepthVisibility   = new StringBuffer();
-    private StringBuffer bufAlphaSlice        = new StringBuffer();
-    private StringBuffer bufIntensitySlice    = new StringBuffer();
-    private StringBuffer bufVisibleIndexX     = new StringBuffer();
-    private StringBuffer bufVisibleIndexY     = new StringBuffer();
-    private StringBuffer bufVisibleIndexZ     = new StringBuffer();
-    private StringBuffer bufAlphaAll          = new StringBuffer();
-    private StringBuffer bufIntensityAll      = new StringBuffer();
-    private StringBuffer bufShininess         = new StringBuffer();
-    private StringBuffer bufConstantFrequency = new StringBuffer();
+    private final StringBuffer bufScale           = new StringBuffer();
+    private final StringBuffer bufDepthVisibility = new StringBuffer();
+    private final StringBuffer bufAlphaSlice      = new StringBuffer();
+    private final StringBuffer bufIntensitySlice = new StringBuffer();
+    private final StringBuffer bufVisibleIndexX = new StringBuffer();
+    private final StringBuffer bufVisibleIndexY = new StringBuffer();
+    private final StringBuffer bufVisibleIndexZ = new StringBuffer();
+    private final StringBuffer bufAlphaAll      = new StringBuffer();
+    private final StringBuffer bufIntensityAll      = new StringBuffer();
+    private final StringBuffer bufShininess         = new StringBuffer();
+    private final StringBuffer bufConstantFrequency = new StringBuffer();
 
     public FrameSettings(NuklearModel frames) {
         super(frames);
     }
 
     @Override public String getTitle() {
-        return "QFS Settings";
+        return "Settings";
     }
 
     @Override public void render(long windowHandle, NkContext ctx) {
         super.render(windowHandle, ctx);
 
-        switch (settings.getSliceType()) {
-            case none:
-                heightAdjust = -60;
-                break;
-            case sliceXZ:
-            case sliceYZ:
-            case sliceXY:
-                heightAdjust = 70;
-                break;
-            default:
-                heightAdjust = 0;
-                break;
-        }
+        int heightAdjust = switch (settings.getSliceType()) {
+            case none -> -60;
+            case sliceXZ, sliceYZ, sliceXY -> 70;
+            default -> 0;
+        };
         if (Objects.requireNonNull(settings.getNodeFormulaVersion()) == NodeFormulaVersion.v_0_2) {
             heightAdjust += 70;
         }
 
+        int width = 300;
+        int height = 720;
         createLayout(ctx, 0, nuklearModel.getMenuBarHeight() + 120, width, height + heightAdjust);
     }
 
     @Override protected void layout(NkContext ctx, int x, int y, int width, int height) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
 
+            float leftCol = 0.6f;
+            float rightCol = 0.4f;
             settings.scale = nk_label_edit(ctx, stack, " Scale:", bufScale, settings.scale, leftCol,
                                            rightCol);
             settings.scale = nk_slider(ctx, 0.2, settings.scale, 8.0, 0.1);
