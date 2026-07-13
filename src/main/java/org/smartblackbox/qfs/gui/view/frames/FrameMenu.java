@@ -31,12 +31,12 @@ import org.smartblackbox.qfs.settings.Project;
 
 public class FrameMenu extends AbstractFrame {
 
-    private Project  project  = Project.getInstance();
-    private RemModel REMModel = project.getRemModel();
+    private final Project  project  = Project.getInstance();
+    private final RemModel remModel = project.getRemModel();
 
-    private int menuWidth = 150;
+    private final int menuWidth = 200;
 
-    private NkVec2 fileVec2 = NkVec2.create().set(menuWidth, 300);
+    private final NkVec2 fileVec2 = NkVec2.create().set(menuWidth, 300);
 
     public FrameMenu(NuklearModel model) {
         super(model);
@@ -110,13 +110,39 @@ public class FrameMenu extends AbstractFrame {
                     Nuklear.nk_menu_close(ctx);
                 }
 
-                if (nk_menu_item_label(ctx, "QFS Colors", stack)) {
+                if (nk_menu_item_label(ctx, "Colors", stack)) {
                     nuklearModel.toggleFrame(Frame.colors);
                     Nuklear.nk_menu_close(ctx);
                 }
 
-                if (nk_menu_item_label(ctx, "Oscillators", stack)) {
-                    REMModel.setEditMode(EditMode.none);
+                if (nk_menu_item_label(ctx, "Terrain Settings", stack)) {
+                    nuklearModel.toggleFrame(Frame.terrainSettings);
+                    Nuklear.nk_menu_close(ctx);
+                }
+
+                if (nk_menu_item_label(ctx, "Settings", stack)) {
+                    nuklearModel.toggleFrame(Frame.settings);
+                    Nuklear.nk_menu_close(ctx);
+                }
+
+                if (nk_menu_item_label(ctx, "TransportSystem", stack)) {
+                    nuklearModel.toggleFrame(Frame.transportSystem);
+                    Nuklear.nk_menu_close(ctx);
+                }
+
+                if (nk_menu_item_label(ctx, "Preferences", stack)) {
+                    nuklearModel.toggleFrame(Frame.preferences);
+                    Nuklear.nk_menu_close(ctx);
+                }
+
+                Nuklear.nk_menu_end(ctx);
+            }
+
+            if (Nuklear.nk_menu_begin_label(ctx, "Tools", Nuklear.NK_TEXT_LEFT, fileVec2)) {
+                isSubMenuVisible = true;
+                Nuklear.nk_layout_row_dynamic(ctx, menuItemHeight, 1);
+                if (nk_menu_item_label(ctx, "Identity", stack)) {
+                    remModel.setEditMode(EditMode.none);
                     nuklearModel.toggleFrame(Frame.identity);
                     Nuklear.nk_menu_close(ctx);
                 }
@@ -142,29 +168,14 @@ public class FrameMenu extends AbstractFrame {
                     Nuklear.nk_menu_close(ctx);
                 }
 
-                if (nk_menu_item_label(ctx, "Terrain Settings", stack)) {
-                    nuklearModel.toggleFrame(Frame.terrainSettings);
-                    Nuklear.nk_menu_close(ctx);
-                }
-
-                if (nk_menu_item_label(ctx, "Settings", stack)) {
-                    nuklearModel.toggleFrame(Frame.settings);
-                    Nuklear.nk_menu_close(ctx);
-                }
-
-                if (nk_menu_item_label(ctx, "Preferences", stack)) {
-                    nuklearModel.toggleFrame(Frame.preferences);
-                    Nuklear.nk_menu_close(ctx);
-                }
-
                 Nuklear.nk_menu_end(ctx);
             }
 
             if (Nuklear.nk_menu_begin_label(ctx, "Run", Nuklear.NK_TEXT_LEFT, fileVec2)) {
                 isSubMenuVisible = true;
                 Nuklear.nk_layout_row_dynamic(ctx, menuItemHeight, 1);
-                if (nk_menu_item_label(ctx, REMModel.getBtnSimulatingLabel(), stack)) {
-                    REMModel.toggleSimulation();
+                if (nk_menu_item_label(ctx, remModel.getBtnSimulatingLabel(), stack)) {
+                    remModel.toggleSimulation();
                     Nuklear.nk_menu_close(ctx);
                 }
 

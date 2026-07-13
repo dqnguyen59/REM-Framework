@@ -2,12 +2,15 @@ package org.smartblackbox.qfs.opengl.controller;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.ini4j.Wini;
 import org.joml.Vector3d;
 import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.opengl.model.RemModel;
 import org.smartblackbox.qfs.opengl.model.entity.Node;
 import org.smartblackbox.qfs.opengl.model.entity.Occupancy;
 import org.smartblackbox.qfs.settings.Project;
+import org.smartblackbox.utils.AbstractSettings;
+import org.smartblackbox.utils.ISettings;
 
 /**
  * REM-FIELD Transport System.
@@ -48,20 +51,64 @@ import org.smartblackbox.qfs.settings.Project;
  */
 @Getter
 @Setter
-public class TransportSystem {
+public class TransportSystem extends AbstractSettings implements ISettings {
 
-    private final Project  project       = Project.getInstance();
-    private final RemModel remModel      = project.getRemModel();
+    private static TransportSystem instance;
+    private final  Project         project  = Project.getInstance();
+    private final  RemModel        remModel = project.getRemModel();
 
-    private       double gradientGain = 0.00001;
+    private boolean logToConsole   = false;
+    private double  gradientGain   = 0.00001;
+    private double  gradientFilter = 0.2;
 
+    private double transportMomentumGain = 0.00001;
+    private double transportMomentumMax  = 0.0000001;
 
     /**
      * Pressure required to transfer one lattice step.
      */
     private double transferThreshold = 0.00001;
 
-    private double f = 0.01;
+    public static TransportSystem getInstance() {
+        if (instance == null) {
+            instance = new TransportSystem();
+        }
+        return instance;
+    }
+
+    @Override
+    public AbstractSettings clone() {
+        return null;
+    }
+
+    @Override
+    public void reset() {
+
+    }
+
+    @Override
+    public void loadFromFile(Wini ini, String section, int index) {
+        System.out.println("TransportSystem.loadFromFile()");
+        super.loadFromFile(ini, section, index);
+        logToConsole          = getBool(section + index, "logToConsole", false);
+        gradientGain          = getDouble(section + index, "gradientGain", 0.00001);
+        gradientFilter        = getDouble(section + index, "gradientFilter", 0.2);
+        transportMomentumGain = getDouble(section + index, "transportMomentumGain", 0.00001);
+        transportMomentumMax  = getDouble(section + index, "transportMomentumMax", 0.0000002);
+        transferThreshold     = getDouble(section + index, "transferThreshold", 0.00001);
+    }
+
+    @Override
+    public void saveToFile(Wini ini, String section, int index) {
+        System.out.println("TransportSystem.saveToFile()");
+        super.saveToFile(ini, section, index);
+        put(section + index, "logToConsole", logToConsole);
+        put(section + index, "gradientGain", gradientGain);
+        put(section + index, "gradientFilter", gradientFilter);
+        put(section + index, "transportMomentumGain", transportMomentumGain);
+        put(section + index, "transportMomentumMax", transportMomentumMax);
+        put(section + index, "transferThreshold", transferThreshold);
+    }
 
     /**
      * Updates the transport state of a single occupancy.
@@ -69,12 +116,12 @@ public class TransportSystem {
      * @param occupancy the occupancy to update
      */
     public void update(Occupancy occupancy) {
-        // gradient = measuredGradient * gradientGain
+        // gradient = gradient * gradientFilter + measuredGradient * gradientGain
         measureGradient(occupancy);
 
         occupancy.updateAverageGradient();
 
-        // transportMomentum += gradient
+        // transportMomentum += gradient * transportMomentumGain
         updateTransportMomentum(occupancy);
 
         // pressure += transportProgress;
@@ -88,7 +135,7 @@ public class TransportSystem {
      * Measures the local recursive field gradient around the occupied node.
      */
     private void measureGradient(Occupancy occupancy) {
-        occupancy.getGradient().mul(0.2).fma(gradientGain, occupancy.getNode().measureGradient());
+        occupancy.getGradient().mul(gradientFilter).fma(gradientGain, occupancy.getNode().measureGradient());
     }
 
     /**
@@ -99,10 +146,13 @@ public class TransportSystem {
      * changes the current transport momentum.
      */
     private void updateTransportMomentum(Occupancy occupancy) {
-        occupancy.getTransportMomentum().fma(0.00001, occupancy.getAverageGradient());
-        double x = Math.clamp(occupancy.getTransportMomentum().x, -transferThreshold * f, transferThreshold * f);
-        double y = Math.clamp(occupancy.getTransportMomentum().y, -transferThreshold * f, transferThreshold * f);
-        double z = Math.clamp(occupancy.getTransportMomentum().z, -transferThreshold * f, transferThreshold * f);
+        occupancy.getTransportMomentum().fma(transportMomentumGain, occupancy.getAverageGradient());
+        double x = Math.clamp(occupancy.getTransportMomentum().x, -transportMomentumMax,
+                              transportMomentumMax);
+        double y = Math.clamp(occupancy.getTransportMomentum().y, -transportMomentumMax,
+                              transportMomentumMax);
+        double z = Math.clamp(occupancy.getTransportMomentum().z, -transportMomentumMax,
+                              transportMomentumMax);
         occupancy.getTransportMomentum().set(x, y, z);
     }
 
@@ -124,8 +174,8 @@ public class TransportSystem {
      */
     private void transferOccupancy(Occupancy occupancy) {
 
-        Vector3d pressure = occupancy.getPressure();
-        Node currentNode = occupancy.getNode();
+        Vector3d pressure    = occupancy.getPressure();
+        Node     currentNode = occupancy.getNode();
 
         if (currentNode == null) return;
 
@@ -136,13 +186,13 @@ public class TransportSystem {
         /*
          * X transport
          */
-        int directionA          = -1;
-        int directionB          = -1;
+        int directionA = -1;
+        int directionB = -1;
         if (absX >= transferThreshold) {
             System.out.println("absX: " + absX);
-            directionA  = pressure.x > 0 ? Constants.NEIGHBOR_LEFT : Constants.NEIGHBOR_RIGHT;
-            directionB  = pressure.x <= 0 ? Constants.NEIGHBOR_LEFT : Constants.NEIGHBOR_RIGHT;
-            pressure.x = pressure.x > 0? absX - transferThreshold : transferThreshold - absX;
+            directionA = pressure.x > 0 ? Constants.NEIGHBOR_LEFT : Constants.NEIGHBOR_RIGHT;
+            directionB = pressure.x <= 0 ? Constants.NEIGHBOR_LEFT : Constants.NEIGHBOR_RIGHT;
+            pressure.x = pressure.x > 0 ? absX - transferThreshold : transferThreshold - absX;
         }
 
         /*
@@ -150,9 +200,9 @@ public class TransportSystem {
          */
         else if (absY >= transferThreshold) {
             System.out.println("absY: " + absY);
-            directionA  = pressure.y > 0 ? Constants.NEIGHBOR_BOTTOM : Constants.NEIGHBOR_TOP;
-            directionB  = pressure.y <= 0 ? Constants.NEIGHBOR_BOTTOM : Constants.NEIGHBOR_TOP;
-            pressure.y = pressure.y > 0? absY - transferThreshold : transferThreshold - absY;
+            directionA = pressure.y > 0 ? Constants.NEIGHBOR_BOTTOM : Constants.NEIGHBOR_TOP;
+            directionB = pressure.y <= 0 ? Constants.NEIGHBOR_BOTTOM : Constants.NEIGHBOR_TOP;
+            pressure.y = pressure.y > 0 ? absY - transferThreshold : transferThreshold - absY;
         }
 
         /*
@@ -160,10 +210,10 @@ public class TransportSystem {
          */
         else if (absZ >= transferThreshold) {
             System.out.println("absZ: " + absZ);
-            directionA  = pressure.z > 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
-            directionB  = pressure.z <= 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
+            directionA = pressure.z > 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
+            directionB = pressure.z <= 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
             pressure.sub(0, 0, pressure.z);
-            pressure.z = pressure.z > 0? absZ - transferThreshold : transferThreshold - absZ;
+            pressure.z = pressure.z > 0 ? absZ - transferThreshold : transferThreshold - absZ;
         }
 
         if (directionA != -1) {
@@ -240,6 +290,11 @@ public class TransportSystem {
                                  occupancy.getTransportMomentum().x,
                                  occupancy.getPressure().x);
         remModel.setCustomStatus(s);
-        //System.out.println(s);
+
+        if (logToConsole) {
+            System.out.println(s);
+        }
     }
+
+
 }

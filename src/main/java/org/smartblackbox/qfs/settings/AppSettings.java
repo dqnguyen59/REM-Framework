@@ -74,6 +74,7 @@ public class AppSettings extends AbstractSettings implements ISettings {
     private DecimalFormat formatScientific2  = Utils.setFormat(2, 2, decimalSeperator, false, false);
     private DecimalFormat formatScientific4  = Utils.setFormat(4, 4, decimalSeperator, false, false);
     private DecimalFormat formatScientific8  = Utils.setFormat(8, 8, decimalSeperator, false, false);
+    private DecimalFormat formatScientific9  = Utils.setFormat(9, 9, decimalSeperator, false, false);
     private DecimalFormat formatScientific12 = Utils.setFormat(12, 12, decimalSeperator, false, false);
 
     private int antiAliasing = 1;

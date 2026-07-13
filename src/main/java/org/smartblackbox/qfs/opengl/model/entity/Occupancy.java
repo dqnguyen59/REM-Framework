@@ -151,14 +151,6 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     @Override
-    public void loadFromFile(String filename) {
-    }
-
-    @Override
-    public void saveToFile(String filename) {
-    }
-
-    @Override
     public void loadFromFile(Wini ini, String section, int index) {
         System.out.println("Occupancy.loadFromFile()");
         super.loadFromFile(ini, section, index);

@@ -26,6 +26,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3i;
 import org.lwjgl.glfw.GLFW;
 import org.smartblackbox.qfs.Constants;
+import org.smartblackbox.qfs.opengl.controller.TransportSystem;
 import org.smartblackbox.qfs.opengl.model.*;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
 import org.smartblackbox.qfs.opengl.model.entity.Node;
@@ -158,6 +159,9 @@ public class Project extends AbstractSettings implements ISettings {
         slitWall.loadFromFile(ini, "SlitWall", 0);
 
         int size = getInt("Oscillators", "Size", 0);
+
+        TransportSystem.getInstance().loadFromFile(ini, "TransportSystem", 0);
+
         occupancies.clear();
         for (int i = 0; i < size; i++) {
             Occupancy occupancy = new Occupancy();
@@ -235,6 +239,8 @@ public class Project extends AbstractSettings implements ISettings {
         for (int i = 0; i < oldSize; i++) {
             ini.remove("Oscillator" + i);
         }
+
+        TransportSystem.getInstance().saveToFile(ini, "TransportSystem", 0);
 
         int size = occupancies.size();
         put("Oscillators", "Size", size);

@@ -26,63 +26,62 @@ import org.smartblackbox.qfs.opengl.model.RemModel;
 import org.smartblackbox.qfs.opengl.model.RemModel.EditMode;
 import org.smartblackbox.qfs.settings.Project;
 
-public class FrameEditWall extends AbstractFrame {
+public class FrameEditWalls extends AbstractFrame {
 
-	private Project  project  = Project.getInstance();
-	private RemModel REMModel = project.getRemModel();
+	private final Project  project  = Project.getInstance();
+	private final RemModel remModel = project.getRemModel();
 
-	private int width = 300;
-	private int height = 312;
-
-	public FrameEditWall(NuklearModel frames) {
+    public FrameEditWalls(NuklearModel frames) {
 		super(frames);
 	}
 
 	@Override
 	public String getTitle() {
-		return "Edit Wall";
+		return "Edit Walls";
 	}
 
 	@Override
 	public void render(long windowHandle, NkContext ctx) {
 		super.render(windowHandle, ctx);
 
-		createLayout(ctx, 0, nuklearModel.getMenuBarHeight(), width, height);
+        int width = 300;
+        int height = 312;
+        createLayout(ctx, 0, nuklearModel.getMenuBarHeight(), width, height);
 	}
 
 	@Override
 	protected void layout(NkContext ctx, int x, int y, int width, int height) {
 		try (MemoryStack stack = MemoryStack.stackPush()) {
 			Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
-			REMModel.setWallVisible(Nuklear.nk_check_label(ctx, "Show Wall", REMModel.isWallVisible()));
+			remModel.setWallVisible(Nuklear.nk_check_label(ctx, "Show Wall", remModel.isWallVisible()));
 
 			Nuklear.nk_layout_row_static(ctx, rowHeight, 120, 1);
-			if (Nuklear.nk_option_label(ctx, "None", REMModel.getEditMode() == EditMode.none)) {
-				REMModel.setEditMode(EditMode.none);
+			if (Nuklear.nk_option_label(ctx, "None", remModel.getEditMode() == EditMode.none)) {
+				remModel.setEditMode(EditMode.none);
 			}
 
-			if (Nuklear.nk_option_label(ctx, "Swap Node", REMModel.getEditMode() == EditMode.swapNode)) {
-				REMModel.setEditMode(EditMode.swapNode);
+			if (Nuklear.nk_option_label(ctx, "Swap Node", remModel.getEditMode() == EditMode.swapNode)) {
+				remModel.setEditMode(EditMode.swapNode);
 			}
 
-			if (Nuklear.nk_option_label(ctx, "Swap Nodes Z", REMModel.getEditMode() == EditMode.swapNodesZ)) {
-				REMModel.setEditMode(EditMode.swapNodesZ);
+			if (Nuklear.nk_option_label(ctx, "Swap Nodes Z", remModel.getEditMode() == EditMode.swapNodesZ)) {
+				remModel.setEditMode(EditMode.swapNodesZ);
 			}
 
-			if (Nuklear.nk_option_label(ctx, "Line", REMModel.getEditMode() == EditMode.drawLine)) {
-				REMModel.setEditMode(EditMode.drawLine);
+			if (Nuklear.nk_option_label(ctx, "Line", remModel.getEditMode() == EditMode.drawLine)) {
+				remModel.setEditMode(EditMode.drawLine);
 			}
 
-			if (Nuklear.nk_option_label(ctx, "Wall", REMModel.getEditMode() == EditMode.drawWall)) {
-				REMModel.setEditMode(EditMode.drawWall);
+			if (Nuklear.nk_option_label(ctx, "Wall", remModel.getEditMode() == EditMode.drawWall)) {
+				remModel.setEditMode(EditMode.drawWall);
 			}
 
-			if (Nuklear.nk_option_label(ctx, "Erase Node", REMModel.getEditMode() == EditMode.eraseNode)) {
-				REMModel.setEditMode(EditMode.eraseNode);
+			if (Nuklear.nk_option_label(ctx, "Erase Node", remModel.getEditMode() == EditMode.eraseNode)) {
+				remModel.setEditMode(EditMode.eraseNode);
 			}
 
-			if (Nuklear.nk_option_label(ctx, "Erase Wall", REMModel.getEditMode() == EditMode.eraseWall)) {
-				REMModel.setEditMode(EditMode.eraseWall);
+			if (Nuklear.nk_option_label(ctx, "Erase Wall", remModel.getEditMode() == EditMode.eraseWall)) {
+				remModel.setEditMode(EditMode.eraseWall);
 			}
 
 			Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
@@ -91,7 +90,7 @@ public class FrameEditWall extends AbstractFrame {
 			Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 4);
 			Nuklear.nk_label(ctx, "", Nuklear.NK_TEXT_LEFT);
 			if (nk_button_label(ctx, "Clear all")) {
-				REMModel.clearWalls();
+				remModel.clearWalls();
 			}
 			if (nk_button_label(ctx, "Close")) {
 				close();

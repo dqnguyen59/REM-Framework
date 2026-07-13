@@ -63,7 +63,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     /// Project Settings /////////////////////////////////////////////////////////////
     /// ///////////////////////////////////////////////////////////////////////////////
 
-    private final TransportSystem transportSystem = new TransportSystem();
+    private final TransportSystem transportSystem = TransportSystem.getInstance();
 
     private final Renderer        renderer;
     private final OBJFormatLoader loader;

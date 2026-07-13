@@ -63,6 +63,7 @@ public class NuklearModel {
 		rain,
 		detector,
 		preferences,
+		transportSystem,
 	}
 	
 	private Map<Frame, AbstractFrame> framesMap = new HashMap<Frame, AbstractFrame>();
@@ -180,16 +181,18 @@ public class NuklearModel {
 			return new FrameCameraSettings(this);
 		case settings:
 			return new FrameSettings(this);
+		case transportSystem:
+			return new FrameTransportSystem(this);
 		case preferences:
 			return new FramePreferences(this);
 		case terrainSettings:
 			return new FrameTerrainSettings(this);
 		case identity:
-			return new FrameOscillator(this);
+			return new FrameIdentities(this);
 		case slitWall:
 			return new FrameSlitWall(this);
 		case editWall:
-			return new FrameEditWall(this);
+			return new FrameEditWalls(this);
 		case rain:
 			return new FrameRain(this);
 		case detector:

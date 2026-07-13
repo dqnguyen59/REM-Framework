@@ -108,14 +108,19 @@ public abstract class Engine {
 	}
 
 	private void menuMouseMove() {
-		if (nuklearModel.getMouseY() >  0 && nuklearModel.getMouseY() < nuklearModel.getMenuBarHeight()) {
+		if (nuklearModel.getMouseY() >  0 && nuklearModel.getMouseY() < nuklearModel.getMenuBarHeight() + 5) {
+			int margin = 3;
 			int menuWidth = nuklearModel.getMenuItemWidth() + 5;
-			int menuIndex = (int) (nuklearModel.getMouseX() / menuWidth);
+			int mouseX = (int) (nuklearModel.getMouseX() - 5);
+			int menuIndex = mouseX / menuWidth;
 
-			if (menuIndex > 3) menuIndex = 3;
+			if (menuIndex > 4) menuIndex = 4;
 
-			if (nuklearModel.isSubMenuActive() && menuIndex != nuklearModel.getMenuIndex()) {
+			int menuLeftPos = menuIndex * menuWidth + margin;
+			int menuRightPos = (menuIndex + 1) * menuWidth - margin;
+			boolean isInRange = mouseX > menuLeftPos && mouseX < menuRightPos;
 
+			if (isInRange && nuklearModel.isSubMenuActive() && menuIndex != nuklearModel.getMenuIndex()) {
 				// A fix when sometimes submenu is not visible while subMenu should be active,
 				// otherwise simulate button click to hide the current sub menu and show the sub menu at menu index.
 				if (nuklearModel.isSubMenuVisible())

@@ -229,7 +229,7 @@ public class FrameSettings extends AbstractFrame {
             project.setConstantElectricFactor(
                     nk_label_edit(ctx, stack, " Electric Field:", bufElectricField,
                                   project.getConstantElectricFactor(),
-                                  appSettings.getFormatScientific8(), leftCol, rightCol));
+                                  appSettings.getFormatScientific9(), leftCol, rightCol));
             project.setConstantElectricFactor(
                     nk_slider(ctx, 0, project.getConstantElectricFactor(), 1.0, 0.0001));
             nk_spacer(ctx, spacer1, 1);
@@ -238,7 +238,7 @@ public class FrameSettings extends AbstractFrame {
                 project.setConstantMagneticFactor(
                         nk_label_edit(ctx, stack, " Magnetic Field:", bufMagneticField,
                                       project.getConstantMagneticFactor(),
-                                      appSettings.getFormatScientific8(), leftCol, rightCol));
+                                      appSettings.getFormatScientific9(), leftCol, rightCol));
                 project.setConstantMagneticFactor(
                         nk_slider(ctx, 0, project.getConstantMagneticFactor(), 0.9999, 0.0001));
                 nk_spacer(ctx, spacer1, 1);

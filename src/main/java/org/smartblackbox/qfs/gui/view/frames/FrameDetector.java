@@ -102,7 +102,7 @@ public class FrameDetector extends AbstractFrame {
 					" Detection Velocity:", 
 					bufDetectionVelocity,
 					detectorModel.getDetectionVelocity(),
-					appSettings.getFormatScientific8(),
+					appSettings.getFormatScientific9(),
 					leftCol, rightCol));
 			nk_spacer(ctx, spacer1, 1);
 			

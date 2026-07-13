@@ -31,7 +31,7 @@ import org.smartblackbox.qfs.opengl.model.entity.Occupancy;
 import org.smartblackbox.qfs.opengl.utils.OscillatorType;
 import org.smartblackbox.qfs.settings.Project;
 
-public class FrameOscillator extends AbstractFrame {
+public class FrameIdentities extends AbstractFrame {
 
     private final Project  project  = Project.getInstance();
     private final RemModel remModel = project.getRemModel();
@@ -40,8 +40,6 @@ public class FrameOscillator extends AbstractFrame {
     private final int groupNoScroll   = optionsNoScroll | Nuklear.NK_WINDOW_BORDER;
     private final int autoHideScroll  = Nuklear.NK_WINDOW_SCROLL_AUTO_HIDE;
 
-    private       int    width       = 510;
-    private       int    height      = 640;
     private final double leftCol     = 0.55;
     private final double rightCol    = 0.45;
     private final int    groupHeight = rowHeightEdit * 7;
@@ -59,13 +57,13 @@ public class FrameOscillator extends AbstractFrame {
     private       Occupancy    occupancyEdit;
     private       Occupancy    lastSelectedOccupancy;
 
-    public FrameOscillator(NuklearModel frames) {
+    public FrameIdentities(NuklearModel frames) {
         super(frames);
     }
 
     @Override
     public String getTitle() {
-        return "Oscillator";
+        return "Identities";
     }
 
     @Override
@@ -73,6 +71,8 @@ public class FrameOscillator extends AbstractFrame {
         super.render(windowHandle, ctx);
 
         index = project.occupancies.size();
+        int width = 510;
+        int height = 640;
         createLayout(ctx, 0, getWindowHeight() - (Constants.STATUS_BAR_HEIGHT + height), width, height);
     }
 
@@ -98,10 +98,10 @@ public class FrameOscillator extends AbstractFrame {
     /// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     private void layoutLeftSide(NkContext ctx, MemoryStack stack) {
-        if (Nuklear.nk_group_begin(ctx, "Oscillator List", groupNoScroll)) {
+        if (Nuklear.nk_group_begin(ctx, "Identities", groupNoScroll)) {
 
             Nuklear.nk_layout_row_dynamic(ctx, 516, 1);
-            if (Nuklear.nk_group_begin(ctx, "Oscillator List View", autoHideScroll)) {
+            if (Nuklear.nk_group_begin(ctx, "Identities View", autoHideScroll)) {
 
                 Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
                 for (Occupancy occupancy : project.occupancies) {
@@ -123,7 +123,7 @@ public class FrameOscillator extends AbstractFrame {
 
             Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 3);
             if (nk_button_label(ctx, "Add")) {
-                remModel.setSelectedOccupancy(new Occupancy(new Identity("Oscillator " + index), null));
+                remModel.setSelectedOccupancy(new Occupancy(new Identity("Identities " + index), null));
                 project.occupancies.add(remModel.getSelectedOccupancy());
                 index++;
             }
