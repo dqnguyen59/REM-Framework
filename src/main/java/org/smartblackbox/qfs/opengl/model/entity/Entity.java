@@ -92,6 +92,8 @@ public class Entity {
     protected boolean isSelected  = false;
     protected boolean isHiLighted = false;
 
+    protected float absorptionFactor = 1.0f;
+
     public Entity(
             Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale,
             EntityType type) {
@@ -131,9 +133,9 @@ public class Entity {
 
         Vector4f color          = m.getDiffuseColor();
         float    alpha          = 0;
-        float    intensity      = settings.getIntensity();
-        float    intensity2     = intensity * intensity;
-        float    intensity3     = intensity2 * intensity;
+        float    intensity      = settings.getIntensity() * absorptionFactor;
+        float    intensity2     = intensity * intensity * absorptionFactor;
+        float    intensity3     = intensity2 * intensity * absorptionFactor;
         float    alphaIntensity = settings.getAlpha();
 
         if (customColor != null) {

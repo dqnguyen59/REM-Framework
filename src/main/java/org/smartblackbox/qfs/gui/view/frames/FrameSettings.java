@@ -101,7 +101,7 @@ public class FrameSettings extends AbstractFrame {
                                            rightCol)));
 
             settings.setColorMode(ColorMode.valueOf(
-                    nk_label_combo_options(ctx, stack, " Color Mode:", ColorMode.getValues(),
+                    nk_label_combo_options(ctx, stack, " Color TranslationMode:", ColorMode.getValues(),
                                            settings.getColorMode().name(), leftCol, rightCol)));
 
             if (project.getDimensionZ() > 0) {

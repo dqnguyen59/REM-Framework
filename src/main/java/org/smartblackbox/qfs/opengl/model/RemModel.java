@@ -31,12 +31,13 @@ import org.smartblackbox.qfs.settings.Project;
 @Setter
 public class RemModel {
 
-    public enum Mode {
+    public enum TranslationMode {
         normal,
         rain,
         alpha,
         intensity,
         light,
+        occupancy,
     }
 
     ;
@@ -67,8 +68,8 @@ public class RemModel {
     private boolean isWallVisible = false;
     private boolean isChanged     = false;
 
-    private Mode     mode     = Mode.normal;
-    private EditMode editMode = EditMode.none;
+    private TranslationMode translationMode = TranslationMode.normal;
+    private EditMode        editMode        = EditMode.none;
 
     private double   progress;
     private Vector2d mousePos              = new Vector2d();

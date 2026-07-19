@@ -26,7 +26,7 @@ import org.smartblackbox.qfs.gui.model.NuklearModel;
 import org.smartblackbox.qfs.gui.model.NuklearModel.Frame;
 import org.smartblackbox.qfs.gui.model.Theme;
 import org.smartblackbox.qfs.opengl.model.RemModel;
-import org.smartblackbox.qfs.opengl.model.RemModel.Mode;
+import org.smartblackbox.qfs.opengl.model.RemModel.TranslationMode;
 import org.smartblackbox.qfs.settings.Project;
 
 public class FrameStatusBar extends AbstractFrame {
@@ -34,7 +34,7 @@ public class FrameStatusBar extends AbstractFrame {
     private final Project  project  = Project.getInstance();
     private final RemModel remModel = project.getRemModel();
 
-    private final float[] col = {230, 90, 60, 60, 10, 50, 40, 40, 40, 40, 40, 1400};
+    private final float[] col = {230, 90, 60, 60, 10, 50, 40, 40, 40, 40, 40, 40, 1400};
 
     public FrameStatusBar(NuklearModel frames) {
         super(frames);
@@ -68,11 +68,12 @@ public class FrameStatusBar extends AbstractFrame {
         int i = 0;
         Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, 30, 13);
         Nuklear.nk_layout_row_push(ctx, col[i++] / width);
-        Nuklear.nk_label(ctx, String.format(" CurrentNode.xyz: (%d, %d, %d);",
+        Nuklear.nk_label(ctx, String.format(" CurrentNode.xyz: (%d, %d, %d) (%.1f);",
                                             remModel.getCurrentMouseNodeIndex().x,
                                             remModel.getCurrentMouseNodeIndex().y,
-                                            remModel.getCurrentMouseNodeIndex().z
-                                           ), Nuklear.NK_TEXT_LEFT);
+                                            remModel.getCurrentMouseNodeIndex().z,
+                                            remModel.getCurrentMouseNode() == null ? 0 : remModel.getCurrentMouseNode().getAbsorptionFactor()
+                                            ), Nuklear.NK_TEXT_LEFT);
 
         Nuklear.nk_layout_row_push(ctx, col[i++] / width);
         Nuklear.nk_label(ctx, " Simulation: ", Nuklear.NK_TEXT_LEFT);
@@ -93,14 +94,14 @@ public class FrameStatusBar extends AbstractFrame {
         Nuklear.nk_label(ctx, "", Nuklear.NK_TEXT_LEFT);
 
         Nuklear.nk_layout_row_push(ctx, col[i++] / width);
-        Nuklear.nk_label(ctx, " Mode: ", Nuklear.NK_TEXT_LEFT);
+        Nuklear.nk_label(ctx, " TranslationMode: ", Nuklear.NK_TEXT_LEFT);
 
         String s   = "";
         String tip = "";
-        for (Mode m : Mode.values()) {
+        for (TranslationMode m : TranslationMode.values()) {
             Nuklear.nk_layout_row_push(ctx, col[i++] / width);
 
-            ctx.style().button().normal().data().color(m == remModel.getMode() ? Theme.blue1 : savedCol);
+            ctx.style().button().normal().data().color(m == remModel.getTranslationMode() ? Theme.blue1 : savedCol);
 
             switch (m) {
                 case normal:
@@ -123,6 +124,10 @@ public class FrameStatusBar extends AbstractFrame {
                     s = "L";
                     tip = "Light mode: Ctrl-{Shift}->[up | down | left | right | page-up | page-down]";
                     break;
+                case occupancy:
+                    s = "O";
+                    tip = "Occupancy mode: keys [up | down | left | right]";
+                    break;
                 default:
                     s = "";
                     break;
@@ -130,13 +135,13 @@ public class FrameStatusBar extends AbstractFrame {
 
             tooltip(ctx, tip);
             if (nk_button_label(ctx, s)) {
-                remModel.setMode(m);
-                if (m == Mode.rain)
+                remModel.setTranslationMode(m);
+                if (m == TranslationMode.rain)
                     nuklearModel.toggleFrame(Frame.rain);
             }
         }
 
-        Nuklear.nk_layout_row_push(ctx, col[i++] / width);
+        Nuklear.nk_layout_row_push(ctx, col[i] / width);
         Nuklear.nk_label(ctx, String.format(" %s", remModel.getCustomStatus()), Nuklear.NK_TEXT_LEFT);
 
         Nuklear.nk_layout_row_end(ctx);

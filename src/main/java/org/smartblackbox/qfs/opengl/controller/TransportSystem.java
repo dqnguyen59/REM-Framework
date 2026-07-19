@@ -57,17 +57,23 @@ public class TransportSystem extends AbstractSettings implements ISettings {
     private final  Project         project  = Project.getInstance();
     private final  RemModel        remModel = project.getRemModel();
 
-    private boolean logToConsole   = false;
-    private double  gradientGain   = 0.00001;
-    private double  gradientFilter = 0.2;
+    private boolean logToConsole     = false;
+    private LogType logType          = LogType.none;
+    private double  gradientGain     = 0.0001;
+    private double  accelerationGain = 0.0000001;
+    private double  impulseGain      = 0.000001;
 
-    private double transportMomentumGain = 0.00001;
-    private double transportMomentumMax  = 0.0000001;
+    private double transportMomentumGain = 0.000001;
+    private double transportMomentumMax  = 0.00000005;
+
+    private boolean enableTransport = true;
 
     /**
      * Pressure required to transfer one lattice step.
      */
-    private double transferThreshold = 0.00001;
+    private double transferThreshold     = 0.0000003;
+    private double lastGradientImbalance = Double.MAX_VALUE;
+    private int cyclesToMove = 10;
 
     public static TransportSystem getInstance() {
         if (instance == null) {
@@ -91,8 +97,9 @@ public class TransportSystem extends AbstractSettings implements ISettings {
         System.out.println("TransportSystem.loadFromFile()");
         super.loadFromFile(ini, section, index);
         logToConsole          = getBool(section + index, "logToConsole", false);
+        enableTransport       = getBool(section + index, "enableTransport", true);
         gradientGain          = getDouble(section + index, "gradientGain", 0.00001);
-        gradientFilter        = getDouble(section + index, "gradientFilter", 0.2);
+        accelerationGain      = getDouble(section + index, "accelerationGain", 0.0000001);
         transportMomentumGain = getDouble(section + index, "transportMomentumGain", 0.00001);
         transportMomentumMax  = getDouble(section + index, "transportMomentumMax", 0.0000002);
         transferThreshold     = getDouble(section + index, "transferThreshold", 0.00001);
@@ -103,8 +110,9 @@ public class TransportSystem extends AbstractSettings implements ISettings {
         System.out.println("TransportSystem.saveToFile()");
         super.saveToFile(ini, section, index);
         put(section + index, "logToConsole", logToConsole);
+        put(section + index, "enableTransport", enableTransport);
         put(section + index, "gradientGain", gradientGain);
-        put(section + index, "gradientFilter", gradientFilter);
+        put(section + index, "accelerationGain", accelerationGain);
         put(section + index, "transportMomentumGain", transportMomentumGain);
         put(section + index, "transportMomentumMax", transportMomentumMax);
         put(section + index, "transferThreshold", transferThreshold);
@@ -112,30 +120,74 @@ public class TransportSystem extends AbstractSettings implements ISettings {
 
     /**
      * Updates the transport state of a single occupancy.
+     * <br><br>
+     * G = Gradient Imbalance<br>
+     * a(G) = Acceleration<br>
+     * M = Transport Momentum<br>
+     * P = Pressure<br>
+     * T = Transport<br>
      *
      * @param occupancy the occupancy to update
      */
     public void update(Occupancy occupancy) {
-        // gradient = gradient * gradientFilter + measuredGradient * gradientGain
-        measureGradient(occupancy);
 
-        occupancy.updateAverageGradient();
+        // G = measureGradientImbalance * gradientGain
+        storeMeasuredGradientImbalance(occupancy);
 
-        // transportMomentum += gradient * transportMomentumGain
+        // C is the inverseFactor
+        // a(G)=sign(G) * 1 / (C + G²) - 1 / C
+        updateAcceleration(occupancy);
+
+        // Where km is transportMomentumGain
+        // Mt+1 = Mt + km a(G)
         updateTransportMomentum(occupancy);
 
-        // pressure += transportProgress;
+        // Pt+1 = Pt + Mt+1;
         updatePressure(occupancy);
 
-        // if pressure > threshold then transfer to neighbor node
+        // if |P| > Pthreshold then transfer to neighbor node
         transferOccupancy(occupancy);
     }
 
     /**
      * Measures the local recursive field gradient around the occupied node.
      */
-    private void measureGradient(Occupancy occupancy) {
-        occupancy.getGradient().mul(gradientFilter).fma(gradientGain, occupancy.getNode().measureGradient());
+    private void storeMeasuredGradientImbalance(Occupancy occupancy) {
+        occupancy.saveGradientToHistory(occupancy.getNode().measureGradientImbalance().mul(gradientGain));
+    }
+
+    /**
+     * a(G)=sign(G) * 1 / (C + G²) - 1 / C
+     *
+     * @param occupancy: The node occupied by Identity
+     */
+    private void updateAcceleration(Occupancy occupancy) {
+        occupancy.getAcceleration()
+                 .set(calculateAcceleration(occupancy.getGradientImbalance().x,
+                                            occupancy.getIdentity().getAmplitude().length()),
+                      calculateAcceleration(occupancy.getGradientImbalance().y,
+                                            occupancy.getIdentity().getAmplitude().length()),
+                      calculateAcceleration(occupancy.getGradientImbalance().z,
+                                            occupancy.getIdentity().getAmplitude().length()))
+                 .add(occupancy.getAddAccX(), occupancy.getAddAccY(), occupancy.getAddAccZ());
+        occupancy.setAddAccX(0);
+        occupancy.setAddAccY(0);
+        occupancy.setAddAccZ(0);
+    }
+
+    /**
+     * a(G)=sign(G) / (inverseFactor + G²)
+     *
+     * @param gradientImbalance the imbalance of a node of an axis
+     * @param amplitude         of Identity
+     * @return acceleration
+     */
+    double calculateAcceleration(double gradientImbalance, double amplitude) {
+        if (amplitude == 0) return 0;
+
+        double imbalancedSquared = gradientImbalance * gradientImbalance;
+        double newValue          = accelerationGain * imbalancedSquared / amplitude;
+        return gradientImbalance < 0 ? newValue * -1.0 : newValue;
     }
 
     /**
@@ -146,7 +198,7 @@ public class TransportSystem extends AbstractSettings implements ISettings {
      * changes the current transport momentum.
      */
     private void updateTransportMomentum(Occupancy occupancy) {
-        occupancy.getTransportMomentum().fma(transportMomentumGain, occupancy.getAverageGradient());
+        occupancy.getTransportMomentum().fma(transportMomentumGain, occupancy.getAcceleration());
         double x = Math.clamp(occupancy.getTransportMomentum().x, -transportMomentumMax,
                               transportMomentumMax);
         double y = Math.clamp(occupancy.getTransportMomentum().y, -transportMomentumMax,
@@ -169,62 +221,86 @@ public class TransportSystem extends AbstractSettings implements ISettings {
 
     /**
      * Transfers the occupancy whenever sufficient transport pressure has accumulated.
-     * <br>
-     * The strongest pressure component determines the transport direction.
      */
     private void transferOccupancy(Occupancy occupancy) {
-
         Vector3d pressure    = occupancy.getPressure();
         Node     currentNode = occupancy.getNode();
-
-        if (currentNode == null) return;
 
         double absX = Math.abs(pressure.x);
         double absY = Math.abs(pressure.y);
         double absZ = Math.abs(pressure.z);
 
-        /*
-         * X transport
-         */
         int directionA = -1;
         int directionB = -1;
-        if (absX >= transferThreshold) {
-            System.out.println("absX: " + absX);
-            directionA = pressure.x > 0 ? Constants.NEIGHBOR_LEFT : Constants.NEIGHBOR_RIGHT;
-            directionB = pressure.x <= 0 ? Constants.NEIGHBOR_LEFT : Constants.NEIGHBOR_RIGHT;
-            pressure.x = pressure.x > 0 ? absX - transferThreshold : transferThreshold - absX;
-        }
 
-        /*
-         * Y transport
-         */
-        else if (absY >= transferThreshold) {
-            System.out.println("absY: " + absY);
-            directionA = pressure.y > 0 ? Constants.NEIGHBOR_BOTTOM : Constants.NEIGHBOR_TOP;
-            directionB = pressure.y <= 0 ? Constants.NEIGHBOR_BOTTOM : Constants.NEIGHBOR_TOP;
-            pressure.y = pressure.y > 0 ? absY - transferThreshold : transferThreshold - absY;
-        }
+        if (occupancy.isCycleCompleted()) {
 
-        /*
-         * Z transport
-         */
-        else if (absZ >= transferThreshold) {
-            System.out.println("absZ: " + absZ);
-            directionA = pressure.z > 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
-            directionB = pressure.z <= 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
-            pressure.sub(0, 0, pressure.z);
-            pressure.z = pressure.z > 0 ? absZ - transferThreshold : transferThreshold - absZ;
-        }
+            /*
+             * X transport
+             */
+            if (currentNode != null &&
+                absX >= transferThreshold &&
+                absX >= absY &&
+                absX >= absZ) {
+                //System.out.println("absX: " + absX);
+                occupancy.incrementTransportCycleX();
+                if (occupancy.getTransportCyclesX() >= cyclesToMove) {
+                    directionA  = pressure.x <= 0 ? Constants.NEIGHBOR_LEFT : Constants.NEIGHBOR_RIGHT;
+                    directionB  = pressure.x > 0 ? Constants.NEIGHBOR_LEFT : Constants.NEIGHBOR_RIGHT;
+                    currentNode = moveNode(occupancy, currentNode, directionA, directionB);
+                    if (currentNode != null)
+                        occupancy.setTransportCyclesX(0);
+                }
+                pressure.x = 0;
+            }
 
-        if (directionA != -1) {
-            Node targetNode = currentNode.getNeighbors()[directionA];
-            // If moving occupancy to target fails, because the target is fixed (edge) or a wall
-            if (!moveOccupancy(occupancy, targetNode)) {
-                // Then If moving occupancy to target in the opposite direction
-                targetNode = currentNode.getNeighbors()[directionB];
-                moveOccupancy(occupancy, targetNode);
+            /*
+             * Y transport
+             */
+            else if (currentNode != null && absY >= transferThreshold &&
+                     absY >= absZ) {
+                //System.out.println("absY: " + absY);
+                occupancy.incrementTransportCycleY();
+                if (occupancy.getTransportCyclesY() >= cyclesToMove) {
+                    directionA  = pressure.y <= 0 ? Constants.NEIGHBOR_BOTTOM : Constants.NEIGHBOR_TOP;
+                    directionB  = pressure.y > 0 ? Constants.NEIGHBOR_BOTTOM : Constants.NEIGHBOR_TOP;
+                    currentNode = moveNode(occupancy, currentNode, directionA, directionB);
+                    if (currentNode != null)
+                        occupancy.setTransportCyclesY(0);
+                }
+                pressure.y = 0;
+            }
+
+            /*
+             * Z transport
+             */
+            else if (currentNode != null && absZ >= transferThreshold) {
+                //System.out.println("absZ: " + absZ);
+                occupancy.incrementTransportCycleZ();
+                if (occupancy.getTransportCyclesZ() >= cyclesToMove) {
+                    directionA = pressure.z <= 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
+                    directionB = pressure.z > 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
+                    currentNode = moveNode(occupancy, currentNode, directionA, directionB);
+                    if (currentNode != null)
+                        occupancy.setTransportCyclesZ(0);
+                }
+                pressure.z = 0;
             }
         }
+
+    }
+
+    private Node moveNode(Occupancy occupancy, Node currentNode, int directionA, int directionB) {
+        if (!enableTransport) return null;
+        Node targetNode = currentNode.getNeighbors()[directionA];
+        Node newNode    = moveOccupancy(occupancy, targetNode);
+        // If moving occupancy to target fails, because the target is fixed (edge) or a wall
+        if (newNode == null) {
+            // Then If moving occupancy to target in the opposite direction
+            targetNode = currentNode.getNeighbors()[directionB];
+            newNode    = moveOccupancy(occupancy, targetNode);
+        }
+        return newNode;
     }
 
     /**
@@ -239,20 +315,20 @@ public class TransportSystem extends AbstractSettings implements ISettings {
      * @param occupancy  occupancy being transported
      * @param targetNode destination node
      */
-    private boolean moveOccupancy(Occupancy occupancy, Node targetNode) {
+    private Node moveOccupancy(Occupancy occupancy, Node targetNode) {
 
         if (targetNode == null) {
-            return false;
+            return null;
         }
 
         if (targetNode.isFixed() || targetNode.isWall()) {
-            return false;
+            return null;
         }
 
         Node currentNode = occupancy.getNode();
 
         if (currentNode == targetNode) {
-            return false;
+            return null;
         }
 
 
@@ -271,24 +347,32 @@ public class TransportSystem extends AbstractSettings implements ISettings {
          */
         occupancy.setNode(targetNode);
 
-        return true;
+        return targetNode;
     }
 
-    public void print(Occupancy occupancy) {
+    public void printOccupancy(Occupancy occupancy) {
         String s = String.format("[%s]: " + //
-                                 "N: [%d, %d, %d]; === " + //
-                                 "GX: %12.9f; === " + //
-                                 "AX: %12.9f; === " + //
-                                 "MX: %12.9f; === " + //
-                                 "PrX: %12.9f; ", //
+                                 "N: [%d, %d, %d]; | " + //
+                                 "S: %3d; | " + //
+                                 "G: %12.9f; " + //
+                                 "G-: %12.9f; " + //
+                                 "G+: %12.9f; | " + //
+                                 "A: %12.9f; " + //
+                                 "V: %12.9f; " + //
+                                 "P: %12.18f; " + //
+                                 "T: %12.18f; ", //
                                  occupancy.getIdentity().getName(),
                                  occupancy.getNodeIndex().x,
                                  occupancy.getNodeIndex().y,
                                  occupancy.getNodeIndex().z,
-                                 occupancy.getGradient().x,
-                                 occupancy.getAverageGradient().x,
+                                 occupancy.getSamplesPerCycle(),
+                                 occupancy.getGradientImbalance().x,
+                                 occupancy.getLastMaxNegativeGradient().x,
+                                 occupancy.getLastMaxPositiveGradient().x,
+                                 occupancy.getAcceleration().x,
                                  occupancy.getTransportMomentum().x,
-                                 occupancy.getPressure().x);
+                                 occupancy.getPressure().x,
+                                 transferThreshold);
         remModel.setCustomStatus(s);
 
         if (logToConsole) {
@@ -296,5 +380,23 @@ public class TransportSystem extends AbstractSettings implements ISettings {
         }
     }
 
+    public void printDistanceG(Occupancy occupancyA, Occupancy occupancyB) {
+        if (occupancyB.getGradientImbalance().x != lastGradientImbalance) {
+            String s = String.format("r: %3d; " + //
+                                     "G: %12.9f; " + //
+                                     "MPosG: %12.18f; " + //
+                                     "MNegG: %12.18f; ", //
+                                     occupancyB.getNodeIndex().x - occupancyA.getNodeIndex().x,
+                                     occupancyB.getGradientImbalance().x,
+                                     occupancyB.getLastMaxPositiveGradient().x,
+                                     occupancyB.getLastMaxNegativeGradient().x
+                                    );
+            remModel.setCustomStatus(s);
 
+            lastGradientImbalance = occupancyB.getGradientImbalance().x;
+            if (logToConsole) {
+                System.out.println(s);
+            }
+        }
+    }
 }

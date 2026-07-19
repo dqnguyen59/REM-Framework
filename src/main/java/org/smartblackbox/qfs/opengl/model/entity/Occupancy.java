@@ -86,12 +86,13 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
 
     /**
-     * Most recently measured lattice gradient.
+     * Most recently measured lattice gradient imbalance.
      * <br>
      * This is recomputed every update and is not persistent.
      */
-    private final Vector3d gradient = new Vector3d();
+    private final Vector3d gradientImbalance = new Vector3d();
 
+    private final Vector3d acceleration = new Vector3d();
 
     /**
      * Persistent transport momentum.
@@ -104,16 +105,37 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     private final Vector3d initialTransportMomentum = new Vector3d();
 
-    private static final int GRADIENT_HISTORY = 50;
+    private static final int GRADIENT_IMBALANCE_HISTORY_LENGTH = 100;
 
-    private final Vector3d[] gradientHistory = new Vector3d[GRADIENT_HISTORY];
+    private final Vector3d[] gradientImbalanceHistory        = new Vector3d[GRADIENT_IMBALANCE_HISTORY_LENGTH];
+
+    private final Vector3d maxPositiveGradient = new Vector3d();
+    private final Vector3d maxNegativeGradient = new Vector3d();
+    private final Vector3d lastMaxPositiveGradient = new Vector3d();
+    private final Vector3d lastMaxNegativeGradient = new Vector3d();
 
     private final Vector3d gradientSum = new Vector3d();
 
-    private final Vector3d averageGradient = new Vector3d();
+    private int gradientHistoryIndex = 0;
+    private int sampleCount          = 0;
 
-    private int gradientIndex = 0;
-    private int gradientCount = 0;
+    private boolean isPositiveX = true;
+    private boolean isPositiveY = true;
+    private boolean isPositiveZ = true;
+
+    private boolean signIsPositiveZ = true;
+    private boolean lastPositiveY   = true;
+    private boolean lastPositiveZ   = true;
+    private int     samplesPerCycle = GRADIENT_IMBALANCE_HISTORY_LENGTH;
+    private int cycleSampleCount;
+
+    private int transportCyclesX = 0;
+    private int transportCyclesY = 0;
+    private int transportCyclesZ = 0;
+
+    private double addAccX = 0.0;
+    private double addAccY = 0.0;
+    private double addAccZ = 0.0;
 
     /**
      * Creates an empty occupancy.
@@ -121,7 +143,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
      * The identity and node can be assigned later.
      */
     public Occupancy() {
-        init();
+        resetHistory();
     }
 
     /**
@@ -136,7 +158,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
         if (node != null) {
             nodeIndex.set(node.getIndex());
         }
-        init();
+        resetHistory();
     }
 
     @Override
@@ -144,9 +166,9 @@ public class Occupancy extends AbstractSettings implements ISettings {
         return null;
     }
 
-    private void init() {
-        for (int i = 0; i < GRADIENT_HISTORY; i++) {
-            gradientHistory[i] = new Vector3d();
+    private void resetHistory() {
+        for (int i = 0; i < GRADIENT_IMBALANCE_HISTORY_LENGTH; i++) {
+            gradientImbalanceHistory[i]        = new Vector3d();
         }
     }
 
@@ -194,8 +216,8 @@ public class Occupancy extends AbstractSettings implements ISettings {
         System.out.println("Occupancy.reset()");
         identity.reset();
         pressure.zero();
-        gradient.zero();
-        transportMomentum.zero();
+        resetMaxGradient();
+        resetHistory();
         Entity entity = Lattice.getInstance().createEntity(new Vector3d(), new Vector3d(), 4.0f);
         entity.setOverrideModelMaterial(true);
         entity.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
@@ -205,43 +227,51 @@ public class Occupancy extends AbstractSettings implements ISettings {
         identity.setEntity(entity);
     }
 
-    public void updateAverageGradient() {
-
-        // Remove the oldest sample
-        gradientSum.sub(gradientHistory[gradientIndex]);
-
+    public void saveGradientToHistory(Vector3d gradient) {
         // Store the newest sample
-        gradientHistory[gradientIndex].set(gradient);
-
-        // Add the new sample
-        gradientSum.add(gradient);
+        gradientImbalanceHistory[gradientHistoryIndex].set(gradient);
 
         // Advance circular buffer
-        gradientIndex = (gradientIndex + 1) % GRADIENT_HISTORY;
+        gradientHistoryIndex = (gradientHistoryIndex + 1) % GRADIENT_IMBALANCE_HISTORY_LENGTH;
 
-        if (gradientCount < GRADIENT_HISTORY)
-            gradientCount++;
-
-        // Compute average
-        averageGradient.set(gradientSum).div(gradientCount);
+        cycleSampleCount++;
     }
 
-    public void updateAverageGradient_v1_0(Vector3d gradient) {
-
-        gradientHistory[gradientIndex].set(gradient);
-
-        gradientIndex = (gradientIndex + 1) % GRADIENT_HISTORY;
-
-        if (gradientCount < GRADIENT_HISTORY)
-            gradientCount++;
-
-        averageGradient.zero();
-
-        for (int i = 0; i < gradientCount; i++) {
-            averageGradient.add(gradientHistory[i]);
+    public boolean isCycleCompleted() {
+        if (signIsPositiveZ && node.getVelocity().z < 0) {
+            // Set to negative
+            signIsPositiveZ = false;
         }
+        else if (!signIsPositiveZ && node.getVelocity().z >= 0) {
+            updateMaxGradient(gradientImbalanceHistory);
+            // Set to positive
+            signIsPositiveZ      = true;
+            samplesPerCycle      = cycleSampleCount;
+            gradientHistoryIndex = 0;
+            cycleSampleCount = 0;
+            resetMaxGradient();
+            resetHistory();
+            return true;
+        }
+        return false;
+    }
 
-        averageGradient.div(gradientCount);
+    public void resetMaxGradient() {
+        maxPositiveGradient.zero();
+        maxNegativeGradient.zero();
+    }
+
+    public void updateMaxGradient(Vector3d[] history) {
+        maxPositiveGradient.zero();
+        maxNegativeGradient.zero();
+
+        for (Vector3d vector3d : history) {
+            maxPositiveGradient.max(vector3d);
+            maxNegativeGradient.min(vector3d);
+        }
+        gradientImbalance.set(maxPositiveGradient).add(maxNegativeGradient).mul(0.5);
+        lastMaxPositiveGradient.set(maxPositiveGradient);
+        lastMaxNegativeGradient.set(maxNegativeGradient);
     }
 
     public void updateVisualization() {
@@ -255,9 +285,9 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     public void updateOscillation() {
-        Vector3d o = identity.oscillate();
+        Vector3d o = identity.generateExcitation();
         if (o != null) {
-            node.getPosBuff().add(o);
+            node.addForce(o);
         }
     }
 
@@ -270,5 +300,17 @@ public class Occupancy extends AbstractSettings implements ISettings {
                 updateOscillation();
             }
         }
+    }
+
+    public void incrementTransportCycleX() {
+        transportCyclesX++;
+    }
+
+    public void incrementTransportCycleY() {
+        transportCyclesY++;
+    }
+
+    public void incrementTransportCycleZ() {
+        transportCyclesZ++;
     }
 }

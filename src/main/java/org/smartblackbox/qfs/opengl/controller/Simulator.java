@@ -25,7 +25,7 @@ import org.smartblackbox.qfs.Constants;
 import org.smartblackbox.qfs.IMouseAndKeyboardEvents;
 import org.smartblackbox.qfs.gui.model.NuklearModel.Frame;
 import org.smartblackbox.qfs.opengl.model.*;
-import org.smartblackbox.qfs.opengl.model.RemModel.Mode;
+import org.smartblackbox.qfs.opengl.model.RemModel.TranslationMode;
 import org.smartblackbox.qfs.opengl.model.RemModel.NodeSelectionMode;
 import org.smartblackbox.qfs.opengl.model.entity.Entity;
 import org.smartblackbox.qfs.opengl.model.entity.EntityType;
@@ -387,27 +387,35 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
         switch (key) {
             case GLFW.GLFW_KEY_LEFT:
-                switch (remModel.getMode()) {
+                switch (remModel.getTranslationMode()) {
                     case light:
                         if (remModel.getSelectedLight() != null)
                             remModel.getSelectedLight().getPosBuff().x -= inc;
+                        break;
+                    case occupancy:
+                        if (remModel.getSelectedOccupancy() != null)
+                            remModel.getSelectedOccupancy().setAddAccX(-TransportSystem.getInstance().getAccelerationGain());
                         break;
                     default:
                         break;
                 }
                 break;
             case GLFW.GLFW_KEY_RIGHT:
-                switch (remModel.getMode()) {
+                switch (remModel.getTranslationMode()) {
                     case light:
                         if (remModel.getSelectedLight() != null)
                             remModel.getSelectedLight().getPosBuff().x += inc;
+                        break;
+                    case occupancy:
+                        if (remModel.getSelectedOccupancy() != null)
+                            remModel.getSelectedOccupancy().setAddAccX(TransportSystem.getInstance().getImpulseGain());
                         break;
                     default:
                         break;
                 }
                 break;
             case GLFW.GLFW_KEY_UP:
-                switch (remModel.getMode()) {
+                switch (remModel.getTranslationMode()) {
                     case normal:
                         if (keyEvents.isCtrlPressed) {
                             remModel.getCurrentMouseNodeIndex().z++;
@@ -433,12 +441,14 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                         if (remModel.getSelectedLight() != null)
                             remModel.getSelectedLight().getPosBuff().z -= inc;
                         break;
+                    case occupancy:
+                        break;
                     default:
                         break;
                 }
                 break;
             case GLFW.GLFW_KEY_DOWN:
-                switch (remModel.getMode()) {
+                switch (remModel.getTranslationMode()) {
                     case normal:
                         if (keyEvents.isCtrlPressed) {
                             remModel.getCurrentMouseNodeIndex().z--;
@@ -468,7 +478,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 }
                 break;
             case GLFW.GLFW_KEY_PAGE_UP:
-                switch (remModel.getMode()) {
+                switch (remModel.getTranslationMode()) {
                     case light:
                         if (remModel.getSelectedLight() != null)
                             remModel.getSelectedLight().getPosBuff().y += inc;
@@ -478,7 +488,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 }
                 break;
             case GLFW.GLFW_KEY_PAGE_DOWN:
-                switch (remModel.getMode()) {
+                switch (remModel.getTranslationMode()) {
                     case light:
                         if (remModel.getSelectedLight() != null)
                             remModel.getSelectedLight().getPosBuff().y -= inc;
@@ -553,20 +563,20 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     }
                     break;
                 case GLFW.GLFW_KEY_N:
-                    remModel.setMode(Mode.normal);
+                    remModel.setTranslationMode(TranslationMode.normal);
                     break;
                 case GLFW.GLFW_KEY_R:
-                    remModel.setMode(Mode.rain);
+                    remModel.setTranslationMode(RemModel.TranslationMode.rain);
                     nuklearModel.toggleFrame(Frame.rain);
                     break;
                 case GLFW.GLFW_KEY_G:
-                    remModel.setMode(Mode.alpha);
+                    remModel.setTranslationMode(TranslationMode.alpha);
                     break;
                 case GLFW.GLFW_KEY_I:
-                    remModel.setMode(Mode.intensity);
+                    remModel.setTranslationMode(RemModel.TranslationMode.intensity);
                     break;
                 case GLFW.GLFW_KEY_L:
-                    remModel.setMode(Mode.light);
+                    remModel.setTranslationMode(RemModel.TranslationMode.light);
                     break;
                 case GLFW.GLFW_KEY_F4:
                     scene.toggleAnimation();
@@ -744,15 +754,23 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private void simulateOccupancies() {
         if (remModel.isSimulating()) {
+
             for (Occupancy occupancy : project.occupancies) {
                 if (occupancy.isOccupied()) {
                     Node node = Lattice.getInstance().getNodeByIndex(occupancy.getNodeIndex());
                     occupancy.setNode(node);
 
                     transportSystem.update(occupancy);
-                    transportSystem.print(occupancy);
+                    if (transportSystem.getLogType() == LogType.occupancy) {
+                        transportSystem.printOccupancy(occupancy);
+                    }
                     occupancy.update();
                 }
+            }
+            if (transportSystem.getLogType() == LogType.distanceG && project.occupancies.size() == 2) {
+                Occupancy occupancyA = project.occupancies.getFirst();
+                Occupancy occupancyB = project.occupancies.get(1);
+                transportSystem.printDistanceG(occupancyA, occupancyB);
             }
         }
     }

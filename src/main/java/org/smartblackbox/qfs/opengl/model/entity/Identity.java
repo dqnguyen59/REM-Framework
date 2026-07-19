@@ -126,7 +126,7 @@ public class Identity extends AbstractSettings implements ISettings {
         return identity;
     }
 
-    private double oscillateAxis(
+    private double exciteAxis(
             boolean active,
             OscillatorType oscillatorType,
             Vector3d phase,
@@ -192,12 +192,12 @@ public class Identity extends AbstractSettings implements ISettings {
      *
      * @return Oscillation vector, or {@code null} if the identity is inactive.
      */
-    public Vector3d oscillate() {
+    public Vector3d generateExcitation() {
         excitation.zero();
 
-        excitation.x = oscillateAxis(active.x, oscillatorType.x, phase, phaseAngle, phaseIncrement, 0);
-        excitation.y = oscillateAxis(active.y, oscillatorType.y, phase, phaseAngle, phaseIncrement, 1);
-        excitation.z = oscillateAxis(active.z, oscillatorType.z, phase, phaseAngle, phaseIncrement, 2);
+        excitation.x = exciteAxis(active.x, oscillatorType.x, phase, phaseAngle, phaseIncrement, 0);
+        excitation.y = exciteAxis(active.y, oscillatorType.y, phase, phaseAngle, phaseIncrement, 1);
+        excitation.z = exciteAxis(active.z, oscillatorType.z, phase, phaseAngle, phaseIncrement, 2);
 
         if (!isActive())
             return null;

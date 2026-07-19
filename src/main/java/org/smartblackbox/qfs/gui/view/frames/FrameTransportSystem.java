@@ -21,6 +21,7 @@ package org.smartblackbox.qfs.gui.view.frames;
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.system.MemoryStack;
 import org.smartblackbox.qfs.gui.model.NuklearModel;
+import org.smartblackbox.qfs.opengl.controller.LogType;
 import org.smartblackbox.qfs.opengl.controller.TransportSystem;
 
 public class FrameTransportSystem extends AbstractFrame {
@@ -28,12 +29,14 @@ public class FrameTransportSystem extends AbstractFrame {
     private final TransportSystem transportSystem = TransportSystem.getInstance();
 
 
-    private final StringBuffer bufGradientGain   = new StringBuffer();
-    private final StringBuffer bufGradientFilter = new StringBuffer();
+    private final StringBuffer bufGradientGain     = new StringBuffer();
+    private final StringBuffer bufAccelerationGain = new StringBuffer();
+    private final StringBuffer bufImpulseGain      = new StringBuffer();
 
     private final StringBuffer bufTransportMomentumGain = new StringBuffer();
     private final StringBuffer bufTransportMomentumMax  = new StringBuffer();
     private final StringBuffer bufTransferThreshold     = new StringBuffer();
+    private final StringBuffer bufCycleToMove           = new StringBuffer();
 
 
     public FrameTransportSystem(NuklearModel frames) {
@@ -50,7 +53,7 @@ public class FrameTransportSystem extends AbstractFrame {
         super.render(windowHandle, ctx);
 
         int width  = 300;
-        int height = 440;
+        int height = 680;
         createLayout(ctx, 0, nuklearModel.getMenuBarHeight() + 120, width, height);
     }
 
@@ -69,12 +72,20 @@ public class FrameTransportSystem extends AbstractFrame {
                     nk_slider(ctx, 0, transportSystem.getGradientGain(), 1.0, 0.000001));
             nk_spacer(ctx, spacer1, 1);
 
-            transportSystem.setGradientFilter(
-                    nk_label_edit(ctx, stack, " Gradient Filter:", bufGradientFilter,
-                                  transportSystem.getGradientFilter(),
+            transportSystem.setAccelerationGain(
+                    nk_label_edit(ctx, stack, " Acceleration Gain:", bufAccelerationGain,
+                                  transportSystem.getAccelerationGain(),
                                   appSettings.getFormatScientific9(), leftCol, rightCol));
-            transportSystem.setGradientFilter(
-                    nk_slider(ctx, 0, transportSystem.getGradientFilter(), 1.0, 0.00001));
+            transportSystem.setAccelerationGain(
+                    nk_slider(ctx, 0, transportSystem.getAccelerationGain(), 1.0, 0.000001));
+            nk_spacer(ctx, spacer1, 1);
+
+            transportSystem.setImpulseGain(
+                    nk_label_edit(ctx, stack, " Impulse Gain:", bufImpulseGain,
+                                  transportSystem.getImpulseGain(),
+                                  appSettings.getFormatScientific9(), leftCol, rightCol));
+            transportSystem.setImpulseGain(
+                    nk_slider(ctx, 0, transportSystem.getImpulseGain(), 1.0, 0.000001));
             nk_spacer(ctx, spacer1, 1);
 
             transportSystem.setTransportMomentumGain(
@@ -100,6 +111,26 @@ public class FrameTransportSystem extends AbstractFrame {
             transportSystem.setTransferThreshold(
                     nk_slider(ctx, 0, transportSystem.getTransferThreshold(), 1.0, 0.000001));
             nk_spacer(ctx, spacer1, 1);
+
+            transportSystem.setCyclesToMove(
+                    (int) nk_label_edit(ctx, stack, " Cycles To Move:", bufCycleToMove,
+                                        transportSystem.getCyclesToMove(),
+                                        appSettings.getFormatScientific9(), leftCol, rightCol));
+            transportSystem.setCyclesToMove(
+                    (int) nk_slider(ctx, 0, transportSystem.getCyclesToMove(), 100, 1));
+            nk_spacer(ctx, spacer1, 1);
+
+            transportSystem.setEnableTransport(
+                    nk_check_label(ctx, " Enable Transport:", transportSystem.isEnableTransport(), leftCol,
+                                   rightCol));
+            nk_spacer(ctx, spacer1, 1);
+
+            transportSystem.setLogType(LogType.valueOf(
+                    nk_label_combo_options(ctx, stack, " Slice Type:", LogType.getValues(),
+                                           transportSystem.getLogType().name(), leftCol, rightCol)));
+
+            nk_spacer(ctx, spacer1, 1);
+
 
             transportSystem.setLogToConsole(
                     nk_check_label(ctx, " Log to console:", transportSystem.isLogToConsole(), leftCol,

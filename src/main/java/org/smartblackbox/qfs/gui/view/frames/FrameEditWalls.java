@@ -93,6 +93,7 @@ public class FrameEditWalls extends AbstractFrame {
 				remModel.clearWalls();
 			}
 			if (nk_button_label(ctx, "Close")) {
+				remModel.setEditMode(EditMode.none);
 				close();
 			}
 		}

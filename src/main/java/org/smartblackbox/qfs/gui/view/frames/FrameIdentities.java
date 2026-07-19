@@ -54,8 +54,8 @@ public class FrameIdentities extends AbstractFrame {
     private final StringBuffer bufAmplitudeY  = new StringBuffer();
     private final StringBuffer bufAmplitudeZ  = new StringBuffer();
     private       int          index;
-    private       Occupancy    occupancyEdit;
-    private       Occupancy    lastSelectedOccupancy;
+//    private       Occupancy    occupancyEdit;
+//    private       Occupancy    lastSelectedOccupancy;
 
     public FrameIdentities(NuklearModel frames) {
         super(frames);
@@ -111,10 +111,10 @@ public class FrameIdentities extends AbstractFrame {
                                                        selected);
                     if (selected) {
                         remModel.setSelectedOccupancy(occupancy);
-                        if (lastSelectedOccupancy != occupancy) {
-                            occupancyEdit = null;
-                        }
-                        lastSelectedOccupancy = occupancy;
+//                        if (lastSelectedOccupancy != occupancy) {
+//                            occupancyEdit = null;
+//                        }
+//                        lastSelectedOccupancy = occupancy;
                     }
                 }
 
@@ -162,7 +162,8 @@ public class FrameIdentities extends AbstractFrame {
     private void layoutOscillatorX(NkContext ctx, MemoryStack stack) {
         Nuklear.nk_layout_row_dynamic(ctx, groupHeight, 1);
         if (Nuklear.nk_group_begin(ctx, "X-Oscillator", optionsNoScroll)) {
-            Identity identity = occupancyEdit.getIdentity();
+            Identity identity = remModel.getSelectedOccupancy().getIdentity();
+//            Identity identity = occupancyEdit.getIdentity();
             identity.getActive().x         = nk_check_label(ctx, "Active", identity.getActive().x, leftCol,
                                                             rightCol);
             identity.getOscillatorType().x = OscillatorType.valueOf(nk_label_combo_options(ctx, stack,
@@ -190,7 +191,8 @@ public class FrameIdentities extends AbstractFrame {
     private void layoutOscillatorY(NkContext ctx, MemoryStack stack) {
         Nuklear.nk_layout_row_dynamic(ctx, groupHeight, 1);
         if (Nuklear.nk_group_begin(ctx, "Y-Oscillator", optionsNoScroll)) {
-            Identity identity = occupancyEdit.getIdentity();
+            Identity identity = remModel.getSelectedOccupancy().getIdentity();
+//            Identity identity = occupancyEdit.getIdentity();
             identity.getActive().y         = nk_check_label(ctx, "Active", identity.getActive().y,
                                                             leftCol, rightCol);
             identity.getOscillatorType().y = OscillatorType.valueOf(nk_label_combo_options(ctx, stack,
@@ -217,7 +219,8 @@ public class FrameIdentities extends AbstractFrame {
     private void layoutOscillatorZ(NkContext ctx, MemoryStack stack) {
         Nuklear.nk_layout_row_dynamic(ctx, groupHeight, 1);
         if (Nuklear.nk_group_begin(ctx, "Z-Oscillator", optionsNoScroll)) {
-            Identity identity = occupancyEdit.getIdentity();
+            Identity identity = remModel.getSelectedOccupancy().getIdentity();
+//            Identity identity = occupancyEdit.getIdentity();
             identity.getActive().z         = nk_check_label(ctx, "Active", identity.getActive().z,
                                                             leftCol, rightCol);
             identity.getOscillatorType().z = OscillatorType.valueOf(nk_label_combo_options(ctx, stack,
@@ -242,11 +245,11 @@ public class FrameIdentities extends AbstractFrame {
     }
 
     private void layoutRightSide(NkContext ctx, MemoryStack stack) {
-        if (remModel.getSelectedOccupancy() != null
+        Occupancy occupancy = remModel.getSelectedOccupancy();
+        if (occupancy != null
             &&
             Nuklear.nk_group_begin(ctx, "Oscillator", groupNoScroll)) {
 
-            Occupancy occupancy = remModel.getSelectedOccupancy();
             Vector3i  nodeIndex = occupancy.getNode() == null? new Vector3i(-1) : occupancy.getNode().getIndex();
 
             Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
@@ -271,12 +274,13 @@ public class FrameIdentities extends AbstractFrame {
                 close();
             }
 
-            if (occupancyEdit == null) {
-                occupancyEdit = new Occupancy(remModel.getSelectedOccupancy().getIdentity().clone(), occupancy.getNode());
-            }
+//            if (occupancyEdit == null) {
+//                //occupancyEdit = new Occupancy(remModel.getSelectedOccupancy().getIdentity().clone(), occupancy.getNode());
+//                occupancyEdit = remModel.getSelectedOccupancy().getIdentity().clone(), occupancy.getNode());
+//            }
 
             Nuklear.nk_layout_row_dynamic(ctx, spacer1, 1);
-            if (occupancyEdit != null) {
+            if (occupancy != null) {
                 Nuklear.nk_layout_row_dynamic(ctx, 450, 1);
                 if (Nuklear.nk_group_begin(ctx, "Scrollable", 0)) {
                     layoutOscillatorX(ctx, stack);
@@ -291,7 +295,8 @@ public class FrameIdentities extends AbstractFrame {
                 if (nk_button_label(ctx, "Apply")) {
                     if (remModel.getSelectedOccupancy().getNode().getIndex().x >= 0) {
                         int i = project.occupancies.indexOf(remModel.getSelectedOccupancy());
-                        remModel.setSelectedOccupancy(new Occupancy(occupancyEdit.getIdentity().clone(), occupancy.getNode()));
+                        //remModel.setSelectedOccupancy(new Occupancy(occupancyEdit.getIdentity().clone(), occupancy.getNode()));
+                        remModel.setSelectedOccupancy(occupancy);
                         project.occupancies.set(i, remModel.getSelectedOccupancy());
                     } else {
                         nuklearModel.showWarningDialog("Node Selection",

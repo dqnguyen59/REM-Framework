@@ -41,9 +41,9 @@ public class AppSettings extends AbstractSettings implements ISettings {
     public static int MAX_NUM_THREADS = Runtime.getRuntime().availableProcessors();
     private       int numThreads      = MAX_NUM_THREADS;
 
-    private boolean useFixedNodes        = true;
+    private boolean useFixedNodes = true;
     // Range: 0.0 - 1.0
-    private double  reflectionFixedNodes = 1.0;
+    private double  absorption    = 1.0;
     private boolean useLoop;
     private boolean isChanged;
 

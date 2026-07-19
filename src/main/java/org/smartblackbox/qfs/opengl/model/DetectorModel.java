@@ -150,7 +150,7 @@ public class DetectorModel extends AbstractSettings {
             }
         }
 
-        Vector3d gradient = node.measureGradient();
+        Vector3d gradient = node.measureGradientImbalance();
         gradientX = gradient.x;
         gradientY = gradient.y;
         gradientZ = gradient.z;

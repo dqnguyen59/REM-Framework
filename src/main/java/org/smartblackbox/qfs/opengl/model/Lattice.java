@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
- * 
+ *
  * File created on 09/07/2026
  */
 package org.smartblackbox.qfs.opengl.model;
@@ -39,213 +39,256 @@ import java.util.List;
 @Setter
 public class Lattice {
 
-	private final AppSettings appSettings = AppSettings.getInstance();
-	private final Project  project  = Project.getInstance();
-	private final RemModel remModel = project.getRemModel();
+    private final AppSettings appSettings = AppSettings.getInstance();
+    private final Project     project     = Project.getInstance();
+    private final RemModel    remModel    = project.getRemModel();
 
-    private Entity baseEntity;
-	private ObjFileModel modelSphere;
+    private Entity       baseEntity;
+    private ObjFileModel modelSphere;
 
-	private Node[][][]   nodeMatrix;
-	private List<Entity> entities;
+    private Node[][][]   nodeMatrix;
+    private List<Entity> entities;
 
-	private Object[] nodeArray;
-	private Object[] entityArray;
+    private Object[] nodeArray;
+    private Object[] entityArray;
 
-	private static Lattice latticeInstance;
+    private int numEdgeAbsorptionLayers = 30;
 
-	public static Lattice getInstance() {
-		if (latticeInstance == null) {
-			latticeInstance = new Lattice();
-		}
-		return latticeInstance;
-	}
+    /**
+     * Number of boundary layers that absorb outgoing waves.
+     * <br><br>
+     * 0 = perfectly reflecting boundaries.
+     * Larger values create a wider absorbing region.
+     */
+    private static Lattice latticeInstance;
 
-	public Lattice() {
-		System.out.println("Lattice.Lattice()");
-		entities = new ArrayList<>();
-	}
+    public static Lattice getInstance() {
+        if (latticeInstance == null) {
+            latticeInstance = new Lattice();
+        }
+        return latticeInstance;
+    }
 
-	public Node getNode(int x, int y, int z) {
-		return nodeMatrix[z][y][x];
-	}
+    public Lattice() {
+        System.out.println("Lattice.Lattice()");
+        entities = new ArrayList<>();
+    }
 
-	public Node getNode(Vector3i node) {
-		return getNode(node.x, node.y, node.z);
-	}
+    public Node getNode(int x, int y, int z) {
+        return nodeMatrix[z][y][x];
+    }
 
-	private Entity addEntity(Entity entity) {
-		entities.add(entity);
-		return entity;
-	}
+    public Node getNode(Vector3i node) {
+        return getNode(node.x, node.y, node.z);
+    }
 
-	public Entity createEntity(
-			Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
-		return addEntity(new Entity(parent, model, position, rotation, scale, EntityType.ENTITY));
-	}
+    private Entity addEntity(Entity entity) {
+        entities.add(entity);
+        return entity;
+    }
 
-	public Entity createEntity(Vector3d position, Vector3d rotation, double scale) {
-		if (baseEntity == null) {
-			System.out.println("Warning, baseEntity is null!");
-			return null;
-		}
-		if (modelSphere == null) {
-			System.out.println("Warning, modelSphere is null!");
-			return null;
-		}
-		return addEntity(new Entity(baseEntity, modelSphere, position, rotation, scale, EntityType.ENTITY));
-	}
+    public Entity createEntity(
+            Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
+        return addEntity(new Entity(parent, model, position, rotation, scale, EntityType.ENTITY));
+    }
 
-	public Node createNode(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
-		return (Node) addEntity(new Node(parent, model, position, rotation, scale));
-	}
+    public Entity createEntity(Vector3d position, Vector3d rotation, double scale) {
+        if (baseEntity == null) {
+            System.out.println("Warning, baseEntity is null!");
+            return null;
+        }
+        if (modelSphere == null) {
+            System.out.println("Warning, modelSphere is null!");
+            return null;
+        }
+        return addEntity(new Entity(baseEntity, modelSphere, position, rotation, scale, EntityType.ENTITY));
+    }
 
-	public void deleteEntity(Node node) {
-		if (node != null) {
-			entities.remove(node);
-		}
-	}
+    public Node createNode(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
+        return (Node) addEntity(new Node(parent, model, position, rotation, scale));
+    }
 
-	public List<Entity> getNodes() {
-		List<Entity> nodes = new ArrayList<>();
-		for (Entity entity : getEntities()) {
-			if (Node.class.isAssignableFrom(entity.getClass())) {
-				nodes.add(entity);
-			}
-		}
-		return nodes;
-	}
+    public void deleteEntity(Node node) {
+        if (node != null) {
+            entities.remove(node);
+        }
+    }
 
-	public Node getNodeByIndex(Vector3i nodeIndex) {
-		int index = nodeIndex.z * project.getDimensionY() * project.getDimensionX() +
-		            nodeIndex.y * project.getDimensionX() + nodeIndex.x;
-		if (index >= 0 && index < getNodeArray().length)
-			return (Node) getNodeArray()[index];
-		else
-			return null;
+    public List<Entity> getNodes() {
+        List<Entity> nodes = new ArrayList<>();
+        for (Entity entity : getEntities()) {
+            if (Node.class.isAssignableFrom(entity.getClass())) {
+                nodes.add(entity);
+            }
+        }
+        return nodes;
+    }
 
-	}
+    public Node getNodeByIndex(Vector3i nodeIndex) {
+        int index = nodeIndex.z * project.getDimensionY() * project.getDimensionX() +
+                    nodeIndex.y * project.getDimensionX() + nodeIndex.x;
+        if (index >= 0 && index < getNodeArray().length)
+            return (Node) getNodeArray()[index];
+        else
+            return null;
 
-	public Entity build() {
-		System.out.println("Lattice.build()");
-		Vector3i dimension = new Vector3i();
-		project.getDimension(dimension);
+    }
 
-		int sizeI = dimension.x;
-		int sizeJ = dimension.y;
-		int sizeK = dimension.z;
+    /**
+     * Computes the boundary absorption factor for a node.
+     * <br><br>
+     * Interior nodes return 1.0.
+     * Nodes inside the absorption region smoothly decrease toward 0.0
+     * at the outer boundary.
+     */
+    private float computeAbsorptionFactor(
+            int i, int j, int k,
+            int sizeI, int sizeJ, int sizeK) {
 
-		Performance.numNodes = sizeI * sizeJ * sizeK;
-		Performance.numNodesX = sizeI;
-		Performance.numNodesY = sizeJ;
-		Performance.numNodesZ = sizeK;
+        if (numEdgeAbsorptionLayers <= 0)
+            return 1.0f;
 
-		modelSphere = new OBJFormatLoader().loadOBJModel(Constants.MODEL_NODE);
+        int distanceX = numEdgeAbsorptionLayers * 2 >= sizeI ? Integer.MAX_VALUE : Math.min(i, sizeI - 1 - i);
+        int distanceY = numEdgeAbsorptionLayers * 2 >= sizeJ ? Integer.MAX_VALUE : Math.min(j, sizeJ - 1 - j);
+        int distanceZ = numEdgeAbsorptionLayers * 2 >= sizeK ? Integer.MAX_VALUE : Math.min(k, sizeK - 1 - k);
 
-		baseEntity = createEntity(null, null, new Vector3d(), new Vector3d(), 1.0f);
-		baseEntity.setPosition(0, 0, 0);
-		baseEntity.setRotation(project.baseRotation.x, project.baseRotation.y, project.baseRotation.z);
+        int edgeDistance = Math.min(distanceX, Math.min(distanceY, distanceZ));
 
-		float step = Constants.EP_DEFAULT_DISTANCE;
-		
-		// Draw xyz arrows on entity baseField.
-		//drawArrows(baseField, Constants.EP_DEFAULT_DISTANCE, modelSphere, sizeI, sizeJ, sizeK);
+        //System.out.println(String.format("I,J,K: (%d, %d, %d) = %d", i, j, k, edgeDistance));
 
-		nodeMatrix = new Node[sizeK][sizeJ][sizeI];
+        if (edgeDistance >= numEdgeAbsorptionLayers)
+            return 1.0f;
 
-		int NumNodes = sizeI * sizeJ * sizeK;
-		
-		remModel.setLoadingReady(false);
-		remModel.setProgress(0.0);
-		
-		new Thread(new Runnable() {
-			
-			@Override
-			public void run() {
-				int countNode = 0;
-				for (int k = 0; k < sizeK; k++) {
-					for (int j = 0; j < sizeJ; j++) {
-						for (int i = 0; i < sizeI; i++) {
-							Node n = createNode(baseEntity, modelSphere,
-							                    new Vector3d((i - sizeI / 2.0) * step, (j - sizeJ / 2.0) * step, (k - sizeK / 2.0) * step),
-							                    new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
-							n.setIndex(i, j, k);
-							
-							n.setOverrideModelMaterial(true);
-							n.getMaterial().setDiffuseColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
-							n.getMaterial().setAmbientColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
-							nodeMatrix[k][j][i] = n;
-							
-							boolean isEdgeX = (sizeI > 1 && (i == 0 || i == sizeI - 1)); 
-							boolean isEdgeY = (sizeJ > 1 && (j == 0 || j == sizeJ - 1)); 
-							boolean isEdgeZ = (sizeK > 1 && (k == 0 || k == sizeK - 1)); 
+        // first free layer = 1
+        float t = (edgeDistance + 1.0f) / (numEdgeAbsorptionLayers + 1.0f);
 
-							if (isEdgeX || isEdgeY || isEdgeZ) n.setType(EntityType.FIXED);
-//							n.setFixed(isEdgeX || isEdgeY || isEdgeZ);
-							n.setXFixed(isEdgeX);
-							n.setYFixed(isEdgeY);
-							n.setZFixed(isEdgeZ);
+        return (float) (0.5 - 0.5 * Math.cos(Math.PI * t));
+    }
 
-							// experimentalMode, when only the edges are fixed. This creates a cool effect.
-//							if (!(
-//								(i > 0 && i < sizeI - 1) && (j > 0 && j < sizeJ - 1)
-//								 || (i > 0 && i < sizeI - 1) && (k > 0 && k < sizeK - 1)
-//								 || (j > 0 && j < sizeJ - 1) && (k > 0 && k < sizeK - 1)
-//								)) {
-//								n.setFixed(true);
-//							}
+    public Entity build() {
+        System.out.println("Lattice.build()");
+        Vector3i dimension = new Vector3i();
+        project.getDimension(dimension);
+
+        int sizeI = dimension.x;
+        int sizeJ = dimension.y;
+        int sizeK = dimension.z;
+
+        Performance.numNodes  = sizeI * sizeJ * sizeK;
+        Performance.numNodesX = sizeI;
+        Performance.numNodesY = sizeJ;
+        Performance.numNodesZ = sizeK;
+
+        modelSphere = new OBJFormatLoader().loadOBJModel(Constants.MODEL_NODE);
+
+        baseEntity = createEntity(null, null, new Vector3d(), new Vector3d(), 1.0f);
+        baseEntity.setPosition(0, 0, 0);
+        baseEntity.setRotation(project.baseRotation.x, project.baseRotation.y, project.baseRotation.z);
+
+        float step = Constants.EP_DEFAULT_DISTANCE;
+
+        // Draw xyz arrows on entity baseField.
+        //drawArrows(baseField, Constants.EP_DEFAULT_DISTANCE, modelSphere, sizeI, sizeJ, sizeK);
+
+        nodeMatrix = new Node[sizeK][sizeJ][sizeI];
+
+        int NumNodes = sizeI * sizeJ * sizeK;
+
+        remModel.setLoadingReady(false);
+        remModel.setProgress(0.0);
+
+        new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                int countNode = 0;
+                for (int k = 0; k < sizeK; k++) {
+                    for (int j = 0; j < sizeJ; j++) {
+                        for (int i = 0; i < sizeI; i++) {
+                            Node n = createNode(baseEntity, modelSphere,
+                                                new Vector3d((i - sizeI / 2.0) * step, (j - sizeJ / 2.0) * step, (k - sizeK / 2.0) * step),
+                                                new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
+                            n.setIndex(i, j, k);
+
+                            n.setAbsorptionFactor(
+                                    computeAbsorptionFactor(i, j, k,
+                                                            sizeI, sizeJ, sizeK));
+
+                            n.setOverrideModelMaterial(true);
+                            n.getMaterial().setDiffuseColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
+                            n.getMaterial().setAmbientColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
+                            nodeMatrix[k][j][i] = n;
+
+                            boolean isEdgeX = (sizeI > 1 && (i == 0 || i == sizeI - 1));
+                            boolean isEdgeY = (sizeJ > 1 && (j == 0 || j == sizeJ - 1));
+                            boolean isEdgeZ = (sizeK > 1 && (k == 0 || k == sizeK - 1));
+
+                            if (isEdgeX || isEdgeY || isEdgeZ) n.setType(EntityType.FIXED);
+                            //							n.setFixed(isEdgeX || isEdgeY || isEdgeZ);
+                            n.setXFixed(isEdgeX);
+                            n.setYFixed(isEdgeY);
+                            n.setZFixed(isEdgeZ);
+
+                            // experimentalMode, when only the edges are fixed. This creates a cool effect.
+                            //							if (!(
+                            //								(i > 0 && i < sizeI - 1) && (j > 0 && j < sizeJ - 1)
+                            //								 || (i > 0 && i < sizeI - 1) && (k > 0 && k < sizeK - 1)
+                            //								 || (j > 0 && j < sizeJ - 1) && (k > 0 && k < sizeK - 1)
+                            //								)) {
+                            //								n.setFixed(true);
+                            //							}
 
 
-							countNode++;
-							remModel.setProgress((double) countNode / (double) NumNodes * 100);
-						}
-					}
-				}
+                            countNode++;
+                            remModel.setProgress((double) countNode / (double) NumNodes * 100);
+                        }
+                    }
+                }
 
-				// Connect all neighbors in fieldMatrix.
-				for (int k = 0; k < sizeK; k++) {
-					for (int j = 0; j < sizeJ; j++) {
-						for (int i = 0; i < sizeI; i++) {
-							if (i > 0)
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][i - 1]);
-							else if (appSettings.isUseLoop())
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][sizeI - 1]);
-							if (i < sizeI - 1)
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][i + 1]);
-							else if (appSettings.isUseLoop())
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][0]);
+                // Connect all neighbors in fieldMatrix.
+                for (int k = 0; k < sizeK; k++) {
+                    for (int j = 0; j < sizeJ; j++) {
+                        for (int i = 0; i < sizeI; i++) {
+                            if (i > 0)
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][i - 1]);
+                            else if (appSettings.isUseLoop())
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][sizeI - 1]);
+                            if (i < sizeI - 1)
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][i + 1]);
+                            else if (appSettings.isUseLoop())
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][0]);
 
-							if (j > 0)
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][j - 1][i]);
-							else if (appSettings.isUseLoop())
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][sizeJ - 1][i]);
-							if (j < sizeJ - 1)
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][j + 1][i]);
-							else if (appSettings.isUseLoop())
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][0][i]);
+                            if (j > 0)
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][j - 1][i]);
+                            else if (appSettings.isUseLoop())
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][sizeJ - 1][i]);
+                            if (j < sizeJ - 1)
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][j + 1][i]);
+                            else if (appSettings.isUseLoop())
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][0][i]);
 
-							if (k > 0)
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[k - 1][j][i]);
-							else if (appSettings.isUseLoop())
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[sizeK - 1][j][i]);
-							if (k < sizeK - 1)
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[k + 1][j][i]);
-							else if (appSettings.isUseLoop())
-								nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[0][j][i]);
-						}
-					}
-				}
-				remModel.setLoadingReady(true);
-			}
-		}).start();
+                            if (k > 0)
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[k - 1][j][i]);
+                            else if (appSettings.isUseLoop())
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[sizeK - 1][j][i]);
+                            if (k < sizeK - 1)
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[k + 1][j][i]);
+                            else if (appSettings.isUseLoop())
+                                nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[0][j][i]);
+                        }
+                    }
+                }
+                remModel.setLoadingReady(true);
+            }
+        }).start();
 
-		return baseEntity;
-	}
-	
-	public void update() {
-		System.out.println("Lattice.update()");
-		setNodeArray(getNodes().toArray());
-		setEntityArray(entities.toArray());
-	}
+        return baseEntity;
+    }
+
+    public void update() {
+        System.out.println("Lattice.update()");
+        setNodeArray(getNodes().toArray());
+        setEntityArray(entities.toArray());
+    }
 
 }

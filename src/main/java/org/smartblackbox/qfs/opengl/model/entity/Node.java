@@ -61,12 +61,12 @@ public class Node extends Entity {
 
     private Vector3d fixedPos;
 
-    private final Vector3d[] deltaPositions = new Vector3d[6];
-    private final Vector3d[] deltaVelocity  = new Vector3d[6];
-    private final double[]   flow           = new double[6];
-    private final double[] previousFlow = new double[6];
-    private final double[] deltaFlow = new double[6];
-    private final Vector3d   gradient       = new Vector3d();
+    private final Vector3d[] deltaPositions   = new Vector3d[6];
+    private final Vector3d[] deltaVelocity    = new Vector3d[6];
+    private final double[]   flow             = new double[6];
+    private final double[]   previousFlow     = new double[6];
+    private final double[] deltaFlow         = new double[6];
+    private final Vector3d gradientImbalance = new Vector3d();
 
     /**
      * Electric Field
@@ -80,6 +80,7 @@ public class Node extends Entity {
 
     private final Vector3d ef           = new Vector3d();
     private final Vector3d mf           = new Vector3d();
+    private       Vector3d force        = new Vector3d();
     private       Vector3d acceleration = new Vector3d();
     private       Vector3d velocity     = new Vector3d();
 
@@ -127,7 +128,8 @@ public class Node extends Entity {
     }
 
     public void addForce(Vector3d force) {
-        eField.a.add(force);
+        this.force.set(force);
+        //eField.a.add(force);
     }
 
     @Override
@@ -158,18 +160,18 @@ public class Node extends Entity {
         return isVisible || (type == EntityType.WALL) && remModel.isWallVisible();
     }
 
-    public Vector3d measureGradient() {
+    public Vector3d measureGradientImbalance() {
 
         for (int i = 0; i < deltaPositions.length; i++) {
             if (neighbors[i] != null) {
                 deltaPositions[i].set(neighbors[i].position).sub(position);
                 deltaVelocity[i].set(neighbors[i].velocity).sub(velocity);
-                flow[i] = deltaPositions[i].dot(deltaVelocity[i]);
+                flow[i] = deltaPositions[i].length();//Squared();//lengthSquared() * deltaVelocity[i].lengthSquared();
             }
         }
 
 
-        return gradient.set(flow[NEIGHBOR_RIGHT] - flow[NEIGHBOR_LEFT],
+        return gradientImbalance.set(flow[NEIGHBOR_RIGHT] - flow[NEIGHBOR_LEFT],
                             flow[NEIGHBOR_TOP] - flow[NEIGHBOR_BOTTOM],
                             flow[NEIGHBOR_FRONT] - flow[NEIGHBOR_BACK]);
     }
@@ -253,43 +255,36 @@ public class Node extends Entity {
 
         ef.set(0);
 
+        double alpha = isWall ? absorptionFactor : 1.00;
+
         for (Node neighbor : neighbors) {
             if (neighbor != null) {
-                if (isXFixed || isWall) {
-                    double alpha = isWall ? 0.00 : (1.0 - appSettings.getReflectionFixedNodes());
-
-                    if (alpha == 0) {
-                        velocity.set(0);
-                        posBuff.set(fixedPos);
-                    }
-
-                    if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
-                        ef.y += (neighbor.position.y - position.y) * alpha;
-                        ef.z += (neighbor.position.z - position.z) * alpha;
-                    }
-                    if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
-                        ef.x += (neighbor.position.x - position.x) * alpha;
-                        ef.z += (neighbor.position.z - position.z) * alpha;
-                    }
-                    if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
-                        ef.x += (neighbor.position.x - position.x) * alpha;
-                        ef.y += (neighbor.position.y - position.y) * alpha;
-                    }
-                } else {
-                    ef.add(neighbor.position).sub(position);
+                //                if (isXFixed || isWall) {
+                if (alpha == 0) {
+                    //                    velocity.set(0);
+                    //                    posBuff.set(fixedPos);
                 }
+                ef.add(neighbor.position).sub(position);
             }
         }
 
-        acceleration.set(ef.mul(gamma));
+        acceleration.set(ef.add(force).mul(gamma * alpha));
+        force.zero();
 
         // Note that the result of the addition or multiplication is stored in the object
         // variable itself.
         posBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul(0.5));
 
-        if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.x = fixedPos.x;
-        if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;
-        if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.z = fixedPos.z;
+        //        if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.x = fixedPos.x;
+        //        if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;
+        //        if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.z = fixedPos.z;
+        if (isFixed) posBuff.x = fixedPos.x;
+        if (isFixed) posBuff.y = fixedPos.y;
+        if (isFixed) posBuff.z = fixedPos.z;
+
+        if (absorptionFactor >= 0.2 && absorptionFactor < 0.5) {
+            absorptionFactor = absorptionFactor;
+        }
 
         setColor(isFixed ? FIXED_COLOR : ef);
     }
@@ -308,7 +303,7 @@ public class Node extends Entity {
         for (Node neighbor : neighbors) {
             if (neighbor != null) {
                 if (isFixed || isWall) {
-                    double alpha = isWall ? 0.00 : (1.0 - appSettings.getReflectionFixedNodes());
+                    double alpha = isWall ? 0.00 : (1.0 - appSettings.getAbsorption());
 
                     if (alpha == 0) {
                         velocity.set(0);
@@ -352,7 +347,7 @@ public class Node extends Entity {
         Vector3d e_f = ef.mul(gamma);
         Vector3d m_f = mf.mul(beta);
 
-        acceleration.set(e_f.add(m_f));
+        acceleration.set(e_f.add(m_f)).add(force);
 
         // Note that the result of the addition or multiplication is stored in the object
         // variable itself.
@@ -405,7 +400,8 @@ public class Node extends Entity {
         ef.y = (nRight.z - nLeft.z) * f - (nFront.x - nBack.x) * f;
         ef.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
 
-        eField.a.set(ef.mul(gamma));
+        eField.a.set(ef.mul(gamma)).add(force);
+        ;
         eField.p.add(eField.v.add(eField.a.mul(cws))).add(eField.a.mul(0.5));
 
         acceleration = eField.a;

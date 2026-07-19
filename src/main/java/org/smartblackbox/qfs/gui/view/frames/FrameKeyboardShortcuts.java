@@ -74,15 +74,17 @@ public class FrameKeyboardShortcuts extends AbstractFrame {
 		
 		nk_spacer(ctx, spacer1 , 1);
 		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
-		Nuklear.nk_label(ctx, " Mode keys:", Nuklear.NK_TEXT_LEFT);
-		nk_label_value(ctx, "   - N:", "Normal Mode", leftCol, rightCol, alignLabel, alignValue);
+		Nuklear.nk_label(ctx, " TranslationMode keys:", Nuklear.NK_TEXT_LEFT);
+		nk_label_value(ctx, "   - N:", "Norma", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - N:", "Ctrl-> [Up, Down] (Move Z slice plane)", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - R:", "Rain Mode", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - G:", "Alpha Mode (change the alpha color of the nodes)", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - I:", "Intensity Mode (change the intensity color of the nodes) [Up, Down]", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - L:", "Move Light Mode (Ctrl-{Shift}-> [Left, Right, Up, Down, Page Up, Page Down]])",
 				leftCol, rightCol, alignLabel, alignValue);
-		
+		nk_label_value(ctx, "   - O:", "Move Occupancy Mode (Ctrl-{Shift}-> [Left, Right, Up, Down, Page Up, Page Down]])",
+		               leftCol, rightCol, alignLabel, alignValue);
+
 		nk_spacer(ctx, spacer1 , 1);
 		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
 		Nuklear.nk_label(ctx, " Other keys:", Nuklear.NK_TEXT_LEFT);
