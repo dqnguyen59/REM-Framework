@@ -197,89 +197,85 @@ public class Lattice {
         remModel.setLoadingReady(false);
         remModel.setProgress(0.0);
 
-        new Thread(new Runnable() {
+        new Thread(() -> {
+            int countNode = 0;
+            for (int k = 0; k < sizeK; k++) {
+                for (int j = 0; j < sizeJ; j++) {
+                    for (int i = 0; i < sizeI; i++) {
+                        Node n = createNode(baseEntity, modelSphere,
+                                            new Vector3d((i - sizeI / 2.0) * step, (j - sizeJ / 2.0) * step, (k - sizeK / 2.0) * step),
+                                            new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
+                        n.setIndex(i, j, k);
 
-            @Override
-            public void run() {
-                int countNode = 0;
-                for (int k = 0; k < sizeK; k++) {
-                    for (int j = 0; j < sizeJ; j++) {
-                        for (int i = 0; i < sizeI; i++) {
-                            Node n = createNode(baseEntity, modelSphere,
-                                                new Vector3d((i - sizeI / 2.0) * step, (j - sizeJ / 2.0) * step, (k - sizeK / 2.0) * step),
-                                                new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
-                            n.setIndex(i, j, k);
+                        n.setAbsorptionFactor(
+                                computeAbsorptionFactor(i, j, k,
+                                                        sizeI, sizeJ, sizeK));
 
-                            n.setAbsorptionFactor(
-                                    computeAbsorptionFactor(i, j, k,
-                                                            sizeI, sizeJ, sizeK));
+                        n.setOverrideModelMaterial(true);
+                        n.getMaterial().setDiffuseColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
+                        n.getMaterial().setAmbientColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
+                        nodeMatrix[k][j][i] = n;
 
-                            n.setOverrideModelMaterial(true);
-                            n.getMaterial().setDiffuseColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
-                            n.getMaterial().setAmbientColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
-                            nodeMatrix[k][j][i] = n;
+                        boolean isEdgeX = (sizeI > 1 && (i == 0 || i == sizeI - 1));
+                        boolean isEdgeY = (sizeJ > 1 && (j == 0 || j == sizeJ - 1));
+                        boolean isEdgeZ = (sizeK > 1 && (k == 0 || k == sizeK - 1));
 
-                            boolean isEdgeX = (sizeI > 1 && (i == 0 || i == sizeI - 1));
-                            boolean isEdgeY = (sizeJ > 1 && (j == 0 || j == sizeJ - 1));
-                            boolean isEdgeZ = (sizeK > 1 && (k == 0 || k == sizeK - 1));
+                        if (isEdgeX || isEdgeY || isEdgeZ) n.setType(EntityType.FIXED);
+                        //							n.setFixed(isEdgeX || isEdgeY || isEdgeZ);
+                        n.setXFixed(isEdgeX);
+                        n.setYFixed(isEdgeY);
+                        n.setZFixed(isEdgeZ);
 
-                            if (isEdgeX || isEdgeY || isEdgeZ) n.setType(EntityType.FIXED);
-                            //							n.setFixed(isEdgeX || isEdgeY || isEdgeZ);
-                            n.setXFixed(isEdgeX);
-                            n.setYFixed(isEdgeY);
-                            n.setZFixed(isEdgeZ);
-
-                            // experimentalMode, when only the edges are fixed. This creates a cool effect.
-                            //							if (!(
-                            //								(i > 0 && i < sizeI - 1) && (j > 0 && j < sizeJ - 1)
-                            //								 || (i > 0 && i < sizeI - 1) && (k > 0 && k < sizeK - 1)
-                            //								 || (j > 0 && j < sizeJ - 1) && (k > 0 && k < sizeK - 1)
-                            //								)) {
-                            //								n.setFixed(true);
-                            //							}
+                        // experimentalMode, when only the edges are fixed. This creates a cool effect.
+                        //							if (!(
+                        //								(i > 0 && i < sizeI - 1) && (j > 0 && j < sizeJ - 1)
+                        //								 || (i > 0 && i < sizeI - 1) && (k > 0 && k < sizeK - 1)
+                        //								 || (j > 0 && j < sizeJ - 1) && (k > 0 && k < sizeK - 1)
+                        //								)) {
+                        //								n.setFixed(true);
+                        //							}
 
 
-                            countNode++;
-                            remModel.setProgress((double) countNode / (double) NumNodes * 100);
-                        }
+                        countNode++;
+                        remModel.setProgress((double) countNode / (double) NumNodes * 100);
                     }
                 }
-
-                // Connect all neighbors in fieldMatrix.
-                for (int k = 0; k < sizeK; k++) {
-                    for (int j = 0; j < sizeJ; j++) {
-                        for (int i = 0; i < sizeI; i++) {
-                            if (i > 0)
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][i - 1]);
-                            else if (appSettings.isUseLoop())
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][sizeI - 1]);
-                            if (i < sizeI - 1)
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][i + 1]);
-                            else if (appSettings.isUseLoop())
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][0]);
-
-                            if (j > 0)
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][j - 1][i]);
-                            else if (appSettings.isUseLoop())
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][sizeJ - 1][i]);
-                            if (j < sizeJ - 1)
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][j + 1][i]);
-                            else if (appSettings.isUseLoop())
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][0][i]);
-
-                            if (k > 0)
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[k - 1][j][i]);
-                            else if (appSettings.isUseLoop())
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[sizeK - 1][j][i]);
-                            if (k < sizeK - 1)
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[k + 1][j][i]);
-                            else if (appSettings.isUseLoop())
-                                nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[0][j][i]);
-                        }
-                    }
-                }
-                remModel.setLoadingReady(true);
             }
+
+            // Connect all neighbors in fieldMatrix.
+            for (int k = 0; k < sizeK; k++) {
+                for (int j = 0; j < sizeJ; j++) {
+                    for (int i = 0; i < sizeI; i++) {
+                        if (i > 0)
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][i - 1]);
+                        else if (appSettings.isUseLoop())
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][sizeI - 1]);
+                        if (i < sizeI - 1)
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][i + 1]);
+                        else if (appSettings.isUseLoop())
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][0]);
+
+                        if (j > 0)
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][j - 1][i]);
+                        else if (appSettings.isUseLoop())
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][sizeJ - 1][i]);
+                        if (j < sizeJ - 1)
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][j + 1][i]);
+                        else if (appSettings.isUseLoop())
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][0][i]);
+
+                        if (k > 0)
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[k - 1][j][i]);
+                        else if (appSettings.isUseLoop())
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[sizeK - 1][j][i]);
+                        if (k < sizeK - 1)
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[k + 1][j][i]);
+                        else if (appSettings.isUseLoop())
+                            nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[0][j][i]);
+                    }
+                }
+            }
+            remModel.setLoadingReady(true);
         }).start();
 
         return baseEntity;

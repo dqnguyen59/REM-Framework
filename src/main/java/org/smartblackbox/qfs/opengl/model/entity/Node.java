@@ -282,10 +282,6 @@ public class Node extends Entity {
         if (isFixed) posBuff.y = fixedPos.y;
         if (isFixed) posBuff.z = fixedPos.z;
 
-        if (absorptionFactor >= 0.2 && absorptionFactor < 0.5) {
-            absorptionFactor = absorptionFactor;
-        }
-
         setColor(isFixed ? FIXED_COLOR : ef);
     }
 
@@ -401,7 +397,7 @@ public class Node extends Entity {
         ef.z = (nTop.x - nBottom.x) * f - (nRight.y - nLeft.y) * f;
 
         eField.a.set(ef.mul(gamma)).add(force);
-        ;
+
         eField.p.add(eField.v.add(eField.a.mul(cws))).add(eField.a.mul(0.5));
 
         acceleration = eField.a;

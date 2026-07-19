@@ -27,18 +27,13 @@ import org.smartblackbox.qfs.settings.Project;
 
 public class FramePreferences extends AbstractFrame {
 
-	private int width = 300;
-	private int height = 240;
-	private float leftCol = 0.6f;
-	private float rightCol = 0.4f;
-
-	private Project   project   = Project.getInstance();
-	private RainModel rainModel = project.rainModel;
+    private final Project   project   = Project.getInstance();
+	private final RainModel rainModel = project.rainModel;
 	
-	private StringBuffer bufNumThreads = new StringBuffer();
-	private StringBuffer bufSwapInterval = new StringBuffer();
-	private StringBuffer bufForce = new StringBuffer();
-	private StringBuffer bufAbsorptionFixedNodes = new StringBuffer();
+	private final StringBuffer bufNumThreads   = new StringBuffer();
+	private final StringBuffer bufSwapInterval         = new StringBuffer();
+	private final StringBuffer bufForce                = new StringBuffer();
+	private final StringBuffer bufAbsorptionFixedNodes = new StringBuffer();
 
 	public FramePreferences(NuklearModel frames) {
 		super(frames);
@@ -52,15 +47,20 @@ public class FramePreferences extends AbstractFrame {
 	@Override
 	public void render(long windowHandle, NkContext ctx) {
 		super.render(windowHandle, ctx);
-		
-		createLayout(ctx, 0, nuklearModel.getMenuBarHeight() + 120, width, height + (appSettings.isUseFixedNodes()? 0 : 120));
+
+        int width = 300;
+        int height = 240;
+        createLayout(ctx, 0, nuklearModel.getMenuBarHeight() + 120, width, height + (appSettings.isUseFixedNodes() ? 0 : 120));
 	}
 
 	@Override
 	protected void layout(NkContext ctx, int x, int y, int width, int height) {
 		try (MemoryStack stack = MemoryStack.stackPush()) {
 
-			appSettings.setNumThreads(nk_label_edit(ctx, stack, " CPU Threads:", bufNumThreads, appSettings.getNumThreads(), leftCol, rightCol));
+            float leftCol = 0.6f;
+            float rightCol = 0.4f;
+            appSettings.setNumThreads(nk_label_edit(ctx, stack, " CPU Threads:", bufNumThreads, appSettings.getNumThreads(), leftCol,
+                                                    rightCol));
 			nk_spacer(ctx, spacer1, 1);
 			
 			appSettings.setUseFixedNodes(nk_check_label(ctx, " Use Fixed Nodes:", appSettings.isUseFixedNodes(), leftCol, rightCol));
@@ -68,7 +68,7 @@ public class FramePreferences extends AbstractFrame {
 			
 			if (!appSettings.isUseFixedNodes()) {
 				appSettings.setAbsorption(nk_label_edit(ctx, stack, " Absorption:",
-				                                        bufAbsorptionFixedNodes, appSettings.getAbsorption(), leftCol, rightCol));
+                                                        bufAbsorptionFixedNodes, appSettings.getAbsorption(), leftCol, rightCol));
 				appSettings.setAbsorption(nk_slider(ctx, 0.0, appSettings.getAbsorption(), 1.0, 0.01));
 				nk_spacer(ctx, spacer1, 1);
 
@@ -76,7 +76,8 @@ public class FramePreferences extends AbstractFrame {
 				nk_spacer(ctx, spacer1, 1);
 			}
 			
-			project.setGlSwapInterval(nk_label_edit(ctx, stack, " GLSwap Interval:", bufSwapInterval, project.getGlSwapInterval(), leftCol, rightCol));
+			project.setGlSwapInterval(nk_label_edit(ctx, stack, " GLSwap Interval:", bufSwapInterval, project.getGlSwapInterval(), leftCol,
+                                                    rightCol));
 			nk_spacer(ctx, spacer1, 1);
 			
 			rainModel.setForce(nk_label_edit(ctx, stack, " Force:", bufForce, rainModel.getForce(), leftCol, rightCol));

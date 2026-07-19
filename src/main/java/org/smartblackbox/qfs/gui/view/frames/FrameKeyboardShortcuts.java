@@ -24,14 +24,7 @@ import org.smartblackbox.qfs.gui.model.NuklearModel;
 
 public class FrameKeyboardShortcuts extends AbstractFrame {
 
-    private int width = 850;
-	private int height = 830;
-	private float leftCol = 0.3f;
-	private float rightCol = 0.7f;
-	private int alignLabel = Nuklear.NK_TEXT_LEFT;
-	private int alignValue = Nuklear.NK_TEXT_LEFT;
-
-	public FrameKeyboardShortcuts(NuklearModel frames) {
+    public FrameKeyboardShortcuts(NuklearModel frames) {
 		super(frames);
 	}
 
@@ -44,7 +37,9 @@ public class FrameKeyboardShortcuts extends AbstractFrame {
 	public void render(long windowHandle, NkContext ctx) {
 		super.render(windowHandle, ctx);
 
-		createLayoutCentered(ctx, width, height);
+        int width = 850;
+        int height = 830;
+        createLayoutCentered(ctx, width, height);
 	}
 
 	@Override
@@ -53,7 +48,11 @@ public class FrameKeyboardShortcuts extends AbstractFrame {
 		nk_spacer(ctx, spacer1 , 1);
 		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
 		Nuklear.nk_label(ctx, " Move keys:", Nuklear.NK_TEXT_LEFT);
-		nk_label_value(ctx, "   - A:", "Move Left", leftCol, rightCol, alignLabel, alignValue);
+        int alignValue = Nuklear.NK_TEXT_LEFT;
+        int alignLabel = Nuklear.NK_TEXT_LEFT;
+        float rightCol = 0.7f;
+        float leftCol  = 0.3f;
+        nk_label_value(ctx, "   - A:", "Move Left", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - D:", "Move Right", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - W:", "Move Forward", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - S:", "Move Backward", leftCol, rightCol, alignLabel, alignValue);
@@ -79,18 +78,20 @@ public class FrameKeyboardShortcuts extends AbstractFrame {
 		nk_label_value(ctx, "   - N:", "Ctrl-> [Up, Down] (Move Z slice plane)", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - R:", "Rain Mode", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - G:", "Alpha Mode (change the alpha color of the nodes)", leftCol, rightCol, alignLabel, alignValue);
-		nk_label_value(ctx, "   - I:", "Intensity Mode (change the intensity color of the nodes) [Up, Down]", leftCol, rightCol, alignLabel, alignValue);
+		nk_label_value(ctx, "   - I:", "Intensity Mode (change the intensity color of the nodes) [Up, Down]", leftCol, rightCol, alignLabel,
+                       alignValue);
 		nk_label_value(ctx, "   - L:", "Move Light Mode (Ctrl-{Shift}-> [Left, Right, Up, Down, Page Up, Page Down]])",
-				leftCol, rightCol, alignLabel, alignValue);
+                       leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - O:", "Move Occupancy Mode (Ctrl-{Shift}-> [Left, Right, Up, Down, Page Up, Page Down]])",
-		               leftCol, rightCol, alignLabel, alignValue);
+                       leftCol, rightCol, alignLabel, alignValue);
 
 		nk_spacer(ctx, spacer1 , 1);
 		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
 		Nuklear.nk_label(ctx, " Other keys:", Nuklear.NK_TEXT_LEFT);
 		nk_label_value(ctx, "   - F8:", "Turn physics simulatation on or off", leftCol, rightCol, alignLabel, alignValue);
 		nk_label_value(ctx, "   - F12:", "Swap between slice (XY plance) and XYZ (All)", leftCol, rightCol, alignLabel, alignValue);
-		nk_label_value(ctx, "   - SPACEBAR:", "Force node to move down, see Menu Rain to change the force", leftCol, rightCol, alignLabel, alignValue);
+		nk_label_value(ctx, "   - SPACEBAR:", "Force node to move down, see Menu Rain to change the force", leftCol, rightCol, alignLabel,
+                       alignValue);
 
 		nk_spacer(ctx, spacer1 , 1);
 		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 3);

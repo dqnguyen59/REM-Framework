@@ -48,6 +48,7 @@ import org.smartblackbox.utils.Utils;
 
 import java.lang.Math;
 import java.util.ArrayList;
+import java.util.Objects;
 
 public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
@@ -326,7 +327,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             }
         } else {
             leftButtonPressed  = false;
-            leftButtonReleased = false;
             rightButtonPress   = false;
         }
         return false;
@@ -478,23 +478,15 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 }
                 break;
             case GLFW.GLFW_KEY_PAGE_UP:
-                switch (remModel.getTranslationMode()) {
-                    case light:
-                        if (remModel.getSelectedLight() != null)
-                            remModel.getSelectedLight().getPosBuff().y += inc;
-                        break;
-                    default:
-                        break;
+                if (Objects.requireNonNull(remModel.getTranslationMode()) == TranslationMode.light) {
+                    if (remModel.getSelectedLight() != null)
+                        remModel.getSelectedLight().getPosBuff().y += inc;
                 }
                 break;
             case GLFW.GLFW_KEY_PAGE_DOWN:
-                switch (remModel.getTranslationMode()) {
-                    case light:
-                        if (remModel.getSelectedLight() != null)
-                            remModel.getSelectedLight().getPosBuff().y -= inc;
-                        break;
-                    default:
-                        break;
+                if (Objects.requireNonNull(remModel.getTranslationMode()) == TranslationMode.light) {
+                    if (remModel.getSelectedLight() != null)
+                        remModel.getSelectedLight().getPosBuff().y -= inc;
                 }
                 break;
             case GLFW.GLFW_KEY_KP_4:
@@ -848,36 +840,20 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                             j == project.getDimensionY() - 1 && k == 0 ||
                             j == project.getDimensionY() - 1 && k == project.getDimensionZ() - 1;
 
-                    boolean isVisible = false;
-
-                    switch (settings.getSliceType()) {
-                        case none:
-                            isVisible = isBoundingLine ||
-                                        (i > 0 && i < dimX - 1 && j > 0 && j < dimY - 1 && k > 0 &&
-                                         k < dimZ - 1);
-                            break;
-                        case sliceX:
-                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX());
-                            break;
-                        case sliceY:
-                            isVisible = isBoundingLine || (j == settings.getVisibleIndexY());
-                            break;
-                        case sliceZ:
-                            isVisible = isBoundingLine || (k == settings.getVisibleIndexZ());
-                            break;
-                        case sliceXZ:
-                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX() &&
+                    boolean isVisible = switch (settings.getSliceType()) {
+                        case none -> isBoundingLine ||
+                                     (i > 0 && i < dimX - 1 && j > 0 && j < dimY - 1 && k > 0 &&
+                                      k < dimZ - 1);
+                        case sliceX -> isBoundingLine || (i == settings.getVisibleIndexX());
+                        case sliceY -> isBoundingLine || (j == settings.getVisibleIndexY());
+                        case sliceZ -> isBoundingLine || (k == settings.getVisibleIndexZ());
+                        case sliceXZ -> isBoundingLine || (i == settings.getVisibleIndexX() &&
                                                            k == settings.getVisibleIndexZ());
-                            break;
-                        case sliceYZ:
-                            isVisible = isBoundingLine || (j == settings.getVisibleIndexY() &&
+                        case sliceYZ -> isBoundingLine || (j == settings.getVisibleIndexY() &&
                                                            k == settings.getVisibleIndexZ());
-                            break;
-                        case sliceXY:
-                            isVisible = isBoundingLine || (i == settings.getVisibleIndexX() &&
+                        case sliceXY -> isBoundingLine || (i == settings.getVisibleIndexX() &&
                                                            j == settings.getVisibleIndexY());
-                            break;
-                    }
+                    };
 
                     node.setVisible(isVisible || node.isHiLighted());
 

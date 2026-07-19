@@ -132,7 +132,7 @@ public class Entity {
         Material m = getMaterial();
 
         Vector4f color          = m.getDiffuseColor();
-        float    alpha          = 0;
+        float    alpha;
         float    intensity      = settings.getIntensity() * absorptionFactor;
         float    intensity2     = intensity * intensity * absorptionFactor;
         float    intensity3     = intensity2 * intensity * absorptionFactor;

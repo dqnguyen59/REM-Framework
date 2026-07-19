@@ -40,8 +40,6 @@ public class RemModel {
         occupancy,
     }
 
-    ;
-
     public enum EditMode {
         none,
         swapNode,

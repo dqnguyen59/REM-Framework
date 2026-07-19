@@ -38,7 +38,6 @@ public class FrameIdentities extends AbstractFrame {
 
     private final int optionsNoScroll = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_NO_SCROLLBAR;
     private final int groupNoScroll   = optionsNoScroll | Nuklear.NK_WINDOW_BORDER;
-    private final int autoHideScroll  = Nuklear.NK_WINDOW_SCROLL_AUTO_HIDE;
 
     private final double leftCol     = 0.55;
     private final double rightCol    = 0.45;
@@ -101,6 +100,7 @@ public class FrameIdentities extends AbstractFrame {
         if (Nuklear.nk_group_begin(ctx, "Identities", groupNoScroll)) {
 
             Nuklear.nk_layout_row_dynamic(ctx, 516, 1);
+            int autoHideScroll = Nuklear.NK_WINDOW_SCROLL_AUTO_HIDE;
             if (Nuklear.nk_group_begin(ctx, "Identities View", autoHideScroll)) {
 
                 Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
@@ -280,29 +280,27 @@ public class FrameIdentities extends AbstractFrame {
 //            }
 
             Nuklear.nk_layout_row_dynamic(ctx, spacer1, 1);
-            if (occupancy != null) {
-                Nuklear.nk_layout_row_dynamic(ctx, 450, 1);
-                if (Nuklear.nk_group_begin(ctx, "Scrollable", 0)) {
-                    layoutOscillatorX(ctx, stack);
-                    layoutOscillatorY(ctx, stack);
-                    layoutOscillatorZ(ctx, stack);
+            Nuklear.nk_layout_row_dynamic(ctx, 450, 1);
+            if (Nuklear.nk_group_begin(ctx, "Scrollable", 0)) {
+                layoutOscillatorX(ctx, stack);
+                layoutOscillatorY(ctx, stack);
+                layoutOscillatorZ(ctx, stack);
 
-                    Nuklear.nk_group_end(ctx);
-                }
+                Nuklear.nk_group_end(ctx);
+            }
 
-                Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 3);
-                Nuklear.nk_label(ctx, "", Nuklear.NK_TEXT_LEFT);
-                if (nk_button_label(ctx, "Apply")) {
-                    if (remModel.getSelectedOccupancy().getNode().getIndex().x >= 0) {
-                        int i = project.occupancies.indexOf(remModel.getSelectedOccupancy());
-                        //remModel.setSelectedOccupancy(new Occupancy(occupancyEdit.getIdentity().clone(), occupancy.getNode()));
-                        remModel.setSelectedOccupancy(occupancy);
-                        project.occupancies.set(i, remModel.getSelectedOccupancy());
-                    } else {
-                        nuklearModel.showWarningDialog("Node Selection",
-                                                       "You haven't select a node, please select a node " +
-                                                       "first.");
-                    }
+            Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 3);
+            Nuklear.nk_label(ctx, "", Nuklear.NK_TEXT_LEFT);
+            if (nk_button_label(ctx, "Apply")) {
+                if (remModel.getSelectedOccupancy().getNode().getIndex().x >= 0) {
+                    int i = project.occupancies.indexOf(remModel.getSelectedOccupancy());
+                    //remModel.setSelectedOccupancy(new Occupancy(occupancyEdit.getIdentity().clone(), occupancy.getNode()));
+                    remModel.setSelectedOccupancy(occupancy);
+                    project.occupancies.set(i, remModel.getSelectedOccupancy());
+                } else {
+                    nuklearModel.showWarningDialog("Node Selection",
+                                                   "You haven't select a node, please select a node " +
+                                                   "first.");
                 }
             }
             Nuklear.nk_group_end(ctx);

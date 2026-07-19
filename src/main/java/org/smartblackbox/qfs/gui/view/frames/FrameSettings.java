@@ -135,7 +135,6 @@ public class FrameSettings extends AbstractFrame {
                                                               project.getDimensionZ() - 2, 1.0));
                     break;
                 case sliceXZ:
-                    height = 786;
                     settings.setVisibleIndexX(
                             nk_label_edit(ctx, stack, " Slice X:", bufVisibleIndexX,
                                           settings.getVisibleIndexX(), leftCol, rightCol));
@@ -150,7 +149,6 @@ public class FrameSettings extends AbstractFrame {
                                                               project.getDimensionZ() - 2, 1.0));
                     break;
                 case sliceYZ:
-                    height = 786;
                     settings.setVisibleIndexY(
                             nk_label_edit(ctx, stack, " Slice Y:", bufVisibleIndexY,
                                           settings.getVisibleIndexY(), leftCol, rightCol));
@@ -165,7 +163,6 @@ public class FrameSettings extends AbstractFrame {
                                                               project.getDimensionZ() - 2, 1.0));
                     break;
                 case sliceXY:
-                    height = 786;
                     settings.setVisibleIndexX(
                             nk_label_edit(ctx, stack, " Slice X:", bufVisibleIndexX,
                                           settings.getVisibleIndexX(), leftCol, rightCol));

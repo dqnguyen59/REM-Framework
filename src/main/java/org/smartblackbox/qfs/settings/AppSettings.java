@@ -66,7 +66,7 @@ public class AppSettings extends AbstractSettings implements ISettings {
     private int defaultDimensionY = Constants.DEFAULT_DIMENSION_Y;
     private int defaultDimensionZ = Constants.DEFAULT_DIMENSION_Z;
 
-    private HashMap<String, NkRect> frameRectMap = new HashMap<String, NkRect>();
+    private HashMap<String, NkRect> frameRectMap = new HashMap<>();
 
     private char          decimalSeperator   = '.';
     private DecimalFormat formatInt          = Utils.setFormat(0, 0, decimalSeperator, false, false);

@@ -230,8 +230,8 @@ public class TransportSystem extends AbstractSettings implements ISettings {
         double absY = Math.abs(pressure.y);
         double absZ = Math.abs(pressure.z);
 
-        int directionA = -1;
-        int directionB = -1;
+        int directionA;
+        int directionB;
 
         if (occupancy.isCycleCompleted()) {
 

@@ -68,7 +68,7 @@ public class Identity extends AbstractSettings implements ISettings {
      * Human-readable identifier used for debugging,
      * visualization and configuration.
      */
-    private String name = "";
+    private String name;
 
     private Entity entity;
 

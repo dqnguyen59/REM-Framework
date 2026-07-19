@@ -96,7 +96,7 @@ public class FrameStatusBar extends AbstractFrame {
         Nuklear.nk_layout_row_push(ctx, col[i++] / width);
         Nuklear.nk_label(ctx, " TranslationMode: ", Nuklear.NK_TEXT_LEFT);
 
-        String s   = "";
+        String s;
         String tip = "";
         for (TranslationMode m : TranslationMode.values()) {
             Nuklear.nk_layout_row_push(ctx, col[i++] / width);

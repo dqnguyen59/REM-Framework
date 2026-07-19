@@ -51,7 +51,7 @@ public class FrameEditWalls extends AbstractFrame {
 
 	@Override
 	protected void layout(NkContext ctx, int x, int y, int width, int height) {
-		try (MemoryStack stack = MemoryStack.stackPush()) {
+		try (MemoryStack ignored = MemoryStack.stackPush()) {
 			Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
 			remModel.setWallVisible(Nuklear.nk_check_label(ctx, "Show Wall", remModel.isWallVisible()));
 
