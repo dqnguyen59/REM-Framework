@@ -218,7 +218,7 @@ public class Node extends Entity {
      * Decreasing this constant will result in a lower speed of light.		<br/>
      * </p>
      * <br/>
-     * The equation of Quantum Field is simply based on motion formula:<br/>
+     * The fundamental node equation is simply based on motion formula:<br/>
      * <p style="margin-left: 30px;">
      * ∆v = avg(N) = k² / |N| * ∑(n – p) {n ∈ N}	<br/>
      * a = ∆v / ∆t									<br/>
