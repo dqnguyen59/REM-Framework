@@ -52,20 +52,13 @@ public class Main {
 
         GLWindow glWindow = new GLWindow(Constants.TITLE);
 		Engine engine = new Simulator(glWindow);
-	
+
 		try {
 			engine.init();
+			engine.start();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
-		try {
-			engine.start();
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
-		
 	}
 
 }
