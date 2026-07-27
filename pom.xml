@@ -4,31 +4,12 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
 >
 
-<!--
-	Build executable JAR file:
-	$mvn clean package
-	
-	Run jar file:
-	$java -jar ../QFSLauncher/binary/QuantumFieldSimulator/QuantumFieldSimulator-vx.x.xxx-{OS}.jar
--->
-
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.smartblackbox</groupId>
-	<artifactId>QuantumFieldSimulator</artifactId>
-	<version>0.1</version>
-	<name>Duy Quoc Nguyen</name>
+	<groupId>com.rem</groupId>
+	<artifactId>REM-Framework</artifactId>
+	<version>0.2</version>
+	<name>Duy Nguyen</name>
 	<description>
-		This application simulates the quantum field theory.
-		Inititially it was developed to simulate the double slit experiment.
-		It uses a simple motion formula to simulate the light wave.
-		By defining the slits in the simulator, the interference patterns can be
-		simulated.
-		Even walls/mirrors can be defined freely in 3D quantum field.
-		There are also other files to simulate, for example rain drops or
-		detecting the speed of light.
-		This simulator does not approximate the real world values,
-		but rather simulates the properties of the light wave due to a lack of
-		CPU/GPU power.
 	</description>
 
 	<packaging>jar</packaging>
@@ -459,7 +440,7 @@
 						<manifest>
 							<addClasspath>true</addClasspath>
 							<classpathPrefix>dependency/</classpathPrefix>
-							<mainClass>org.smartblackbox.Main</mainClass>
+							<mainClass>remframework.Main</mainClass>
 						</manifest>
 						<manifestEntries>
 							<Title>Quantum Field Simulator</Title>
