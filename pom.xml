@@ -17,14 +17,15 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<maven.compiler.source>1.8</maven.compiler.source>
-		<maven.compiler.target>1.8</maven.compiler.target>
+		<maven.compiler.release>21</maven.compiler.release>
 		<maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
 		<maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
 		<exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
+		<lombok.version>1.18.46</lombok.version>
 		<lwjgl.version>3.4.1</lwjgl.version>
 		<swt.maven.version>3.134.0</swt.maven.version> <!-- 3.132.0+ requires Java 21 -->
 		<joml.version>1.10.9</joml.version>
+		<junit.version>5.14.1</junit.version>
 		<!-- Can be overwritten via -D property during mvn invoke to specify a different demo. The package "org.lwjgl.demo."
             is prepended automatically. -->
 	</properties>
@@ -347,8 +348,14 @@
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
-			<version>1.18.46</version>
+			<version>${lombok.version}</version>
 			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
 		</dependency>
 
 	</dependencies>
@@ -371,12 +378,16 @@
 						<path>
 							<groupId>org.projectlombok</groupId>
 							<artifactId>lombok</artifactId>
-							<version>1.18.38</version>
+							<version>${lombok.version}</version>
 						</path>
 					</annotationProcessorPaths>
-                    <source>21</source>
-                    <target>21</target>
+					<release>${maven.compiler.release}</release>
                 </configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.5.4</version>
 			</plugin>
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
@@ -429,9 +440,7 @@
 					</execution>
 				</executions>
 				<configuration>
-					<finalName>
-						${project.artifactId}-v${project.version}.${buildNumber}-${platform}
-					</finalName>
+					<finalName>rem-framework</finalName>
 					<appendAssemblyId>false</appendAssemblyId>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
@@ -472,6 +481,7 @@
 							<goal>shade</goal>
 						</goals>
 						<configuration>
+							<createDependencyReducedPom>false</createDependencyReducedPom>
 							<filters>
 								<filter>
 									<!-- exclude files that sign a jar -->
