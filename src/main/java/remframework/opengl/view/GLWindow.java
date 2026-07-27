@@ -44,8 +44,7 @@ public class GLWindow {
     private boolean resize;
 
     private GLFWFramebufferSizeCallback framebufferCallback;
-    private GLFWKeyCallback             keyCallback;
-    private GLFWErrorCallback errorCallback;
+    private GLFWErrorCallback           errorCallback;
 
     public GLWindow(String title) {
         this.title = title;
@@ -88,32 +87,24 @@ public class GLWindow {
             throw new RuntimeException("Error: Failed to create GLFW window!");
         }
 
-//        GLFW.glfwSetFramebufferSizeCallback(windowHandle, (window, width, height) -> {
-//            this.width  = width;
-//            this.height = height;
-//            this.setResize(true);
-//        });
-//
-//        GLFW.glfwSetKeyCallback(windowHandle, (window, key, scancode, action, mods) -> {
-//            if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_RELEASE) GLFW.glfwSetWindowShouldClose(
-//                    window, true);
-//        });
+        //        GLFW.glfwSetFramebufferSizeCallback(windowHandle, (window, width, height) -> {
+        //            this.width  = width;
+        //            this.height = height;
+        //            this.setResize(true);
+        //        });
+        //
+        //        GLFW.glfwSetKeyCallback(windowHandle, (window, key, scancode, action, mods) -> {
+        //            if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_RELEASE) GLFW.glfwSetWindowShouldClose(
+        //                    window, true);
+        //        });
 
         framebufferCallback = GLFWFramebufferSizeCallback.create((window, width, height) -> {
-            this.width = width;
+            this.width  = width;
             this.height = height;
             this.setResize(true);
         });
 
         GLFW.glfwSetFramebufferSizeCallback(windowHandle, framebufferCallback);
-
-        keyCallback = GLFWKeyCallback.create((window, key, scancode, action, mods) -> {
-            if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_RELEASE) {
-                GLFW.glfwSetWindowShouldClose(window, true);
-            }
-        });
-
-        GLFW.glfwSetKeyCallback(windowHandle, keyCallback);
 
         if (maximized) {
             GLFW.glfwMaximizeWindow(windowHandle);
@@ -146,30 +137,22 @@ public class GLWindow {
     }
 
     public void cleanUp() {
-//        GLFW.glfwDestroyWindow(windowHandle);
-//        windowHandle = 0;
         System.out.println("GLWindows.cleanUp()");
 
-        errorCallback.free();
-
-        if (windowHandle != 0) {
-            //GLFW.glfwFreeCallbacks(windowHandle);
-            GLFW.glfwDestroyWindow(windowHandle);
-            windowHandle = 0;
-        }
-
-        if (framebufferCallback != null) {
-            framebufferCallback.free();
+        if (windowHandle != MemoryUtil.NULL) {
+            Callbacks.glfwFreeCallbacks(windowHandle);
             framebufferCallback = null;
+            GLFW.glfwDestroyWindow(windowHandle);
+            windowHandle = MemoryUtil.NULL;
         }
 
-        if (keyCallback != null) {
-            keyCallback.free();
-            keyCallback = null;
+        GLFWErrorCallback registeredErrorCallback = GLFW.glfwSetErrorCallback(null);
+        if (registeredErrorCallback != null) {
+            registeredErrorCallback.free();
         }
+        errorCallback = null;
 
         GLFW.glfwTerminate();
-
     }
 
     public void setClearColor(float r, float g, float b, float a) {

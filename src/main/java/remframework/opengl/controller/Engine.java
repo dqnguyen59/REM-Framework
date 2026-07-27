@@ -21,7 +21,6 @@ package remframework.opengl.controller;
 import lombok.Getter;
 import lombok.Setter;
 import org.lwjgl.glfw.GLFW;
-import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.nuklear.NkRect;
 import org.lwjgl.opengl.GL11;
 import remframework.helpers.Constants;
@@ -51,8 +50,6 @@ public abstract class Engine {
 	
 	private List<IMouseAndKeyboardEvents> eventListeners = new ArrayList<>();
 	
-	private GLFWErrorCallback errorCallback;
-
 	protected GLWindow glWindow;
 	protected NuklearController nuklearController;
 	protected NuklearView nuklearView;
@@ -75,7 +72,6 @@ public abstract class Engine {
 	}
 
 	public void init() throws Exception {
-		GLFW.glfwSetErrorCallback(errorCallback = GLFWErrorCallback.createPrint(System.err));
 		glWindow.init();
 		
 		nuklearModel = new NuklearModel();
@@ -251,6 +247,10 @@ public abstract class Engine {
         });
 
 		GLFW.glfwSetKeyCallback(handle, (window, key, scancode, action, mods) -> {
+//			if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_RELEASE) {
+//				GLFW.glfwSetWindowShouldClose(window, true);
+//			}
+
 			keyEvents.isKeyPressed = action == GLFW.GLFW_PRESS;
 			keyEvents.isKeyRepeating = action == GLFW.GLFW_REPEAT;
 			keyEvents.isKeyReleased = action == GLFW.GLFW_RELEASE;
@@ -362,8 +362,6 @@ public abstract class Engine {
 	protected void cleanUp() {
 		nuklearView.cleanUp();
 		glWindow.cleanUp();
-		errorCallback.free();
-		GLFW.glfwTerminate();
 	}
 
 	private void showPerformance() {

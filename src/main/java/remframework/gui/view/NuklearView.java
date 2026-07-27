@@ -515,7 +515,6 @@ public class NuklearView {
 
         Objects.requireNonNull(ALLOCATOR.alloc()).free();
         Objects.requireNonNull(ALLOCATOR.mfree()).free();
-        Objects.requireNonNull(GLFW.glfwSetErrorCallback(null)).free();
     }
 
     public void beginInput() {
