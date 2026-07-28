@@ -167,6 +167,10 @@ public class GLWindow {
         return GLFW.glfwWindowShouldClose(windowHandle);
     }
 
+    public void requestClose() {
+        GLFW.glfwSetWindowShouldClose(windowHandle, true);
+    }
+
     public void setTitle(String title) {
         GLFW.glfwSetWindowTitle(windowHandle, title);
     }

@@ -368,6 +368,7 @@
 
 
 	<build>
+		<finalName>rem</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -429,49 +430,6 @@
 			</plugin>
 
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-assembly-plugin</artifactId>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<goals>
-							<goal>single</goal>
-						</goals>
-					</execution>
-				</executions>
-				<configuration>
-					<finalName>rem-framework</finalName>
-					<appendAssemblyId>false</appendAssemblyId>
-					<descriptorRefs>
-						<descriptorRef>jar-with-dependencies</descriptorRef>
-					</descriptorRefs>
-					<archive>
-						<manifest>
-							<addClasspath>true</addClasspath>
-							<classpathPrefix>dependency/</classpathPrefix>
-							<mainClass>remframework.Main</mainClass>
-						</manifest>
-						<manifestEntries>
-							<Title>Quantum Field Simulator</Title>
-							<Description>${project.description}</Description>
-							<!--suppress UnresolvedMavenProperty -->
-							<Date-Time>${buildDateTime}</Date-Time>
-							<Built-By>${project.groupId}</Built-By>
-							<Author>${project.name}</Author>
-							<Contributors>${project.name}</Contributors>
-							<Version>${project.version}.${buildNumber}</Version>
-							<Website>https://www.smartblackbox.org</Website>
-							<Email>d.q.nguyen@smartblackbox.org</Email>
-						</manifestEntries>
-					</archive>
-					<outputDirectory>
-						<!-- Change the output JAR file to your own output folder! -->
-						../QFSLauncher/binary/QuantumFieldSimulator/
-					</outputDirectory>
-				</configuration>
-			</plugin>
-
-			<plugin>
 				<artifactId>maven-shade-plugin</artifactId>
 				<version>${maven-shade-plugin.version}</version>
 				<executions>
@@ -496,9 +454,9 @@
 							<transformers>
 								<transformer
 										implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>remframework.Main</mainClass>
 								</transformer>
 							</transformers>
-							<finalName>lwjgl3-demos</finalName>
 						</configuration>
 					</execution>
 				</executions>

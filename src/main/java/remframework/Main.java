@@ -26,10 +26,54 @@ import remframework.opengl.view.GLWindow;
 import remframework.settings.AppSettings;
 import remframework.helpers.AppInfo;
 import remframework.helpers.Utils;
+import remframework.settings.Project;
+
+import java.nio.file.Path;
 
 public class Main {
 
     public static void main(String[] args) {
+		Path startupProjectPath = null;
+		Long updateLimit = null;
+		for (String argument : args) {
+			if (argument.startsWith("--")) {
+				if (!argument.startsWith("--updates=") || argument.length() == "--updates=".length()) {
+					System.err.println("Invalid option: " + argument
+							+ ". Expected --updates=<positive integer>.");
+					System.exit(1);
+					return;
+				}
+				if (updateLimit != null) {
+					System.err.println("The --updates option may only be specified once.");
+					System.exit(1);
+					return;
+				}
+				try {
+					updateLimit = Long.parseLong(argument.substring("--updates=".length()));
+				}
+				catch (NumberFormatException exception) {
+					System.err.println("Invalid update limit: " + argument
+							+ ". Expected a positive integer.");
+					System.exit(1);
+					return;
+				}
+				if (updateLimit <= 0) {
+					System.err.println("Invalid update limit: " + argument
+							+ ". Expected a positive integer.");
+					System.exit(1);
+					return;
+				}
+			}
+			else {
+				if (startupProjectPath != null) {
+					System.err.println("Only one project filename may be specified.");
+					System.exit(1);
+					return;
+				}
+				startupProjectPath = Path.of(argument).toAbsolutePath().normalize();
+			}
+		}
+
 		AppInfo.getManifestInfo("QuantumFieldSimulator");
 
 		System.out.println(AppInfo.getTitle());
@@ -51,10 +95,14 @@ public class Main {
 		AppSettings.getInstance().loadFromFile(Constants.BASE_PATH + Constants.APP_SETTINGS_FILE);
 
         GLWindow glWindow = new GLWindow(Constants.TITLE);
-		Engine engine = new Simulator(glWindow);
+		Engine engine = new Simulator(glWindow, updateLimit);
 
 		try {
 			engine.init();
+			if (startupProjectPath != null) {
+				System.out.println("Loading startup project: " + startupProjectPath);
+				Project.getInstance().loadFromFile(startupProjectPath.toString());
+			}
 			engine.start();
 		} catch (Exception e) {
 			e.printStackTrace();

@@ -27,6 +27,7 @@ import org.joml.Vector3i;
 import org.lwjgl.glfw.GLFW;
 import remframework.opengl.model.*;
 import remframework.helpers.Constants;
+import remframework.measurement.gravity.GravityExperimentController;
 import remframework.opengl.controller.TransportSystem;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.Node;
@@ -37,6 +38,8 @@ import remframework.helpers.AbstractSettings;
 import remframework.helpers.ISettings;
 import remframework.helpers.Utils;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -167,6 +170,31 @@ public class Project extends AbstractSettings implements ISettings {
             Occupancy occupancy = new Occupancy();
             occupancy.loadFromFile(ini, "Oscillator", i);
             occupancies.add(occupancy);
+        }
+
+        // Temporary Gravity Test 1 configuration. Remove once experiment selection becomes configurable.
+        if (occupancies.size() >= 2) {
+            GravityExperimentController controller = GravityExperimentController.getInstance();
+            int runNumber = 1;
+            Path outputFile;
+            do {
+                outputFile = Path.of(
+                        "measurements",
+                        String.format("gravity-test-1-run-%03d.csv", runNumber++));
+            } while (Files.exists(outputFile));
+
+            controller.configure(outputFile);
+            controller.designateSourceIdentity(occupancies.get(0).getIdentity());
+            controller.clearMeasurementIdentities();
+            for (int i = 1; i < occupancies.size(); i++) {
+                controller.addMeasurementIdentity(occupancies.get(i).getIdentity());
+            }
+            controller.setEnabled(true);
+
+            System.out.println("Gravity Test 1 enabled");
+            System.out.println("Source: " + occupancies.get(0).getIdentity().getName());
+            System.out.println("Measurement points: " + (occupancies.size() - 1));
+            System.out.println("CSV: " + outputFile);
         }
 
         rainModel.loadFromFile(ini, "Rain", index);

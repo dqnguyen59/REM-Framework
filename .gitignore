@@ -28,3 +28,4 @@ qfs.ini
 hs_err_pid*
 
 .idea/*.xml
+/.idea/codeStyles/codeStyleConfig.xml

@@ -5,6 +5,7 @@ import lombok.Setter;
 import org.ini4j.Wini;
 import org.joml.Vector3d;
 import remframework.helpers.Constants;
+import remframework.measurement.gravity.GravityMeasurementLogger;
 import remframework.opengl.model.RemModel;
 import remframework.opengl.model.entity.Node;
 import remframework.opengl.model.entity.Occupancy;
@@ -56,6 +57,8 @@ public class TransportSystem extends AbstractSettings implements ISettings {
     private static TransportSystem instance;
     private final  Project         project  = Project.getInstance();
     private final  RemModel        remModel = project.getRemModel();
+    private final GravityMeasurementLogger gravityMeasurementLogger =
+            GravityMeasurementLogger.getInstance();
 
     private boolean logToConsole     = false;
     private LogType logType          = LogType.none;
@@ -153,7 +156,10 @@ public class TransportSystem extends AbstractSettings implements ISettings {
      * Measures the local recursive field gradient around the occupied node.
      */
     private void storeMeasuredGradientImbalance(Occupancy occupancy) {
-        occupancy.saveGradientToHistory(occupancy.getNode().measureGradientImbalance().mul(gradientGain));
+        Vector3d measuredGradient = occupancy.getNode().measureGradientImbalance();
+        gravityMeasurementLogger.captureRawGradient(occupancy, measuredGradient);
+        measuredGradient.mul(gradientGain);
+        occupancy.saveGradientToHistory(measuredGradient);
     }
 
     /**

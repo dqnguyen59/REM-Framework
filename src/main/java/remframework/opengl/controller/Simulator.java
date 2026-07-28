@@ -25,6 +25,7 @@ import remframework.opengl.model.*;
 import remframework.helpers.Constants;
 import remframework.helpers.IMouseAndKeyboardEvents;
 import remframework.gui.model.NuklearModel.Frame;
+import remframework.measurement.gravity.GravityExperimentController;
 import remframework.opengl.model.RemModel.TranslationMode;
 import remframework.opengl.model.RemModel.NodeSelectionMode;
 import remframework.opengl.model.entity.Entity;
@@ -85,10 +86,13 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     protected            long            currentTime;
     private              int             numFrameCalculation;
     private              Thread          thread;
+    private final        Long            updateLimit;
+    private volatile     boolean         updateLimitReached;
 
-    public Simulator(GLWindow glWindow) {
+    public Simulator(GLWindow glWindow, Long updateLimit) {
         super(glWindow);
 
+        this.updateLimit = updateLimit;
         renderer = new Renderer();
         loader   = new OBJFormatLoader();
     }
@@ -745,7 +749,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void simulateOccupancies() {
-        if (remModel.isSimulating()) {
+        if (remModel.isSimulating() && !updateLimitReached) {
+            GravityExperimentController controller = GravityExperimentController.getInstance();
+            controller.beginSimulationUpdate();
 
             for (Occupancy occupancy : project.occupancies) {
                 if (occupancy.isOccupied()) {
@@ -763,6 +769,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 Occupancy occupancyA = project.occupancies.getFirst();
                 Occupancy occupancyB = project.occupancies.get(1);
                 transportSystem.printDistanceG(occupancyA, occupancyB);
+            }
+            if (updateLimit != null && controller.getUpdatesRecorded() >= updateLimit) {
+                updateLimitReached = true;
             }
         }
     }
@@ -949,10 +958,20 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     @Override
     public void cleanUp() {
         System.out.println("simulator.cleanUp();");
+        GravityExperimentController controller = GravityExperimentController.getInstance();
+        controller.close();
         scene.stopAnimation();
         renderer.cleanup();
         loader.cleanup();
         super.cleanUp();
+        if (updateLimit != null) {
+            System.out.println("Gravity Test 1 complete");
+            System.out.println("Configured updates: " + updateLimit);
+            System.out.println("Updates recorded: " + controller.getUpdatesRecorded());
+            System.out.println("Measurement points: " + controller.getMeasurementPointCount());
+            System.out.println("Rows written: " + controller.getRowsWritten());
+            System.out.println("CSV: " + controller.getOutputFile());
+        }
     }
 
     @Override
@@ -967,6 +986,10 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
         waitForNextFrameIsReady();
 
+        if (updateLimitReached) {
+            glWindow.requestClose();
+        }
+
         if (isLoadingStarted) {
             // Make sure it is not doing any calculation while updating new scene.
             if (remModel.isLoadingReady()) {
@@ -974,7 +997,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 isLoadingStarted = false;
                 System.out.println("isLoadingStarted: " + isLoadingStarted);
             }
-        } else {
+        } else if (!updateLimitReached) {
             waitForRenderingReady();
             resetMonitoringDeadThreads();
             // Meanwhile, start calculating the next frame while rendering.
