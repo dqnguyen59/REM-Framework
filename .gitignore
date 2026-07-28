@@ -29,3 +29,13 @@ hs_err_pid*
 
 .idea/*.xml
 /.idea/codeStyles/codeStyleConfig.xml
+/samples/a_wall.qfs
+/samples/detectGradient.qfs
+/samples/detectGradient2.qfs
+/samples/detectGradient3.qfs
+/samples/detectGradient4.qfs
+/samples/detectGradient5.qfs
+/measurements/gravity-test-1-run-001.csv
+/measurements/gravity-test-1-run-002.csv
+/pom.org.xml
+/.idea/REM-Field.iml
