@@ -438,7 +438,16 @@ public class Scene {
             int i = start;
 
             while (i < end) {
-                ((Entity) lattice.getEntityArray()[i++]).updateMatrix();
+                Entity entity = (Entity) lattice.getEntityArray()[i++];
+                if (settings.getSliceType() == Settings.SliceType.identitiesOnly
+                        && entity instanceof Node node) {
+                    node.updatePosition();
+                    node.setCustomScale(-1);
+                    node.setCustomColor(null);
+                }
+                else {
+                    entity.updateMatrix();
+                }
             }
         }));
     }

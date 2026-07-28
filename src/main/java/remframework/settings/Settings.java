@@ -41,26 +41,45 @@ import java.util.Objects;
 public class Settings extends AbstractSettings implements ISettings {
 
     public enum SliceType {
-        sliceX,
-        sliceY,
-        sliceZ,
-        sliceXZ,
-        sliceYZ,
-        sliceXY,
-        none,
+        sliceX("Visible slice X"),
+        sliceY("Visible slice Y"),
+        sliceZ("Visible slice Z"),
+        sliceXZ("Visible slice XZ"),
+        sliceYZ("Visible slice YZ"),
+        sliceXY("Visible slice XY"),
+        none("All nodes"),
+        identitiesOnly("Identities only"),
         ;
 
         private static String[] strEnums;
+        private final String label;
+
+        SliceType(String label) {
+            this.label = label;
+        }
 
         public static String[] getValues() {
             if (strEnums == null) {
                 SliceType[] v = values();
                 strEnums = new String[v.length];
                 for (int i = 0; i < v.length; i++) {
-                    strEnums[i] = v[i].name();
+                    strEnums[i] = v[i].label;
                 }
             }
             return strEnums;
+        }
+
+        public static SliceType fromLabel(String label) {
+            for (SliceType sliceType : values()) {
+                if (sliceType.label.equals(label)) {
+                    return sliceType;
+                }
+            }
+            throw new IllegalArgumentException("Unknown rendering mode: " + label);
+        }
+
+        public String getLabel() {
+            return label;
         }
     }
 

@@ -822,6 +822,13 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         System.out.println("Simulator.updateNodesProperties()");
         renderer.cleanupNodes();
 
+        if (settings.getSliceType() == SliceType.identitiesOnly) {
+            for (Entity entity : scene.getLattice().getNonNodeRenderEntities()) {
+                renderer.processEntity(entity);
+            }
+            return;
+        }
+
         for (Entity entity : scene.getLattice().getEntities()) {
             if (entity.getClass() == Node.class) {
                 Node node = (Node) entity;
@@ -862,6 +869,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                                                            k == settings.getVisibleIndexZ());
                         case sliceXY -> isBoundingLine || (i == settings.getVisibleIndexX() &&
                                                            j == settings.getVisibleIndexY());
+                        case identitiesOnly -> false;
                     };
 
                     node.setVisible(isVisible || node.isHiLighted());
@@ -912,7 +920,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             System.out.println("isLoadingStarted: " + isLoadingStarted);
             remModel.setLoadingReady(false);
             // Build the Lattice 3D Matrices of Nodes
-            scene.getLattice().getEntities().clear();
+            scene.getLattice().clearEntities();
             scene.build();
             resetOccupancies();
             waitAfterReset = 0;

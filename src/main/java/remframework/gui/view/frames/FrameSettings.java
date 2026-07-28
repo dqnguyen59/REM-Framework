@@ -65,7 +65,7 @@ public class FrameSettings extends AbstractFrame {
         super.render(windowHandle, ctx);
 
         int heightAdjust = switch (settings.getSliceType()) {
-            case none -> -60;
+            case none, identitiesOnly -> -60;
             case sliceXZ, sliceYZ, sliceXY -> 70;
             default -> 0;
         };
@@ -73,7 +73,7 @@ public class FrameSettings extends AbstractFrame {
             heightAdjust += 70;
         }
 
-        int width  = 300;
+        int width  = 400;
         int height = 720;
         createLayout(ctx, 0, nuklearModel.getMenuBarHeight() + 120, width, height + heightAdjust);
     }
@@ -107,9 +107,9 @@ public class FrameSettings extends AbstractFrame {
                                            settings.getColorMode().name(), leftCol, rightCol)));
 
             if (project.getDimensionZ() > 0) {
-                settings.setSliceType(SliceType.valueOf(
-                        nk_label_combo_options(ctx, stack, " Slice Type:", SliceType.getValues(),
-                                               settings.getSliceType().name(), leftCol, rightCol)));
+                settings.setSliceType(SliceType.fromLabel(
+                        nk_label_combo_options(ctx, stack, " Rendering:", SliceType.getValues(),
+                                               settings.getSliceType().getLabel(), leftCol, rightCol)));
             }
 
             nk_spacer(ctx, spacer1, 1);

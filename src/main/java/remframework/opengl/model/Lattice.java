@@ -48,6 +48,7 @@ public class Lattice {
 
     private Node[][][]   nodeMatrix;
     private List<Entity> entities;
+    private List<Entity> nonNodeRenderEntities;
 
     private Object[] nodeArray;
     private Object[] entityArray;
@@ -72,6 +73,7 @@ public class Lattice {
     public Lattice() {
         System.out.println("Lattice.Lattice()");
         entities = new ArrayList<>();
+        nonNodeRenderEntities = new ArrayList<>();
     }
 
     public Node getNode(int x, int y, int z) {
@@ -84,7 +86,15 @@ public class Lattice {
 
     private Entity addEntity(Entity entity) {
         entities.add(entity);
+        if (!(entity instanceof Node)) {
+            nonNodeRenderEntities.add(entity);
+        }
         return entity;
+    }
+
+    public void clearEntities() {
+        entities.clear();
+        nonNodeRenderEntities.clear();
     }
 
     public Entity createEntity(
