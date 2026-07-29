@@ -47,7 +47,49 @@ public final class DetectorConfiguration {
                     optional(ini, section, "description")));
         }
         loadRadialAxisDetectors(ini, dimension, result, names);
+        loadAngularShellDetectors(ini, dimension, result, names);
         return List.copyOf(result);
+    }
+
+    private static void loadAngularShellDetectors(
+            Wini ini, Vector3i dimension, List<Detector> result,
+            Set<String> names) {
+        String radiusValue = ini.get("AngularShellDetectors", "radius");
+        if (radiusValue == null || radiusValue.isBlank()) return;
+        int radius = parseInt(radiusValue.trim(),
+                "AngularShellDetectors.radius");
+        int sourceX = requiredInt(ini, "AngularShellDetectors", "source.x");
+        int sourceY = requiredInt(ini, "AngularShellDetectors", "source.y");
+        int sourceZ = requiredInt(ini, "AngularShellDetectors", "source.z");
+        Experiment3AGeometry.uniquePlacements(radius);
+        for (Experiment3AGeometry.DirectionSpec direction
+                : Experiment3AGeometry.highSymmetryDirections()) {
+            Vector3i offset = Experiment3AGeometry.integerOffset(
+                    direction, radius);
+            Vector3i index = new Vector3i(
+                    sourceX + offset.x,
+                    sourceY + offset.y,
+                    sourceZ + offset.z);
+            String name = String.format(
+                    "%s_R%03d", direction.label(), radius);
+            if (!names.add(name)) {
+                throw new IllegalArgumentException(
+                        "Duplicate detector name: " + name);
+            }
+            if (index.x < 0 || index.x >= dimension.x
+                    || index.y < 0 || index.y >= dimension.y
+                    || index.z < 0 || index.z >= dimension.z) {
+                throw new IllegalArgumentException(
+                        "Detector " + name + " node index " + index
+                                + " is outside lattice dimension " + dimension);
+            }
+            result.add(new Detector(
+                    name, index, radius, null, direction.label(),
+                    "Experiment 3A " + direction.directionClass()
+                            + "; requestedDirection="
+                            + direction.requestedDirection()
+                            + "; opposite=" + direction.oppositeLabel()));
+        }
     }
 
     private static void loadRadialAxisDetectors(

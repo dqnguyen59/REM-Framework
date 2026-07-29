@@ -345,6 +345,108 @@ class DetectorInfrastructureTest {
         }
     }
 
+    @Test
+    void experiment3aGeneratesTwentySixClassifiedOppositeDirections() {
+        List<Experiment3AGeometry.DirectionSpec> directions =
+                Experiment3AGeometry.highSymmetryDirections();
+        assertEquals(26, directions.size());
+        assertEquals(6, directions.stream().filter(direction ->
+                direction.directionClass()
+                        == Experiment3AGeometry.DirectionClass.AXIS).count());
+        assertEquals(12, directions.stream().filter(direction ->
+                direction.directionClass()
+                        == Experiment3AGeometry.DirectionClass.FACE_DIAGONAL)
+                .count());
+        assertEquals(8, directions.stream().filter(direction ->
+                direction.directionClass()
+                        == Experiment3AGeometry.DirectionClass.BODY_DIAGONAL)
+                .count());
+        Set<String> labels = new HashSet<>();
+        directions.forEach(direction -> {
+            assertTrue(labels.add(direction.label()));
+            assertEquals(1.0, direction.unitDirection().length(), 1e-15);
+        });
+        directions.forEach(direction -> assertEquals(1,
+                directions.stream().filter(candidate ->
+                        candidate.label().equals(direction.oppositeLabel()))
+                        .count()));
+    }
+
+    @Test
+    void experiment3aRadiusTwentyPlacementIsUniqueAndExact() {
+        Map<Vector3i, Experiment3AGeometry.DirectionSpec> placements =
+                Experiment3AGeometry.uniquePlacements(20);
+        assertEquals(26, placements.size());
+        placements.forEach((offset, direction) -> {
+            assertTrue(offset.lengthSquared() > 0);
+            Vector3d actual = new Vector3d(offset.x, offset.y, offset.z);
+            assertEquals(actual.length(),
+                    Math.sqrt((double) offset.x * offset.x
+                            + (double) offset.y * offset.y
+                            + (double) offset.z * offset.z));
+            assertTrue(actual.normalize().dot(direction.unitDirection())
+                    > 0.999);
+        });
+    }
+
+    @Test
+    void experiment3aAnglesProjectionAndParityUseGeometry() {
+        assertEquals(0.0, Experiment3AGeometry.thetaDegrees(
+                new Vector3d(0, 0, 1)));
+        assertEquals(180.0, Experiment3AGeometry.thetaDegrees(
+                new Vector3d(0, 0, -1)));
+        assertEquals(90.0, Experiment3AGeometry.thetaDegrees(
+                new Vector3d(1, 0, 0)));
+        assertEquals(90.0, Experiment3AGeometry.phiDegrees(
+                new Vector3d(0, 1, 0)));
+        assertEquals(-90.0, Experiment3AGeometry.phiDegrees(
+                new Vector3d(0, -1, 0)));
+        assertEquals(-3.0, Experiment3AGeometry.radialProjection(
+                new Vector3d(3, 0, 0), new Vector3d(-1, 0, 0)));
+        assertEquals(0.0, Experiment3AGeometry.evenDifference(2.0, 2.0));
+        assertEquals(0.0, Experiment3AGeometry.oddResidual(2.0, -2.0));
+        assertTrue(Experiment3AGeometry.evenDifference(2.0, -2.0) > 1.0);
+        assertEquals(List.of(18),
+                Experiment3AGeometry.completeCycleEndUpdates(35, 18));
+        assertThrows(IllegalArgumentException.class,
+                () -> Experiment3AGeometry.completeCycleEndUpdates(35, 0));
+    }
+
+    @Test
+    void experiment3aProjectCreatesUniqueShellAndOutputsWhenPresent()
+            throws Exception {
+        Wini ini = new Wini(new File(
+                "samples/experiment-3a-angular-characterization.qfs"));
+        List<Detector> detectors = DetectorConfiguration.load(
+                ini, new Vector3i(161, 161, 161));
+        assertEquals(26, detectors.size());
+        assertEquals(26, detectors.stream().map(Detector::getNodeIndex)
+                .map(Vector3i::new).collect(java.util.stream.Collectors.toSet())
+                .size());
+
+        Path output = Path.of("measurements",
+                "experiment-3a-angular-characterization");
+        Assumptions.assumeTrue(Files.exists(output.resolve("report.md")),
+                "Experiment 3A generated evidence is not present");
+        assertTrue(Files.size(output.resolve("detector-geometry.csv")) > 0);
+        assertTrue(Files.size(output.resolve("detector-cycle-summary.csv")) > 0);
+        for (String chart : List.of(
+                "angular-radial-acceleration",
+                "angular-acceleration-magnitude",
+                "angular-raw-radial-gradient",
+                "angular-displacement-magnitude",
+                "azimuthal-response", "opposite-even-parity",
+                "opposite-odd-parity", "direction-class-comparison",
+                "representative-radial-acceleration",
+                "representative-acceleration-magnitude",
+                "directional-response-3d")) {
+            assertTrue(Files.size(output.resolve(
+                    "charts/" + chart + ".png")) > 20_000);
+            assertTrue(Files.size(output.resolve(
+                    "charts/" + chart + ".svg")) > 2_000);
+        }
+    }
+
     private static Wini detectorIni(int size) {
         Wini ini = new Wini();
         ini.put("Detectors", "Size", size);
