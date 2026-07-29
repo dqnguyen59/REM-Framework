@@ -29,6 +29,10 @@ import remframework.opengl.model.*;
 import remframework.helpers.Constants;
 import remframework.measurement.gravity.GravityExperimentController;
 import remframework.measurement.gravitypressure.GravityPressureExperimentController;
+import remframework.measurement.detector.Detector;
+import remframework.measurement.detector.DetectorConfiguration;
+import remframework.measurement.detector.DetectorExperimentController;
+import remframework.measurement.detector.FeasibilityPilotTelemetry;
 import remframework.opengl.controller.TransportSystem;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.Node;
@@ -52,6 +56,7 @@ public class Project extends AbstractSettings implements ISettings {
 
     private boolean isChanged;
     private boolean isFileSaved;
+    private boolean headlessLoading;
 
     /**
      * Set the universe dimension.
@@ -83,6 +88,7 @@ public class Project extends AbstractSettings implements ISettings {
     private final ArrayList<Light> lights = new ArrayList<>();
 
     public List<Occupancy> occupancies = new ArrayList<>();
+    private List<Detector> detectors = List.of();
 
     public static Project getInstance() {
         if (instance == null) {
@@ -130,6 +136,15 @@ public class Project extends AbstractSettings implements ISettings {
         return new Project(this);
     }
 
+    public void loadHeadlessFromFile(String filename) {
+        headlessLoading = true;
+        try {
+            super.loadFromFile(filename);
+        } finally {
+            headlessLoading = false;
+        }
+    }
+
     @Override
     public void loadFromFile(Wini ini, String section, int index) {
         System.out.println("Project.loadFromFile() started");
@@ -155,9 +170,13 @@ public class Project extends AbstractSettings implements ISettings {
         baseRotation.y         = getDouble("Base", "rotation.y", 0.0);
         baseRotation.z         = getDouble("Base", "rotation.z", 0.0);
 
-        terrain.loadFromFile(ini, "Terrain", index);
+        if (terrain != null) {
+            terrain.loadFromFile(ini, "Terrain", index);
+        }
 
-        loadLights(ini);
+        if (!headlessLoading) {
+            loadLights(ini);
+        }
 
         settings.loadFromFile(ini, "QFSSettings", 0);
         slitWall.loadFromFile(ini, "SlitWall", 0);
@@ -173,8 +192,50 @@ public class Project extends AbstractSettings implements ISettings {
             occupancies.add(occupancy);
         }
 
+        detectors = DetectorConfiguration.load(ini, dimension);
+        DetectorExperimentController detectorController =
+                DetectorExperimentController.getInstance();
+        detectorController.disable();
+
         String projectBaseName = Path.of(currentFilename).getFileName().toString();
-        if (projectBaseName.startsWith("gravity-test-2") && occupancies.size() >= 2) {
+        if (!detectors.isEmpty()) {
+            GravityExperimentController.getInstance().setEnabled(false);
+            GravityPressureExperimentController.getInstance().setEnabled(false);
+            String experimentName = projectBaseName.substring(
+                    0, projectBaseName.length() - ".qfs".length());
+            boolean feasibilityPilot =
+                    getBool("FeasibilityPilot", "enabled", false);
+            Vector3i sourceIndex = occupancies.isEmpty()
+                                   ? null : occupancies.getFirst().getNodeIndex();
+            Path experimentDirectory = Path.of("measurements", experimentName);
+            Path outputFile = feasibilityPilot
+                              ? experimentDirectory.resolve(
+                                      "raw-detectors-run-001.csv")
+                              : Path.of("measurements",
+                                      experimentName + "-run-001.csv");
+            try {
+                detectorController.configure(outputFile, detectors, sourceIndex);
+                if (feasibilityPilot) {
+                    int configuredUpdates = getInt(
+                            "FeasibilityPilot", "updates", 180);
+                    FeasibilityPilotTelemetry telemetry =
+                            FeasibilityPilotTelemetry.getInstance();
+                    telemetry.configure(
+                            experimentDirectory.resolve(
+                                    "runtime-memory-telemetry.csv"),
+                            experimentName, dimension.x, configuredUpdates);
+                    telemetry.markDetectorsInitialized();
+                }
+            } catch (Exception exception) {
+                throw new IllegalStateException(
+                        "Could not configure passive detectors: "
+                                + exception.getMessage(), exception);
+            }
+            System.out.println("Passive detector instrumentation enabled");
+            System.out.println("Detectors: " + detectors.size());
+            System.out.println("CSV: " + outputFile);
+        }
+        else if (projectBaseName.startsWith("gravity-test-2") && occupancies.size() >= 2) {
             GravityExperimentController.getInstance().setEnabled(false);
             String experimentName = projectBaseName.substring(
                     0, projectBaseName.length() - ".qfs".length());
@@ -248,14 +309,16 @@ public class Project extends AbstractSettings implements ISettings {
 
         reset();
         remModel.setLoadingReady(false);
-        Thread.startVirtualThread(() -> {
-            while (!remModel.isLoadingReady()) {
-                Utils.sleepMS(100);
-            }
-            Utils.sleepMS(200);
-            loadWalls(ini);
-            System.out.println("Project loadFromFile() ready");
-        });
+        if (!headlessLoading) {
+            Thread.startVirtualThread(() -> {
+                while (!remModel.isLoadingReady()) {
+                    Utils.sleepMS(100);
+                }
+                Utils.sleepMS(200);
+                loadWalls(ini);
+                System.out.println("Project loadFromFile() ready");
+            });
+        }
     }
 
     @Override
@@ -301,6 +364,31 @@ public class Project extends AbstractSettings implements ISettings {
         put("Oscillators", "Size", size);
         for (int i = 0; i < size; i++) {
             occupancies.get(i).saveToFile(ini, "Oscillator", i);
+        }
+
+        put("Detectors", "Size", detectors.size());
+        for (int i = 0; i < detectors.size(); i++) {
+            Detector detector = detectors.get(i);
+            Vector3i nodeIndex = detector.getNodeIndex();
+            put("Detector" + i, "name", detector.getName());
+            put("Detector" + i, "nodeIndex.x", nodeIndex.x);
+            put("Detector" + i, "nodeIndex.y", nodeIndex.y);
+            put("Detector" + i, "nodeIndex.z", nodeIndex.z);
+            if (detector.getRequestedRadius() != null) {
+                put("Detector" + i, "requestedRadius",
+                        detector.getRequestedRadius());
+            }
+            if (detector.getRequestedAngleDegrees() != null) {
+                put("Detector" + i, "requestedAngleDegrees",
+                        detector.getRequestedAngleDegrees());
+            }
+            if (detector.getDirection() != null) {
+                put("Detector" + i, "direction", detector.getDirection());
+            }
+            if (detector.getDescription() != null) {
+                put("Detector" + i, "description",
+                        detector.getDescription());
+            }
         }
 
         rainModel.saveToFile(ini, "Rain", index);

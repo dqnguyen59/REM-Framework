@@ -176,6 +176,21 @@ public class Lattice {
     }
 
     public Entity build() {
+        return build(false);
+    }
+
+    /**
+     * Builds the mechanical lattice without allocating OpenGL model resources.
+     *
+     * <br><br>
+     * Node construction, absorption factors, fixed boundaries, indexing, and
+     * neighbor wiring are identical to {@link #build()}.
+     */
+    public Entity buildHeadless() {
+        return build(true);
+    }
+
+    private Entity build(boolean headless) {
         System.out.println("Lattice.build()");
         Vector3i dimension = new Vector3i();
         project.getDimension(dimension);
@@ -189,7 +204,10 @@ public class Lattice {
         Performance.numNodesY = sizeJ;
         Performance.numNodesZ = sizeK;
 
-        modelSphere = new OBJFormatLoader().loadOBJModel(Constants.MODEL_NODE);
+        modelSphere = headless
+                      ? null
+                      : new OBJFormatLoader().loadOBJModel(
+                              Constants.MODEL_NODE);
 
         baseEntity = createEntity(null, null, new Vector3d(), new Vector3d(), 1.0f);
         baseEntity.setPosition(0, 0, 0);

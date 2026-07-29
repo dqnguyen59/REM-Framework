@@ -27,6 +27,8 @@ import remframework.helpers.IMouseAndKeyboardEvents;
 import remframework.gui.model.NuklearModel.Frame;
 import remframework.measurement.gravity.GravityExperimentController;
 import remframework.measurement.gravitypressure.GravityPressureExperimentController;
+import remframework.measurement.detector.DetectorExperimentController;
+import remframework.measurement.detector.FeasibilityPilotTelemetry;
 import remframework.opengl.model.RemModel.TranslationMode;
 import remframework.opengl.model.RemModel.NodeSelectionMode;
 import remframework.opengl.model.entity.Entity;
@@ -701,6 +703,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         // While the GPU is rendering on the current buffer,
         // swap the buffer to calculate physics on another buffer.
         Node.swapBuffer();
+        FeasibilityPilotTelemetry.getInstance().beginUpdate();
 
         //thread = new Thread(() -> {
         thread = Thread.startVirtualThread(() -> {
@@ -731,6 +734,14 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             PerformanceMonitor.start(Measurement.updateMatrix);
             scene.updateMatrix(numThreads, segmentSize);
             scene.waitForAllTasksReady();
+            samplePassiveDetectors();
+            FeasibilityPilotTelemetry telemetry =
+                    FeasibilityPilotTelemetry.getInstance();
+            if (telemetry.isEnabled()) {
+                telemetry.endUpdate(
+                        DetectorExperimentController.getInstance()
+                                .getUpdatesRecorded());
+            }
             PerformanceMonitor.stop(Measurement.updateMatrix);
 
             PerformanceMonitor.stop(Measurement.totalCPURenderTime);
@@ -772,9 +783,29 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 Occupancy occupancyB = project.occupancies.get(1);
                 transportSystem.printDistanceG(occupancyA, occupancyB);
             }
-            if (updateLimit != null && controller.getUpdatesRecorded() >= updateLimit) {
+            if (updateLimit != null
+                    && !DetectorExperimentController.getInstance().isEnabled()
+                    && controller.getUpdatesRecorded() >= updateLimit) {
                 updateLimitReached = true;
             }
+        }
+    }
+
+    private void samplePassiveDetectors() {
+        DetectorExperimentController controller =
+                DetectorExperimentController.getInstance();
+        if (!remModel.isSimulating() || updateLimitReached
+                || !controller.isEnabled()) {
+            return;
+        }
+        double sourcePhase = project.occupancies.isEmpty()
+                             ? Double.NaN
+                             : project.occupancies.getFirst()
+                                     .getIdentity().getPhase().z;
+        controller.sample(scene.getLattice(), sourcePhase);
+        if (updateLimit != null
+                && controller.getUpdatesRecorded() >= updateLimit) {
+            updateLimitReached = true;
         }
     }
 
@@ -889,6 +920,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         updateNodesProperties();
         //resetOccupancies();
         scene.update();
+        DetectorExperimentController.getInstance().resolveNodes(
+                scene.getLattice());
+        FeasibilityPilotTelemetry.getInstance().markLatticeInitialized();
 //        resetOccupancies();
         nuklearModel.closeFrame(Frame.progress);
 
@@ -971,14 +1005,27 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         GravityExperimentController controller = GravityExperimentController.getInstance();
         GravityPressureExperimentController pressureController =
                 GravityPressureExperimentController.getInstance();
+        DetectorExperimentController detectorController =
+                DetectorExperimentController.getInstance();
         controller.close();
         pressureController.close();
+        detectorController.close();
+        FeasibilityPilotTelemetry.getInstance().close();
         scene.stopAnimation();
         renderer.cleanup();
         loader.cleanup();
         super.cleanUp();
         if (updateLimit != null) {
-            if (pressureController.getOutputFile() != null) {
+            if (detectorController.getOutputFile() != null) {
+                System.out.println("Passive detector experiment complete");
+                System.out.println("Configured updates: " + updateLimit);
+                System.out.println("Updates recorded: "
+                        + detectorController.getUpdatesRecorded());
+                System.out.println("Rows written: "
+                        + detectorController.getRowsWritten());
+                System.out.println("CSV: "
+                        + detectorController.getOutputFile());
+            } else if (pressureController.getOutputFile() != null) {
                 System.out.println("Gravity Test 2 complete");
                 System.out.println("Configured updates: " + updateLimit);
                 System.out.println("Updates recorded: " + pressureController.getUpdatesRecorded());

@@ -176,6 +176,25 @@ public class Node extends Entity {
                             flow[NEIGHBOR_FRONT] - flow[NEIGHBOR_BACK]);
     }
 
+    /**
+     * Reads the current neighbor-distance imbalance without changing any Node
+     * field, cache, or transport state.
+     *
+     * @return a new vector containing right-left, top-bottom and front-back
+     *         neighbor-distance differences
+     */
+    public Vector3d readGradientImbalance() {
+        return new Vector3d(
+                neighborDistance(NEIGHBOR_RIGHT) - neighborDistance(NEIGHBOR_LEFT),
+                neighborDistance(NEIGHBOR_TOP) - neighborDistance(NEIGHBOR_BOTTOM),
+                neighborDistance(NEIGHBOR_FRONT) - neighborDistance(NEIGHBOR_BACK));
+    }
+
+    private double neighborDistance(int neighborIndex) {
+        Node neighbor = neighbors[neighborIndex];
+        return neighbor == null ? 0.0 : neighbor.position.distance(position);
+    }
+
     public void updateNodeProperties(NodeFormulaVersion nodeFormulaVersion) {
         // If set to false then the node stops updating its position
         if (!remModel.isSimulating()) return;
