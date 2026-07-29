@@ -26,6 +26,7 @@ import remframework.helpers.Constants;
 import remframework.helpers.IMouseAndKeyboardEvents;
 import remframework.gui.model.NuklearModel.Frame;
 import remframework.measurement.gravity.GravityExperimentController;
+import remframework.measurement.gravitypressure.GravityPressureExperimentController;
 import remframework.opengl.model.RemModel.TranslationMode;
 import remframework.opengl.model.RemModel.NodeSelectionMode;
 import remframework.opengl.model.entity.Entity;
@@ -752,6 +753,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         if (remModel.isSimulating() && !updateLimitReached) {
             GravityExperimentController controller = GravityExperimentController.getInstance();
             controller.beginSimulationUpdate();
+            GravityPressureExperimentController.getInstance().beginSimulationUpdate();
 
             for (Occupancy occupancy : project.occupancies) {
                 if (occupancy.isOccupied()) {
@@ -967,18 +969,29 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     public void cleanUp() {
         System.out.println("simulator.cleanUp();");
         GravityExperimentController controller = GravityExperimentController.getInstance();
+        GravityPressureExperimentController pressureController =
+                GravityPressureExperimentController.getInstance();
         controller.close();
+        pressureController.close();
         scene.stopAnimation();
         renderer.cleanup();
         loader.cleanup();
         super.cleanUp();
         if (updateLimit != null) {
-            System.out.println("Gravity Test 1 complete");
-            System.out.println("Configured updates: " + updateLimit);
-            System.out.println("Updates recorded: " + controller.getUpdatesRecorded());
-            System.out.println("Measurement points: " + controller.getMeasurementPointCount());
-            System.out.println("Rows written: " + controller.getRowsWritten());
-            System.out.println("CSV: " + controller.getOutputFile());
+            if (pressureController.getOutputFile() != null) {
+                System.out.println("Gravity Test 2 complete");
+                System.out.println("Configured updates: " + updateLimit);
+                System.out.println("Updates recorded: " + pressureController.getUpdatesRecorded());
+                System.out.println("Rows written: " + pressureController.getRowsWritten());
+                System.out.println("CSV: " + pressureController.getOutputFile());
+            } else {
+                System.out.println("Gravity Test 1 complete");
+                System.out.println("Configured updates: " + updateLimit);
+                System.out.println("Updates recorded: " + controller.getUpdatesRecorded());
+                System.out.println("Measurement points: " + controller.getMeasurementPointCount());
+                System.out.println("Rows written: " + controller.getRowsWritten());
+                System.out.println("CSV: " + controller.getOutputFile());
+            }
         }
     }
 

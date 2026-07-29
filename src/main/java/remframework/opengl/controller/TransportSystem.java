@@ -6,6 +6,7 @@ import org.ini4j.Wini;
 import org.joml.Vector3d;
 import remframework.helpers.Constants;
 import remframework.measurement.gravity.GravityMeasurementLogger;
+import remframework.measurement.gravitypressure.GravityPressureExperimentController;
 import remframework.opengl.model.RemModel;
 import remframework.opengl.model.entity.Node;
 import remframework.opengl.model.entity.Occupancy;
@@ -59,6 +60,8 @@ public class TransportSystem extends AbstractSettings implements ISettings {
     private final  RemModel        remModel = project.getRemModel();
     private final GravityMeasurementLogger gravityMeasurementLogger =
             GravityMeasurementLogger.getInstance();
+    private final GravityPressureExperimentController gravityPressureController =
+            GravityPressureExperimentController.getInstance();
 
     private boolean logToConsole     = false;
     private LogType logType          = LogType.none;
@@ -133,6 +136,12 @@ public class TransportSystem extends AbstractSettings implements ISettings {
      * @param occupancy the occupancy to update
      */
     public void update(Occupancy occupancy) {
+        boolean suppressTransfer = gravityPressureController.isDesignatedReceiver(occupancy);
+        if (suppressTransfer) {
+            gravityPressureController.beginReceiverUpdate(
+                    occupancy, gradientGain, accelerationGain,
+                    transportMomentumGain, transportMomentumMax, transferThreshold);
+        }
 
         // G = measureGradientImbalance * gradientGain
         storeMeasuredGradientImbalance(occupancy);
@@ -149,7 +158,17 @@ public class TransportSystem extends AbstractSettings implements ISettings {
         updatePressure(occupancy);
 
         // if |P| > Pthreshold then transfer to neighbor node
-        transferOccupancy(occupancy);
+        if (suppressTransfer) {
+            /*
+             * Gravity Test 2 preserves the real late-cycle refresh, but skips
+             * all subsequent pressure reset, cycle-count and movement handling
+             * for its one designated fixed receiver.
+             */
+            gravityPressureController.completeSuppressedTransfer(
+                    occupancy, occupancy.isCycleCompleted());
+        } else {
+            transferOccupancy(occupancy);
+        }
     }
 
     /**
@@ -158,7 +177,9 @@ public class TransportSystem extends AbstractSettings implements ISettings {
     private void storeMeasuredGradientImbalance(Occupancy occupancy) {
         Vector3d measuredGradient = occupancy.getNode().measureGradientImbalance();
         gravityMeasurementLogger.captureRawGradient(occupancy, measuredGradient);
+        gravityPressureController.captureRawGradient(occupancy, measuredGradient);
         measuredGradient.mul(gradientGain);
+        gravityPressureController.captureScaledGradient(occupancy, measuredGradient);
         occupancy.saveGradientToHistory(measuredGradient);
     }
 
@@ -179,6 +200,8 @@ public class TransportSystem extends AbstractSettings implements ISettings {
         occupancy.setAddAccX(0);
         occupancy.setAddAccY(0);
         occupancy.setAddAccZ(0);
+        gravityPressureController.captureAcceleration(
+                occupancy, occupancy.getAcceleration());
     }
 
     /**
@@ -204,7 +227,10 @@ public class TransportSystem extends AbstractSettings implements ISettings {
      * changes the current transport momentum.
      */
     private void updateTransportMomentum(Occupancy occupancy) {
+        Vector3d momentumBefore = new Vector3d(occupancy.getTransportMomentum());
         occupancy.getTransportMomentum().fma(transportMomentumGain, occupancy.getAcceleration());
+        gravityPressureController.captureMomentumCandidate(
+                occupancy, momentumBefore, occupancy.getTransportMomentum());
         double x = Math.clamp(occupancy.getTransportMomentum().x, -transportMomentumMax,
                               transportMomentumMax);
         double y = Math.clamp(occupancy.getTransportMomentum().y, -transportMomentumMax,
@@ -212,6 +238,8 @@ public class TransportSystem extends AbstractSettings implements ISettings {
         double z = Math.clamp(occupancy.getTransportMomentum().z, -transportMomentumMax,
                               transportMomentumMax);
         occupancy.getTransportMomentum().set(x, y, z);
+        gravityPressureController.captureMomentumAfter(
+                occupancy, occupancy.getTransportMomentum());
     }
 
     /**
@@ -222,7 +250,11 @@ public class TransportSystem extends AbstractSettings implements ISettings {
      * a node transfer may occur.
      */
     private void updatePressure(Occupancy occupancy) {
+        Vector3d pressureBefore = new Vector3d(occupancy.getPressure());
         occupancy.getPressure().add(occupancy.getTransportMomentum());
+        gravityPressureController.capturePressure(
+                occupancy, pressureBefore, occupancy.getTransportMomentum(),
+                occupancy.getPressure());
     }
 
     /**

@@ -28,6 +28,7 @@ import org.lwjgl.glfw.GLFW;
 import remframework.opengl.model.*;
 import remframework.helpers.Constants;
 import remframework.measurement.gravity.GravityExperimentController;
+import remframework.measurement.gravitypressure.GravityPressureExperimentController;
 import remframework.opengl.controller.TransportSystem;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.Node;
@@ -172,8 +173,34 @@ public class Project extends AbstractSettings implements ISettings {
             occupancies.add(occupancy);
         }
 
+        String projectBaseName = Path.of(currentFilename).getFileName().toString();
+        if (projectBaseName.startsWith("gravity-test-2") && occupancies.size() >= 2) {
+            GravityExperimentController.getInstance().setEnabled(false);
+            String experimentName = projectBaseName.substring(
+                    0, projectBaseName.length() - ".qfs".length());
+            boolean sourceEnabled = !experimentName.contains("source-off");
+            String receiverConfiguration = experimentName.contains("zero-receiver")
+                                           ? "zero-amplitude receiver gate"
+                                           : "active Z sin amplitude 0.01";
+            GravityPressureExperimentController controller =
+                    GravityPressureExperimentController.getInstance();
+            try {
+                Path outputFile = controller.configure(
+                        experimentName, sourceEnabled, receiverConfiguration,
+                        occupancies.get(0),
+                        new ArrayList<>(occupancies.subList(1, occupancies.size())));
+                controller.setEnabled(true);
+                System.out.println("Gravity Test 2 enabled");
+                System.out.println("Source: " + occupancies.get(0).getIdentity().getName());
+                System.out.println("Receivers: " + (occupancies.size() - 1));
+                System.out.println("CSV: " + outputFile);
+            } catch (Exception e) {
+                controller.setEnabled(false);
+                System.err.println("Gravity Test 2 logging disabled: " + e.getMessage());
+            }
+        }
         // Temporary Gravity Test 1 configuration. Remove once experiment selection becomes configurable.
-        if (occupancies.size() >= 2) {
+        else if (occupancies.size() >= 2) {
             GravityExperimentController controller = GravityExperimentController.getInstance();
             int runNumber = 1;
             Path outputFile;
