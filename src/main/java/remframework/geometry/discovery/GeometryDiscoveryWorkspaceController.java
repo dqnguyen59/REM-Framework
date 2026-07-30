@@ -3,6 +3,7 @@ package remframework.geometry.discovery;
 import remframework.gui.model.NuklearModel;
 import remframework.gui.model.NuklearModel.Frame;
 import remframework.opengl.model.RemModel;
+import remframework.helpers.Constants;
 
 import java.nio.file.Path;
 
@@ -81,6 +82,7 @@ public final class GeometryDiscoveryWorkspaceController implements AutoCloseable
         closeIfVisible(Frame.geometryDiscoverySearch);
         closeIfVisible(Frame.geometryDiscoveryStatus);
         closeIfVisible(Frame.geometryDiscoveryIntroduction);
+        closeIfVisible(Frame.geometryDiscoveryNew);
     }
 
     private void closeIfVisible(Frame frame) {
@@ -169,6 +171,12 @@ public final class GeometryDiscoveryWorkspaceController implements AutoCloseable
     public GeometryDiscoveryWorkspaceState state() { return state; }
     public GeometryDiscoveryViewState viewState() { return viewState; }
     public GeometryDiscoveryWorkflowResolver workflowResolver() { return workflowResolver; }
+
+    public GeometryDiscoveryWorkspaceLayout layout(int width, int height) {
+        int top = nuklearModel == null ? 30 : nuklearModel.getMenuBarHeight() + 4;
+        return GeometryDiscoveryWorkspaceLayout.calculate(
+                width, height, top, Constants.STATUS_BAR_HEIGHT);
+    }
 
     @Override public void close() {
         deactivateWorkspace();

@@ -4,6 +4,7 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import remframework.geometry.discovery.*;
 import remframework.gui.model.NuklearModel;
+import remframework.helpers.Constants;
 
 import java.util.List;
 
@@ -24,10 +25,11 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
 
     @Override public void render(long window, NkContext context) {
         super.render(window, context);
-        int left = 340;
-        int right = 365;
-        createLayout(context, left, Math.max(300, getWindowHeight() - 290),
-                Math.max(360, getWindowWidth() - left - right), 285);
+        GeometryDiscoveryWorkspaceLayout.Bounds bounds =
+                GeometryDiscoveryWorkspaceLayout.calculate(getWindowWidth(), getWindowHeight(),
+                        nuklearModel.getMenuBarHeight() + 4,
+                        Constants.STATUS_BAR_HEIGHT).details();
+        createFixedLayout(context, bounds.x(), bounds.y(), bounds.width(), bounds.height());
     }
 
     @Override protected void layout(NkContext c, int x, int y, int width, int height) {
@@ -169,13 +171,22 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
                 .mapToDouble(TopologySearchHistoryEntry::currentScore).max().orElse(minimum + 1);
         if (maximum <= minimum) maximum = minimum + 1;
         Nuklear.nk_layout_row_dynamic(c, 70, 1);
+        int first = Math.max(0, snapshot.search().history().size() - 500);
         if (Nuklear.nk_chart_begin(c, Nuklear.NK_CHART_LINES,
-                snapshot.search().history().size(), (float) minimum, (float) maximum)) {
-            for (TopologySearchHistoryEntry entry : snapshot.search().history())
-                Nuklear.nk_chart_push(c, (float) entry.bestScore());
+                snapshot.search().history().size() - first, (float) minimum, (float) maximum)) {
+            for (int i = first; i < snapshot.search().history().size(); i++)
+                Nuklear.nk_chart_push(c,
+                        (float) snapshot.search().history().get(i).bestScore());
             Nuklear.nk_chart_end(c);
         }
         label(c, "Archived candidates: " + snapshot.search().topCandidates().size());
+        label(c, "Important Events (latest first)");
+        List<DiscoveryExperimentEvent> events = controller.workspace().eventLog();
+        for (int i = events.size() - 1; i >= Math.max(0, events.size() - 8); i--) {
+            DiscoveryExperimentEvent event = events.get(i);
+            label(c, event.type() + " at iteration " + event.iteration()
+                    + ": " + event.details());
+        }
     }
 
     private void label(NkContext c, String text) {

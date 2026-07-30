@@ -154,7 +154,8 @@ public abstract class AbstractFrame implements IFrame {
 		return appSettings.getWindowHeight();
 	}
 
-	private void _createLayout(NkContext ctx, int x, int y, int width, int height, boolean centered) {
+	private void _createLayout(NkContext ctx, int x, int y, int width, int height,
+							   boolean centered, boolean fixed) {
 		String title = getTitle();
 
         //System.out.println("width, height: " + lastWidth + ", " + lastHeight + ", " + width + ", " + height + ", ");
@@ -175,7 +176,7 @@ public abstract class AbstractFrame implements IFrame {
 				windowRect.y(y);
 			}
 		}
-		else {
+		else if (!fixed) {
 
 			NkRect r = appSettings.getFrameRectMap().get(title);
 
@@ -247,22 +248,24 @@ public abstract class AbstractFrame implements IFrame {
 //				}
 			}
 
-			NkRect lastRect = appSettings.getFrameRectMap().get(title);
+			NkRect lastRect = fixed ? null : appSettings.getFrameRectMap().get(title);
 
-			if (lastRect == null ||
+			if (!fixed && (lastRect == null ||
 				lastRect.x() != frameRect.x() ||
 				lastRect.y() != frameRect.y() ||
 				lastRect.w() != frameRect.w() ||
-				lastRect.h() != frameRect.h()) {
+				lastRect.h() != frameRect.h())) {
 
 				System.out.println("Frame: " + title + "; X: " + frameRect.x() + " ; y :" + frameRect.y());
 
 				appSettings.getFrameRectMap().put(title, frameRect);
-
 				appSettings.saveToFile();
 			}
 
+			boolean inputBlocked = nuklearModel.isInputBlockedFor(this);
+			if (inputBlocked) Nuklear.nk_widget_disable_begin(ctx);
 			layout(ctx, (int)contentRect.x(), (int)contentRect.y(), width, height);
+			if (inputBlocked) Nuklear.nk_widget_disable_end(ctx);
 
 			tabKeyPressed = false;
 			focusChanged = false;
@@ -277,11 +280,15 @@ public abstract class AbstractFrame implements IFrame {
 	}
 
 	protected void createLayout(NkContext ctx, int x, int y, int width, int height) {
-		_createLayout(ctx, x, y, width, height, false);
+		_createLayout(ctx, x, y, width, height, false, false);
 	}
 
 	protected void createLayoutCentered(NkContext ctx, int width, int height) {
-		_createLayout(ctx, 0, 0, width, height, true);
+		_createLayout(ctx, 0, 0, width, height, true, false);
+	}
+
+	protected void createFixedLayout(NkContext ctx, int x, int y, int width, int height) {
+		_createLayout(ctx, x, y, width, height, false, true);
 	}
 
 	abstract protected void layout(NkContext ctx, int x, int y, int width, int height);

@@ -2,13 +2,9 @@ package remframework.gui.view.frames;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
-import remframework.geometry.discovery.GeometryDiscoveryWorkflowResolution;
-import remframework.geometry.discovery.GeometryDiscoveryWorkspaceController;
-import remframework.geometry.discovery.GeometryDiscoveryWorkspaceManager;
-import remframework.geometry.discovery.GeometryDiscoveryWorkspaceSnapshot;
-import remframework.geometry.discovery.TopologySearchMetrics;
-import remframework.geometry.discovery.TopologySearchResult;
+import remframework.geometry.discovery.*;
 import remframework.gui.model.NuklearModel;
+import remframework.helpers.Constants;
 
 /**
  * Context and guidance panel for the integrated discovery workspace.
@@ -27,9 +23,11 @@ public final class GeometryDiscoverySearchFrame extends AbstractFrame {
 
     @Override public void render(long window, NkContext context) {
         super.render(window, context);
-        createLayout(context, Math.max(680, getWindowWidth() - 365),
-                nuklearModel.getMenuBarHeight() + 5, 360,
-                getWindowHeight() - nuklearModel.getMenuBarHeight() - 300);
+        GeometryDiscoveryWorkspaceLayout.Bounds bounds =
+                GeometryDiscoveryWorkspaceLayout.calculate(getWindowWidth(), getWindowHeight(),
+                        nuklearModel.getMenuBarHeight() + 4,
+                        Constants.STATUS_BAR_HEIGHT).status();
+        createFixedLayout(context, bounds.x(), bounds.y(), bounds.width(), bounds.height());
     }
 
     @Override protected void layout(NkContext c, int x, int y, int width, int height) {
@@ -38,7 +36,34 @@ public final class GeometryDiscoverySearchFrame extends AbstractFrame {
         heading(c, "Stage " + workflow.stage().number() + ": " + workflow.stage().label());
         label(c, "Experiment state: " + display(workflow.state().name()));
         label(c, "Candidate: " + snapshot.geometry().model().name());
+        DiscoveryExperimentConfiguration experiment =
+                controller.state().experimentConfiguration();
+        if (experiment != null) {
+            label(c, "Experiment: " + experiment.name());
+            label(c, "Workflow phase: " + display(
+                    controller.state().experimentLifecycle().name()));
+        }
         label(c, "Scoring profile: " + display(controller.state().scoringProfile().name()));
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 3);
+        if (Nuklear.nk_button_label(c, "Current Candidate"))
+            controller.state().setViewportSelection(
+                    DiscoveryViewportSelection.CURRENT_CANDIDATE);
+        if (Nuklear.nk_button_label(c, "Best Candidate"))
+            controller.state().setViewportSelection(
+                    DiscoveryViewportSelection.BEST_CANDIDATE);
+        if (Nuklear.nk_button_label(c, "Preview Candidate"))
+            controller.state().setViewportSelection(
+                    DiscoveryViewportSelection.PREVIEW_CANDIDATE);
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 2);
+        if (Nuklear.nk_button_label(c, "Follow Best: "
+                + (controller.state().followBestCandidate() ? "On" : "Off")))
+            controller.state().setFollowBestCandidate(
+                    !controller.state().followBestCandidate());
+        if (Nuklear.nk_button_label(c, "Viewport updates: "
+                + controller.state().snapshotUpdatesPerSecond() + "/s"))
+            controller.state().setSnapshotUpdatesPerSecond(
+                    controller.state().snapshotUpdatesPerSecond() >= 10 ? 5
+                            : controller.state().snapshotUpdatesPerSecond() + 1);
         if (controller.state().guidedMode()) {
             heading(c, "Recommended Next Action");
             label(c, workflow.recommendation().action());
@@ -61,8 +86,22 @@ public final class GeometryDiscoverySearchFrame extends AbstractFrame {
             label(c, String.format("Best score: %.7g",
                     search.bestCandidate().score().total()));
             label(c, "Accepted: " + metrics.acceptedMutationCount()
-                    + "    Invalid: " + metrics.invalidMutationCount());
+                    + "    Rejected: " + metrics.rejectedMutationCount());
+            label(c, "Invalid: " + metrics.invalidMutationCount()
+                    + "    Duplicates: " + metrics.duplicateTopologyCount());
+            label(c, "Relaxation failures: " + metrics.relaxationFailureCount());
+            label(c, String.format("Temperature: %.6g",
+                    search.history().isEmpty() ? search.settings().initialTemperature()
+                            : search.history().getLast().temperature()));
             label(c, "Elapsed: " + metrics.elapsedMilliseconds() + " ms");
+        } else if (snapshot.relaxationRunning()) {
+            GeometryDiscoveryMetrics metrics = snapshot.geometry().metrics();
+            int maximum = snapshot.geometry().settings().maximumIterations();
+            label(c, "Relaxation iteration: " + metrics.iterationCount() + " / " + maximum);
+            label(c, String.format("Relaxation completion: %.1f%%",
+                    100.0 * metrics.iterationCount() / maximum));
+            label(c, String.format("Current edge error: %.7g",
+                    metrics.totalEdgeLengthError()));
         }
     }
 

@@ -4,6 +4,7 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import remframework.geometry.discovery.*;
+import remframework.helpers.Constants;
 import remframework.gui.model.AbstractDialogModel.ConfirmState;
 import remframework.gui.model.DialogFileModel;
 import remframework.gui.model.NuklearModel;
@@ -47,8 +48,13 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     @Override public String getTitle() { return "Geometry Discovery Workflow"; }
     @Override public void render(long window, NkContext context) {
         super.render(window, context);
-        createLayout(context, 5, nuklearModel.getMenuBarHeight() + 5,
-                335, getWindowHeight() - nuklearModel.getMenuBarHeight() - 10);
+        GeometryDiscoveryWorkspaceLayout.Bounds bounds = workspaceLayout().workflow();
+        createFixedLayout(context, bounds.x(), bounds.y(), bounds.width(), bounds.height());
+    }
+
+    private GeometryDiscoveryWorkspaceLayout workspaceLayout() {
+        return GeometryDiscoveryWorkspaceLayout.calculate(getWindowWidth(), getWindowHeight(),
+                nuklearModel.getMenuBarHeight() + 4, Constants.STATUS_BAR_HEIGHT);
     }
 
     @Override protected void layout(NkContext c, int x, int y, int width, int height) {
@@ -86,6 +92,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private void candidateSection(NkContext c) {
         GeometryDiscoveryWorkspaceSnapshot snapshot = controller.workspace().snapshot();
         heading(c, "1. Candidate");
+        primaryButton(c, "New Discovery", true, "", () ->
+                nuklearModel.showFrame(NuklearModel.Frame.geometryDiscoveryNew));
         try (MemoryStack stack = MemoryStack.stackPush()) {
             selectedExample = nk_label_combo_options(c, stack, "Example", EXAMPLES,
                     selectedExample, .35, .65);
@@ -101,6 +109,24 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         primaryButton(c, "Recent Candidates", !recentCandidates.isEmpty(),
                 "No candidate file has been opened during this session.", () ->
                         controller.workspace().loadCandidate(recentCandidates.getFirst()));
+        primaryButton(c, "Save Experiment Configuration",
+                controller.state().experimentConfiguration() != null,
+                "Create a New Discovery experiment before saving its configuration.", () -> {
+                    try {
+                        controller.workspace().saveExperimentConfiguration(Path.of(
+                                "lattice/experiments/discovery-experiment.properties"));
+                    } catch (Exception exception) {
+                        nuklearModel.showErrorDialog("Geometry Discovery", exception.getMessage());
+                    }
+                });
+        primaryButton(c, "Load Experiment Configuration", true, "", () -> {
+            try {
+                controller.workspace().loadExperimentConfiguration(Path.of(
+                        "lattice/experiments/discovery-experiment.properties"));
+            } catch (Exception exception) {
+                nuklearModel.showErrorDialog("Geometry Discovery", exception.getMessage());
+            }
+        });
         label(c, "Model: " + snapshot.geometry().model().name());
         label(c, "Source: " + (controller.state().currentSource() == null
                 ? "Built-in example" : controller.state().currentSource()));

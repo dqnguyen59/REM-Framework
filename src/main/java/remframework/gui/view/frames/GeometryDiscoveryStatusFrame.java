@@ -4,6 +4,7 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import remframework.geometry.discovery.*;
 import remframework.gui.model.NuklearModel;
+import remframework.helpers.Constants;
 
 public final class GeometryDiscoveryStatusFrame extends AbstractFrame {
     private final GeometryDiscoveryWorkspaceController controller =
@@ -16,9 +17,12 @@ public final class GeometryDiscoveryStatusFrame extends AbstractFrame {
     @Override public String getTitle() { return "Discovery Viewport Status"; }
     @Override public void render(long window, NkContext context) {
         super.render(window, context);
-        int rightWidth = 370;
-        createLayout(context, 345, nuklearModel.getMenuBarHeight() + 6,
-                Math.max(300, getWindowWidth() - 345 - rightWidth), 72);
+        GeometryDiscoveryWorkspaceLayout.Bounds viewport =
+                GeometryDiscoveryWorkspaceLayout.calculate(getWindowWidth(), getWindowHeight(),
+                        nuklearModel.getMenuBarHeight() + 4,
+                        Constants.STATUS_BAR_HEIGHT).viewport();
+        createFixedLayout(context, viewport.x(), viewport.y(), viewport.width(),
+                Math.min(72, viewport.height()));
     }
     @Override protected void layout(NkContext c, int x, int y, int width, int height) {
         GeometryDiscoveryWorkspaceSnapshot snapshot = controller.workspace().snapshot();

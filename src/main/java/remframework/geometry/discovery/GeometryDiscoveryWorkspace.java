@@ -3,6 +3,8 @@ package remframework.geometry.discovery;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -33,6 +35,9 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
     private GeometryDiscoveryModel inputModel;
     private volatile String lastWorkerThreadName = "";
     private volatile int relaxationIterationsPerUpdate = 25;
+    private final Deque<DiscoveryExperimentEvent> eventLog = new ArrayDeque<>();
+    private static final int EVENT_LOG_LIMIT = 200;
+    private volatile long lastVisualPublishNanos;
 
     public GeometryDiscoveryWorkspace(GeometryDiscoveryWorkspaceState state) {
         this.state = state;
@@ -60,7 +65,93 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
         geometrySession = new GeometryDiscoverySession(inputModel, settings);
         searchSession = null;
         state.setCurrentSource(source);
+        state.setExperimentLifecycle(DiscoveryExperimentLifecycle.CREATED);
         publish("Candidate loaded", "");
+    }
+
+    public synchronized DiscoveryExperimentValidation createExperiment(
+            DiscoveryExperimentConfiguration configuration) {
+        DiscoveryExperimentValidation validation =
+                new DiscoveryExperimentValidator().validate(configuration);
+        if (!validation.valid()) return validation;
+        try {
+            GeometryDiscoveryModel model = new DiscoveryExperimentGenerator()
+                    .generate(configuration);
+            loadModel(model, configuration.geometrySettings(), null);
+            state.setExperimentConfiguration(configuration);
+            state.setScoringProfile(configuration.scoringProfile());
+            state.setScoreWeights(configuration.scoreWeights());
+            state.setWeightsOverridden(configuration.customWeights());
+            state.setViewportSelection(DiscoveryViewportSelection.CURRENT_CANDIDATE);
+            setRelaxationIterationsPerUpdate(configuration.workerIterationsPerUpdate());
+            state.setExperimentLifecycle(DiscoveryExperimentLifecycle.CREATED);
+            recordEvent("created", 0, "Experiment '" + configuration.name() + "' created.");
+            publish("Experiment created", "");
+            return validation;
+        } catch (RuntimeException exception) {
+            return new DiscoveryExperimentValidation(List.of(exception.getMessage()));
+        }
+    }
+
+    public DiscoveryExperimentValidation createAndRelax(
+            DiscoveryExperimentConfiguration configuration) {
+        DiscoveryExperimentValidation validation = createExperiment(configuration);
+        if (validation.valid()) startRelaxation();
+        return validation;
+    }
+
+    public synchronized DiscoveryExperimentValidation startDiscovery(
+            DiscoveryExperimentConfiguration configuration) {
+        DiscoveryExperimentValidation validation = createExperiment(configuration);
+        if (!validation.valid()) return validation;
+        stopRequested = false;
+        relaxationRequested = true;
+        searchRequested = false;
+        state.setExperimentLifecycle(DiscoveryExperimentLifecycle.INITIAL_RELAXATION);
+        recordEvent("relaxation-started", 0, "Initial relaxation started.");
+        GeometryDiscoverySession session = geometrySession;
+        activeTask = worker.submit(() -> runDiscoveryPipeline(session, configuration));
+        return validation;
+    }
+
+    private void runDiscoveryPipeline(GeometryDiscoverySession geometry,
+                                      DiscoveryExperimentConfiguration configuration) {
+        lastWorkerThreadName = Thread.currentThread().getName();
+        try {
+            geometry.start();
+            while (!stopRequested && geometrySession == geometry && !geometry.isFinished()) {
+                for (int i = 0; i < relaxationIterationsPerUpdate
+                        && !stopRequested && !geometry.isFinished(); i++) geometry.step();
+                publishThrottled("Initial relaxation");
+            }
+            relaxationRequested = false;
+            if (stopRequested) {
+                state.setExperimentLifecycle(DiscoveryExperimentLifecycle.STOPPED);
+                recordEvent("stopped", 0, "Discovery stopped during initial relaxation.");
+                publish("Discovery stopped", "");
+                return;
+            }
+            recordEvent(geometry.result().converged()
+                    ? "relaxation-completed" : "relaxation-failed",
+                    geometry.result().metrics().iterationCount(),
+                    geometry.result().converged() ? "Initial relaxation converged."
+                            : "Initial relaxation reached its iteration limit.");
+            state.setExperimentLifecycle(DiscoveryExperimentLifecycle.READY);
+            searchSession = new TopologySearchSession(geometry.result().model(),
+                    configuration.topologySearchSettings());
+            searchRequested = true;
+            state.setExperimentLifecycle(DiscoveryExperimentLifecycle.SEARCHING);
+            recordEvent("search-started", 0, "Topology search started.");
+            runSearchLoop(searchSession, configuration.topologySearchSettings());
+        } catch (Throwable throwable) {
+            state.setExperimentLifecycle(DiscoveryExperimentLifecycle.FAILED);
+            recordEvent("error", 0, Objects.requireNonNullElse(
+                    throwable.getMessage(), throwable.getClass().getSimpleName()));
+            publishError("Discovery failed: " + throwable.getMessage());
+        } finally {
+            relaxationRequested = false;
+            searchRequested = false;
+        }
     }
 
     public synchronized void startRelaxation() {
@@ -68,6 +159,8 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
         stopRequested = false;
         relaxationRequested = true;
         geometrySession.start();
+        state.setExperimentLifecycle(DiscoveryExperimentLifecycle.INITIAL_RELAXATION);
+        recordEvent("relaxation-started", 0, "Geometry relaxation started.");
         GeometryDiscoverySession session = geometrySession;
         activeTask = worker.submit(() -> {
             lastWorkerThreadName = Thread.currentThread().getName();
@@ -76,11 +169,19 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
                         && !session.isFinished()) {
                     for (int i = 0; i < relaxationIterationsPerUpdate && relaxationRequested
                             && geometrySession == session && !session.isFinished(); i++) session.step();
-                    publish("Relaxing", "");
+                    publishThrottled("Relaxing");
                     Thread.yield();
                 }
-                if (geometrySession == session)
+                if (geometrySession == session) {
+                    state.setExperimentLifecycle(session.isFinished()
+                            ? DiscoveryExperimentLifecycle.READY
+                            : DiscoveryExperimentLifecycle.PAUSED);
+                    recordEvent(session.isFinished() ? "relaxation-completed" : "pause",
+                            session.result().metrics().iterationCount(),
+                            session.isFinished() ? "Geometry relaxation completed."
+                                    : "Geometry relaxation paused.");
                     publish(session.isFinished() ? "Relaxation finished" : "Relaxation paused", "");
+                }
             } catch (Throwable throwable) {
                 publishError("Relaxation failed: " + throwable.getMessage());
             } finally {
@@ -95,6 +196,9 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
         worker.submit(() -> {
             lastWorkerThreadName = Thread.currentThread().getName();
             if (geometrySession != null) geometrySession.pause();
+            state.setExperimentLifecycle(DiscoveryExperimentLifecycle.PAUSED);
+            recordEvent("pause", searchSession == null ? 0 : searchSession.iteration(),
+                    "Discovery worker paused.");
             publish("Paused", "");
         });
     }
@@ -130,29 +234,70 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
         if (searchRequested) return;
         stopRequested = false;
         searchRequested = true;
+        state.setExperimentLifecycle(DiscoveryExperimentLifecycle.SEARCHING);
+        recordEvent(searchSession == null ? "search-started" : "resume",
+                searchSession == null ? 0 : searchSession.iteration(),
+                searchSession == null ? "Topology search started." : "Topology search resumed.");
         activeTask = worker.submit(() -> {
             lastWorkerThreadName = Thread.currentThread().getName();
             try {
                 if (searchSession == null)
                     searchSession = new TopologySearchSession(
                             geometrySession.result().model(), settings);
-                TopologySearchSession session = searchSession;
-                while (searchRequested && !stopRequested
-                        && searchSession == session
-                        && session.iteration() < settings.maximumSearchIterations()) {
-                    session.step();
-                    if (session.iteration() % 5 == 0) publish("Searching", "");
-                    Thread.yield();
-                }
-                if (searchSession == session)
-                    publish(session.iteration() >= settings.maximumSearchIterations()
-                            ? "Search finished" : "Search paused", "");
+                runSearchLoop(searchSession, settings);
             } catch (Throwable throwable) {
                 publishError("Topology search failed: " + throwable.getMessage());
             } finally {
                 searchRequested = false;
             }
         });
+    }
+
+    private void runSearchLoop(TopologySearchSession session, TopologySearchSettings settings) {
+        double priorBest = session.bestCandidate().score().total();
+        int priorAccepted = session.metrics().acceptedMutationCount();
+        while (searchRequested && !stopRequested && searchSession == session
+                && session.iteration() < settings.maximumSearchIterations()) {
+            double previousScore = session.currentCandidate().score().total();
+            session.step();
+            TopologySearchMetrics metrics = session.metrics();
+            if (metrics.acceptedMutationCount() > priorAccepted) {
+                TopologyMutation mutation = session.currentCandidate().mutation();
+                String mutationDetails = mutation == null ? "unknown mutation"
+                        : mutation.type() + "; removed " + mutation.removedEdges()
+                        + "; added " + mutation.addedEdges();
+                recordEvent("accepted-mutation", session.iteration(),
+                        mutationDetails + "; score " + previousScore + " -> "
+                                + session.currentCandidate().score().total());
+                priorAccepted = metrics.acceptedMutationCount();
+            }
+            double best = session.bestCandidate().score().total();
+            if (best < priorBest) {
+                TopologyMutation mutation = session.bestCandidate().mutation();
+                recordEvent("new-best", session.iteration(),
+                        (mutation == null ? "" : mutation.type() + "; removed "
+                                + mutation.removedEdges() + "; added "
+                                + mutation.addedEdges() + "; ")
+                                + "best score " + priorBest + " -> " + best);
+                priorBest = best;
+                if (state.followBestCandidate())
+                    state.setViewportSelection(DiscoveryViewportSelection.BEST_CANDIDATE);
+            }
+            publishThrottled("Searching");
+            Thread.yield();
+        }
+        if (searchSession == session) {
+            boolean complete = session.iteration() >= settings.maximumSearchIterations();
+            state.setExperimentLifecycle(complete ? DiscoveryExperimentLifecycle.COMPLETED
+                    : stopRequested ? DiscoveryExperimentLifecycle.STOPPED
+                    : DiscoveryExperimentLifecycle.PAUSED);
+            recordEvent(complete ? "completed" : stopRequested ? "stop" : "pause",
+                    session.iteration(), complete ? "Topology search completed."
+                            : stopRequested ? "Topology search stopped."
+                            : "Topology search paused.");
+            publish(complete ? "Search finished" : stopRequested
+                    ? "Search stopped" : "Search paused", "");
+        }
     }
 
     public void singleSearchStep(TopologySearchSettings settings) {
@@ -198,7 +343,8 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
     }
 
     public Path exportCandidate(TopologyCandidate candidate, Path requested) throws IOException {
-        return new GeometryDiscoveryExporter().export(candidate.geometryResult(), requested);
+        return new GeometryDiscoveryExporter().export(candidate.geometryResult(),
+                state.experimentConfiguration(), requested);
     }
 
     public void preview(TopologyCandidate candidate) {
@@ -224,7 +370,8 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
     }
 
     public Path exportCurrent(Path requested) throws IOException {
-        return new GeometryDiscoveryExporter().export(snapshot().geometry(), requested);
+        return new GeometryDiscoveryExporter().export(snapshot().geometry(),
+                state.experimentConfiguration(), requested);
     }
 
     public Path exportBest(Path outputDirectory) throws IOException {
@@ -237,11 +384,50 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
         return new GeometryDiscoveryMetricsReportWriter().write(snapshot().geometry(), requested);
     }
 
+    public Path saveExperimentConfiguration(Path requested) throws IOException {
+        if (state.experimentConfiguration() == null)
+            throw new IllegalStateException("No New Discovery configuration is active.");
+        Path result = new DiscoveryExperimentConfigurationStore().save(
+                state.experimentConfiguration(), requested);
+        recordEvent("export", 0, "Experiment configuration saved to " + result);
+        return result;
+    }
+
+    public DiscoveryExperimentValidation loadExperimentConfiguration(Path path)
+            throws IOException {
+        DiscoveryExperimentConfiguration configuration =
+                new DiscoveryExperimentConfigurationStore().load(path);
+        // Creation is intentional, but no relaxation/search worker is resumed.
+        return createExperiment(configuration);
+    }
+
     public synchronized void stop() {
         stopRequested = true;
         relaxationRequested = false;
         searchRequested = false;
         if (geometrySession != null) geometrySession.pause();
+        if (state.experimentLifecycle() == DiscoveryExperimentLifecycle.SEARCHING
+                || state.experimentLifecycle() == DiscoveryExperimentLifecycle.INITIAL_RELAXATION)
+            state.setExperimentLifecycle(DiscoveryExperimentLifecycle.STOPPED);
+    }
+
+    private void publishThrottled(String status) {
+        long now = System.nanoTime();
+        long interval = 1_000_000_000L / state.snapshotUpdatesPerSecond();
+        if (now - lastVisualPublishNanos >= interval) {
+            lastVisualPublishNanos = now;
+            publish(status, "");
+        }
+    }
+
+    private synchronized void recordEvent(String type, int iteration, String details) {
+        eventLog.addLast(new DiscoveryExperimentEvent(
+                java.time.Instant.now(), type, iteration, details));
+        while (eventLog.size() > EVENT_LOG_LIMIT) eventLog.removeFirst();
+    }
+
+    public synchronized List<DiscoveryExperimentEvent> eventLog() {
+        return List.copyOf(eventLog);
     }
 
     private void publish(String status, String error) {

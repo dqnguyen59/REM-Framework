@@ -19,6 +19,12 @@ public final class GeometryDiscoveryExporter {
     public static final String GENERATOR_VERSION = "0.1";
 
     public Path export(GeometryDiscoveryResult result, Path requestedPath) throws IOException {
+        return export(result, null, requestedPath);
+    }
+
+    public Path export(GeometryDiscoveryResult result,
+                       DiscoveryExperimentConfiguration configuration,
+                       Path requestedPath) throws IOException {
         Path normalized = requestedPath.toAbsolutePath().normalize();
         if (normalized.getFileName() != null
                 && normalized.getFileName().toString().equalsIgnoreCase("cubic-lattice.toml"))
@@ -26,11 +32,16 @@ public final class GeometryDiscoveryExporter {
                     "Geometry discovery must never overwrite lattice/cubic-lattice.toml.");
         Path target = uniquePath(normalized);
         if (target.getParent() != null) Files.createDirectories(target.getParent());
-        Files.writeString(target, serialize(result), StandardCharsets.UTF_8);
+        Files.writeString(target, serialize(result, configuration), StandardCharsets.UTF_8);
         return target;
     }
 
     public String serialize(GeometryDiscoveryResult result) {
+        return serialize(result, null);
+    }
+
+    public String serialize(GeometryDiscoveryResult result,
+                            DiscoveryExperimentConfiguration configuration) {
         GeometryDiscoveryModel model = result.model();
         GeometryDiscoverySettings settings = result.settings();
         GeometryDiscoveryMetrics metrics = result.metrics();
@@ -86,6 +97,7 @@ public final class GeometryDiscoveryExporter {
         number(out, "extentY", metrics.extentY());
         number(out, "extentZ", metrics.extentZ());
         line(out, "effectiveDimensionality", metrics.effectiveDimensionality());
+        if (configuration != null) appendExperiment(out, configuration);
 
         Map<Integer, List<String>> neighbors = neighbors(model, compatibility);
         int sequentialIndex = 0;
@@ -109,6 +121,67 @@ public final class GeometryDiscoveryExporter {
             out.append("]\n");
         }
         return out.toString();
+    }
+
+    private void appendExperiment(StringBuilder out, DiscoveryExperimentConfiguration c) {
+        out.append('\n').append("[experiment]\n");
+        line(out, "name", c.name());
+        line(out, "description", c.description());
+        out.append("embeddingDimension = ").append(c.embeddingDimension()).append('\n');
+        out.append("nodeCount = ").append(c.nodeCount()).append('\n');
+        out.append("randomSeed = ").append(c.randomSeed()).append('\n');
+        line(out, "initialTopology", c.initialTopology().name());
+        line(out, "neighborCountPolicy", c.neighborCountPolicy().name());
+        out.append("minimumDegree = ").append(c.minimumDegree()).append('\n');
+        out.append("maximumDegree = ").append(c.maximumDegree()).append('\n');
+        number(out, "targetInitialDegree", c.targetInitialDegree());
+        number(out, "edgeProbability", c.edgeProbability());
+        line(out, "geometryInitialization", c.geometryInitialization().name());
+        number(out, "initialExtent", c.initialExtent());
+        number(out, "perturbationMagnitude", c.perturbationMagnitude());
+        line(out, "scoringProfile", c.scoringProfile().name());
+        line(out, "searchMode", c.topologySearchSettings().searchMode().name());
+        out.append("maximumSearchIterations = ")
+                .append(c.topologySearchSettings().maximumSearchIterations()).append('\n');
+        out.append("mutationsPerIteration = ")
+                .append(c.topologySearchSettings().mutationsAttemptedPerIteration()).append('\n');
+        out.append("archiveSize = ").append(c.topologySearchSettings().archiveSize()).append('\n');
+        number(out, "initialTemperature", c.topologySearchSettings().initialTemperature());
+        number(out, "coolingRate", c.topologySearchSettings().coolingRate());
+        number(out, "minimumTemperature", c.topologySearchSettings().minimumTemperature());
+        number(out, "improvementTolerance",
+                c.topologySearchSettings().scoreImprovementTolerance());
+        out.append("checkpointInterval = ")
+                .append(c.topologySearchSettings().checkpointInterval()).append('\n');
+        out.append("workerIterationsPerUpdate = ")
+                .append(c.workerIterationsPerUpdate()).append('\n');
+        out.append('\n').append("[experiment.relaxation]\n");
+        GeometryDiscoverySettings g = c.geometrySettings();
+        number(out, "targetDistance", g.targetDistance());
+        number(out, "minimumSeparation", g.minimumNodeSeparation());
+        out.append("maximumIterations = ").append(g.maximumIterations()).append('\n');
+        number(out, "learningRate", g.learningRate());
+        number(out, "repulsionStrength", g.repulsionStrength());
+        number(out, "maximumCorrection", g.maximumCorrection());
+        number(out, "convergenceTolerance", g.convergenceTolerance());
+        out.append('\n').append("[experiment.scoreWeights]\n");
+        TopologyScoreWeights w = c.scoreWeights();
+        number(out, "edgeLengthError", w.edgeLengthError());
+        number(out, "edgeLengthVariance", w.edgeLengthVariance());
+        number(out, "separationCollision", w.separationCollision());
+        number(out, "nonConvergence", w.nonConvergence());
+        number(out, "directionalBias", w.directionalBias());
+        number(out, "tensorIsotropy", w.tensorIsotropy());
+        number(out, "knownReferenceAngular", w.knownReferenceAngular());
+        number(out, "sphericalCoverage", w.sphericalCoverage());
+        number(out, "oppositeDirection", w.oppositeDirection());
+        number(out, "localDimensionality", w.localDimensionality());
+        number(out, "degreeVariance", w.degreeVariance());
+        number(out, "bridgePenalty", w.bridgePenalty());
+        number(out, "articulationPenalty", w.articulationPenalty());
+        number(out, "graphDiameterPreference", w.graphDiameterPreference());
+        number(out, "runtimeCompatibility", w.runtimeCompatibility());
+        number(out, "profileDegree", w.profileDegree());
     }
 
     private Map<Integer, List<String>> neighbors(GeometryDiscoveryModel model,

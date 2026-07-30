@@ -24,6 +24,13 @@ public final class GeometryDiscoveryWorkspaceState {
             GeometryDiscoveryWorkflowStage.CANDIDATE;
     private volatile GeometryDiscoveryDetailTab selectedDetailTab =
             GeometryDiscoveryDetailTab.OVERVIEW;
+    private volatile DiscoveryExperimentConfiguration experimentConfiguration;
+    private volatile DiscoveryExperimentLifecycle experimentLifecycle =
+            DiscoveryExperimentLifecycle.CREATED;
+    private volatile DiscoveryViewportSelection viewportSelection =
+            DiscoveryViewportSelection.CURRENT_CANDIDATE;
+    private volatile boolean followBestCandidate;
+    private volatile int snapshotUpdatesPerSecond = 8;
 
     public boolean open() { return open; }
     void setOpen(boolean value) { open = value; }
@@ -68,5 +75,25 @@ public final class GeometryDiscoveryWorkspaceState {
     public GeometryDiscoveryDetailTab selectedDetailTab() { return selectedDetailTab; }
     public void setSelectedDetailTab(GeometryDiscoveryDetailTab value) {
         selectedDetailTab = value;
+    }
+    public DiscoveryExperimentConfiguration experimentConfiguration() {
+        return experimentConfiguration;
+    }
+    void setExperimentConfiguration(DiscoveryExperimentConfiguration value) {
+        experimentConfiguration = value;
+    }
+    public DiscoveryExperimentLifecycle experimentLifecycle() { return experimentLifecycle; }
+    void setExperimentLifecycle(DiscoveryExperimentLifecycle value) {
+        experimentLifecycle = value;
+    }
+    public DiscoveryViewportSelection viewportSelection() { return viewportSelection; }
+    public void setViewportSelection(DiscoveryViewportSelection value) {
+        viewportSelection = value;
+    }
+    public boolean followBestCandidate() { return followBestCandidate; }
+    public void setFollowBestCandidate(boolean value) { followBestCandidate = value; }
+    public int snapshotUpdatesPerSecond() { return snapshotUpdatesPerSecond; }
+    public void setSnapshotUpdatesPerSecond(int value) {
+        snapshotUpdatesPerSecond = Math.max(1, Math.min(60, value));
     }
 }

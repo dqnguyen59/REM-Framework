@@ -5,6 +5,9 @@ import java.util.Map;
 public final class GeometryDiscoveryWorkspaceHelp {
     public static final Map<String, String> PRIMARY_TOOLTIPS = Map.ofEntries(
             Map.entry("Load Example", "Load the selected built-in candidate without changing REM."),
+            Map.entry("New Discovery", "Define a reproducible experiment in a seven-step setup."),
+            Map.entry("Save Experiment Configuration", "Save every experiment input for reproduction."),
+            Map.entry("Load Experiment Configuration", "Recreate a stopped experiment from saved inputs."),
             Map.entry("Open Candidate File", "Open an explicit discovery candidate TOML file."),
             Map.entry("Reload Candidate", "Reload the current candidate from its source file."),
             Map.entry("Recent Candidates", "Open the most recently selected candidate file."),

@@ -70,6 +70,7 @@ public class NuklearModel {
 		geometryDiscoverySearch,
 		geometryDiscoveryStatus,
 		geometryDiscoveryIntroduction,
+		geometryDiscoveryNew,
 	}
 	
 	private Map<Frame, AbstractFrame> framesMap = new HashMap<Frame, AbstractFrame>();
@@ -155,6 +156,10 @@ public class NuklearModel {
 		return dialogActiveCount > 0;
 	}
 
+	public boolean isInputBlockedFor(AbstractFrame frame) {
+		return frame != null && !frame.isDialog() && isAnyDialogActive();
+	}
+
 	public Map<Frame, AbstractFrame> getFrames() {
 		return framesMap;
 	}
@@ -215,6 +220,8 @@ public class NuklearModel {
 			return new GeometryDiscoveryStatusFrame(this);
 		case geometryDiscoveryIntroduction:
 			return new GeometryDiscoveryIntroductionFrame(this);
+		case geometryDiscoveryNew:
+			return new GeometryDiscoveryNewFrame(this);
 		case openFileDialog:
 			return new FrameOpenFileDialog(this);
 		case saveFileDialog:
