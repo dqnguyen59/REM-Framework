@@ -46,6 +46,7 @@ public class AppSettings extends AbstractSettings implements ISettings {
     private double  absorption    = 1.0;
     private boolean useLoop;
     private boolean isChanged;
+    private String latticeModelIdentifier = "system:cubic";
 
     private String projectFilePath = Constants.PROJECT_FILE_PATH;
 
@@ -120,6 +121,7 @@ public class AppSettings extends AbstractSettings implements ISettings {
         numThreads    = getInt("System", "numThreads", MAX_NUM_THREADS);
         useFixedNodes = getBool("System", "useFixedNodes", true);
         useLoop       = getBool("System", "useLoop", false);
+        latticeModelIdentifier = getString("System", "latticeModel", "system:cubic");
         if (numThreads >= MAX_NUM_THREADS) numThreads = MAX_NUM_THREADS;
 
         setProjectFilePath(getString("System", "projectFilePath", Constants.PROJECT_FILE_PATH));
@@ -162,6 +164,7 @@ public class AppSettings extends AbstractSettings implements ISettings {
         put("System", "numThreads", numThreads);
         put("System", "useFixedNodes", useFixedNodes);
         put("System", "useLoop", useLoop);
+        put("System", "latticeModel", latticeModelIdentifier);
         put("System", "projectFilePath", projectFilePath);
         put("System", "fontFile", fontFile);
         put("System", "fontFileBold", fontFileBold);
@@ -203,6 +206,25 @@ public class AppSettings extends AbstractSettings implements ISettings {
             saveToFile();
             isChanged = true;
         }
+    }
+
+    public void setLatticeModelIdentifier(String identifier) {
+        if (!latticeModelIdentifier.equals(identifier)) {
+            latticeModelIdentifier = identifier;
+            if (!getCurrentFilename().isEmpty()) saveToFile();
+            isChanged = true;
+        }
+    }
+
+    public void setLatticeModelIdentifierSilently(String identifier) {
+        if (!latticeModelIdentifier.equals(identifier)) {
+            latticeModelIdentifier = identifier;
+            if (!getCurrentFilename().isEmpty()) saveToFile();
+        }
+    }
+
+    public void requestLatticeRebuild() {
+        isChanged = true;
     }
 
     /**

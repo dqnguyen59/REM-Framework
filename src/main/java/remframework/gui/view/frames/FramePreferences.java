@@ -24,11 +24,16 @@ import org.lwjgl.system.MemoryStack;
 import remframework.gui.model.NuklearModel;
 import remframework.opengl.model.RainModel;
 import remframework.settings.Project;
+import remframework.lattice.LatticeDescriptor;
+import remframework.lattice.LatticeManager;
+
+import java.util.List;
 
 public class FramePreferences extends AbstractFrame {
 
     private final Project   project   = Project.getInstance();
 	private final RainModel rainModel = project.rainModel;
+	private final LatticeManager latticeManager = LatticeManager.getInstance();
 	
 	private final StringBuffer bufNumThreads   = new StringBuffer();
 	private final StringBuffer bufSwapInterval         = new StringBuffer();
@@ -48,8 +53,8 @@ public class FramePreferences extends AbstractFrame {
 	public void render(long windowHandle, NkContext ctx) {
 		super.render(windowHandle, ctx);
 
-        int width = 300;
-        int height = 240;
+        int width = 470;
+        int height = 350;
         createLayout(ctx, 0, nuklearModel.getMenuBarHeight() + 120, width, height + (appSettings.isUseFixedNodes() ? 0 : 120));
 	}
 
@@ -59,6 +64,47 @@ public class FramePreferences extends AbstractFrame {
 
             float leftCol = 0.6f;
             float rightCol = 0.4f;
+            List<LatticeDescriptor> descriptors = latticeManager.descriptors();
+            String[] labels = descriptors.stream().map(LatticeDescriptor::uiLabel).toArray(String[]::new);
+            LatticeDescriptor selected = latticeManager.selected();
+            String chosen = nk_label_combo_options(ctx, stack, " Lattice Model:", labels,
+                    selected.uiLabel(), 0.35f, 0.65f);
+            if (!chosen.equals(selected.uiLabel())) {
+                LatticeDescriptor candidate = descriptors.get(java.util.Arrays.asList(labels).indexOf(chosen));
+                boolean wasSimulating = project.getRemModel().isSimulating();
+                project.getRemModel().setSimulating(false);
+                if (latticeManager.select(candidate.identifier())) {
+                    project.getRemModel().setCustomStatus("Loading " + candidate.displayName());
+                    appSettings.requestLatticeRebuild();
+                    System.out.println("Runtime Lattice Model change: " + candidate.uiLabel()
+                            + (wasSimulating ? " (simulation paused)" : ""));
+                } else {
+                    nuklearModel.showErrorDialog("Invalid Lattice Model",
+                            latticeManager.lastWarning() + "\n\n"
+                                    + candidate.messages().stream()
+                                    .map(m -> m.severity() + ": " + m.message())
+                                    .reduce((a, b) -> a + "\n" + b).orElse(""));
+                    appSettings.requestLatticeRebuild();
+                }
+            }
+            Nuklear.nk_layout_row_dynamic(ctx, rowHeightEdit, 1);
+            if (nk_button_label(ctx, "Refresh Lattice Models")) {
+                String before = latticeManager.selected().identifier();
+                latticeManager.refresh();
+                if (!before.equals(latticeManager.selected().identifier())) {
+                    project.getRemModel().setSimulating(false);
+                    appSettings.requestLatticeRebuild();
+                    nuklearModel.showErrorDialog("Lattice Model Refresh",
+                            latticeManager.lastWarning());
+                }
+                project.getRemModel().setCustomStatus("Lattice model list refreshed");
+            }
+            if (!latticeManager.lastWarning().isBlank()) {
+                Nuklear.nk_layout_row_dynamic(ctx, rowHeightEdit * 2, 1);
+                Nuklear.nk_label_wrap(ctx, "Warning: " + latticeManager.lastWarning());
+            }
+            nk_spacer(ctx, spacer1, 1);
+
             appSettings.setNumThreads(nk_label_edit(ctx, stack, " CPU Threads:", bufNumThreads, appSettings.getNumThreads(), leftCol,
                                                     rightCol));
 			nk_spacer(ctx, spacer1, 1);

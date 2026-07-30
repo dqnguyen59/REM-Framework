@@ -36,6 +36,7 @@ import remframework.opengl.view.GLWindow;
 import remframework.settings.Project;
 import remframework.helpers.PerformanceMonitor;
 import remframework.helpers.PerformanceMonitor.Measurement;
+import remframework.lattice.LatticeManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -90,6 +91,11 @@ public abstract class Engine {
     	nuklearController.unfocusAllFrames();
 
 		Project.getInstance().setNuklearModel(nuklearModel);
+		String latticeWarning = LatticeManager.getInstance().lastWarning();
+		if (!latticeWarning.isBlank()) {
+			Project.getInstance().getRemModel().setCustomStatus(latticeWarning);
+			nuklearModel.showErrorDialog("Lattice Model Warning", latticeWarning);
+		}
 	}
 	
 	protected void addMouseAndKeyboardListener(IMouseAndKeyboardEvents listener) {

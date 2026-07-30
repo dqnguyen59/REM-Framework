@@ -27,6 +27,7 @@ import remframework.settings.AppSettings;
 import remframework.helpers.AppInfo;
 import remframework.helpers.Utils;
 import remframework.settings.Project;
+import remframework.lattice.LatticeManager;
 
 import java.nio.file.Path;
 
@@ -93,6 +94,7 @@ public class Main {
 		Utils.deleteAllTmpFiles(Constants.BASE_PATH + "tmp");
 		
 		AppSettings.getInstance().loadFromFile(Constants.BASE_PATH + Constants.APP_SETTINGS_FILE);
+		LatticeManager.getInstance().initialize();
 
         GLWindow glWindow = new GLWindow(Constants.TITLE);
 		Engine engine = new Simulator(glWindow, updateLimit);

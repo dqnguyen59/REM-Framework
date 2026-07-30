@@ -31,9 +31,15 @@ import remframework.opengl.helpers.Neighbor;
 import remframework.opengl.helpers.OBJFormatLoader;
 import remframework.settings.AppSettings;
 import remframework.settings.Project;
+import remframework.lattice.LatticeDescriptor;
+import remframework.lattice.LatticeManager;
+import remframework.lattice.LatticeModel;
+import remframework.lattice.SystemCubicLatticeModel;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -135,8 +141,9 @@ public class Lattice {
     }
 
     public Node getNodeByIndex(Vector3i nodeIndex) {
-        int index = nodeIndex.z * project.getDimensionY() * project.getDimensionX() +
-                    nodeIndex.y * project.getDimensionX() + nodeIndex.x;
+        int sizeY = nodeMatrix == null ? 0 : nodeMatrix[0].length;
+        int sizeX = sizeY == 0 ? 0 : nodeMatrix[0][0].length;
+        int index = nodeIndex.z * sizeY * sizeX + nodeIndex.y * sizeX + nodeIndex.x;
         if (index >= 0 && index < getNodeArray().length)
             return (Node) getNodeArray()[index];
         else
@@ -192,8 +199,14 @@ public class Lattice {
 
     private Entity build(boolean headless) {
         System.out.println("Lattice.build()");
-        Vector3i dimension = new Vector3i();
-        project.getDimension(dimension);
+        Vector3i projectDimension = new Vector3i();
+        project.getDimension(projectDimension);
+        LatticeDescriptor descriptor = LatticeManager.getInstance().selected();
+        LatticeModel latticeModel = descriptor.sourceType() == LatticeDescriptor.SourceType.SYSTEM
+                ? SystemCubicLatticeModel.create(appSettings.isUseLoop()) : descriptor.model();
+        Vector3i dimension = latticeModel.dimensions(projectDimension);
+        if (!dimension.equals(projectDimension))
+            project.setDimension(dimension.x, dimension.y, dimension.z, false);
 
         int sizeI = dimension.x;
         int sizeJ = dimension.y;
@@ -213,95 +226,60 @@ public class Lattice {
         baseEntity.setPosition(0, 0, 0);
         baseEntity.setRotation(project.baseRotation.x, project.baseRotation.y, project.baseRotation.z);
 
-        float step = Constants.EP_DEFAULT_DISTANCE;
-
-        // Draw xyz arrows on entity baseField.
-        //drawArrows(baseField, Constants.EP_DEFAULT_DISTANCE, modelSphere, sizeI, sizeJ, sizeK);
-
         nodeMatrix = new Node[sizeK][sizeJ][sizeI];
-
-        int NumNodes = sizeI * sizeJ * sizeK;
+        List<LatticeModel.NodeDefinition> definitions = latticeModel.nodes(projectDimension);
+        int NumNodes = definitions.size();
 
         remModel.setLoadingReady(false);
         remModel.setProgress(0.0);
 
         new Thread(() -> {
             int countNode = 0;
-            for (int k = 0; k < sizeK; k++) {
-                for (int j = 0; j < sizeJ; j++) {
-                    for (int i = 0; i < sizeI; i++) {
-                        Node n = createNode(baseEntity, modelSphere,
-                                            new Vector3d((i - sizeI / 2.0) * step, (j - sizeJ / 2.0) * step, (k - sizeK / 2.0) * step),
+            Map<String, Node> nodesById = new HashMap<>();
+            try {
+                for (LatticeModel.NodeDefinition definition : definitions) {
+                    int i = definition.index().x;
+                    int j = definition.index().y;
+                    int k = definition.index().z;
+                    Node n = createNode(baseEntity, modelSphere, new Vector3d(definition.position()),
                                             new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
-                        n.setIndex(i, j, k);
+                    n.setIndex(i, j, k);
 
-                        n.setAbsorptionFactor(
-                                computeAbsorptionFactor(i, j, k,
-                                                        sizeI, sizeJ, sizeK));
+                    n.setAbsorptionFactor(computeAbsorptionFactor(i, j, k, sizeI, sizeJ, sizeK));
 
-                        n.setOverrideModelMaterial(true);
-                        n.getMaterial().setDiffuseColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
-                        n.getMaterial().setAmbientColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
-                        nodeMatrix[k][j][i] = n;
+                    n.setOverrideModelMaterial(true);
+                    n.getMaterial().setDiffuseColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
+                    n.getMaterial().setAmbientColor(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
+                    nodeMatrix[k][j][i] = n;
+                    nodesById.put(definition.id(), n);
 
-                        boolean isEdgeX = (sizeI > 1 && (i == 0 || i == sizeI - 1));
-                        boolean isEdgeY = (sizeJ > 1 && (j == 0 || j == sizeJ - 1));
-                        boolean isEdgeZ = (sizeK > 1 && (k == 0 || k == sizeK - 1));
+                    boolean isEdgeX = (sizeI > 1 && (i == 0 || i == sizeI - 1));
+                    boolean isEdgeY = (sizeJ > 1 && (j == 0 || j == sizeJ - 1));
+                    boolean isEdgeZ = (sizeK > 1 && (k == 0 || k == sizeK - 1));
 
-                        if (isEdgeX || isEdgeY || isEdgeZ) n.setType(EntityType.FIXED);
-                        //							n.setFixed(isEdgeX || isEdgeY || isEdgeZ);
-                        n.setXFixed(isEdgeX);
-                        n.setYFixed(isEdgeY);
-                        n.setZFixed(isEdgeZ);
+                    if (isEdgeX || isEdgeY || isEdgeZ) n.setType(EntityType.FIXED);
+                    n.setXFixed(isEdgeX);
+                    n.setYFixed(isEdgeY);
+                    n.setZFixed(isEdgeZ);
+                    countNode++;
+                    remModel.setProgress((double) countNode / (double) NumNodes * 100);
+                }
 
-                        // experimentalMode, when only the edges are fixed. This creates a cool effect.
-                        //							if (!(
-                        //								(i > 0 && i < sizeI - 1) && (j > 0 && j < sizeJ - 1)
-                        //								 || (i > 0 && i < sizeI - 1) && (k > 0 && k < sizeK - 1)
-                        //								 || (j > 0 && j < sizeJ - 1) && (k > 0 && k < sizeK - 1)
-                        //								)) {
-                        //								n.setFixed(true);
-                        //							}
-
-
-                        countNode++;
-                        remModel.setProgress((double) countNode / (double) NumNodes * 100);
+                for (LatticeModel.NodeDefinition definition : definitions) {
+                    Node node = nodesById.get(definition.id());
+                    for (Map.Entry<Integer, String> neighbor : definition.neighbors().entrySet()) {
+                        node.setNeighbor(Neighbor.values()[neighbor.getKey()],
+                                nodesById.get(neighbor.getValue()));
                     }
                 }
-            }
-
-            // Connect all neighbors in fieldMatrix.
-            for (int k = 0; k < sizeK; k++) {
-                for (int j = 0; j < sizeJ; j++) {
-                    for (int i = 0; i < sizeI; i++) {
-                        if (i > 0)
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][i - 1]);
-                        else if (appSettings.isUseLoop())
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.LEFT, nodeMatrix[k][j][sizeI - 1]);
-                        if (i < sizeI - 1)
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][i + 1]);
-                        else if (appSettings.isUseLoop())
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.RIGHT, nodeMatrix[k][j][0]);
-
-                        if (j > 0)
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][j - 1][i]);
-                        else if (appSettings.isUseLoop())
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.BOTTOM, nodeMatrix[k][sizeJ - 1][i]);
-                        if (j < sizeJ - 1)
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][j + 1][i]);
-                        else if (appSettings.isUseLoop())
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.TOP, nodeMatrix[k][0][i]);
-
-                        if (k > 0)
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[k - 1][j][i]);
-                        else if (appSettings.isUseLoop())
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.BACK, nodeMatrix[sizeK - 1][j][i]);
-                        if (k < sizeK - 1)
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[k + 1][j][i]);
-                        else if (appSettings.isUseLoop())
-                            nodeMatrix[k][j][i].setNeighbor(Neighbor.FRONT, nodeMatrix[0][j][i]);
-                    }
-                }
+                System.out.println("Built Lattice Model: " + descriptor.uiLabel());
+            } catch (RuntimeException exception) {
+                System.err.println("Lattice construction failed for " + descriptor.uiLabel()
+                        + ": " + exception.getMessage());
+                remModel.setCustomStatus("Lattice construction failed: " + exception.getMessage());
+                if (!LatticeManager.SYSTEM_CUBIC_ID.equals(descriptor.identifier()))
+                    LatticeManager.getInstance().constructionFailed(descriptor,
+                            exception.getMessage());
             }
             remModel.setLoadingReady(true);
         }).start();
@@ -311,7 +289,14 @@ public class Lattice {
 
     public void update() {
         System.out.println("Lattice.update()");
-        setNodeArray(getNodes().toArray());
+        List<Node> orderedNodes = new ArrayList<>();
+        if (nodeMatrix != null) {
+            for (Node[][] plane : nodeMatrix)
+                for (Node[] row : plane)
+                    for (Node node : row)
+                        if (node != null) orderedNodes.add(node);
+        }
+        setNodeArray(orderedNodes.toArray());
         setEntityArray(entities.toArray());
     }
 
