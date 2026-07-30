@@ -1,0 +1,8 @@
+validationItem,sourceAxis,expected,observed,status
+rawRows,X,42120,42120,PASS
+detectors,X,234,234,PASS
+rawRows,Y,42120,42120,PASS
+detectors,Y,234,234,PASS
+rawRows,Z,42120,42120,PASS
+detectors,Z,234,234,PASS
+globalCommonSafeCycles,ALL,at least two,5 6,PASS

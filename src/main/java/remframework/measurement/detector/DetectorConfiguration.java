@@ -48,7 +48,82 @@ public final class DetectorConfiguration {
         }
         loadRadialAxisDetectors(ini, dimension, result, names);
         loadAngularShellDetectors(ini, dimension, result, names);
+        loadExactRadiusShellDetectors(ini, dimension, result, names);
+        loadAngularEvolutionDetectors(ini, dimension, result, names);
         return List.copyOf(result);
+    }
+
+    private static void loadAngularEvolutionDetectors(
+            Wini ini, Vector3i dimension, List<Detector> result,
+            Set<String> names) {
+        String enabled = ini.get("AngularEvolutionDetectors", "enabled");
+        if (!Boolean.parseBoolean(enabled)) return;
+        int sourceX = requiredInt(
+                ini, "AngularEvolutionDetectors", "source.x");
+        int sourceY = requiredInt(
+                ini, "AngularEvolutionDetectors", "source.y");
+        int sourceZ = requiredInt(
+                ini, "AngularEvolutionDetectors", "source.z");
+        for (Experiment3EGeometry.Direction direction
+                : Experiment3EGeometry.directions()) {
+            Vector3i offset = direction.offset();
+            Vector3i index = new Vector3i(sourceX + offset.x,
+                    sourceY + offset.y, sourceZ + offset.z);
+            if (!names.add(direction.label())) {
+                throw new IllegalArgumentException(
+                        "Duplicate detector name: " + direction.label());
+            }
+            if (index.x < 0 || index.x >= dimension.x
+                    || index.y < 0 || index.y >= dimension.y
+                    || index.z < 0 || index.z >= dimension.z) {
+                throw new IllegalArgumentException(
+                        "Detector " + direction.label() + " node index "
+                                + index + " is outside lattice dimension "
+                                + dimension);
+            }
+            result.add(new Detector(direction.label(), index,
+                    Experiment3EGeometry.BASE_RADIUS
+                            * direction.scaleFactor(),
+                    null, direction.baseDirectionLabel(),
+                    "Experiment 3E " + direction.orbitId()
+                            + "; scale=" + direction.scaleFactor()
+                            + "; opposite=" + direction.oppositeLabel()));
+        }
+    }
+
+    private static void loadExactRadiusShellDetectors(
+            Wini ini, Vector3i dimension, List<Detector> result,
+            Set<String> names) {
+        String enabled = ini.get("ExactRadiusShellDetectors", "enabled");
+        if (!Boolean.parseBoolean(enabled)) return;
+        int sourceX = requiredInt(
+                ini, "ExactRadiusShellDetectors", "source.x");
+        int sourceY = requiredInt(
+                ini, "ExactRadiusShellDetectors", "source.y");
+        int sourceZ = requiredInt(
+                ini, "ExactRadiusShellDetectors", "source.z");
+        for (Experiment3DGeometry.Direction direction
+                : Experiment3DGeometry.directions()) {
+            Vector3i offset = direction.offset();
+            Vector3i index = new Vector3i(sourceX + offset.x,
+                    sourceY + offset.y, sourceZ + offset.z);
+            if (!names.add(direction.label())) {
+                throw new IllegalArgumentException(
+                        "Duplicate detector name: " + direction.label());
+            }
+            if (index.x < 0 || index.x >= dimension.x
+                    || index.y < 0 || index.y >= dimension.y
+                    || index.z < 0 || index.z >= dimension.z) {
+                throw new IllegalArgumentException(
+                        "Detector " + direction.label() + " node index "
+                                + index + " is outside lattice dimension "
+                                + dimension);
+            }
+            result.add(new Detector(direction.label(), index, 25, null,
+                    direction.label(), "Experiment 3D "
+                    + direction.orbitId() + "; opposite="
+                    + direction.oppositeLabel()));
+        }
     }
 
     private static void loadAngularShellDetectors(

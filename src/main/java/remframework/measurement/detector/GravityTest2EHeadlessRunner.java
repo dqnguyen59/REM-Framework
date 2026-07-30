@@ -6,6 +6,7 @@ import remframework.opengl.model.Scene;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.Node;
 import remframework.opengl.model.entity.Occupancy;
+import remframework.opengl.model.entity.Identity;
 import remframework.settings.AppSettings;
 
 import java.nio.file.Path;
@@ -86,8 +87,8 @@ public final class GravityTest2EHeadlessRunner {
                 scene.waitForAllTasksReady();
                 double phase = project.occupancies.isEmpty()
                                ? Double.NaN
-                               : project.occupancies.getFirst()
-                                       .getIdentity().getPhase().z;
+                               : activeSourcePhase(project.occupancies
+                                       .getFirst().getIdentity());
                 detectors.sample(lattice, phase);
                 telemetry.endUpdate(update);
             }
@@ -99,5 +100,12 @@ public final class GravityTest2EHeadlessRunner {
             detectors.close();
             telemetry.close();
         }
+    }
+
+    static double activeSourcePhase(Identity identity) {
+        if (identity.getActive().x) return identity.getPhase().x;
+        if (identity.getActive().y) return identity.getPhase().y;
+        if (identity.getActive().z) return identity.getPhase().z;
+        return Double.NaN;
     }
 }

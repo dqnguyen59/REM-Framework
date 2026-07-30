@@ -165,7 +165,7 @@ class DetectorInfrastructureTest {
     @Test
     void test2dDefines112UniqueExactAxisDetectors() throws Exception {
         Wini ini = new Wini(new File(
-                "samples/gravity-test-2d-radial-falloff.qfs"));
+                "samples/gravity-test-2/gravity-test-2d-radial-falloff.qfs"));
         List<Detector> detectors = DetectorConfiguration.load(
                 ini, new Vector3i(1201, 1201, 1));
         assertEquals(112, detectors.size());
@@ -241,7 +241,7 @@ class DetectorInfrastructureTest {
     void test2eDefinesCenteredSixAxisThreeDimensionalDetectors()
             throws Exception {
         Wini ini = new Wini(new File(
-                "samples/gravity-test-2e-3d-pilot.qfs"));
+                "samples/gravity-test-2/gravity-test-2e-3d-pilot.qfs"));
         List<Detector> detectors = DetectorConfiguration.load(
                 ini, new Vector3i(161, 161, 161));
         assertEquals(54, detectors.size());
@@ -445,6 +445,408 @@ class DetectorInfrastructureTest {
             assertTrue(Files.size(output.resolve(
                     "charts/" + chart + ".svg")) > 2_000);
         }
+    }
+
+    @Test
+    void experiment3bConfigurationsRotateOnlyTheSourceAmplitude()
+            throws Exception {
+        Map<String, Vector3d> expected = Map.of(
+                "x", new Vector3d(200, 0, 0),
+                "y", new Vector3d(0, 200, 0),
+                "z", new Vector3d(0, 0, 200));
+        Set<Set<Vector3i>> placements = new HashSet<>();
+        for (Map.Entry<String, Vector3d> entry : expected.entrySet()) {
+            Wini ini = new Wini(new File(
+                    "samples/experiment-3b-rotation-"
+                            + entry.getKey() + ".qfs"));
+            Vector3d amplitude = new Vector3d(
+                    ini.get("Oscillator0", "amplitude.x", double.class),
+                    ini.get("Oscillator0", "amplitude.y", double.class),
+                    ini.get("Oscillator0", "amplitude.z", double.class));
+            assertEquals(entry.getValue(), amplitude);
+            List<Detector> detectors = DetectorConfiguration.load(
+                    ini, new Vector3i(161, 161, 161));
+            assertEquals(26, detectors.size());
+            placements.add(detectors.stream().map(Detector::getNodeIndex)
+                    .map(Vector3i::new).collect(
+                            java.util.stream.Collectors.toSet()));
+        }
+        assertEquals(1, placements.size());
+    }
+
+    @Test
+    void experiment3bRotationIsInvertibleAndPreservesGeometry() {
+        for (Experiment3BRotation.SourceAxis axis
+                : Experiment3BRotation.SourceAxis.values()) {
+            for (Experiment3AGeometry.DirectionSpec direction
+                    : Experiment3AGeometry.highSymmetryDirections()) {
+                Vector3i canonical =
+                        Experiment3BRotation.canonicalComponents(
+                                direction.requestedDirection(), axis);
+                Vector3i restored = Experiment3BRotation.latticeComponents(
+                        canonical, axis);
+                assertEquals(direction.requestedDirection(), restored);
+                assertEquals(direction.requestedDirection().lengthSquared(),
+                        canonical.lengthSquared());
+                assertTrue(Experiment3AGeometry.highSymmetryDirections()
+                        .stream().anyMatch(candidate ->
+                                candidate.requestedDirection()
+                                        .equals(canonical)));
+                Vector3i opposite = new Vector3i(
+                        direction.requestedDirection()).negate();
+                assertEquals(new Vector3i(canonical).negate(),
+                        Experiment3BRotation.canonicalComponents(
+                                opposite, axis));
+            }
+        }
+    }
+
+    @Test
+    void experiment3bSourceRelativeAnglesAndDecompositionAreCorrect() {
+        usingAxis(Experiment3BRotation.SourceAxis.X,
+                new Vector3d(1, 0, 0));
+        usingAxis(Experiment3BRotation.SourceAxis.Y,
+                new Vector3d(0, 1, 0));
+        usingAxis(Experiment3BRotation.SourceAxis.Z,
+                new Vector3d(0, 0, 1));
+        assertEquals(0.0, Experiment3BRotation.sourceAzimuthDegrees(
+                new Vector3d(0, 1, 0),
+                Experiment3BRotation.SourceAxis.X));
+        assertEquals(90.0, Experiment3BRotation.sourceAzimuthDegrees(
+                new Vector3d(0, 0, 1),
+                Experiment3BRotation.SourceAxis.X));
+        assertEquals(new Vector3i(1, 0, 0),
+                Experiment3BRotation.canonicalComponents(
+                        new Vector3i(0, 0, 1),
+                        Experiment3BRotation.SourceAxis.Z));
+        assertEquals(new Vector3i(1, 0, 0),
+                Experiment3BRotation.canonicalComponents(
+                        new Vector3i(1, 0, 0),
+                        Experiment3BRotation.SourceAxis.X));
+        assertEquals(new Vector3i(1, 0, 0),
+                Experiment3BRotation.canonicalComponents(
+                        new Vector3i(0, 1, 0),
+                        Experiment3BRotation.SourceAxis.Y));
+        assertEquals(3.0, Experiment3BRotation.longitudinal(
+                new Vector3d(3, 4, 0),
+                Experiment3BRotation.SourceAxis.X));
+        assertEquals(4.0, Experiment3BRotation.transverseMagnitude(
+                new Vector3d(3, 4, 0),
+                Experiment3BRotation.SourceAxis.X));
+    }
+
+    @Test
+    void experiment3bResidualStatisticsAndGeneratedEvidence() throws Exception {
+        assertEquals(0.0, Experiment3BRotation.coefficientOfVariation(
+                2.0, 2.0, 2.0));
+        assertEquals(1.0, Experiment3BRotation.maximumRelativeSpread(
+                1.0, 2.0, 3.0));
+        assertThrows(IllegalArgumentException.class,
+                () -> Experiment3BRotation.coefficientOfVariation(
+                        1.0, Double.NaN));
+        Path root = Path.of("measurements",
+                "experiment-3b-rotational-consistency");
+        Assumptions.assumeTrue(Files.exists(root.resolve("combined/report.md")),
+                "Experiment 3B generated evidence is not present");
+        for (String run : List.of("run-x", "run-y", "run-z")) {
+            assertTrue(Files.size(root.resolve(
+                    run + "/detector-cycle-summary.csv")) > 0);
+        }
+        assertTrue(Files.size(root.resolve(
+                "combined/rotational-residuals.csv")) > 0);
+        assertTrue(Files.size(root.resolve(
+                "charts/chart-validation.txt")) > 0);
+    }
+
+    @Test
+    void experiment3cCompositeDefinitionsPreserveSignedValues() {
+        assertEquals(2.0, Experiment3CComposite.arithmeticMean(1, 2, 3));
+        assertEquals(Math.sqrt(14.0 / 3.0),
+                Experiment3CComposite.pooledRms(1, 2, 3));
+        assertEquals(-2.0,
+                Experiment3CComposite.arithmeticMean(-1, -2, -3));
+        assertEquals(0.0,
+                Experiment3CComposite.coefficientOfVariation(4, 4, 4));
+        assertEquals(1.0,
+                Experiment3CComposite.relativeSpread(1, 2, 3));
+        assertEquals(12.0,
+                Experiment3CComposite.radiusNormalize(3, 2, 2));
+        assertThrows(IllegalArgumentException.class,
+                () -> Experiment3CComposite.pooledRms(Double.NaN));
+    }
+
+    @Test
+    void experiment3cSyntheticCasesAndGeneratedEvidence() throws Exception {
+        double[] isotropic = {5, 5, 5, 5, 5, 5};
+        assertEquals(0.0,
+                Experiment3CComposite.coefficientOfVariation(isotropic));
+        double[] cubic = {1, 1, 2, 2, 3, 3};
+        assertTrue(Experiment3CComposite.coefficientOfVariation(cubic) > 0);
+        double[] radii = {10, 20, 40};
+        double[] radiusOnly = {1.0 / 10, 1.0 / 20, 1.0 / 40};
+        double[] normalized = new double[3];
+        for (int i = 0; i < normalized.length; i++) {
+            normalized[i] = Experiment3CComposite.radiusNormalize(
+                    radiusOnly[i], radii[i], 1);
+        }
+        assertEquals(0.0,
+                Experiment3CComposite.coefficientOfVariation(normalized));
+        assertTrue(Experiment3CComposite.coefficientOfVariation(
+                2, 1, 1, 1, 1, 1) > 0);
+
+        Path root = Path.of("measurements",
+                "experiment-3c-axis-averaged-source");
+        Assumptions.assumeTrue(Files.exists(root.resolve("report.md")),
+                "Experiment 3C generated evidence is not present");
+        for (String file : List.of(
+                "input-validation.csv", "composite-detector-summary.csv",
+                "composite-cycle-summary.csv",
+                "composite-opposite-parity.csv",
+                "composite-direction-class-summary.csv",
+                "composite-cubic-groups.csv",
+                "radius-normalization-summary.csv",
+                "directional-isotropy-summary.csv",
+                "metric-definition-comparison.csv")) {
+            assertTrue(Files.size(root.resolve(file)) > 0, file);
+        }
+        assertTrue(Files.size(root.resolve(
+                "charts/chart-validation.txt")) > 0);
+    }
+
+    @Test
+    void experiment3dExactShellHasValidatedClosedCubicOrbits() {
+        List<Experiment3DGeometry.Direction> directions =
+                Experiment3DGeometry.directions();
+        assertEquals(150, directions.size());
+        assertEquals(Map.of(
+                "ORBIT_25_0_0", 6L,
+                "ORBIT_24_7_0", 24L,
+                "ORBIT_20_15_0", 24L,
+                "ORBIT_20_12_9", 48L,
+                "ORBIT_16_15_12", 48L),
+                directions.stream().collect(java.util.stream.Collectors
+                        .groupingBy(
+                                Experiment3DGeometry.Direction::orbitId,
+                                java.util.stream.Collectors.counting())));
+        Set<Vector3i> offsets = directions.stream()
+                .map(Experiment3DGeometry.Direction::offset)
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(150, offsets.size());
+        Set<String> labels = new HashSet<>();
+        for (Experiment3DGeometry.Direction direction : directions) {
+            Vector3i offset = direction.offset();
+            assertEquals(625, offset.lengthSquared());
+            assertEquals(25.0, Math.sqrt(offset.lengthSquared()));
+            assertTrue(labels.add(direction.label()));
+            Experiment3DGeometry.Direction opposite =
+                    Experiment3DGeometry.byOffset().get(
+                            new Vector3i(offset).negate());
+            assertNotNull(opposite);
+            assertEquals(direction.oppositeLabel(), opposite.label());
+            assertEquals(direction.orbitId(), opposite.orbitId());
+        }
+        Experiment3DGeometry.orbits().forEach(orbit -> {
+            assertEquals(625, orbit.primitive().lengthSquared());
+            assertEquals(orbit.expectedSize(),
+                    Experiment3DGeometry.signedPermutations(
+                            orbit.primitive()).size());
+        });
+        assertEquals(1.0, Experiment3DGeometry.cubicInvariantI4(
+                new Vector3i(25, 0, 0)));
+    }
+
+    @Test
+    void experiment3dRotationsAndCompositeStatisticsAreClosed() {
+        Map<Vector3i, Experiment3DGeometry.Direction> shell =
+                Experiment3DGeometry.byOffset();
+        for (Experiment3BRotation.SourceAxis axis
+                : Experiment3BRotation.SourceAxis.values()) {
+            for (Experiment3DGeometry.Direction direction
+                    : Experiment3DGeometry.directions()) {
+                Vector3i canonical =
+                        Experiment3BRotation.canonicalComponents(
+                                direction.offset(), axis);
+                assertTrue(shell.containsKey(canonical));
+                assertEquals(direction.offset().lengthSquared(),
+                        canonical.lengthSquared());
+            }
+        }
+        double mean = Experiment3CComposite.arithmeticMean(1, 2, 3);
+        double pooled = Experiment3CComposite.pooledRms(1, 2, 3);
+        assertTrue(pooled >= mean);
+        assertEquals((pooled - mean) / mean,
+                (pooled - mean) / Math.max(Math.abs(mean), Math.ulp(1.0)));
+        assertEquals(0.0,
+                Experiment3AGeometry.evenDifference(2, 2));
+        assertEquals(0.0,
+                Experiment3AGeometry.oddResidual(2, -2));
+    }
+
+    @Test
+    void experiment3dProjectsAndGeneratedEvidenceAreComplete()
+            throws Exception {
+        Set<Set<Vector3i>> placements = new HashSet<>();
+        for (String axis : List.of("x", "y", "z")) {
+            Wini ini = new Wini(new File(
+                    "samples/experiment-3d-exact-radius-"
+                            + axis + ".qfs"));
+            List<Detector> detectors = DetectorConfiguration.load(
+                    ini, new Vector3i(181, 181, 181));
+            assertEquals(150, detectors.size());
+            placements.add(detectors.stream().map(Detector::getNodeIndex)
+                    .map(Vector3i::new).collect(
+                            java.util.stream.Collectors.toSet()));
+        }
+        assertEquals(1, placements.size());
+        Path root = Path.of("measurements",
+                "experiment-3d-exact-radius-angular-structure");
+        Assumptions.assumeTrue(Files.exists(root.resolve(
+                "combined/report.md")),
+                "Experiment 3D generated evidence is not present");
+        for (String file : List.of(
+                "detector-geometry.csv", "input-validation.csv",
+                "safe-cycle-intersection.csv",
+                "source-relative-rotation-map.csv",
+                "source-relative-comparison.csv",
+                "rotational-residuals.csv",
+                "composite-detector-summary.csv",
+                "composite-cycle-summary.csv",
+                "composite-opposite-parity.csv",
+                "cubic-orbit-summary.csv",
+                "cubic-orbit-pairwise-comparison.csv",
+                "angular-isotropy-summary.csv",
+                "cubic-invariant-analysis.csv",
+                "metric-definition-comparison.csv")) {
+            Path combined = root.resolve("combined/" + file);
+            Path shared = root.resolve(file);
+            assertTrue((Files.exists(combined) && Files.size(combined) > 0)
+                    || (Files.exists(shared) && Files.size(shared) > 0), file);
+        }
+        assertTrue(Files.size(root.resolve(
+                "charts/chart-validation.txt")) > 0);
+    }
+
+    @Test
+    void experiment3eExactCollinearShellsAreCompleteAndClosed() {
+        List<Experiment3EGeometry.Direction> directions =
+                Experiment3EGeometry.directions();
+        assertEquals(234, directions.size());
+        assertEquals(Map.of(
+                "ORBIT_13_0_0", 18L,
+                "ORBIT_12_5_0", 72L,
+                "ORBIT_12_4_3", 144L),
+                directions.stream().collect(java.util.stream.Collectors
+                        .groupingBy(Experiment3EGeometry.Direction::orbitId,
+                                java.util.stream.Collectors.counting())));
+        assertEquals(78, directions.stream()
+                .map(Experiment3EGeometry.Direction::baseDirectionLabel)
+                .distinct().count());
+        Map<String, Experiment3EGeometry.Direction> byLabel =
+                directions.stream().collect(java.util.stream.Collectors.toMap(
+                        Experiment3EGeometry.Direction::label,
+                        direction -> direction));
+        for (Experiment3EGeometry.Direction direction : directions) {
+            assertEquals(new Vector3i(direction.baseOffset())
+                            .mul(direction.scaleFactor()),
+                    direction.offset());
+            assertEquals(169 * direction.scaleFactor()
+                            * direction.scaleFactor(),
+                    direction.offset().lengthSquared());
+            assertNotNull(byLabel.get(direction.oppositeLabel()));
+            assertEquals(direction.orbitId(),
+                    byLabel.get(direction.oppositeLabel()).orbitId());
+            assertEquals(Experiment3EGeometry.cubicInvariantI4(
+                            direction.baseOffset()),
+                    Experiment3EGeometry.cubicInvariantI4(
+                            direction.offset()), 1e-15);
+        }
+        assertEquals(List.of(6, 24, 48),
+                Experiment3EGeometry.orbits().stream()
+                        .map(Experiment3EGeometry.Orbit::expectedSize).toList());
+    }
+
+    @Test
+    void experiment3eRotationsStatisticsAndTrendClassificationAreSound() {
+        Set<Vector3i> bases = Experiment3EGeometry.directions().stream()
+                .filter(direction -> direction.scaleFactor() == 1)
+                .map(Experiment3EGeometry.Direction::baseOffset)
+                .collect(java.util.stream.Collectors.toSet());
+        for (Experiment3BRotation.SourceAxis axis
+                : Experiment3BRotation.SourceAxis.values()) {
+            for (Vector3i base : bases) {
+                assertTrue(bases.contains(
+                        Experiment3BRotation.canonicalComponents(base, axis)));
+            }
+        }
+        assertEquals(Math.sqrt(14.0 / 3.0),
+                Experiment3EAnalysis.pooledRms(1, 2, 3));
+        assertEquals(2.0, Experiment3EAnalysis.mean(1, 2, 3));
+        assertEquals(0.0,
+                Experiment3EAnalysis.directionalCv(2, 2, 2));
+        assertEquals(0.0,
+                Experiment3EAnalysis.directionalSpread(2, 2, 2));
+        assertEquals("decreasing",
+                Experiment3EAnalysis.classifyTrend(3, 2, 1));
+        assertEquals("increasing",
+                Experiment3EAnalysis.classifyTrend(1, 2, 3));
+        assertEquals("approximately stable",
+                Experiment3EAnalysis.classifyTrend(2, 2, 2));
+        assertEquals("non-monotonic",
+                Experiment3EAnalysis.classifyTrend(1, 3, 2));
+        assertThrows(IllegalArgumentException.class,
+                () -> Experiment3EAnalysis.mean(Double.NaN));
+    }
+
+    @Test
+    void experiment3eProjectsAndEvidenceAreComplete() throws Exception {
+        Set<Set<Vector3i>> placements = new HashSet<>();
+        for (String axis : List.of("x", "y", "z")) {
+            Wini ini = new Wini(new File(
+                    "samples/experiment-3e-angular-evolution-"
+                            + axis + ".qfs"));
+            List<Detector> detectors = DetectorConfiguration.load(
+                    ini, new Vector3i(211, 211, 211));
+            assertEquals(234, detectors.size());
+            placements.add(detectors.stream().map(Detector::getNodeIndex)
+                    .map(Vector3i::new).collect(
+                            java.util.stream.Collectors.toSet()));
+        }
+        assertEquals(1, placements.size());
+        Path root = Path.of("measurements",
+                "experiment-3e-angular-evolution-with-radius");
+        Assumptions.assumeTrue(Files.exists(root.resolve(
+                "combined/report.md")),
+                "Experiment 3E generated evidence is not present");
+        for (String file : List.of(
+                "detector-geometry.csv", "input-validation.csv",
+                "safe-cycle-intersection.csv",
+                "source-relative-rotation-map.csv",
+                "rotational-residuals.csv",
+                "composite-detector-summary.csv",
+                "composite-cycle-summary.csv",
+                "shell-angular-summary.csv",
+                "normalized-angular-response.csv",
+                "orbit-summary-by-radius.csv",
+                "orbit-pairwise-evolution.csv",
+                "opposite-parity-by-radius.csv",
+                "cubic-invariant-by-radius.csv",
+                "cross-radius-pattern-comparison.csv",
+                "same-direction-radial-comparison.csv",
+                "metric-definition-comparison.csv",
+                "runtime-memory-summary.csv")) {
+            assertTrue(Files.size(root.resolve("combined/" + file)) > 0,
+                    file);
+        }
+        assertTrue(Files.size(root.resolve(
+                "charts/chart-validation.txt")) > 0);
+    }
+
+    private static void usingAxis(
+            Experiment3BRotation.SourceAxis axis, Vector3d direction) {
+        assertEquals(0.0,
+                Experiment3BRotation.sourcePolarDegrees(direction, axis));
+        assertEquals(180.0, Experiment3BRotation.sourcePolarDegrees(
+                new Vector3d(direction).negate(), axis));
     }
 
     private static Wini detectorIni(int size) {

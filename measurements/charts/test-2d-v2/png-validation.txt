@@ -1,0 +1,185 @@
+Gravity Test 2D v2 PNG and SVG validation
+============================================
+
+Matplotlib version: 3.11.1
+Pillow version: 12.3.0
+
+filename: raw-gradient-rms-v2.png
+absolute path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/raw-gradient-rms-v2.png
+byte size: 82991
+width: 2142
+height: 1241
+mode: RGBA
+detected format: PNG
+PNG signature: 89 50 4E 47 0D 0A 1A 0A
+Pillow verify result: PASS
+Pillow load result: PASS
+file command result: measurements/charts/test-2d-v2/raw-gradient-rms-v2.png: PNG image data, 2142 x 1241, 8-bit/color RGBA, non-interlaced
+ImageMagick result: not installed
+pixel extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+/tmp copy Pillow load result: PASS
+SVG path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/raw-gradient-rms-v2.svg
+SVG byte size: 55285
+result: PASS
+
+filename: cycle-gradient-rms-v2.png
+absolute path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/cycle-gradient-rms-v2.png
+byte size: 86533
+width: 2141
+height: 1241
+mode: RGBA
+detected format: PNG
+PNG signature: 89 50 4E 47 0D 0A 1A 0A
+Pillow verify result: PASS
+Pillow load result: PASS
+file command result: measurements/charts/test-2d-v2/cycle-gradient-rms-v2.png: PNG image data, 2141 x 1241, 8-bit/color RGBA, non-interlaced
+ImageMagick result: not installed
+pixel extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+/tmp copy Pillow load result: PASS
+SVG path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/cycle-gradient-rms-v2.svg
+SVG byte size: 58405
+result: PASS
+
+filename: raw-gradient-loglog-v2.png
+absolute path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/raw-gradient-loglog-v2.png
+byte size: 103424
+width: 2141
+height: 1241
+mode: RGBA
+detected format: PNG
+PNG signature: 89 50 4E 47 0D 0A 1A 0A
+Pillow verify result: PASS
+Pillow load result: PASS
+file command result: measurements/charts/test-2d-v2/raw-gradient-loglog-v2.png: PNG image data, 2141 x 1241, 8-bit/color RGBA, non-interlaced
+ImageMagick result: not installed
+pixel extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+/tmp copy Pillow load result: PASS
+SVG path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/raw-gradient-loglog-v2.svg
+SVG byte size: 54026
+result: PASS
+
+filename: cycle-gradient-loglog-v2.png
+absolute path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/cycle-gradient-loglog-v2.png
+byte size: 107475
+width: 2141
+height: 1241
+mode: RGBA
+detected format: PNG
+PNG signature: 89 50 4E 47 0D 0A 1A 0A
+Pillow verify result: PASS
+Pillow load result: PASS
+file command result: measurements/charts/test-2d-v2/cycle-gradient-loglog-v2.png: PNG image data, 2141 x 1241, 8-bit/color RGBA, non-interlaced
+ImageMagick result: not installed
+pixel extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+/tmp copy Pillow load result: PASS
+SVG path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/cycle-gradient-loglog-v2.svg
+SVG byte size: 54949
+result: PASS
+
+filename: raw-gradient-local-exponent-v2.png
+absolute path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/raw-gradient-local-exponent-v2.png
+byte size: 174820
+width: 2140
+height: 1241
+mode: RGBA
+detected format: PNG
+PNG signature: 89 50 4E 47 0D 0A 1A 0A
+Pillow verify result: PASS
+Pillow load result: PASS
+file command result: measurements/charts/test-2d-v2/raw-gradient-local-exponent-v2.png: PNG image data, 2140 x 1241, 8-bit/color RGBA, non-interlaced
+ImageMagick result: not installed
+pixel extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+/tmp copy Pillow load result: PASS
+SVG path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/raw-gradient-local-exponent-v2.svg
+SVG byte size: 48833
+result: PASS
+
+filename: cycle-gradient-local-exponent-v2.png
+absolute path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/cycle-gradient-local-exponent-v2.png
+byte size: 196690
+width: 2140
+height: 1241
+mode: RGBA
+detected format: PNG
+PNG signature: 89 50 4E 47 0D 0A 1A 0A
+Pillow verify result: PASS
+Pillow load result: PASS
+file command result: measurements/charts/test-2d-v2/cycle-gradient-local-exponent-v2.png: PNG image data, 2140 x 1241, 8-bit/color RGBA, non-interlaced
+ImageMagick result: not installed
+pixel extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+/tmp copy Pillow load result: PASS
+SVG path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/cycle-gradient-local-exponent-v2.svg
+SVG byte size: 50631
+result: PASS
+
+filename: directional-symmetry-v2.png
+absolute path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/directional-symmetry-v2.png
+byte size: 176447
+width: 2142
+height: 1241
+mode: RGBA
+detected format: PNG
+PNG signature: 89 50 4E 47 0D 0A 1A 0A
+Pillow verify result: PASS
+Pillow load result: PASS
+file command result: measurements/charts/test-2d-v2/directional-symmetry-v2.png: PNG image data, 2142 x 1241, 8-bit/color RGBA, non-interlaced
+ImageMagick result: not installed
+pixel extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+/tmp copy Pillow load result: PASS
+SVG path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/directional-symmetry-v2.svg
+SVG byte size: 64584
+result: PASS
+
+filename: arrival-update-v2.png
+absolute path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/arrival-update-v2.png
+byte size: 104108
+width: 2141
+height: 1241
+mode: RGBA
+detected format: PNG
+PNG signature: 89 50 4E 47 0D 0A 1A 0A
+Pillow verify result: PASS
+Pillow load result: PASS
+file command result: measurements/charts/test-2d-v2/arrival-update-v2.png: PNG image data, 2141 x 1241, 8-bit/color RGBA, non-interlaced
+ImageMagick result: not installed
+pixel extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+/tmp copy Pillow load result: PASS
+SVG path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/arrival-update-v2.svg
+SVG byte size: 58160
+result: PASS
+
+filename: reflection-margin-v2.png
+absolute path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/reflection-margin-v2.png
+byte size: 118219
+width: 2140
+height: 1241
+mode: RGBA
+detected format: PNG
+PNG signature: 89 50 4E 47 0D 0A 1A 0A
+Pillow verify result: PASS
+Pillow load result: PASS
+file command result: measurements/charts/test-2d-v2/reflection-margin-v2.png: PNG image data, 2140 x 1241, 8-bit/color RGBA, non-interlaced
+ImageMagick result: not installed
+pixel extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+/tmp copy Pillow load result: PASS
+SVG path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/reflection-margin-v2.svg
+SVG byte size: 62192
+result: PASS
+
+filename: model-residuals-v2.png
+absolute path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/model-residuals-v2.png
+byte size: 107309
+width: 2141
+height: 1241
+mode: RGBA
+detected format: PNG
+PNG signature: 89 50 4E 47 0D 0A 1A 0A
+Pillow verify result: PASS
+Pillow load result: PASS
+file command result: measurements/charts/test-2d-v2/model-residuals-v2.png: PNG image data, 2141 x 1241, 8-bit/color RGBA, non-interlaced
+ImageMagick result: not installed
+pixel extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+/tmp copy Pillow load result: PASS
+SVG path: /home/dqnguyen/IdeaProjects/REM-Framework/measurements/charts/test-2d-v2/model-residuals-v2.svg
+SVG byte size: 42592
+result: PASS

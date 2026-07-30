@@ -1,0 +1,118 @@
+[QuantumField]
+constantFrequency = 1.0
+constantElectricFactor = 1.0
+constantMagneticFactor = 0.8
+glSwapInterval = 2
+dimension.x = 1201
+dimension.y = 1201
+dimension.z = 1
+
+[Lights]
+numLights = 1
+
+[Lights0]
+name = DefaultPointLight
+position.x = 30.0
+position.y = 200.0
+position.z = 175.0
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+direction.x = 0.0
+direction.y = 0.0
+direction.z = 1.0
+color.x = 0.67
+color.y = 0.8
+color.z = 1.0
+intensity = 0.8
+constant = 0.3
+linear = 0.003
+exponent = 0.0
+scale = 1.0
+spotlight = false
+cutOff = 90.0
+
+[Camera]
+fieldOfFiew = 45.0
+position.x = 0.0
+position.y = 0.0
+position.z = 300.0
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+
+[Base]
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+
+[Terrain]
+visible = false
+texturePath = resources/textures/terrains/
+textureFile = default2.jpg
+scale = 1.0
+depthVisibility = 1.0
+
+[QFSSettings]
+sliceType = identitiesOnly
+visibleIndexX = 600
+visibleIndexY = 600
+visibleIndexZ = 0
+nodeFormulaVersion = v_0_1
+
+[SlitWall]
+active = false
+
+[TransportSystem0]
+logToConsole = false
+enableTransport = false
+
+[Oscillators]
+Size = 1
+
+[Oscillator0]
+name = Source
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 200.0
+nodeIndex.x = 600
+nodeIndex.y = 600
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Detectors]
+Size = 0
+
+[RadialAxisDetectors]
+source.x = 600
+source.y = 600
+source.z = 0
+radii = 10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,180,200,220,240,260,280,300,320,340,360,380,400
+
+[Rain]
+active = false
+
+[Detector]
+ignitorNode.x = -1
+ignitorNode.y = -1
+ignitorNode.z = -1
+detectorNode.x = -1
+detectorNode.y = -1
+detectorNode.z = -1
+
+[Walls]
+numWalls = 0

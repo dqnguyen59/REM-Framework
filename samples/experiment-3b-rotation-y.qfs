@@ -1,0 +1,122 @@
+[QuantumField]
+constantFrequency = 1.0
+constantElectricFactor = 1.0
+constantMagneticFactor = 0.8
+glSwapInterval = 2
+dimension.x = 161
+dimension.y = 161
+dimension.z = 161
+
+[Lights]
+numLights = 1
+
+[Lights0]
+name = DefaultPointLight
+position.x = 30.0
+position.y = 200.0
+position.z = 175.0
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+direction.x = 0.0
+direction.y = 0.0
+direction.z = 1.0
+color.x = 0.67
+color.y = 0.8
+color.z = 1.0
+intensity = 0.8
+constant = 0.3
+linear = 0.003
+exponent = 0.0
+scale = 1.0
+spotlight = false
+cutOff = 90.0
+
+[Camera]
+fieldOfFiew = 45.0
+position.x = 0.0
+position.y = 0.0
+position.z = 300.0
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+
+[Base]
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+
+[Terrain]
+visible = false
+texturePath = resources/textures/terrains/
+textureFile = default2.jpg
+scale = 1.0
+depthVisibility = 1.0
+
+[QFSSettings]
+sliceType = identitiesOnly
+visibleIndexX = 80
+visibleIndexY = 80
+visibleIndexZ = 80
+nodeFormulaVersion = v_0_1
+
+[SlitWall]
+active = false
+
+[TransportSystem0]
+logToConsole = false
+enableTransport = false
+
+[Oscillators]
+Size = 1
+
+[Oscillator0]
+name = Source
+active.x = false
+active.y = true
+active.z = false
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 20.0
+angleIncrement.z = 0.0
+amplitude.x = 0.0
+amplitude.y = 200.0
+amplitude.z = 0.0
+nodeIndex.x = 80
+nodeIndex.y = 80
+nodeIndex.z = 80
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Detectors]
+Size = 0
+
+[AngularShellDetectors]
+source.x = 80
+source.y = 80
+source.z = 80
+radius = 20
+
+[FeasibilityPilot]
+enabled = true
+updates = 180
+
+[Rain]
+active = false
+
+[Detector]
+ignitorNode.x = -1
+ignitorNode.y = -1
+ignitorNode.z = -1
+detectorNode.x = -1
+detectorNode.y = -1
+detectorNode.z = -1
+
+[Walls]
+numWalls = 0

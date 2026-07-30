@@ -1,0 +1,142 @@
+[QuantumField]
+constantFrequency = 1.0
+constantElectricFactor = 1.0
+constantMagneticFactor = 0.8
+glSwapInterval = 2
+dimension.x = 501
+dimension.y = 501
+dimension.z = 1
+
+[Lights]
+numLights = 1
+
+[Lights0]
+name = DefaultPointLight
+position.x = 30.0
+position.y = 200.0
+position.z = 175.0
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+direction.x = 0.0
+direction.y = 0.0
+direction.z = 1.0
+color.x = 0.67
+color.y = 0.8
+color.z = 1.0
+intensity = 0.8
+constant = 0.3
+linear = 0.003
+exponent = 0.0
+scale = 1.0
+spotlight = false
+cutOff = 90.0
+
+[Camera]
+fieldOfFiew = 45.0
+position.x = 0.0
+position.y = 0.0
+position.z = 120.0
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+
+[Base]
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+
+[Terrain]
+visible = false
+texturePath = resources/textures/terrains/
+textureFile = default2.jpg
+scale = 1.0
+depthVisibility = 1.0
+
+[QFSSettings]
+sliceType = identitiesOnly
+visibleIndexX = 250
+visibleIndexY = 250
+visibleIndexZ = 0
+
+[SlitWall]
+active = false
+direction = x
+numSlits = 2
+slitWidth = 3
+slitHeight = 20
+slitDistance = 17
+position = 0.25
+
+[TransportSystem0]
+logToConsole = false
+enableTransport = false
+
+[Oscillators]
+Size = 2
+
+[Rain]
+active = false
+force = 50.0
+iterations = 2
+
+[Detector]
+ignitorNode.x = -1
+ignitorNode.y = -1
+ignitorNode.z = -1
+detectorNode.x = -1
+detectorNode.y = -1
+detectorNode.z = -1
+detectionVelocity = 5.0E-5
+
+[Walls]
+numWalls = 0
+
+[Oscillator0]
+name = Oscillator 0
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 200.0
+nodeIndex.x = 250
+nodeIndex.y = 250
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator1]
+name = Receiver A60
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 260
+nodeIndex.y = 267
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+

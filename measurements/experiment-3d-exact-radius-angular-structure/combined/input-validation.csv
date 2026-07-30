@@ -1,0 +1,11 @@
+validationItem,sourceAxis,expected,observed,status
+rawRows,X,27000,27000,PASS
+detectors,X,150,150,PASS
+actualRadius,X,25.0,25.0,PASS
+rawRows,Y,27000,27000,PASS
+detectors,Y,150,150,PASS
+actualRadius,Y,25.0,25.0,PASS
+rawRows,Z,27000,27000,PASS
+detectors,Z,150,150,PASS
+actualRadius,Z,25.0,25.0,PASS
+allRunCommonSafeCycles,ALL,at least two,4 5,PASS
