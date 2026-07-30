@@ -1,0 +1,55 @@
+REM Framework Geometry Discovery topology search
+mode=HILL_CLIMBING
+seed=1
+scoringProfile=GENERAL_GEOMETRY
+initialScore=1.4751024981789687
+bestScore=1.4751024981789687
+acceptedMutations=0
+rejectedMutations=49
+invalidMutations=10
+duplicateTopologies=41
+relaxationFailures=0
+elapsedMilliseconds=198
+bestCandidate=/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/refined-five-seed-batch/run-0001/best-candidate.toml
+
+scoreExplanation:
+REM Framework Geometry Discovery diagnostic report
+model=small-cubic
+scoringProfile=GENERAL_GEOMETRY
+totalScore=1.475102498
+globalDimensionality=3
+meanNormalizedDirectionalBias=0.5773502692
+meanTensorIsotropyError=0.000000000
+knownReferenceAngularError=0.000000000 applicableNodes=0
+meanNearestDirectionAngle=0.9427024703 maximumUncoveredAngle=2.182445901 approximate=true
+meanOppositeDirectionMismatch=1.570796327 missingDirections=24
+dimensionDeficientNodes=0 dimensionMismatchNodes=0
+
+scoreExplanation:
+metric,applicable,raw,normalized,weight,contribution,percent
+edgeLengthError,true,0.000000000,0.000000000,5.000000000,0.000000000,0.000000000
+edgeLengthVariance,true,0.000000000,0.000000000,2.000000000,0.000000000,0.000000000
+separationCollision,true,0.000000000,0.000000000,10.00000000,0.000000000,0.000000000
+nonConvergence,true,0.000000000,0.000000000,10.00000000,0.000000000,0.000000000
+directionalBias,true,0.5773502692,0.5773502692,0.000000000,0.000000000,0.000000000
+tensorIsotropy,true,0.000000000,0.000000000,3.000000000,0.000000000,0.000000000
+knownReferenceAngular,false,0.000000000,0.000000000,1.000000000,0.000000000,0.000000000
+sphericalCoverage,true,2.182445901,0.6946941062,2.000000000,1.389388212,94.18926578
+oppositeDirection,true,1.570796327,0.5000000000,0.000000000,0.000000000,0.000000000
+localDimensionality,true,0.000000000,0.000000000,1.000000000,0.000000000,0.000000000
+degreeVariance,true,0.000000000,0.000000000,0.5000000000,0.000000000,0.000000000
+bridge,true,0.000000000,0.000000000,2.000000000,0.000000000,0.000000000
+articulationPoint,true,0.000000000,0.000000000,2.000000000,0.000000000,0.000000000
+graphDiameter,true,3.000000000,0.4285714286,0.2000000000,0.08571428571,5.810734225
+runtimeCompatibility,false,0.000000000,0.000000000,0.000000000,0.000000000,0.000000000
+profileDegree,false,0.000000000,0.000000000,0.000000000,0.000000000,0.000000000
+
+nodeDiagnostics:
+node=0 degree=3 dimension=3 eigenvalues=[0.3333333333333333, 0.3333333333333333, 0.3333333333333333] bias=0.5773502692 tensor=0.000000000 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.570796327
+node=1 degree=3 dimension=3 eigenvalues=[0.3333333333333333, 0.3333333333333333, 0.3333333333333333] bias=0.5773502692 tensor=0.000000000 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.570796327
+node=2 degree=3 dimension=3 eigenvalues=[0.3333333333333333, 0.3333333333333333, 0.3333333333333333] bias=0.5773502692 tensor=0.000000000 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.570796327
+node=3 degree=3 dimension=3 eigenvalues=[0.3333333333333333, 0.3333333333333333, 0.3333333333333333] bias=0.5773502692 tensor=0.000000000 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.570796327
+node=4 degree=3 dimension=3 eigenvalues=[0.3333333333333333, 0.3333333333333333, 0.3333333333333333] bias=0.5773502692 tensor=0.000000000 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.570796327
+node=5 degree=3 dimension=3 eigenvalues=[0.3333333333333333, 0.3333333333333333, 0.3333333333333333] bias=0.5773502692 tensor=0.000000000 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.570796327
+node=6 degree=3 dimension=3 eigenvalues=[0.3333333333333333, 0.3333333333333333, 0.3333333333333333] bias=0.5773502692 tensor=0.000000000 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.570796327
+node=7 degree=3 dimension=3 eigenvalues=[0.3333333333333333, 0.3333333333333333, 0.3333333333333333] bias=0.5773502692 tensor=0.000000000 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.570796327

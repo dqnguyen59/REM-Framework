@@ -92,3 +92,38 @@ Outputs include explicit candidates,
 history and score CSV files, a summary, and a summary checkpoint. The checkpoint
 does not restore exact PRNG state, so resume is not bit-for-bit supported.
 Canonical signatures normalize edge ordering but do not solve graph isomorphism.
+
+### Angular diagnostics and scoring profiles
+
+Topology metadata version 0.2 separates normalized net directional bias from
+isotropy. Bias is `|sum(u)| / degree`; it is useful for centrosymmetric
+neighborhoods but is not a universal symmetry error. The principal isotropy
+measure is the Frobenius error of the local second moment against `I/d`, where
+`d` is estimated from the symmetric tensor eigenvalues.
+
+Known angular references are applied only to opposite degree-2 directions in
+1D, equilateral degree-3 directions in 2D, tetrahedral degree-4 directions in
+3D, and octahedral degree-6 directions in 3D. Unsupported degrees remain
+descriptive and receive no reference penalty. A deterministic Fibonacci-sphere
+sample estimates uncovered solid angle. Opposite-direction mismatch is reported
+separately and is disabled in the general profile.
+
+Available profiles are `general`, `wave`, `centrosymmetric`, `tetrahedral`, and
+`cubic-runtime`. Override a profile weight with options such as
+`--weight-tensor-isotropy 5` or `--weight-opposite-direction 0`.
+
+Analyze without relaxation or topology mutation:
+
+```shell
+java -cp target/rem.jar remframework.geometry.discovery.GeometryDiagnosticMain \
+  --model tetrahedron --profile general
+
+java -cp target/rem.jar remframework.geometry.discovery.GeometryDiagnosticMain \
+  --file lattice/topology-search/run-001/best-candidate.toml --profile wave
+```
+
+Scores use dimensionless edge error relative to target distance, edge variance
+relative to squared target distance, collision counts relative to all node
+pairs, angular errors relative to pi where appropriate, and graph counts
+relative to graph size. Reports retain raw values, normalized values, weights,
+applicability, weighted contributions, and percentage of total.

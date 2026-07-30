@@ -90,7 +90,8 @@ public final class TopologySearchSession {
         if (settings.searchMode() == TopologySearchMode.SIMULATED_ANNEALING)
             temperature = Math.max(settings.minimumTemperature(), temperature * settings.coolingRate());
         history.add(new TopologySearchHistoryEntry(iteration, current.score().total(),
-                best.score().total(), acceptedThisIteration, mutationName, temperature, elapsed()));
+                best.score().total(), acceptedThisIteration, mutationName, temperature, elapsed(),
+                current.score().details()));
     }
 
     public boolean accept(double candidateScore, double currentScore) {

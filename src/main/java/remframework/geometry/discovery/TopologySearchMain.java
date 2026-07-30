@@ -21,6 +21,10 @@ public final class TopologySearchMain {
                 .toLowerCase(Locale.ROOT).startsWith("anneal")
                 ? TopologySearchMode.SIMULATED_ANNEALING : TopologySearchMode.HILL_CLIMBING;
         TopologySearchSettings defaults = TopologySearchSettings.defaults(seed, geometry);
+        TopologyScoringProfile profile = TopologyScoringProfile.parse(
+                options.getOrDefault("scoring-profile", "general"));
+        TopologyScoreWeights weights = applyWeightOverrides(
+                TopologyScoreWeights.forProfile(profile), options);
         TopologySearchSettings settings = new TopologySearchSettings(mode, seed,
                 integer(options, "iterations", defaults.maximumSearchIterations()),
                 integer(options, "mutations-per-iteration", 1),
@@ -30,7 +34,8 @@ public final class TopologySearchMain {
                 decimal(options, "initial-temperature", defaults.initialTemperature()),
                 decimal(options, "cooling-rate", defaults.coolingRate()),
                 defaults.minimumTemperature(), defaults.scoreImprovementTolerance(), geometry,
-                defaults.scoreWeights(), integer(options, "checkpoint-interval", 100));
+                weights, profile, defaults.diagnosticSettings(),
+                integer(options, "checkpoint-interval", 100));
         GeometryDiscoveryModel model;
         if (options.containsKey("input-file"))
             model = new GeometryDiscoveryCandidateLoader()
@@ -40,8 +45,9 @@ public final class TopologySearchMain {
                 .replace('-', '_').toUpperCase(Locale.ROOT);
         TopologyInitialization initialization = TopologyInitialization.valueOf(initializationName);
         model = new TopologyCoordinateInitializer().initialize(model, initialization, target, seed);
-        System.out.printf(Locale.ROOT, "Topology search: model=%s nodes=%d mode=%s seed=%d%n",
-                model.name(), model.nodes().size(), mode, seed);
+        System.out.printf(Locale.ROOT,
+                "Topology search: model=%s nodes=%d mode=%s profile=%s seed=%d%n",
+                model.name(), model.nodes().size(), mode, profile, seed);
         TopologySearchSession session = new TopologySearchSession(model, settings);
         TopologySearchResult result = session.run(s -> {
             TopologySearchMetrics m = s.metrics();
@@ -66,6 +72,15 @@ public final class TopologySearchMain {
             String value = i + 1 < args.length && !args[i + 1].startsWith("--") ? args[++i] : "true";
             result.put(key, value);
         }
+        return result;
+    }
+    static TopologyScoreWeights applyWeightOverrides(TopologyScoreWeights weights,
+                                                     Map<String, String> options) {
+        TopologyScoreWeights result = weights;
+        for (Map.Entry<String, String> option : options.entrySet())
+            if (option.getKey().startsWith("weight-"))
+                result = result.override(option.getKey().substring("weight-".length()),
+                        Double.parseDouble(option.getValue()));
         return result;
     }
     private static int integer(Map<String, String> o, String k, int d) {

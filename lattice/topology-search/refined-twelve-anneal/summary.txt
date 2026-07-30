@@ -1,0 +1,59 @@
+REM Framework Geometry Discovery topology search
+mode=SIMULATED_ANNEALING
+seed=42
+scoringProfile=GENERAL_GEOMETRY
+initialScore=14.068316980009323
+bestScore=2.5343154974374220
+acceptedMutations=97
+rejectedMutations=1795
+invalidMutations=540
+duplicateTopologies=2568
+relaxationFailures=0
+elapsedMilliseconds=2233
+bestCandidate=/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/refined-twelve-anneal/best-candidate.toml
+
+scoreExplanation:
+REM Framework Geometry Discovery diagnostic report
+model=generated-12
+scoringProfile=GENERAL_GEOMETRY
+totalScore=2.534315497
+globalDimensionality=3
+meanNormalizedDirectionalBias=0.6761042640
+meanTensorIsotropyError=0.2524218418
+knownReferenceAngularError=0.000000000 applicableNodes=0
+meanNearestDirectionAngle=1.006729708 maximumUncoveredAngle=2.312038349 approximate=true
+meanOppositeDirectionMismatch=1.555418643 missingDirections=34
+dimensionDeficientNodes=2 dimensionMismatchNodes=2
+
+scoreExplanation:
+metric,applicable,raw,normalized,weight,contribution,percent
+edgeLengthError,true,2.329924536e-14,1.370543845e-15,5.000000000,6.852719223e-15,2.703972426e-13
+edgeLengthVariance,true,1.365390572e-15,1.365390572e-15,2.000000000,2.730781144e-15,1.077522174e-13
+separationCollision,true,0.000000000,0.000000000,10.00000000,0.000000000,0.000000000
+nonConvergence,true,0.000000000,0.000000000,10.00000000,0.000000000,0.000000000
+directionalBias,true,0.6761042640,0.6761042640,0.000000000,0.000000000,0.000000000
+tensorIsotropy,true,0.2524218418,0.2524218418,3.000000000,0.7572655255,29.88047566
+knownReferenceAngular,false,0.000000000,0.000000000,1.000000000,0.000000000,0.000000000
+sphericalCoverage,true,2.312038349,0.7359446637,2.000000000,1.471889327,58.07837773
+oppositeDirection,true,1.555418643,0.4951051313,0.000000000,0.000000000,0.000000000
+localDimensionality,true,2.000000000,0.1666666667,1.000000000,0.1666666667,6.576397723
+degreeVariance,true,0.3726779962,0.1315334104,0.5000000000,0.06576670522,2.595048063
+bridge,true,0.000000000,0.000000000,2.000000000,0.000000000,0.000000000
+articulationPoint,true,0.000000000,0.000000000,2.000000000,0.000000000,0.000000000
+graphDiameter,true,4.000000000,0.3636363636,0.2000000000,0.07272727273,2.869700825
+runtimeCompatibility,false,1.000000000,1.000000000,0.000000000,0.000000000,0.000000000
+profileDegree,false,0.000000000,0.000000000,0.000000000,0.000000000,0.000000000
+
+nodeDiagnostics:
+node=0 degree=3 dimension=3 eigenvalues=[0.42500569590694603, 0.33956077357300407, 0.23543353052004962] bias=0.6397809230 tensor=0.1342645689 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.588170046
+node=1 degree=2 dimension=2 eigenvalues=[0.5195532013651625, 0.4804467986348374, 8.673617379884035E-19] bias=0.6931426972 tensor=0.02765240256 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.531679950
+node=2 degree=3 dimension=3 eigenvalues=[0.5075397356546, 0.33106553143351697, 0.16139473291188303] bias=0.6916340078 tensor=0.2447772372 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.626202025
+node=3 degree=3 dimension=3 eigenvalues=[0.4871586612003634, 0.29988345321781845, 0.21295788558181797] bias=0.5422308980 tensor=0.1981700643 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.317404768
+node=4 degree=3 dimension=3 eigenvalues=[0.5415895145437606, 0.3644202306229609, 0.0939902548332782] bias=0.7175288737 tensor=0.3187822790 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.622112196
+node=5 degree=3 dimension=3 eigenvalues=[0.5774362095052189, 0.23763758497685125, 0.18492620551792974] bias=0.5062351291 tensor=0.3012782202 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.176998727
+node=6 degree=3 dimension=3 eigenvalues=[0.5313425244275969, 0.35162505861988164, 0.11703241695252092] bias=0.7164909398 tensor=0.2938168024 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.657912901
+node=7 degree=3 dimension=3 eigenvalues=[0.5217874431690771, 0.32269581357825183, 0.15551674325267076] bias=0.7030421665 tensor=0.2593199723 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.663037468
+node=8 degree=3 dimension=3 eigenvalues=[0.6310031418013081, 0.3495247180844479, 0.01947214011424419] bias=0.7727829952 tensor=0.4328721802 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.685094189
+node=9 degree=3 dimension=3 eigenvalues=[0.5252711013531691, 0.405625899305413, 0.06910299934141795] bias=0.6171198730 tensor=0.3344906445 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.310447461
+node=10 degree=3 dimension=3 eigenvalues=[0.5526677843540578, 0.3555079274071293, 0.09182428823881283] bias=0.7317494420 tensor=0.3269953102 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.691788758
+node=11 degree=2 dimension=2 eigenvalues=[0.6107629172923856, 0.38923708270761476, 0.0] bias=0.7815132227 tensor=0.1566424198 angularReference=NONE angularApplicable=false angularError=0.000000000 oppositeMismatch=1.794175231

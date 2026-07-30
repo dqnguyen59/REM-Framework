@@ -1,0 +1,9 @@
+# Topology-search checkpoint (summary checkpoint; PRNG state is not restored)
+formatVersion = "0.2"
+iteration = 5000
+seed = 42
+searchMode = "SIMULATED_ANNEALING"
+scoringProfile = "GENERAL_GEOMETRY"
+currentCandidateId = 1521
+bestCandidateId = 1521
+bestScore = 2.5343154974374220

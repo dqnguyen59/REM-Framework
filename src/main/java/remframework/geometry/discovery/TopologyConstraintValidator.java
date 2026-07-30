@@ -18,6 +18,24 @@ public final class TopologyConstraintValidator {
                 || settings.initialTemperature() < 0 || !Double.isFinite(settings.coolingRate())
                 || settings.coolingRate() <= 0 || settings.coolingRate() > 1)
             result.error("SEARCH_NUMERICS", "Search numerical settings are invalid.");
+        TopologyDiagnosticSettings diagnostics = settings.diagnosticSettings();
+        if (diagnostics == null || !Double.isFinite(diagnostics.eigenvalueRelativeTolerance())
+                || diagnostics.eigenvalueRelativeTolerance() <= 0
+                || !Double.isFinite(diagnostics.oppositeDirectionToleranceRadians())
+                || diagnostics.oppositeDirectionToleranceRadians() < 0
+                || diagnostics.sphericalSampleCount() < 16)
+            result.error("DIAGNOSTIC_SETTINGS", "Directional diagnostic settings are invalid.");
+        TopologyScoreWeights weights = settings.scoreWeights();
+        if (weights == null || java.util.stream.DoubleStream.of(weights.edgeLengthError(),
+                        weights.edgeLengthVariance(), weights.separationCollision(),
+                        weights.nonConvergence(), weights.directionalBias(), weights.tensorIsotropy(),
+                        weights.knownReferenceAngular(), weights.sphericalCoverage(),
+                        weights.oppositeDirection(), weights.localDimensionality(),
+                        weights.degreeVariance(), weights.bridgePenalty(),
+                        weights.articulationPenalty(), weights.graphDiameterPreference(),
+                        weights.runtimeCompatibility(), weights.profileDegree())
+                .anyMatch(value -> !Double.isFinite(value) || value < 0))
+            result.error("SCORE_WEIGHTS", "Score weights must be finite and non-negative.");
         if (model.nodes().size() < 4 || model.nodes().size() > 32)
             result.error("NODE_LIMIT", "Topology search supports 4 to 32 nodes.");
         Map<Integer, Integer> degree = new HashMap<>();

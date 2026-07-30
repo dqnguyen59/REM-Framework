@@ -22,13 +22,19 @@ public final class TopologySearchBatchMain {
         List<TopologySearchMode> modes = modes(options.getOrDefault("search-modes",
                 "hill-climbing,annealing"));
         List<Double> weightScales = decimals(options.getOrDefault("weight-scales", "1"));
+        List<TopologyScoringProfile> profiles = profiles(
+                options.getOrDefault("scoring-profiles",
+                        options.getOrDefault("scoring-profile", "general")));
         StringBuilder csv = new StringBuilder(
-                "runId,seed,searchMode,weightScale,initialTopology,initialScore,bestScore,scoreImprovement,"
-                        + "acceptedMutationCount,invalidMutationCount,duplicateCount,"
-                        + "runtimeMilliseconds,bestCandidatePath\n");
+                "runId,seed,searchMode,scoringProfile,weightScale,initialTopology,initialScore,bestScore,scoreImprovement,"
+                        + "converged,acceptedMutationCount,invalidMutationCount,duplicateCount,"
+                        + "meanDirectionalBias,tensorIsotropyError,angularReferenceApplicable,"
+                        + "angularReferenceError,maximumUncoveredAngle,oppositeDirectionMismatch,"
+                        + "dimensionMismatchCount,runtimeMilliseconds,bestCandidatePath\n");
         int runId = 0;
         for (long seed : seeds) for (TopologySearchMode mode : modes)
-                for (double weightScale : weightScales) {
+                for (TopologyScoringProfile profile : profiles)
+                    for (double weightScale : weightScales) {
             GeometryDiscoverySettings geometry = GeometryDiscoverySettings.defaults(1)
                     .withMaximumIterations(Integer.parseInt(
                             options.getOrDefault("relaxation-iterations", "500")))
@@ -37,22 +43,34 @@ public final class TopologySearchBatchMain {
             TopologySearchSettings settings = new TopologySearchSettings(mode, seed, iterations, 1,
                     1, 6, -1, 10, base.initialTemperature(), base.coolingRate(),
                     base.minimumTemperature(), base.scoreImprovementTolerance(), geometry,
-                    base.scoreWeights().scaled(weightScale), Math.max(1, iterations));
+                    TopologySearchMain.applyWeightOverrides(
+                            TopologyScoreWeights.forProfile(profile).scaled(weightScale), options),
+                    profile, base.diagnosticSettings(), Math.max(1, iterations));
             GeometryDiscoveryModel initial = TopologySearchExamples.create(model, nodes, 1, seed);
             TopologySearchResult result = new TopologySearchEngine().search(initial, settings);
             Path runDir = output.resolve(String.format(Locale.ROOT, "run-%04d", ++runId));
             Path best = new TopologySearchExporter().export(result, runDir);
             TopologySearchMetrics metrics = result.metrics();
+            DirectionalBalanceMetrics diagnostics = result.bestCandidate().directionalMetrics();
             csv.append(runId).append(',').append(seed).append(',').append(mode).append(',')
+                    .append(profile).append(',')
                     .append(weightScale).append(',')
                     .append(initial.name()).append(',')
                     .append(result.initialCandidate().score().total()).append(',')
                     .append(result.bestCandidate().score().total()).append(',')
                     .append(result.initialCandidate().score().total()
                             - result.bestCandidate().score().total()).append(',')
+                    .append(result.bestCandidate().geometryResult().converged()).append(',')
                     .append(metrics.acceptedMutationCount()).append(',')
                     .append(metrics.invalidMutationCount()).append(',')
                     .append(metrics.duplicateTopologyCount()).append(',')
+                    .append(diagnostics.meanNormalizedDirectionalBias()).append(',')
+                    .append(diagnostics.meanTensorIsotropyError()).append(',')
+                    .append(diagnostics.angularReferenceApplicableNodeCount() > 0).append(',')
+                    .append(diagnostics.meanKnownReferenceAngularError()).append(',')
+                    .append(diagnostics.maximumUncoveredAngle()).append(',')
+                    .append(diagnostics.meanOppositeDirectionMismatch()).append(',')
+                    .append(diagnostics.localGlobalDimensionMismatchCount()).append(',')
                     .append(metrics.elapsedMilliseconds()).append(',').append(best).append('\n');
         }
         Path summary = output.resolve("topology-batch-summary.csv");
@@ -84,6 +102,12 @@ public final class TopologySearchBatchMain {
         for (String item : value.split(","))
             result.add(item.trim().toLowerCase(Locale.ROOT).startsWith("anneal")
                     ? TopologySearchMode.SIMULATED_ANNEALING : TopologySearchMode.HILL_CLIMBING);
+        return result;
+    }
+
+    private static List<TopologyScoringProfile> profiles(String value) {
+        List<TopologyScoringProfile> result = new ArrayList<>();
+        for (String item : value.split(",")) result.add(TopologyScoringProfile.parse(item.trim()));
         return result;
     }
 }

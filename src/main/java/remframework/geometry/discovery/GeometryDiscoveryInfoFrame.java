@@ -54,16 +54,29 @@ final class GeometryDiscoveryInfoFrame extends AbstractFrame {
         label(context, result.runtimeCompatibility().reason());
         TopologySearchMetadata topology = visualizer.topologySearchMetadata();
         if (topology != null) {
-            label(context, String.format("Topology score %.7g  Mode %s  Seed %d",
-                    topology.totalScore(), topology.searchMode(), topology.searchSeed()));
+            label(context, String.format("Topology score %.7g  Profile %s",
+                    topology.totalScore(), topology.scoringProfile()));
+            label(context, "Diagnostics metadata: "
+                    + (topology.redesignedDiagnosticsAvailable() ? "version "
+                    + topology.metadataVersion() : "legacy; new metrics unavailable"));
             label(context, String.format("Degree min/mean/max %d / %.4g / %d  Diameter %d",
                     topology.minimumDegree(), topology.meanDegree(), topology.maximumDegree(),
                     topology.graphDiameter()));
             label(context, "Bridges: " + topology.bridgeCount() + "  Articulation points: "
                     + topology.articulationPointCount());
-            label(context, String.format("Directional imbalance %.6g  Tensor anisotropy %.6g",
-                    topology.meanDirectionalImbalance(), topology.tensorAnisotropy()));
-            label(context, String.format("Score parts edge %.5g direction %.5g tensor %.5g degree %.5g",
+            label(context, String.format("Directional bias %.6g  Tensor isotropy %.6g",
+                    topology.meanDirectionalBias(), topology.tensorIsotropyError()));
+            if (topology.redesignedDiagnosticsAvailable()) {
+                label(context, "Angular reference: " + (topology.angularReferenceAvailable()
+                        ? String.format("error %.6g", topology.angularReferenceError())
+                        : "not applicable"));
+                label(context, String.format("Coverage max gap %.6g  Opposite mismatch %.6g",
+                        topology.maximumUncoveredAngle(),
+                        topology.oppositeDirectionMismatch()));
+                label(context, "Global dimension: " + topology.globalDimensionality()
+                        + "  local mismatches: " + topology.dimensionalityMismatchCount());
+            }
+            label(context, String.format("Score parts edge %.5g bias %.5g tensor %.5g degree %.5g",
                     topology.edgeLengthComponent(), topology.directionalComponent(),
                     topology.tensorComponent(), topology.degreeVarianceComponent()));
             label(context, "Parent mutation: " + topology.parentMutation());
@@ -168,6 +181,26 @@ final class GeometryDiscoveryInfoFrame extends AbstractFrame {
                     label(context, "Neighbor distances: " + local.neighborDistances());
                 label(context, String.format("Local mean %.6g  Max error %.6g",
                         local.meanLocalEdgeDistance(), local.maximumLocalEdgeError()));
+                LocalDirectionalDiagnostics nodeDiagnostics =
+                        visualizer.selectedNodeDirectionalDiagnostics();
+                if (nodeDiagnostics != null) {
+                    label(context, "Local degree: " + nodeDiagnostics.degree()
+                            + "  dimension: " + nodeDiagnostics.localDimensionality());
+                    label(context, "Eigenvalues: " + nodeDiagnostics.eigenvalues());
+                    label(context, String.format("Bias %.6g  Tensor error %.6g",
+                            nodeDiagnostics.normalizedDirectionalBias(),
+                            nodeDiagnostics.tensorIsotropyError()));
+                    label(context, "Pairwise dots: " + nodeDiagnostics.pairwiseDotProducts());
+                    label(context, "Angular reference: "
+                            + (nodeDiagnostics.angularReferenceApplicable()
+                            ? nodeDiagnostics.angularReferenceType() + " error "
+                            + nodeDiagnostics.knownReferenceAngularError() : "not applicable"));
+                    label(context, String.format("Opposite mismatch %.6g  Coverage max gap %s",
+                            nodeDiagnostics.meanOppositeDirectionMismatch(),
+                            nodeDiagnostics.sphericalCoverageApplicable()
+                                    ? String.format("%.6g", nodeDiagnostics.maximumUncoveredAngle())
+                                    : "unavailable"));
+                }
             }
         }
         Nuklear.nk_layout_row_end(context);

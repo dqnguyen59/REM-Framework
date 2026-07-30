@@ -56,6 +56,12 @@ public final class GeometryDiscoveryVisualizer {
                 viewState.selectedNodeId(), session.settings().targetDistance());
     }
 
+    public LocalDirectionalDiagnostics selectedNodeDirectionalDiagnostics() {
+        if (viewState.selectedNodeId() == null) return null;
+        return new DirectionalBalanceCalculator().calculate(session.model())
+                .localDiagnostics().get(viewState.selectedNodeId());
+    }
+
     public Path exportCandidate(Path path) throws IOException {
         return new GeometryDiscoveryExporter().export(session.result(), path);
     }
