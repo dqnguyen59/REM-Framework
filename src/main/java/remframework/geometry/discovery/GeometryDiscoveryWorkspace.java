@@ -38,6 +38,8 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
     private final Deque<DiscoveryExperimentEvent> eventLog = new ArrayDeque<>();
     private static final int EVENT_LOG_LIMIT = 200;
     private volatile long lastVisualPublishNanos;
+    private volatile long searchVisualPublicationCount;
+    private volatile long intentionalPacingWaitCount;
 
     public GeometryDiscoveryWorkspace(GeometryDiscoveryWorkspaceState state) {
         this.state = state;
@@ -256,12 +258,16 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
     private void runSearchLoop(TopologySearchSession session, TopologySearchSettings settings) {
         double priorBest = session.bestCandidate().score().total();
         int priorAccepted = session.metrics().acceptedMutationCount();
+        searchVisualPublicationCount = 0;
+        intentionalPacingWaitCount = 0;
+        lastVisualPublishNanos = 0;
         while (searchRequested && !stopRequested && searchSession == session
                 && session.iteration() < settings.maximumSearchIterations()) {
             double previousScore = session.currentCandidate().score().total();
             session.step();
             TopologySearchMetrics metrics = session.metrics();
-            if (metrics.acceptedMutationCount() > priorAccepted) {
+            boolean acceptedMutation = metrics.acceptedMutationCount() > priorAccepted;
+            if (acceptedMutation) {
                 TopologyMutation mutation = session.currentCandidate().mutation();
                 String mutationDetails = mutation == null ? "unknown mutation"
                         : mutation.type() + "; removed " + mutation.removedEdges()
@@ -272,7 +278,8 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
                 priorAccepted = metrics.acceptedMutationCount();
             }
             double best = session.bestCandidate().score().total();
-            if (best < priorBest) {
+            boolean newBest = best < priorBest;
+            if (newBest) {
                 TopologyMutation mutation = session.bestCandidate().mutation();
                 recordEvent("new-best", session.iteration(),
                         (mutation == null ? "" : mutation.type() + "; removed "
@@ -283,11 +290,24 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
                 if (state.followBestCandidate())
                     state.setViewportSelection(DiscoveryViewportSelection.BEST_CANDIDATE);
             }
-            publishThrottled("Searching");
+            if (shouldPublishSearch(acceptedMutation, newBest)) {
+                publish("Searching", "");
+                searchVisualPublicationCount++;
+                paceAfterVisualPublication();
+            }
+            if (new DiscoveryVisualizationPublicationPolicy().shouldPauseOnNewBest(
+                    state.pauseOnNewBest(), newBest)) {
+                searchRequested = false;
+                state.setExperimentLifecycle(DiscoveryExperimentLifecycle.PAUSED);
+                recordEvent("pause", session.iteration(), "Paused on a new best candidate.");
+                publish("Paused on new best candidate", "");
+                break;
+            }
             Thread.yield();
         }
         if (searchSession == session) {
             boolean complete = session.iteration() >= settings.maximumSearchIterations();
+            searchRequested = false;
             state.setExperimentLifecycle(complete ? DiscoveryExperimentLifecycle.COMPLETED
                     : stopRequested ? DiscoveryExperimentLifecycle.STOPPED
                     : DiscoveryExperimentLifecycle.PAUSED);
@@ -297,7 +317,40 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
                             : "Topology search paused.");
             publish(complete ? "Search finished" : stopRequested
                     ? "Search stopped" : "Search paused", "");
+            searchVisualPublicationCount++;
         }
+    }
+
+    private boolean shouldPublishSearch(boolean accepted, boolean newBest) {
+        long now = System.nanoTime();
+        boolean timedDue = state.maximumVisualizationSpeed()
+                || now - lastVisualPublishNanos >= visualizationIntervalNanos();
+        return new DiscoveryVisualizationPublicationPolicy().shouldPublish(
+                state.visualizationUpdateTrigger(), accepted, newBest, timedDue);
+    }
+
+    private void paceAfterVisualPublication() {
+        lastVisualPublishNanos = System.nanoTime();
+        if (state.maximumVisualizationSpeed()
+                || state.visualizationUpdateTrigger()
+                == DiscoveryVisualizationUpdateTrigger.TIMED_SNAPSHOT) return;
+        long deadline = lastVisualPublishNanos + visualizationIntervalNanos();
+        while (searchRequested && !stopRequested) {
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) return;
+            try {
+                Thread.sleep(Math.min(25,
+                        Math.max(1, remaining / 1_000_000)));
+                intentionalPacingWaitCount++;
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
+    private long visualizationIntervalNanos() {
+        return 1_000_000_000L / Math.max(1, state.snapshotUpdatesPerSecond());
     }
 
     public void singleSearchStep(TopologySearchSettings settings) {
@@ -454,6 +507,8 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
     }
     public String lastWorkerThreadName() { return lastWorkerThreadName; }
     public int relaxationIterationsPerUpdate() { return relaxationIterationsPerUpdate; }
+    public long searchVisualPublicationCount() { return searchVisualPublicationCount; }
+    public long intentionalPacingWaitCount() { return intentionalPacingWaitCount; }
     public void setRelaxationIterationsPerUpdate(int value) {
         relaxationIterationsPerUpdate = Math.max(1, Math.min(10_000, value));
     }

@@ -24,7 +24,8 @@ public final class GeometryDiscoveryWizardFormLayout {
         List<Row> rows = new ArrayList<>();
         for (FieldKind field : fields) {
             int rowHeight = field == FieldKind.DESCRIPTION
-                    ? DESCRIPTION_ROW_HEIGHT : STANDARD_ROW_HEIGHT;
+                    ? DESCRIPTION_ROW_HEIGHT : field == FieldKind.HELP ? 72
+                    : STANDARD_ROW_HEIGHT;
             rows.add(new Row(new Rectangle(0, y, labelWidth, rowHeight),
                     new Rectangle(labelWidth + 12, y, controlWidth, rowHeight)));
             y += rowHeight + ROW_SPACING;
@@ -36,7 +37,7 @@ public final class GeometryDiscoveryWizardFormLayout {
                 Math.max(contentHeight, y));
     }
 
-    public enum FieldKind { STANDARD, DESCRIPTION }
+    public enum FieldKind { STANDARD, DESCRIPTION, HELP }
     public record Rectangle(int x, int y, int width, int height) {
         public int bottom() { return y + height; }
         public boolean overlaps(Rectangle other) {

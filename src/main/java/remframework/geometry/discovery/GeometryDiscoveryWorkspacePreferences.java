@@ -35,6 +35,15 @@ public final class GeometryDiscoveryWorkspacePreferences {
                     values.getProperty("introductionDismissed", "false")));
             state.setSelectedDetailTab(GeometryDiscoveryDetailTab.valueOf(values.getProperty(
                     "selectedDetailTab", GeometryDiscoveryDetailTab.OVERVIEW.name())));
+            state.setVisualizationUpdateTrigger(DiscoveryVisualizationUpdateTrigger.valueOf(
+                    values.getProperty("visualizationUpdateTrigger",
+                            DiscoveryVisualizationUpdateTrigger.ACCEPTED_MUTATION.name())));
+            state.setSnapshotUpdatesPerSecond(Integer.parseInt(
+                    values.getProperty("visualizationSpeed", "8")));
+            state.setMaximumVisualizationSpeed(Boolean.parseBoolean(
+                    values.getProperty("maximumVisualizationSpeed", "false")));
+            state.setPauseOnNewBest(Boolean.parseBoolean(
+                    values.getProperty("pauseOnNewBest", "false")));
         } catch (Exception exception) {
             System.err.println("Could not load Geometry Discovery preferences: "
                     + exception.getMessage());
@@ -55,6 +64,13 @@ public final class GeometryDiscoveryWorkspacePreferences {
         values.setProperty("introductionDismissed",
                 Boolean.toString(state.introductionDismissed()));
         values.setProperty("selectedDetailTab", state.selectedDetailTab().name());
+        values.setProperty("visualizationUpdateTrigger",
+                state.visualizationUpdateTrigger().name());
+        values.setProperty("visualizationSpeed",
+                Integer.toString(state.snapshotUpdatesPerSecond()));
+        values.setProperty("maximumVisualizationSpeed",
+                Boolean.toString(state.maximumVisualizationSpeed()));
+        values.setProperty("pauseOnNewBest", Boolean.toString(state.pauseOnNewBest()));
         try {
             if (path.getParent() != null) Files.createDirectories(path.getParent());
             try (OutputStream output = Files.newOutputStream(path)) {

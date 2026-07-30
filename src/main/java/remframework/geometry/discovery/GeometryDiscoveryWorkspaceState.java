@@ -31,6 +31,10 @@ public final class GeometryDiscoveryWorkspaceState {
             DiscoveryViewportSelection.CURRENT_CANDIDATE;
     private volatile boolean followBestCandidate;
     private volatile int snapshotUpdatesPerSecond = 8;
+    private volatile DiscoveryVisualizationUpdateTrigger visualizationUpdateTrigger =
+            DiscoveryVisualizationUpdateTrigger.ACCEPTED_MUTATION;
+    private volatile boolean maximumVisualizationSpeed;
+    private volatile boolean pauseOnNewBest;
 
     public boolean open() { return open; }
     void setOpen(boolean value) { open = value; }
@@ -94,6 +98,20 @@ public final class GeometryDiscoveryWorkspaceState {
     public void setFollowBestCandidate(boolean value) { followBestCandidate = value; }
     public int snapshotUpdatesPerSecond() { return snapshotUpdatesPerSecond; }
     public void setSnapshotUpdatesPerSecond(int value) {
-        snapshotUpdatesPerSecond = Math.max(1, Math.min(60, value));
+        if (!DiscoveryVisualizationPacing.validSpeed(value) && value != 8)
+            throw new IllegalArgumentException("Visualization speed must be one of the supported values.");
+        snapshotUpdatesPerSecond = value;
     }
+    public DiscoveryVisualizationUpdateTrigger visualizationUpdateTrigger() {
+        return visualizationUpdateTrigger;
+    }
+    public void setVisualizationUpdateTrigger(DiscoveryVisualizationUpdateTrigger value) {
+        visualizationUpdateTrigger = java.util.Objects.requireNonNull(value);
+    }
+    public boolean maximumVisualizationSpeed() { return maximumVisualizationSpeed; }
+    public void setMaximumVisualizationSpeed(boolean value) {
+        maximumVisualizationSpeed = value;
+    }
+    public boolean pauseOnNewBest() { return pauseOnNewBest; }
+    public void setPauseOnNewBest(boolean value) { pauseOnNewBest = value; }
 }

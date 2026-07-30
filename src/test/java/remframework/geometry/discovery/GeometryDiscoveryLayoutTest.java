@@ -6,6 +6,8 @@ import remframework.gui.view.frames.AbstractFrame;
 import remframework.gui.view.frames.GeometryDiscoveryNewFrame;
 
 import java.util.List;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -89,5 +91,52 @@ class GeometryDiscoveryLayoutTest {
             assertTrue(layout.footer().bottom() <= Math.max(180, size[1])
                     + GeometryDiscoveryWizardFormLayout.ROW_SPACING);
         }
+    }
+
+    @Test void wizardTopologyGeometryAndSearchFieldsUseDistinctRowsAndClearScroll()
+            throws Exception {
+        GeometryDiscoveryWizardFormLayout calculator =
+                new GeometryDiscoveryWizardFormLayout();
+        for (List<GeometryDiscoveryWizardFormLayout.FieldKind> page : List.of(
+                List.of(GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.HELP),
+                List.of(GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD),
+                List.of(GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD,
+                        GeometryDiscoveryWizardFormLayout.FieldKind.STANDARD))) {
+            GeometryDiscoveryWizardFormLayout.Layout layout =
+                    calculator.calculate(640, 500, page);
+            for (int i = 1; i < layout.rows().size(); i++)
+                assertTrue(layout.rows().get(i).label().y()
+                        >= layout.rows().get(i - 1).label().bottom());
+            for (GeometryDiscoveryWizardFormLayout.Row row : layout.rows())
+                assertFalse(row.label().overlaps(row.control()));
+        }
+        String source = Files.readString(Path.of(
+                "src/main/java/remframework/gui/view/frames/GeometryDiscoveryNewFrame.java"));
+        for (String label : List.of("Initial topology", "Neighbor-count policy",
+                "Minimum neighbors per node", "Target initial neighbors per node",
+                "Maximum neighbors per node", "Initial geometry", "Search method",
+                "Search iterations", "Mutations per iteration", "Archive size"))
+            assertTrue(source.contains("\"" + label + "\""));
+        assertTrue(source.contains("nk_group_set_scroll"));
+        assertTrue(source.contains("\"Create Initial Candidate\""));
+        assertTrue(source.contains("\"Create and Relax Geometry\""));
+        assertTrue(source.contains("\"Create and Start Topology Search\""));
+        assertFalse(source.contains("\"Create Experiment\""));
+        assertFalse(source.contains("\"Create and Relax\""));
+        assertFalse(source.contains("\"Start Discovery\""));
     }
 }

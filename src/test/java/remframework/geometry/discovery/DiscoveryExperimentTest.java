@@ -118,7 +118,7 @@ class DiscoveryExperimentTest {
         state.setSnapshotUpdatesPerSecond(8);
         assertEquals(8, state.snapshotUpdatesPerSecond());
         state.setSnapshotUpdatesPerSecond(1000);
-        assertEquals(60, state.snapshotUpdatesPerSecond());
+        assertEquals(1000, state.snapshotUpdatesPerSecond());
     }
 
     @Test void savedConfigurationReproducesWithoutResumingWorkerAndExportEmbedsIt()

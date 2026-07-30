@@ -60,6 +60,7 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
     private TopologyScoreWeights weights =
             TopologyScoreWeights.forProfile(TopologyScoringProfile.WAVE_PROPAGATION);
     private String validationMessage = "";
+    private int renderedStep = 1;
 
     public GeometryDiscoveryNewFrame(NuklearModel model) {
         super(model);
@@ -79,12 +80,16 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
     @Override protected void layout(NkContext c, int x, int y, int width, int height) {
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 7);
         for (int i = 1; i <= 7; i++)
-            if (Nuklear.nk_button_label(c, Integer.toString(i))) step = i;
+            if (Nuklear.nk_button_label(c, Integer.toString(i))) changeStep(i);
         heading(c, step + ". " + title(step));
         int contentHeight = Math.max(130, height - 145);
         Nuklear.nk_layout_row_dynamic(c, contentHeight, 1);
         if (Nuklear.nk_group_begin(c, "New Discovery Wizard Content",
                 Nuklear.NK_WINDOW_BORDER)) {
+            if (renderedStep != step) {
+                Nuklear.nk_group_set_scroll(c, "New Discovery Wizard Content", 0, 0);
+                renderedStep = step;
+            }
             switch (step) {
                 case 1 -> experiment(c);
                 case 2 -> topology(c);
@@ -104,12 +109,12 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         Nuklear.nk_layout_row_dynamic(c, 6, 1);
         Nuklear.nk_spacer(c);
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 3);
-        if (Nuklear.nk_button_label(c, "Back") && step > 1) step--;
+        if (Nuklear.nk_button_label(c, "Back") && step > 1) changeStep(step - 1);
         if (Nuklear.nk_button_label(c, "Next") && step < 7) {
             DiscoveryExperimentValidation validation =
                     new DiscoveryExperimentValidator().validate(configuration());
             validationMessage = String.join("\n", validation.errors());
-            if (validation.valid() || step < 6) step++;
+            if (validation.valid() || step < 6) changeStep(step + 1);
         }
         if (Nuklear.nk_button_label(c, "Cancel")) close();
     }
@@ -159,53 +164,78 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         return result;
     }
 
+    private double formDouble(NkContext c, String label, double value,
+                              double minimum, double maximum, double step) {
+        Nuklear.nk_layout_row_begin(c, Nuklear.NK_DYNAMIC,
+                GeometryDiscoveryWizardFormLayout.STANDARD_ROW_HEIGHT, 2);
+        Nuklear.nk_layout_row_push(c, (float) GeometryDiscoveryWizardFormLayout.LABEL_FRACTION);
+        Nuklear.nk_label(c, label, Nuklear.NK_TEXT_LEFT);
+        Nuklear.nk_layout_row_push(c,
+                (float) (1 - GeometryDiscoveryWizardFormLayout.LABEL_FRACTION));
+        double result = Nuklear.nk_propertyd(c, "#", minimum, value, maximum,
+                step, (float) Math.max(1e-9, step / 10));
+        Nuklear.nk_layout_row_end(c);
+        return result;
+    }
+
+    private String formCombo(NkContext c, MemoryStack stack, String label,
+                             String[] options, String value) {
+        return nk_label_combo_options(c, stack, label, options, value,
+                GeometryDiscoveryWizardFormLayout.LABEL_FRACTION,
+                1 - GeometryDiscoveryWizardFormLayout.LABEL_FRACTION);
+    }
+
+    private void helpBlock(NkContext c, String text) {
+        Nuklear.nk_layout_row_dynamic(c, 72, 1);
+        Nuklear.nk_label_wrap(c, text);
+    }
+
     private void topology(NkContext c) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            topology = nk_label_combo_options(c, stack, "Initial topology",
+            topology = formCombo(c, stack, "Initial topology",
                     new String[]{"Line", "Ring", "Cubic Grid", "Random Tree",
                             "Random Connected Graph", "Complete Graph",
-                            "Load Candidate", "Load TOML"}, topology, .4, .6);
-            neighborPolicy = nk_label_combo_options(c, stack, "Neighbor-count policy",
+                            "Load Candidate", "Load TOML"}, topology);
+            neighborPolicy = formCombo(c, stack, "Neighbor-count policy",
                     new String[]{"Uniform", "Bounded", "Boundary-aware",
-                            "Unrestricted within bounds"}, neighborPolicy, .4, .6);
+                            "Unrestricted within bounds"}, neighborPolicy);
         }
-        minimumDegree = Nuklear.nk_propertyi(c, "Minimum neighbors per node", 0,
-                minimumDegree, 31, 1, 1);
-        targetDegree = Nuklear.nk_propertyd(c, "Target initial neighbors per node", 0,
-                targetDegree, 31, .25, .1f);
-        maximumDegree = Nuklear.nk_propertyi(c, "Maximum neighbors per node", 0,
-                maximumDegree, 31, 1, 1);
-        edgeProbability = Nuklear.nk_propertyd(c, "Edge probability", 0,
-                edgeProbability, 1, .05, .01f);
-        label(c, "Help: The number of neighbors is |N| in the Fundamental Node Equation. "
+        minimumDegree = formInt(c, "Minimum neighbors per node", minimumDegree, 0, 31);
+        targetDegree = formDouble(c, "Target initial neighbors per node",
+                targetDegree, 0, 31, .25);
+        maximumDegree = formInt(c, "Maximum neighbors per node", maximumDegree, 0, 31);
+        if (topology.equals("Random Connected Graph"))
+            edgeProbability = formDouble(c, "Edge probability",
+                    edgeProbability, 0, 1, .05);
+        helpBlock(c, "Help:\nThe number of neighbors is |N| in the Fundamental Node Equation. "
                 + "The current cubic REM lattice uses |N| = 6, but Geometry Discovery "
                 + "may explore other fixed or bounded neighbor counts.");
         if (neighborPolicy.equals("Boundary-aware"))
-            label(c, "Boundary-aware is provisional and currently uses bounded behavior "
+            helpBlock(c, "Boundary-aware is provisional and currently uses bounded behavior "
                     + "because reliable boundary classification is not yet available.");
         if (topology.startsWith("Load")) {
             if (sourceCandidate == null) sourceCandidate = controller.state().currentSource();
-            label(c, sourceCandidate == null ? "No source candidate selected."
+            helpBlock(c, sourceCandidate == null ? "No source candidate selected."
                     : "Source: " + sourceCandidate);
-            label(c, "Use Open Candidate File in stage 1, then choose Existing Coordinates.");
+            helpBlock(c, "Use Open Candidate File in stage 1, then choose Existing Coordinates.");
         }
     }
 
     private void geometry(NkContext c) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            initialization = nk_label_combo_options(c, stack, "Initialization",
+            initialization = formCombo(c, stack, "Initial geometry",
                     new String[]{"Random Sphere", "Random Cube", "Cubic Grid",
                             "Planar Circle", "Existing Coordinates"},
-                    initialization, .4, .6);
+                    initialization);
         }
-        extent = Nuklear.nk_propertyd(c, "Initial radius or extent", .001,
-                extent, 1_000_000, 1, .1f);
-        targetDistance = Nuklear.nk_propertyd(c, "Target edge distance", .001,
-                targetDistance, 1_000_000, 1, .1f);
-        minimumSeparation = Nuklear.nk_propertyd(c, "Minimum separation", .001,
-                minimumSeparation, 1_000_000, .5, .1f);
-        perturbation = Nuklear.nk_propertyd(c, "Perturbation magnitude", 0,
-                perturbation, 1_000_000, .1, .01f);
+        extent = formDouble(c, "Initial radius or extent", extent, .001, 1_000_000, 1);
+        targetDistance = formDouble(c, "Target edge distance",
+                targetDistance, .001, 1_000_000, 1);
+        minimumSeparation = formDouble(c, "Minimum separation",
+                minimumSeparation, .001, 1_000_000, .5);
+        if (!initialization.equals("Existing Coordinates"))
+            perturbation = formDouble(c, "Perturbation magnitude",
+                    perturbation, 0, 1_000_000, .1);
     }
 
     private void relaxation(NkContext c) {
@@ -229,29 +259,28 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
 
     private void search(NkContext c) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            searchMode = nk_label_combo_options(c, stack, "Search mode",
+            searchMode = formCombo(c, stack, "Search method",
                     new String[]{"Hill Climbing", "Simulated Annealing"},
-                    searchMode, .4, .6);
+                    searchMode);
         }
-        searchIterations = Nuklear.nk_propertyi(c, "Maximum search iterations",
-                1, searchIterations, 10_000_000, 100, 10);
-        mutations = Nuklear.nk_propertyi(c, "Mutations per iteration",
-                1, mutations, 100, 1, 1);
-        minimumDegree = Nuklear.nk_propertyi(c, "Minimum degree",
-                1, minimumDegree, 31, 1, 1);
-        maximumDegree = Nuklear.nk_propertyi(c, "Maximum degree",
-                1, maximumDegree, 31, 1, 1);
-        archiveSize = Nuklear.nk_propertyi(c, "Archive size",
-                1, archiveSize, 1000, 1, 1);
+        searchIterations = formInt(c, "Search iterations",
+                searchIterations, 1, 10_000_000);
+        mutations = formInt(c, "Mutations per iteration", mutations, 1, 100);
+        minimumDegree = formInt(c, "Minimum neighbors", minimumDegree, 0, 31);
+        maximumDegree = formInt(c, "Maximum neighbors", maximumDegree, 0, 31);
+        archiveSize = formInt(c, "Archive size", archiveSize, 1, 1000);
         if (Nuklear.nk_button_label(c, (searchAdvanced ? "Hide" : "Show")
                 + " Advanced Settings")) searchAdvanced = !searchAdvanced;
         if (searchAdvanced) {
-            temperature = property(c, "Initial temperature", temperature);
-            cooling = property(c, "Cooling rate", cooling);
-            minimumTemperature = property(c, "Minimum temperature", minimumTemperature);
-            improvementTolerance = property(c, "Improvement tolerance", improvementTolerance);
-            checkpointInterval = Nuklear.nk_propertyi(c, "Checkpoint interval",
-                    1, checkpointInterval, 1_000_000, 10, 1);
+            temperature = formDouble(c, "Initial temperature",
+                    temperature, 1e-12, 1e9, .1);
+            cooling = formDouble(c, "Cooling rate", cooling, 1e-12, 1, .001);
+            minimumTemperature = formDouble(c, "Minimum temperature",
+                    minimumTemperature, 1e-12, 1e9, 1e-6);
+            improvementTolerance = formDouble(c, "Improvement tolerance",
+                    improvementTolerance, 1e-12, 1e9, 1e-9);
+            checkpointInterval = formInt(c, "Checkpoint interval",
+                    checkpointInterval, 1, 1_000_000);
         }
     }
 
@@ -310,12 +339,18 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         DiscoveryExperimentValidation validation =
                 new DiscoveryExperimentValidator().validate(configuration);
         if (!validation.valid()) label(c, String.join("\n", validation.errors()));
-        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 4, 3);
-        createButton(c, "Create Experiment", validation, () ->
+        helpBlock(c, "Create Initial Candidate:\nBuilds and displays the initial graph and "
+                + "coordinates without running any process.");
+        helpBlock(c, "Create and Relax Geometry:\nBuilds the candidate and relaxes node "
+                + "positions while keeping topology fixed.");
+        helpBlock(c, "Create and Start Topology Search:\nBuilds and relaxes the candidate, "
+                + "then begins topology mutation and evaluation.");
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 8, 3);
+        createButton(c, "Create Initial Candidate", validation, () ->
                 controller.workspace().createExperiment(configuration));
-        createButton(c, "Create and Relax", validation, () ->
+        createButton(c, "Create and Relax Geometry", validation, () ->
                 controller.workspace().createAndRelax(configuration));
-        createButton(c, "Start Discovery", validation, () ->
+        createButton(c, "Create and Start Topology Search", validation, () ->
                 controller.workspace().startDiscovery(configuration));
     }
 
@@ -324,6 +359,11 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
                               java.util.function.Supplier<DiscoveryExperimentValidation> action) {
         if (!validation.valid()) Nuklear.nk_widget_disable_begin(c);
         boolean clicked = Nuklear.nk_button_label(c, text);
+        tooltip(c, switch (text) {
+            case "Create Initial Candidate" -> "Build and display the graph and coordinates without running a process.";
+            case "Create and Relax Geometry" -> "Build the candidate and relax positions with fixed topology.";
+            default -> "Build and relax the candidate, then begin topology mutation and evaluation.";
+        });
         if (!validation.valid()) Nuklear.nk_widget_disable_end(c);
         if (clicked && validation.valid()) {
             DiscoveryExperimentValidation result = action.get();
@@ -417,6 +457,9 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
             case 6 -> "Scoring";
             default -> "Review";
         };
+    }
+    private void changeStep(int value) {
+        step = Math.max(1, Math.min(7, value));
     }
     private void heading(NkContext c, String text) {
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 5, 1);

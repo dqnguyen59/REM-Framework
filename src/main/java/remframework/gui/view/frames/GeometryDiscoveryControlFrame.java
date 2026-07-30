@@ -252,6 +252,68 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             label(c, String.format("Cooling rate: %.5g", coolingRate));
             label(c, "Checkpoint interval: " + checkpointInterval);
         }
+        heading(c, "Live Visualization");
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            String selected = nk_label_combo_options(c, stack, "Update View On",
+                    new String[]{"Every Iteration", "Accepted Mutation",
+                            "New Best Candidate", "Timed Snapshot"},
+                    visualizationTriggerLabel(), .42, .58);
+            controller.state().setVisualizationUpdateTrigger(
+                    visualizationTrigger(selected));
+        }
+        int sliderIndex = DiscoveryVisualizationPacing.sliderIndex(
+                controller.state().snapshotUpdatesPerSecond(),
+                controller.state().maximumVisualizationSpeed());
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        int selectedIndex = Nuklear.nk_slide_int(c, 0, sliderIndex,
+                DiscoveryVisualizationPacing.SPEEDS.length, 1);
+        DiscoveryVisualizationPacing.Selection selection =
+                DiscoveryVisualizationPacing.selection(selectedIndex);
+        controller.state().setMaximumVisualizationSpeed(selection.maximum());
+        if (!selection.maximum())
+            controller.state().setSnapshotUpdatesPerSecond(selection.updatesPerSecond());
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 2);
+        Nuklear.nk_label(c, "Visualization Speed", Nuklear.NK_TEXT_LEFT);
+        if (controller.state().maximumVisualizationSpeed()) {
+            Nuklear.nk_label(c, "Maximum", Nuklear.NK_TEXT_LEFT);
+        } else {
+            int entered = Nuklear.nk_propertyi(c, "# updates per second", 1,
+                    controller.state().snapshotUpdatesPerSecond(), 1000, 1, 1);
+            if (DiscoveryVisualizationPacing.validSpeed(entered))
+                controller.state().setSnapshotUpdatesPerSecond(entered);
+        }
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 2);
+        if (Nuklear.nk_button_label(c, "Maximum Speed: "
+                + (controller.state().maximumVisualizationSpeed() ? "On" : "Off")))
+            controller.state().setMaximumVisualizationSpeed(
+                    !controller.state().maximumVisualizationSpeed());
+        if (Nuklear.nk_button_label(c, "Pause on New Best: "
+                + (controller.state().pauseOnNewBest() ? "On" : "Off")))
+            controller.state().setPauseOnNewBest(!controller.state().pauseOnNewBest());
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        if (Nuklear.nk_button_label(c, "Follow Best Candidate: "
+                + (controller.state().followBestCandidate() ? "On" : "Off")))
+            controller.state().setFollowBestCandidate(
+                    !controller.state().followBestCandidate());
+    }
+
+    private String visualizationTriggerLabel() {
+        return switch (controller.state().visualizationUpdateTrigger()) {
+            case EVERY_ITERATION -> "Every Iteration";
+            case ACCEPTED_MUTATION -> "Accepted Mutation";
+            case NEW_BEST_CANDIDATE -> "New Best Candidate";
+            case TIMED_SNAPSHOT -> "Timed Snapshot";
+        };
+    }
+
+    private DiscoveryVisualizationUpdateTrigger visualizationTrigger(String label) {
+        return switch (label) {
+            case "Every Iteration" -> DiscoveryVisualizationUpdateTrigger.EVERY_ITERATION;
+            case "New Best Candidate" ->
+                    DiscoveryVisualizationUpdateTrigger.NEW_BEST_CANDIDATE;
+            case "Timed Snapshot" -> DiscoveryVisualizationUpdateTrigger.TIMED_SNAPSHOT;
+            default -> DiscoveryVisualizationUpdateTrigger.ACCEPTED_MUTATION;
+        };
     }
 
     private void resultsSection(NkContext c, GeometryDiscoveryWorkflowResolution workflow) {

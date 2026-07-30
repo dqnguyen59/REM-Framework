@@ -54,16 +54,6 @@ public final class GeometryDiscoverySearchFrame extends AbstractFrame {
         if (Nuklear.nk_button_label(c, "Preview Candidate"))
             controller.state().setViewportSelection(
                     DiscoveryViewportSelection.PREVIEW_CANDIDATE);
-        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 2);
-        if (Nuklear.nk_button_label(c, "Follow Best: "
-                + (controller.state().followBestCandidate() ? "On" : "Off")))
-            controller.state().setFollowBestCandidate(
-                    !controller.state().followBestCandidate());
-        if (Nuklear.nk_button_label(c, "Viewport updates: "
-                + controller.state().snapshotUpdatesPerSecond() + "/s"))
-            controller.state().setSnapshotUpdatesPerSecond(
-                    controller.state().snapshotUpdatesPerSecond() >= 10 ? 5
-                            : controller.state().snapshotUpdatesPerSecond() + 1);
         if (controller.state().guidedMode()) {
             heading(c, "Recommended Next Action");
             label(c, workflow.recommendation().action());
