@@ -36,3 +36,39 @@ Current limitations:
 Future versions can add topology mutation/search, alternative optimizers,
 symmetry diagnostics, and standalone visualization without coupling discovery
 to REM simulation mechanics.
+
+## Standalone visualizer
+
+After packaging, launch a built-in model or candidate file without starting the
+REM simulation:
+
+```shell
+java -cp target/rem.jar remframework.geometry.discovery.GeometryDiscoveryVisualizerMain \
+  --model tetrahedron --relax false
+
+java -cp target/rem.jar remframework.geometry.discovery.GeometryDiscoveryVisualizerMain \
+  --file lattice/candidates/tetrahedron-candidate.toml
+```
+
+The standalone GLFW/OpenGL window uses a Nuklear information/control panel.
+Mouse drag or arrow keys orbit, right-drag or WASD pans, the wheel or `+/-`
+zooms, `F` fits, `R` resets, `P` toggles projection, and Tab selects nodes.
+Space starts/pauses relaxation, `N` steps, and `C` runs to convergence. The
+panel also exposes playback speed, relaxation parameters, rendering toggles,
+candidate export, and a plain-text metrics report.
+
+## Batch experiments
+
+```shell
+java -cp target/rem.jar remframework.geometry.discovery.GeometryDiscoveryBatchMain \
+  --model tetrahedron --seeds 1:5 \
+  --learning-rates 0.04,0.08 \
+  --repulsion-strengths 0.1,0.25 \
+  --maximum-corrections 2.0 \
+  --output lattice/experiments/tetrahedron
+```
+
+Batch combinations are ordered by seed, learning rate, repulsion strength, and
+maximum correction. `runs.csv` contains one row per run and `aggregate.txt`
+contains convergence rate, mean iteration count, best/worst runs, fastest
+converged run, and the parameter combination with the highest convergence rate.

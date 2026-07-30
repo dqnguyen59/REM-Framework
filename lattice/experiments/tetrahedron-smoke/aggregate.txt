@@ -1,0 +1,8 @@
+totalRuns=20
+convergedRuns=20
+convergenceRate=1.0
+meanIterationCount=799.0
+bestRunByEdgeError=3
+worstRunByEdgeError=1
+fastestConvergedRun=19
+highestConvergenceParameterCombination=learningRate=0.04,repulsionStrength=0.1,maximumCorrection=2.0

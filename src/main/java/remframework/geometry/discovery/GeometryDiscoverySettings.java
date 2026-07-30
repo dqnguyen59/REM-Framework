@@ -35,4 +35,28 @@ public record GeometryDiscoverySettings(
                 convergenceTolerance, minimumNodeSeparation, repulsionStrength, value,
                 maximumCorrection, dimensionalityTolerance, progressInterval);
     }
+
+    public GeometryDiscoverySettings withLearningRate(double value) {
+        return new GeometryDiscoverySettings(targetDistance, value, maximumIterations,
+                convergenceTolerance, minimumNodeSeparation, repulsionStrength, randomSeed,
+                maximumCorrection, dimensionalityTolerance, progressInterval);
+    }
+
+    public GeometryDiscoverySettings withRepulsionStrength(double value) {
+        return new GeometryDiscoverySettings(targetDistance, learningRate, maximumIterations,
+                convergenceTolerance, minimumNodeSeparation, value, randomSeed,
+                maximumCorrection, dimensionalityTolerance, progressInterval);
+    }
+
+    public GeometryDiscoverySettings withMaximumCorrection(double value) {
+        return new GeometryDiscoverySettings(targetDistance, learningRate, maximumIterations,
+                convergenceTolerance, minimumNodeSeparation, repulsionStrength, randomSeed,
+                value, dimensionalityTolerance, progressInterval);
+    }
+
+    public GeometryDiscoverySettings withConvergenceTolerance(double value) {
+        return new GeometryDiscoverySettings(targetDistance, learningRate, maximumIterations,
+                value, minimumNodeSeparation, repulsionStrength, randomSeed,
+                maximumCorrection, dimensionalityTolerance, progressInterval);
+    }
 }
