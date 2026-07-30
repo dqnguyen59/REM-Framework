@@ -72,3 +72,23 @@ Batch combinations are ordered by seed, learning rate, repulsion strength, and
 maximum correction. `runs.csv` contains one row per run and `aggregate.txt`
 contains convergence rate, mean iteration count, best/worst runs, fastest
 converged run, and the parameter combination with the highest convergence rate.
+
+## Constrained topology search
+
+`TopologySearchMain` performs deterministic small-graph connection search without
+changing node count or entering the REM simulation. It supports hill climbing,
+simulated annealing, add/remove/rewire/endpoint-swap mutations, geometry relaxation
+through the existing engine, explicit score components, and a deterministic archive.
+
+```shell
+java -cp target/rem.jar remframework.geometry.discovery.TopologySearchMain \
+  --input-model small-cubic --search-mode hill-climbing --seed 42 \
+  --iterations 1000 --output lattice/topology-search/cube
+```
+
+`TopologySearchBatchMain` accepts `--seeds 1:5`,
+`--search-modes hill-climbing,annealing`, and `--weight-scales 0.5,1,2`.
+Outputs include explicit candidates,
+history and score CSV files, a summary, and a summary checkpoint. The checkpoint
+does not restore exact PRNG state, so resume is not bit-for-bit supported.
+Canonical signatures normalize edge ordering but do not solve graph isomorphism.

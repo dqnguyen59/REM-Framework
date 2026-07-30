@@ -8,6 +8,7 @@ public final class GeometryDiscoveryVisualizer {
     private final GeometryDiscoveryModel sourceModel;
     private final String sourceDescription;
     private final GeometryDiscoveryViewState viewState = new GeometryDiscoveryViewState();
+    private TopologySearchMetadata topologySearchMetadata;
     private GeometryDiscoverySession session;
     private int iterationsPerFrame = 1;
 
@@ -71,6 +72,10 @@ public final class GeometryDiscoveryVisualizer {
     public GeometryDiscoveryViewState viewState() { return viewState; }
     public GeometryDiscoveryResult result() { return session.result(); }
     public String sourceDescription() { return sourceDescription; }
+    public TopologySearchMetadata topologySearchMetadata() { return topologySearchMetadata; }
+    public void setTopologySearchMetadata(TopologySearchMetadata value) {
+        topologySearchMetadata = value;
+    }
     public int iterationsPerFrame() { return iterationsPerFrame; }
     public void setIterationsPerFrame(int value) {
         iterationsPerFrame = Math.max(1, Math.min(10_000, value));

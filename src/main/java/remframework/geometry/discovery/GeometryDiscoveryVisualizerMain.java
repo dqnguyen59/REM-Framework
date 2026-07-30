@@ -37,6 +37,9 @@ public final class GeometryDiscoveryVisualizerMain {
         GeometryDiscoveryVisualizer visualizer = new GeometryDiscoveryVisualizer(
                 loaded.model(), loaded.settings(),
                 loaded.sourcePath() == null ? "built-in" : loaded.sourcePath().toString());
+        if (loaded.sourcePath() != null)
+            visualizer.setTopologySearchMetadata(
+                    new TopologySearchMetadataLoader().load(loaded.sourcePath()));
         if (Boolean.parseBoolean(options.getOrDefault("relax", "false")))
             visualizer.runToConvergence();
         int frameLimit = Integer.parseInt(options.getOrDefault("frames", "0"));

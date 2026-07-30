@@ -1,0 +1,12 @@
+REM Framework Geometry Discovery topology search
+mode=HILL_CLIMBING
+seed=5
+initialScore=2.0320508075688775
+bestScore=2.0320508075688775
+acceptedMutations=0
+rejectedMutations=55
+invalidMutations=10
+duplicateTopologies=35
+relaxationFailures=0
+elapsedMilliseconds=24
+bestCandidate=/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0009/best-candidate.toml

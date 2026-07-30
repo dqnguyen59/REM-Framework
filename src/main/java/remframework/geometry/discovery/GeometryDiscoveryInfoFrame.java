@@ -52,6 +52,22 @@ final class GeometryDiscoveryInfoFrame extends AbstractFrame {
         label(context, "Dimension: " + metrics.effectiveDimensionality());
         label(context, "Runtime compatible: " + result.runtimeCompatibility().compatible());
         label(context, result.runtimeCompatibility().reason());
+        TopologySearchMetadata topology = visualizer.topologySearchMetadata();
+        if (topology != null) {
+            label(context, String.format("Topology score %.7g  Mode %s  Seed %d",
+                    topology.totalScore(), topology.searchMode(), topology.searchSeed()));
+            label(context, String.format("Degree min/mean/max %d / %.4g / %d  Diameter %d",
+                    topology.minimumDegree(), topology.meanDegree(), topology.maximumDegree(),
+                    topology.graphDiameter()));
+            label(context, "Bridges: " + topology.bridgeCount() + "  Articulation points: "
+                    + topology.articulationPointCount());
+            label(context, String.format("Directional imbalance %.6g  Tensor anisotropy %.6g",
+                    topology.meanDirectionalImbalance(), topology.tensorAnisotropy()));
+            label(context, String.format("Score parts edge %.5g direction %.5g tensor %.5g degree %.5g",
+                    topology.edgeLengthComponent(), topology.directionalComponent(),
+                    topology.tensorComponent(), topology.degreeVarianceComponent()));
+            label(context, "Parent mutation: " + topology.parentMutation());
+        }
         if (visualizer.viewState().showNodeLabels())
             label(context, "Node IDs: " + result.model().sortedNodes().stream()
                     .map(node -> Integer.toString(node.id())).collect(Collectors.joining(", ")));

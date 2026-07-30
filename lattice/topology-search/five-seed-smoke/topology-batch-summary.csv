@@ -1,0 +1,11 @@
+runId,seed,searchMode,initialTopology,initialScore,bestScore,scoreImprovement,acceptedMutationCount,invalidMutationCount,duplicateCount,runtimeMilliseconds,bestCandidatePath
+1,1,HILL_CLIMBING,small-cubic,2.0320508075688775,2.0320508075688775,0.0,0,10,41,160,/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0001/best-candidate.toml
+2,1,SIMULATED_ANNEALING,small-cubic,2.0320508075688775,2.0320508075688775,0.0,11,11,17,59,/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0002/best-candidate.toml
+3,2,HILL_CLIMBING,small-cubic,2.0320508075688775,2.0320508075688775,0.0,0,7,44,43,/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0003/best-candidate.toml
+4,2,SIMULATED_ANNEALING,small-cubic,2.0320508075688775,2.0320508075688775,0.0,7,8,23,25,/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0004/best-candidate.toml
+5,3,HILL_CLIMBING,small-cubic,2.0320508075688775,2.0320508075688775,0.0,0,10,39,19,/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0005/best-candidate.toml
+6,3,SIMULATED_ANNEALING,small-cubic,2.0320508075688775,2.0320508075688775,0.0,8,7,14,26,/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0006/best-candidate.toml
+7,4,HILL_CLIMBING,small-cubic,2.0320508075688775,2.0320508075688775,0.0,0,10,36,15,/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0007/best-candidate.toml
+8,4,SIMULATED_ANNEALING,small-cubic,2.0320508075688775,2.0320508075688775,0.0,17,10,7,19,/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0008/best-candidate.toml
+9,5,HILL_CLIMBING,small-cubic,2.0320508075688775,2.0320508075688775,0.0,0,10,35,24,/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0009/best-candidate.toml
+10,5,SIMULATED_ANNEALING,small-cubic,2.0320508075688775,2.0320508075688775,0.0,10,11,9,35,/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0010/best-candidate.toml
