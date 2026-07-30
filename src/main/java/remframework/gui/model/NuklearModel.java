@@ -64,6 +64,12 @@ public class NuklearModel {
 		detector,
 		preferences,
 		transportSystem,
+		geometryDiscoveryControls,
+		geometryDiscoveryMetrics,
+		geometryDiscoveryNode,
+		geometryDiscoverySearch,
+		geometryDiscoveryStatus,
+		geometryDiscoveryIntroduction,
 	}
 	
 	private Map<Frame, AbstractFrame> framesMap = new HashMap<Frame, AbstractFrame>();
@@ -197,6 +203,18 @@ public class NuklearModel {
 			return new FrameRain(this);
 		case detector:
 			return new FrameDetector(this);
+		case geometryDiscoveryControls:
+			return new GeometryDiscoveryControlFrame(this);
+		case geometryDiscoveryMetrics:
+			return new GeometryDiscoveryMetricsFrame(this);
+		case geometryDiscoveryNode:
+			return new GeometryDiscoveryNodeFrame(this);
+		case geometryDiscoverySearch:
+			return new GeometryDiscoverySearchFrame(this);
+		case geometryDiscoveryStatus:
+			return new GeometryDiscoveryStatusFrame(this);
+		case geometryDiscoveryIntroduction:
+			return new GeometryDiscoveryIntroductionFrame(this);
 		case openFileDialog:
 			return new FrameOpenFileDialog(this);
 		case saveFileDialog:
@@ -310,6 +328,13 @@ public class NuklearModel {
 		DialogFileModel dlgMessage = dialogModelStack.pushDialogFileModel(DialogFileModel.CANCEL_OPEN, title, "");
 		showFrame(Frame.openFileDialog);
 		return dlgMessage;
+	}
+
+	public DialogFileModel showOpenFileDialog(String title, String directory, String extension) {
+		DialogFileModel model = showOpenFileDialog(title);
+		model.setDirectory(directory);
+		model.setExtension(extension);
+		return model;
 	}
 
 	public DialogFileModel showSaveFileDialog(String title) {

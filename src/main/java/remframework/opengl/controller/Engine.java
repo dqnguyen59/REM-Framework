@@ -45,7 +45,7 @@ import java.util.List;
 @Setter
 public abstract class Engine {
 
-	private String customTitle;
+	private String customTitle = "";
 	
 	private boolean isRunning;
 	
@@ -66,6 +66,7 @@ public abstract class Engine {
 	private long tDoubleClickInterval;
 	private long handle;
 	private int renderCounter;
+	private Long frameLimit;
     private long currentTime;
 
 	public Engine(GLWindow glWindow) {
@@ -354,6 +355,7 @@ public abstract class Engine {
 		while (isRunning) {
 			preRender();
 			render(false);
+			if (frameLimit != null && renderCounter >= frameLimit) stop();
 
 			showPerformance();
 		}

@@ -873,7 +873,7 @@ public abstract class AbstractFrame implements IFrame {
 		if (Nuklear.nk_group_begin(ctx, "ScrollableFiles", 0)) {
 
 			Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
-			List<File> files = Utils.getFiles(path, Constants.PROJECT_FILE_EXT);
+			List<File> files = Utils.getFiles(path, projectFileExt);
 
 			if (dlgFileModel.getSelectedFileName().isEmpty() && files.size() > 0)
 				dlgFileModel.setSelectedFileName(files.get(0).getName());

@@ -13,13 +13,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-final class GeometryDiscoveryOpenGlRenderer implements AutoCloseable {
+public final class GeometryDiscoveryOpenGlRenderer implements AutoCloseable {
     private final int program;
     private final int vao;
     private final int vbo;
     private final int matrixLocation;
 
-    GeometryDiscoveryOpenGlRenderer() {
+    public GeometryDiscoveryOpenGlRenderer() {
         program = createProgram();
         matrixLocation = GL20.glGetUniformLocation(program, "viewProjection");
         vao = GL30.glGenVertexArrays();
@@ -33,18 +33,22 @@ final class GeometryDiscoveryOpenGlRenderer implements AutoCloseable {
         GL30.glBindVertexArray(0);
     }
 
-    void render(GeometryDiscoveryVisualizer visualizer, int width, int height) {
-        GeometryDiscoveryModel model = visualizer.session().model();
-        GeometryDiscoveryViewState view = visualizer.viewState();
+    public void render(GeometryDiscoveryVisualizer visualizer, int width, int height) {
+        render(visualizer.session().model(), visualizer.session().settings(),
+                visualizer.viewState(), width, height);
+    }
+
+    public void render(GeometryDiscoveryModel model, GeometryDiscoverySettings settings,
+                       GeometryDiscoveryViewState view, int width, int height) {
         GeometryViewFit fit = view.calculateFit(model);
-        Matrix4f matrix = matrix(view, fit, width, height);
+        Matrix4f matrix = viewProjection(view, fit, width, height);
         GL20.glUseProgram(program);
         GL20.glUniformMatrix4fv(matrixLocation, false, matrix.get(new float[16]));
         GL30.glBindVertexArray(vao);
 
         List<Float> lines = new ArrayList<>();
         if (view.showConnections()) addConnections(lines, model,
-                visualizer.session().settings(), view.edgeErrorColoring());
+                settings, view.edgeErrorColoring());
         if (view.showAxes()) addAxes(lines, fit);
         addGrid(lines, fit);
         if (view.showBoundingBox()) addBoundingBox(lines, model);
@@ -64,8 +68,8 @@ final class GeometryDiscoveryOpenGlRenderer implements AutoCloseable {
         GL20.glUseProgram(0);
     }
 
-    private Matrix4f matrix(GeometryDiscoveryViewState view, GeometryViewFit fit,
-                            int width, int height) {
+    public Matrix4f viewProjection(GeometryDiscoveryViewState view, GeometryViewFit fit,
+                                   int width, int height) {
         double yaw = Math.toRadians(view.yaw());
         double pitch = Math.toRadians(view.pitch());
         Vector3f center = new Vector3f((float) view.center().x, (float) view.center().y,

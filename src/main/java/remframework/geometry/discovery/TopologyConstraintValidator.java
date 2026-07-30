@@ -85,7 +85,7 @@ public final class TopologyConstraintValidator {
         return components;
     }
 
-    static Map<Integer, Set<Integer>> adjacency(GeometryDiscoveryModel model) {
+    public static Map<Integer, Set<Integer>> adjacency(GeometryDiscoveryModel model) {
         Map<Integer, Set<Integer>> result = new java.util.TreeMap<>();
         for (DiscoveryNode node : model.nodes()) result.put(node.id(), new java.util.TreeSet<>());
         for (DiscoveryConnection edge : model.connections()) {

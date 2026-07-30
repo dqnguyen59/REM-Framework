@@ -28,6 +28,7 @@ import remframework.helpers.AppInfo;
 import remframework.helpers.Utils;
 import remframework.settings.Project;
 import remframework.lattice.LatticeManager;
+import remframework.geometry.discovery.GeometryDiscoveryWorkspaceManager;
 
 import java.nio.file.Path;
 
@@ -36,8 +37,20 @@ public class Main {
     public static void main(String[] args) {
 		Path startupProjectPath = null;
 		Long updateLimit = null;
+		Long frameLimit = null;
+		boolean openGeometryDiscovery = false;
 		for (String argument : args) {
 			if (argument.startsWith("--")) {
+				if (argument.equals("--geometry-discovery")) {
+					openGeometryDiscovery = true;
+					continue;
+				}
+				if (argument.startsWith("--frames=")) {
+					frameLimit = Long.parseLong(argument.substring("--frames=".length()));
+					if (frameLimit <= 0) throw new IllegalArgumentException(
+							"--frames must be a positive integer.");
+					continue;
+				}
 				if (!argument.startsWith("--updates=") || argument.length() == "--updates=".length()) {
 					System.err.println("Invalid option: " + argument
 							+ ". Expected --updates=<positive integer>.");
@@ -98,9 +111,12 @@ public class Main {
 
         GLWindow glWindow = new GLWindow(Constants.TITLE);
 		Engine engine = new Simulator(glWindow, updateLimit);
+		engine.setFrameLimit(frameLimit);
 
 		try {
 			engine.init();
+			if (openGeometryDiscovery)
+				GeometryDiscoveryWorkspaceManager.getInstance().openWorkspace();
 			if (startupProjectPath != null) {
 				System.out.println("Loading startup project: " + startupProjectPath);
 				Project.getInstance().loadFromFile(startupProjectPath.toString());

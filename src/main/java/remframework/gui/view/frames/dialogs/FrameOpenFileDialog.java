@@ -55,7 +55,13 @@ public class FrameOpenFileDialog extends FrameDialog {
 		try (MemoryStack stack = MemoryStack.stackPush()) {
 			
 			Nuklear.nk_layout_row_dynamic(ctx, 250, 1);
-			boolean isOpenFilePerformed = nk_file_list_view(ctx, Constants.BASE_PATH + appSettings.getProjectFilePath(), Constants.PROJECT_FILE_EXT, dlgFileModel);
+			String directory = dlgFileModel.getDirectory().isBlank()
+					? Constants.BASE_PATH + appSettings.getProjectFilePath()
+					: dlgFileModel.getDirectory();
+			String extension = dlgFileModel.getExtension().isBlank()
+					? Constants.PROJECT_FILE_EXT : dlgFileModel.getExtension();
+			boolean isOpenFilePerformed = nk_file_list_view(
+					ctx, directory, extension, dlgFileModel);
 
 			Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
     		Nuklear.nk_label(ctx, " File: " + dlgFileModel.getSelectedFileName(), Nuklear.NK_TEXT_LEFT);

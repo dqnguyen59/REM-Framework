@@ -22,6 +22,8 @@ public class DialogFileModel extends DialogDefaultModel {
 
 	private String selectedFileName = "";
 	private String selectedFilePath = "";
+	private String directory = "";
+	private String extension = "";
 	
 	public DialogFileModel(ConfirmState[] confirmStates, String title, String message) {
 		super(confirmStates, title, message);
@@ -42,5 +44,10 @@ public class DialogFileModel extends DialogDefaultModel {
 	public void setSelectedFilePath(String selectedFilePath) {
 		this.selectedFilePath = selectedFilePath;
 	}
+
+	public String getDirectory() { return directory; }
+	public void setDirectory(String value) { directory = value; }
+	public String getExtension() { return extension; }
+	public void setExtension(String value) { extension = value; }
 
 }

@@ -28,6 +28,7 @@ import remframework.gui.model.NuklearModel.Frame;
 import remframework.opengl.model.RemModel;
 import remframework.opengl.model.RemModel.EditMode;
 import remframework.settings.Project;
+import remframework.geometry.discovery.GeometryDiscoveryWorkspaceManager;
 
 public class FrameMenu extends AbstractFrame {
 
@@ -165,6 +166,15 @@ public class FrameMenu extends AbstractFrame {
 
                 if (nk_menu_item_label(ctx, "Detector", stack)) {
                     nuklearModel.toggleFrame(Frame.detector);
+                    Nuklear.nk_menu_close(ctx);
+                }
+
+                if (nk_menu_item_label(ctx, "Geometry Discovery", stack)) {
+                    GeometryDiscoveryWorkspaceManager.getInstance().openWorkspace();
+                    Nuklear.nk_menu_close(ctx);
+                }
+                if (nk_menu_item_label(ctx, "Close Geometry Discovery", stack)) {
+                    GeometryDiscoveryWorkspaceManager.getInstance().closeWorkspace();
                     Nuklear.nk_menu_close(ctx);
                 }
 

@@ -49,6 +49,9 @@ import remframework.settings.SlitWallSettings;
 import remframework.helpers.PerformanceMonitor;
 import remframework.helpers.PerformanceMonitor.Measurement;
 import remframework.helpers.Utils;
+import remframework.geometry.discovery.GeometryDiscoveryViewport;
+import remframework.geometry.discovery.GeometryDiscoveryWorkspaceController;
+import remframework.geometry.discovery.GeometryDiscoveryWorkspaceManager;
 
 import java.lang.Math;
 import java.util.ArrayList;
@@ -91,6 +94,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private              Thread          thread;
     private final        Long            updateLimit;
     private volatile     boolean         updateLimitReached;
+    private final GeometryDiscoveryWorkspaceController discoveryWorkspace =
+            GeometryDiscoveryWorkspaceManager.getInstance();
+    private GeometryDiscoveryViewport discoveryViewport;
 
     public Simulator(GLWindow glWindow, Long updateLimit) {
         super(glWindow);
@@ -104,8 +110,10 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     public void init() throws Exception {
         System.out.println("Simulator.init()");
         super.init();
+        discoveryWorkspace.attach(remModel, nuklearModel);
         addMouseAndKeyboardListener(this);
         renderer.init();
+        discoveryViewport = new GeometryDiscoveryViewport(discoveryWorkspace);
 
         initDefaultLights();
         initDefaultTerrain();
@@ -247,6 +255,10 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     @Override
     public boolean mouseCursorPosCallback(long handle, double xPos, double yPos) {
+        if (discoveryWorkspace.state().active()) {
+            discoveryViewport.cursor(xPos, yPos);
+            return false;
+        }
         remModel.getMousePos().x = xPos;
         remModel.getMousePos().y = yPos;
 
@@ -292,6 +304,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     @Override
     public boolean mouseButtonCallback(long handle, int button, int action, int mods) {
+        if (discoveryWorkspace.state().active()) {
+            if (nuklearModel.getFocusedFrame() == null)
+                discoveryViewport.button(button, action, glWindow.getWidth(), glWindow.getHeight());
+            return false;
+        }
         boolean leftButtonReleased;
         if (nuklearModel.getFocusedFrame() == null) {
             leftButtonPressed  = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_PRESS;
@@ -341,6 +358,10 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     @Override
     public boolean mouseScrollCallback(long handle, double xOffset, double yOffset) {
+        if (discoveryWorkspace.state().active()) {
+            discoveryViewport.scroll(yOffset);
+            return false;
+        }
         float incCamera = keyEvents != null && keyEvents.isCtrlPressed ? 2 : 12;
         project.camera.movePosition(
                 (float) (incCamera * xOffset * Constants.CAMERA_MOVE_SPEED),
@@ -363,6 +384,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     @Override
     public boolean keyContinuousCallback(long handle, int key, KeyEvents keyEvents) {
+        if (discoveryWorkspace.state().active()) return false;
 
         this.keyEvents = keyEvents;
 
@@ -545,6 +567,32 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     @Override
     public boolean keyCallback(long handle, int key, int scanCode, int action, int mods) {
+        if (discoveryWorkspace.state().active()) {
+            if (action == GLFW.GLFW_RELEASE) {
+                switch (key) {
+                    case GLFW.GLFW_KEY_TAB -> {
+                        var nodes = discoveryWorkspace.workspace().snapshot()
+                                .geometry().model().sortedNodes();
+                        if (!nodes.isEmpty()) {
+                            Integer selected = discoveryWorkspace.viewState().selectedNodeId();
+                            int index = 0;
+                            for (int i = 0; i < nodes.size(); i++)
+                                if (Objects.equals(nodes.get(i).id(), selected)) index = i;
+                            int direction = (mods & GLFW.GLFW_MOD_SHIFT) == 0 ? 1 : -1;
+                            discoveryWorkspace.viewState().setSelectedNodeId(
+                                    nodes.get(Math.floorMod(index + direction, nodes.size())).id());
+                        }
+                    }
+                    case GLFW.GLFW_KEY_F -> discoveryWorkspace.viewState().fitToView(
+                            discoveryWorkspace.workspace().snapshot().geometry().model());
+                    case GLFW.GLFW_KEY_P -> discoveryWorkspace.viewState().setOrthographic(
+                            !discoveryWorkspace.viewState().orthographic());
+                    case GLFW.GLFW_KEY_ESCAPE -> discoveryWorkspace.deactivateWorkspace();
+                    default -> { }
+                }
+            }
+            return false;
+        }
         boolean isReleased = action == GLFW.GLFW_RELEASE;
 
         boolean isShiftPressed = (mods & GLFW.GLFW_MOD_SHIFT) == GLFW.GLFW_MOD_SHIFT;
@@ -1011,6 +1059,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         pressureController.close();
         detectorController.close();
         FeasibilityPilotTelemetry.getInstance().close();
+        discoveryWorkspace.close();
+        if (discoveryViewport != null) discoveryViewport.close();
         scene.stopAnimation();
         renderer.cleanup();
         loader.cleanup();
@@ -1048,6 +1098,15 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             Screenshot.updateScreenshotViewport();
         } else if (glWindow.isResize()) {
             GL11.glViewport(0, 0, glWindow.getWidth(), glWindow.getHeight());
+        }
+
+        if (discoveryWorkspace.state().active()) {
+            waitForNextFrameIsReady();
+            PerformanceMonitor.start(Measurement.sendToGPU);
+            discoveryViewport.render(glWindow.getWidth(), glWindow.getHeight());
+            PerformanceMonitor.stop(Measurement.sendToGPU);
+            super.render(false);
+            return;
         }
 
         checkSettingsChanged();

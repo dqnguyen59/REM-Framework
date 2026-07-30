@@ -127,3 +127,32 @@ relative to squared target distance, collision counts relative to all node
 pairs, angular errors relative to pi where appropriate, and graph counts
 relative to graph size. Reports retain raw values, normalized values, weights,
 applicability, weighted contributions, and percentage of total.
+
+## Main application workspace
+
+Open `Tools > Geometry Discovery` to use the same discovery sessions and OpenGL
+renderer inside the main REM Framework window. Entering the workspace records
+and pauses the REM simulation state; returning to REM restores that state
+without rebuilding or replacing the active lattice. The experiment remains
+available while the workspace is inactive.
+
+Relaxation and topology mutation run on one daemon worker named
+`geometry-discovery-worker`. The render thread only reads copied result
+snapshots. Workspace shutdown requests worker cancellation before deleting its
+OpenGL resources.
+
+The workspace exposes built-in and diagnostic models, candidate TOML loading,
+relaxation playback, incremental topology search, scoring profiles and weight
+overrides, aggregate and selected-node diagnostics, archive preview/comparison,
+and the existing candidate, metrics, and topology-search exporters. Workspace
+UI preferences are stored separately in
+`geometry-discovery-workspace.properties`; active operations are never restored.
+
+For automated window smoke checks, the normal application accepts:
+
+```shell
+java -jar target/rem.jar --geometry-discovery --frames=5
+```
+
+The `--frames` option only limits the application render loop and is not a
+simulation update limit.
