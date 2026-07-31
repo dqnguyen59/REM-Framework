@@ -18,6 +18,8 @@ public final class GeometryDiscoveryWorkspaceController implements AutoCloseable
     private NuklearModel nuklearModel;
     private final GeometryDiscoveryWorkflowResolver workflowResolver =
             new GeometryDiscoveryWorkflowResolver();
+    private final GeometryDiscoveryPhasedWorkflow phasedWorkflow =
+            new GeometryDiscoveryPhasedWorkflow();
 
     public GeometryDiscoveryWorkspaceController() {
         preferences.load(state, viewState);
@@ -171,6 +173,7 @@ public final class GeometryDiscoveryWorkspaceController implements AutoCloseable
     public GeometryDiscoveryWorkspaceState state() { return state; }
     public GeometryDiscoveryViewState viewState() { return viewState; }
     public GeometryDiscoveryWorkflowResolver workflowResolver() { return workflowResolver; }
+    public GeometryDiscoveryPhasedWorkflow phasedWorkflow() { return phasedWorkflow; }
 
     public GeometryDiscoveryWorkspaceLayout layout(int width, int height) {
         int top = nuklearModel == null ? 30 : nuklearModel.getMenuBarHeight() + 4;
