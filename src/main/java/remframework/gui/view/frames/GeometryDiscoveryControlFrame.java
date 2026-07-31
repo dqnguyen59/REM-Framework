@@ -207,12 +207,14 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         DynamicElasticMetrics metrics = controller.workspace().dynamicElasticMetrics();
         DynamicElasticSettings settings = controller.workspace().dynamicElasticSettings();
         heading(c, "2. Dynamic Elastic Relaxation");
-        label(c, "Connections satisfied: " + metrics.connectionsSatisfied()
+        label(c, "Edges satisfied: " + metrics.connectionsSatisfied()
                 + " / " + metrics.connectionCount());
-        label(c, String.format("Distance accuracy: %.3f%%",
+        label(c, "Angles satisfied: " + metrics.localAnglesSatisfied()
+                + " / " + metrics.localAngleCount());
+        label(c, String.format("Mean edge accuracy: %.3f%%",
                 metrics.meanDistanceAccuracy() * 100));
-        label(c, String.format("Satisfied connections: %.3f%%",
-                metrics.satisfiedConnectionPercentage()));
+        label(c, String.format("Maximum angle error: %.5g degrees",
+                metrics.maximumAngleErrorDegrees()));
         label(c, String.format("Maximum node speed: %.7g", metrics.maximumNodeSpeed()));
         label(c, "Stable iterations: " + metrics.stableIterations()
                 + " / " + metrics.requiredStableIterations());
@@ -228,11 +230,14 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         label(c, "Elastic equilibrium: " + (metrics.elasticEquilibrium() ? "Yes" : "No"));
         label(c, "Spatially valid: " + (metrics.spatiallyValid() ? "Yes" : "No"));
         DynamicElasticSpatialSettings spatial = settings.spatial();
-        boolean overlap = nk_check_label(c, "Prevent node overlap",
+        boolean overlap = nk_check_label(c, "Prevent node overlap - "
+                        + enabledLabel(spatial.nonNeighborExclusionEnabled()),
                 spatial.nonNeighborExclusionEnabled(), .65, .35);
-        boolean crossings = nk_check_label(c, "Prevent edge crossings",
+        boolean crossings = nk_check_label(c, "Prevent edge crossings - "
+                        + enabledLabel(spatial.edgeCrossingPreventionEnabled()),
                 spatial.edgeCrossingPreventionEnabled(), .65, .35);
-        boolean spreadEnabled = nk_check_label(c, "Encourage local 3D spread",
+        boolean spreadEnabled = nk_check_label(c, "Encourage local 3D spread - "
+                        + enabledLabel(spatial.localSpreadEnabled()),
                 spatial.localSpreadEnabled(), .65, .35);
         double spatialStrength = dynamicProperty(c, "Spatial constraint strength",
                 spatial.strength(), 0, 100, .001);
@@ -245,6 +250,35 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                     spatial.edgeClearanceDistance(), spreadEnabled, spatialStrength);
             settings = settings.withSpatial(spatial);
             controller.workspace().updateDynamicElasticSettings(settings);
+        }
+        DynamicElasticResult activeResult = controller.workspace().dynamicElasticResult();
+        boolean hasCanonicalAngles = activeResult != null
+                && activeResult.graph().canonicalTopology() != null
+                && activeResult.graph().canonicalTopology()
+                != CanonicalDynamicElasticTopology.CYCLE;
+        if (hasCanonicalAngles) {
+            heading(c, "Canonical geometry constraints");
+            DynamicElasticCanonicalGeometrySettings canonical =
+                    settings.canonicalGeometry();
+            boolean anglesEnabled = nk_check_label(c, "Enforce canonical angles - "
+                            + enabledLabel(canonical.angleConstraintsEnabled()),
+                    canonical.angleConstraintsEnabled(), .65, .35);
+            double targetAngle = dynamicProperty(c, "Target angle (degrees)",
+                    canonical.targetAngleDegrees(), 1e-6, 179.999999, .1);
+            double angleTolerance = dynamicProperty(c, "Angle tolerance (degrees)",
+                    canonical.angleToleranceDegrees(), 0, 180, .1);
+            double angleStrength = dynamicProperty(c, "Angle strength",
+                    canonical.angleStrength(), 0, 100, .001);
+            DynamicElasticCanonicalGeometrySettings changedCanonical =
+                    new DynamicElasticCanonicalGeometrySettings(anglesEnabled,
+                            targetAngle, angleTolerance, angleStrength,
+                            canonical.faceDiagonalsEnabled());
+            if (!changedCanonical.equals(canonical)) {
+                settings = settings.withCanonicalGeometry(changedCanonical);
+                controller.workspace().updateDynamicElasticSettings(settings);
+            }
+        } else {
+            label(c, "No canonical angle model is defined for this graph.");
         }
         label(c, "Operation: " + controller.workspace()
                 .dynamicElasticOperation().label());
@@ -325,10 +359,15 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                             nonNeighborThreshold,
                             settings.spatial().edgeCrossingPreventionEnabled(),
                             edgeClearance, settings.spatial().localSpreadEnabled(),
-                            settings.spatial().strength()));
+                    settings.spatial().strength()));
+            changed = changed.withCanonicalGeometry(settings.canonicalGeometry());
             if (!changed.equals(settings))
                 controller.workspace().updateDynamicElasticSettings(changed);
         }
+    }
+
+    private String enabledLabel(boolean enabled) {
+        return DynamicElasticStatusReporter.constraintState(enabled);
     }
 
     private void dynamicPlaybackControls(NkContext c, DynamicElasticMetrics metrics,

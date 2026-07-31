@@ -309,9 +309,6 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
                     ? canonicalTopology.create(nodeCount)
                     : new FixedDegreeGraphGenerator().generate(
                             nodeCount, exactNeighbors, settings.randomSeed(), 0);
-            if (canonicalTopology == CanonicalDynamicElasticTopology.CUBE)
-                settings = settings.withSpatial(
-                        settings.spatial().withLocalSpreadEnabled(true));
             DynamicElasticSettings configured = settings.withMaximumIterations(
                     state.dynamicElasticMaximumIterations());
             dynamicElasticSession = new DynamicElasticSession(graph, configured);

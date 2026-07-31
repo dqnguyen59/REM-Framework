@@ -15,7 +15,8 @@ public record DynamicElasticSettings(
         int maximumIterations,
         int workerUpdatesPerPublication,
         long randomSeed,
-        DynamicElasticSpatialSettings spatial) {
+        DynamicElasticSpatialSettings spatial,
+        DynamicElasticCanonicalGeometrySettings canonicalGeometry) {
 
     public DynamicElasticSettings(double targetDistance, double requiredAccuracy,
             double springStrength, double updateStrength, double velocityRetention,
@@ -27,11 +28,27 @@ public record DynamicElasticSettings(
                 velocityRetention, linearVelocityDamping, angularVelocityDamping,
                 maximumVelocity, maximumForce, maximumEquilibriumSpeed,
                 requiredStableIterations, maximumIterations, workerUpdatesPerPublication,
-                randomSeed, DynamicElasticSpatialSettings.defaults(targetDistance));
+                randomSeed, DynamicElasticSpatialSettings.defaults(targetDistance),
+                DynamicElasticCanonicalGeometrySettings.disabled());
+    }
+    public DynamicElasticSettings(double targetDistance, double requiredAccuracy,
+            double springStrength, double updateStrength, double velocityRetention,
+            double linearVelocityDamping, double angularVelocityDamping,
+            double maximumVelocity, double maximumForce, double maximumEquilibriumSpeed,
+            int requiredStableIterations, int maximumIterations,
+            int workerUpdatesPerPublication, long randomSeed,
+            DynamicElasticSpatialSettings spatial) {
+        this(targetDistance, requiredAccuracy, springStrength, updateStrength,
+                velocityRetention, linearVelocityDamping, angularVelocityDamping,
+                maximumVelocity, maximumForce, maximumEquilibriumSpeed,
+                requiredStableIterations, maximumIterations, workerUpdatesPerPublication,
+                randomSeed, spatial, DynamicElasticCanonicalGeometrySettings.disabled());
     }
 
     public DynamicElasticSettings {
         if (spatial == null) throw new IllegalArgumentException("Spatial settings are required.");
+        if (canonicalGeometry == null)
+            throw new IllegalArgumentException("Canonical geometry settings are required.");
         if (!positiveFinite(targetDistance)) throw new IllegalArgumentException(
                 "Target distance must be finite and positive.");
         if (!Double.isFinite(requiredAccuracy) || requiredAccuracy <= 0
@@ -56,7 +73,8 @@ public record DynamicElasticSettings(
         return new DynamicElasticSettings(targetDistance, .98, .08, .08,
                 .96, .01, .01, targetDistance * .2, targetDistance,
                 .0001, 100, 100_000, 25, seed,
-                DynamicElasticSpatialSettings.defaults(targetDistance));
+                DynamicElasticSpatialSettings.defaults(targetDistance),
+                DynamicElasticCanonicalGeometrySettings.disabled());
     }
 
     public DynamicElasticSettings withTargetDistance(double value) {
@@ -65,49 +83,57 @@ public record DynamicElasticSettings(
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, requiredStableIterations, maximumIterations,
                 workerUpdatesPerPublication, randomSeed,
-                scaleSpatial(spatial, targetDistance, value));
+                scaleSpatial(spatial, targetDistance, value), canonicalGeometry);
     }
     public DynamicElasticSettings withRequiredAccuracy(double value) {
         return new DynamicElasticSettings(targetDistance, value, springStrength,
                 updateStrength, velocityRetention, linearVelocityDamping,
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, requiredStableIterations, maximumIterations,
-                workerUpdatesPerPublication, randomSeed, spatial);
+                workerUpdatesPerPublication, randomSeed, spatial, canonicalGeometry);
     }
     public DynamicElasticSettings withSpringStrength(double value) {
         return new DynamicElasticSettings(targetDistance, requiredAccuracy, value,
                 updateStrength, velocityRetention, linearVelocityDamping,
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, requiredStableIterations, maximumIterations,
-                workerUpdatesPerPublication, randomSeed, spatial);
+                workerUpdatesPerPublication, randomSeed, spatial, canonicalGeometry);
     }
     public DynamicElasticSettings withUpdateStrength(double value) {
         return new DynamicElasticSettings(targetDistance, requiredAccuracy, springStrength,
                 value, velocityRetention, linearVelocityDamping, angularVelocityDamping,
                 maximumVelocity, maximumForce, maximumEquilibriumSpeed,
                 requiredStableIterations, maximumIterations, workerUpdatesPerPublication,
-                randomSeed, spatial);
+                randomSeed, spatial, canonicalGeometry);
     }
     public DynamicElasticSettings withRequiredStableIterations(int value) {
         return new DynamicElasticSettings(targetDistance, requiredAccuracy, springStrength,
                 updateStrength, velocityRetention, linearVelocityDamping,
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, value, maximumIterations,
-                workerUpdatesPerPublication, randomSeed, spatial);
+                workerUpdatesPerPublication, randomSeed, spatial, canonicalGeometry);
     }
     public DynamicElasticSettings withMaximumIterations(int value) {
         return new DynamicElasticSettings(targetDistance, requiredAccuracy, springStrength,
                 updateStrength, velocityRetention, linearVelocityDamping,
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, requiredStableIterations, value,
-                workerUpdatesPerPublication, randomSeed, spatial);
+                workerUpdatesPerPublication, randomSeed, spatial, canonicalGeometry);
     }
     public DynamicElasticSettings withSpatial(DynamicElasticSpatialSettings value) {
         return new DynamicElasticSettings(targetDistance, requiredAccuracy, springStrength,
                 updateStrength, velocityRetention, linearVelocityDamping,
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, requiredStableIterations, maximumIterations,
-                workerUpdatesPerPublication, randomSeed, value);
+                workerUpdatesPerPublication, randomSeed, value, canonicalGeometry);
+    }
+    public DynamicElasticSettings withCanonicalGeometry(
+            DynamicElasticCanonicalGeometrySettings value) {
+        return new DynamicElasticSettings(targetDistance, requiredAccuracy, springStrength,
+                updateStrength, velocityRetention, linearVelocityDamping,
+                angularVelocityDamping, maximumVelocity, maximumForce,
+                maximumEquilibriumSpeed, requiredStableIterations, maximumIterations,
+                workerUpdatesPerPublication, randomSeed, spatial, value);
     }
     private static DynamicElasticSpatialSettings scaleSpatial(
             DynamicElasticSpatialSettings value, double oldTarget, double newTarget) {

@@ -20,7 +20,10 @@ public final class DynamicElasticResultStore {
             + "iterations,elapsedMilliseconds,resultFile,topologySource,canonicalTopology,"
             + "minimumNonNeighborDistance,minimumObservedNonNeighborDistance,"
             + "edgeClearanceViolations,meanLocalSpread,minimumLocalSpread,"
-            + "elasticEquilibrium,spatiallyValid";
+            + "elasticEquilibrium,spatiallyValid,canonicalAngleConstraintsEnabled,"
+            + "targetAngleDegrees,angleToleranceDegrees,anglesSatisfied,angleCount,"
+            + "meanAngleErrorDegrees,maximumAngleErrorDegrees,canonicalGeometryValid,"
+            + "topologyIndex,canonicalGraphSignature,duplicateGraphsSkipped,generationAttempts";
     private final Path root;
 
     public DynamicElasticResultStore(Path root) { this.root = root; }
@@ -49,7 +52,15 @@ public final class DynamicElasticResultStore {
                 result.settings().spatial().minimumNonNeighborDistance(),
                 m.minimumObservedNonNeighborDistance(), m.edgeClearanceViolations(),
                 m.meanLocalSpread(), m.minimumLocalSpread(), m.elasticEquilibrium(),
-                m.spatiallyValid());
+                m.spatiallyValid(),
+                result.settings().canonicalGeometry().angleConstraintsEnabled(),
+                m.targetAngleDegrees(), m.angleToleranceDegrees(),
+                m.localAnglesSatisfied(), m.localAngleCount(),
+                m.meanAngleErrorDegrees(), m.maximumAngleErrorDegrees(),
+                m.canonicalGeometryValid(), result.graph().topologyIndex(),
+                result.graph().canonicalGraphSignature(),
+                result.graph().duplicateGraphsSkipped(),
+                result.graph().generationAttempts());
         Path csv = root.resolve("stable-results.csv");
         if (Files.notExists(csv))
             Files.writeString(csv, HEADER + System.lineSeparator(),
@@ -67,7 +78,7 @@ public final class DynamicElasticResultStore {
             if (line.isBlank() || line.equals(HEADER)) continue;
             try {
                 List<String> v = parseCsv(line);
-                if (v.size() != 26) continue;
+                if (v.size() != 38) continue;
                 rows.add(new DynamicElasticResultRow(Instant.parse(v.get(0)), v.get(1),
                         Integer.parseInt(v.get(2)), Integer.parseInt(v.get(3)), v.get(4),
                         Long.parseLong(v.get(5)), Double.parseDouble(v.get(6)),
@@ -83,7 +94,13 @@ public final class DynamicElasticResultStore {
                         Double.parseDouble(v.get(19)), Double.parseDouble(v.get(20)),
                         Integer.parseInt(v.get(21)), Double.parseDouble(v.get(22)),
                         Double.parseDouble(v.get(23)), Boolean.parseBoolean(v.get(24)),
-                        Boolean.parseBoolean(v.get(25))));
+                        Boolean.parseBoolean(v.get(25)), Boolean.parseBoolean(v.get(26)),
+                        Double.parseDouble(v.get(27)), Double.parseDouble(v.get(28)),
+                        Integer.parseInt(v.get(29)), Integer.parseInt(v.get(30)),
+                        Double.parseDouble(v.get(31)), Double.parseDouble(v.get(32)),
+                        Boolean.parseBoolean(v.get(33)), Integer.parseInt(v.get(34)),
+                        v.get(35), Integer.parseInt(v.get(36)),
+                        Integer.parseInt(v.get(37))));
             } catch (RuntimeException ignored) {
                 // Defensive row loading: malformed rows do not hide valid rows.
             }
@@ -98,6 +115,12 @@ public final class DynamicElasticResultStore {
         out.append("neighborsPerNode = ").append(result.graph().degree()).append('\n');
         out.append("nodeCount = ").append(result.graph().nodeCount()).append('\n');
         line(out, "topologySignature", result.graph().topologySignature());
+        out.append("topologyIndex = ").append(result.graph().topologyIndex()).append('\n');
+        line(out, "canonicalGraphSignature", result.graph().canonicalGraphSignature());
+        out.append("duplicateGraphsSkipped = ")
+                .append(result.graph().duplicateGraphsSkipped()).append('\n');
+        out.append("generationAttempts = ")
+                .append(result.graph().generationAttempts()).append('\n');
         line(out, "topologySource", result.graph().topologySource().name());
         line(out, "canonicalTopology", result.graph().canonicalTopology() == null ? ""
                 : result.graph().canonicalTopology().displayName());
@@ -129,6 +152,14 @@ public final class DynamicElasticResultStore {
         number(out, "edgeClearanceDistance", s.spatial().edgeClearanceDistance());
         out.append("localSpreadEnabled = ").append(s.spatial().localSpreadEnabled()).append('\n');
         number(out, "spatialConstraintStrength", s.spatial().strength());
+        out.append("canonicalAngleConstraintsEnabled = ")
+                .append(s.canonicalGeometry().angleConstraintsEnabled()).append('\n');
+        number(out, "targetAngleDegrees", s.canonicalGeometry().targetAngleDegrees());
+        number(out, "angleToleranceDegrees",
+                s.canonicalGeometry().angleToleranceDegrees());
+        number(out, "angleStrength", s.canonicalGeometry().angleStrength());
+        out.append("faceDiagonalsEnabled = ")
+                .append(s.canonicalGeometry().faceDiagonalsEnabled()).append('\n');
         DynamicElasticMetrics m = result.metrics();
         out.append("\n[metrics]\n");
         out.append("connectionsSatisfied = ").append(m.connectionsSatisfied()).append('\n');
@@ -144,6 +175,12 @@ public final class DynamicElasticResultStore {
         number(out, "minimumLocalSpread", m.minimumLocalSpread());
         out.append("elasticEquilibrium = ").append(m.elasticEquilibrium()).append('\n');
         out.append("spatiallyValid = ").append(m.spatiallyValid()).append('\n');
+        out.append("anglesSatisfied = ").append(m.localAnglesSatisfied()).append('\n');
+        out.append("angleCount = ").append(m.localAngleCount()).append('\n');
+        number(out, "meanAngleErrorDegrees", m.meanAngleErrorDegrees());
+        number(out, "maximumAngleErrorDegrees", m.maximumAngleErrorDegrees());
+        out.append("canonicalGeometryValid = ")
+                .append(m.canonicalGeometryValid()).append('\n');
         for (DiscoveryConnection edge : result.graph().connections()) {
             out.append("\n[[connections]]\nfirst = ").append(edge.firstNodeId())
                     .append("\nsecond = ").append(edge.secondNodeId()).append('\n');
@@ -176,7 +213,17 @@ public final class DynamicElasticResultStore {
                 Double.toString(r.minimumObservedNonNeighborDistance()),
                 Integer.toString(r.edgeClearanceViolations()),
                 Double.toString(r.meanLocalSpread()), Double.toString(r.minimumLocalSpread()),
-                Boolean.toString(r.elasticEquilibrium()), Boolean.toString(r.spatiallyValid()));
+                Boolean.toString(r.elasticEquilibrium()), Boolean.toString(r.spatiallyValid()),
+                Boolean.toString(r.canonicalAngleConstraintsEnabled()),
+                Double.toString(r.targetAngleDegrees()),
+                Double.toString(r.angleToleranceDegrees()),
+                Integer.toString(r.anglesSatisfied()), Integer.toString(r.angleCount()),
+                Double.toString(r.meanAngleErrorDegrees()),
+                Double.toString(r.maximumAngleErrorDegrees()),
+                Boolean.toString(r.canonicalGeometryValid()),
+                Integer.toString(r.topologyIndex()), csvValue(r.canonicalGraphSignature()),
+                Integer.toString(r.duplicateGraphsSkipped()),
+                Integer.toString(r.generationAttempts()));
     }
     private String csvValue(String value) {
         if (value.indexOf(',') < 0 && value.indexOf('"') < 0

@@ -6,15 +6,32 @@ public record FixedDegreeGraph(int nodeCount, int degree,
                                List<DiscoveryConnection> connections,
                                String topologySignature,
                                DynamicElasticTopologySource topologySource,
-                               CanonicalDynamicElasticTopology canonicalTopology) {
+                               CanonicalDynamicElasticTopology canonicalTopology,
+                               String canonicalGraphSignature,
+                               int topologyIndex,
+                               int duplicateGraphsSkipped,
+                               int generationAttempts) {
     public FixedDegreeGraph(int nodeCount, int degree,
                             List<DiscoveryConnection> connections,
                             String topologySignature) {
         this(nodeCount, degree, connections, topologySignature,
-                DynamicElasticTopologySource.GENERATED_FIXED_DEGREE_TOPOLOGY, null);
+                DynamicElasticTopologySource.GENERATED_FIXED_DEGREE_TOPOLOGY, null,
+                CanonicalGraphSignature.of(nodeCount, connections), 0, 0, 1);
+    }
+    public FixedDegreeGraph(int nodeCount, int degree,
+                            List<DiscoveryConnection> connections, String topologySignature,
+                            DynamicElasticTopologySource topologySource,
+                            CanonicalDynamicElasticTopology canonicalTopology) {
+        this(nodeCount, degree, connections, topologySignature, topologySource,
+                canonicalTopology, CanonicalGraphSignature.of(nodeCount, connections),
+                0, 0, 1);
     }
     public FixedDegreeGraph {
         connections = List.copyOf(connections);
+        if (canonicalGraphSignature == null || canonicalGraphSignature.isBlank())
+            canonicalGraphSignature = CanonicalGraphSignature.of(nodeCount, connections);
+        if (topologyIndex < 0 || duplicateGraphsSkipped < 0 || generationAttempts < 1)
+            throw new IllegalArgumentException("Topology enumeration metadata is invalid.");
         if (topologySource == null)
             throw new IllegalArgumentException("Topology source is required.");
         if (topologySource == DynamicElasticTopologySource.CANONICAL_TOPOLOGY

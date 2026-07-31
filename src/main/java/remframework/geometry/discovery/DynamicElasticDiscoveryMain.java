@@ -46,7 +46,11 @@ public final class DynamicElasticDiscoveryMain {
                 ? new FixedDegreeGraphGenerator().generate(nodes, degree, seed, 0)
                 : canonical.create(nodes);
         if (canonical == CanonicalDynamicElasticTopology.CUBE && spatialEnabled)
-            settings = settings.withSpatial(settings.spatial().withLocalSpreadEnabled(true));
+            settings = settings.withCanonicalGeometry(
+                            DynamicElasticCanonicalGeometrySettings.forTopology(canonical));
+        else if (canonical == CanonicalDynamicElasticTopology.TETRAHEDRON)
+            settings = settings.withCanonicalGeometry(
+                    DynamicElasticCanonicalGeometrySettings.forTopology(canonical));
         DynamicElasticSession session = new DynamicElasticSession(graph, settings);
         System.out.println("REM Framework Dynamic Elastic Discovery");
         System.out.println("K=" + degree + ", N=" + nodes + ", edges="
@@ -75,6 +79,8 @@ public final class DynamicElasticDiscoveryMain {
         int attempts = Integer.parseInt(
                 options.getOrDefault("topology-attempts", "1"));
         int seeds = Integer.parseInt(options.getOrDefault("seeds-per-topology", "1"));
+        int maximumUnique = Integer.parseInt(
+                options.getOrDefault("maximum-unique-topologies", "100"));
         DynamicElasticSearchPolicy policy = switch (
                 options.getOrDefault("policy", "first-per-node-count")) {
             case "stop-first" -> DynamicElasticSearchPolicy.STOP_AT_FIRST_STABLE_CANDIDATE;
@@ -83,7 +89,7 @@ public final class DynamicElasticDiscoveryMain {
                     DynamicElasticSearchPolicy.FIND_FIRST_STABLE_CANDIDATE_PER_NODE_COUNT;
         };
         DynamicElasticSearchSettings search = new DynamicElasticSearchSettings(
-                degree, start, maximum, attempts, seeds, policy, settings);
+                degree, start, maximum, attempts, seeds, policy, settings, maximumUnique);
         DynamicElasticResultStore store = options.containsKey("output")
                 ? new DynamicElasticResultStore(Path.of(options.get("output")))
                 : DynamicElasticResultStore.defaults();
@@ -111,11 +117,14 @@ public final class DynamicElasticDiscoveryMain {
                 metrics.requiredStableIterations(), metrics.state());
         System.out.printf("minimumNonNeighbor=%.7g, clearanceViolations=%d, "
                         + "meanLocalSpread=%.7g, minimumLocalSpread=%.7g, "
-                        + "elasticEquilibrium=%s, spatiallyValid=%s%n",
+                        + "angles=%d/%d, maximumAngleError=%.7g, "
+                        + "elasticEquilibrium=%s, spatiallyValid=%s, canonicalValid=%s%n",
                 metrics.minimumObservedNonNeighborDistance(),
                 metrics.edgeClearanceViolations(), metrics.meanLocalSpread(),
-                metrics.minimumLocalSpread(), metrics.elasticEquilibrium(),
-                metrics.spatiallyValid());
+                metrics.minimumLocalSpread(), metrics.localAnglesSatisfied(),
+                metrics.localAngleCount(), metrics.maximumAngleErrorDegrees(),
+                metrics.elasticEquilibrium(), metrics.spatiallyValid(),
+                metrics.canonicalGeometryValid());
     }
     private static CanonicalDynamicElasticTopology canonical(String value) {
         if (value == null || value.isBlank()) return null;

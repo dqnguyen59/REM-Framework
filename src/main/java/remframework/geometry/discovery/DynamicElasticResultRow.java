@@ -15,5 +15,10 @@ public record DynamicElasticResultRow(
         double minimumObservedNonNeighborDistance,
         int edgeClearanceViolations, double meanLocalSpread,
         double minimumLocalSpread, boolean elasticEquilibrium,
-        boolean spatiallyValid) {
+        boolean spatiallyValid, boolean canonicalAngleConstraintsEnabled,
+        double targetAngleDegrees, double angleToleranceDegrees,
+        int anglesSatisfied, int angleCount, double meanAngleErrorDegrees,
+        double maximumAngleErrorDegrees, boolean canonicalGeometryValid,
+        int topologyIndex, String canonicalGraphSignature,
+        int duplicateGraphsSkipped, int generationAttempts) {
 }

@@ -158,6 +158,10 @@ class DynamicElasticDiscoveryTest {
         assertTrue(detail.contains("minimumNonNeighborDistance"));
         assertTrue(detail.contains("elasticEquilibrium"));
         assertTrue(detail.contains("spatiallyValid"));
+        assertTrue(detail.contains("canonicalAngleConstraintsEnabled"));
+        assertTrue(detail.contains("maximumAngleErrorDegrees"));
+        assertTrue(detail.contains("canonicalGeometryValid"));
+        assertTrue(detail.contains("canonicalGraphSignature"));
         LoadedDynamicElasticResult loaded =
                 new DynamicElasticResultLoader().load(first.resultFile());
         assertEquals(3, loaded.model().nodes().size());

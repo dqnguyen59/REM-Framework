@@ -73,7 +73,13 @@ public final class DynamicElasticResultLoader {
                         ? defaults.workerUpdatesPerPublication()
                         : Math.toIntExact(configuration.getLong(
                                 "workerUpdatesPerPublication")),
-                defaults.randomSeed(), spatial);
+                defaults.randomSeed(), spatial,
+                new DynamicElasticCanonicalGeometrySettings(
+                        bool(configuration, "canonicalAngleConstraintsEnabled", false),
+                        optionalDecimal(configuration, "targetAngleDegrees", 90),
+                        optionalDecimal(configuration, "angleToleranceDegrees", 2),
+                        optionalDecimal(configuration, "angleStrength", .01),
+                        bool(configuration, "faceDiagonalsEnabled", false)));
         String runId = toml.getString("runId");
         GeometryDiscoveryModel model = new GeometryDiscoveryModel(
                 runId == null ? path.getFileName().toString() : runId,

@@ -18,7 +18,14 @@ public record DynamicElasticMetrics(
         double meanLocalSpread,
         double minimumLocalSpread,
         boolean elasticEquilibrium,
-        boolean spatiallyValid) {
+        boolean spatiallyValid,
+        int localAngleCount,
+        int localAnglesSatisfied,
+        double meanAngleErrorDegrees,
+        double maximumAngleErrorDegrees,
+        double targetAngleDegrees,
+        double angleToleranceDegrees,
+        boolean canonicalGeometryValid) {
     public DynamicElasticMetrics {
         edges = List.copyOf(edges);
     }
@@ -29,6 +36,10 @@ public record DynamicElasticMetrics(
                 && Double.isFinite(minimumObservedNonNeighborDistance)
                 && Double.isFinite(meanLocalSpread)
                 && Double.isFinite(minimumLocalSpread)
+                && Double.isFinite(meanAngleErrorDegrees)
+                && Double.isFinite(maximumAngleErrorDegrees)
+                && Double.isFinite(targetAngleDegrees)
+                && Double.isFinite(angleToleranceDegrees)
                 && edges.stream().allMatch(edge -> Double.isFinite(edge.distance())
                 && Double.isFinite(edge.accuracy()));
     }

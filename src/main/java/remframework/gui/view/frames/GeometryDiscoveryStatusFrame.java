@@ -29,18 +29,24 @@ public final class GeometryDiscoveryStatusFrame extends AbstractFrame {
         GeometryDiscoveryWorkflowResolution workflow = controller.workflow();
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
         Nuklear.nk_style_set_font(c, nuklearModel.getDefaultFontBold());
-        Nuklear.nk_label(c, statusLabel(workflow.state()), Nuklear.NK_TEXT_CENTERED);
+        Nuklear.nk_label(c, controller.workspace().dynamicElasticActive()
+                ? dynamicElasticStatus() : statusLabel(workflow.state()),
+                Nuklear.NK_TEXT_CENTERED);
         Nuklear.nk_style_set_font(c, nuklearModel.getDefaultFont());
         Nuklear.nk_layout_row_dynamic(c, rowHeight, 1);
         Nuklear.nk_label(c, "Candidate: " + snapshot.geometry().model().name()
                 + "    Profile: " + profileLabel(controller.state().scoringProfile()),
                 Nuklear.NK_TEXT_CENTERED);
     }
+    private String dynamicElasticStatus() {
+        return DynamicElasticStatusReporter.label(
+                controller.workspace().dynamicElasticMetrics());
+    }
     private String statusLabel(GeometryDiscoveryWorkflowState state) {
         return switch (state) {
             case NO_CANDIDATE -> "No Candidate";
             case CANDIDATE_LOADED -> "Candidate Loaded";
-            case RELAXATION_REQUIRED -> "Relaxation Recommended";
+            case RELAXATION_REQUIRED -> "Relaxation Required";
             case RELAXING -> "Geometry Relaxing";
             case GEOMETRY_CONVERGED, READY_FOR_EVALUATION, READY_FOR_SEARCH ->
                     "Geometry Converged";

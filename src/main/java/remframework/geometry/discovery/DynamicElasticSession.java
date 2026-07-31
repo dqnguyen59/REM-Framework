@@ -21,6 +21,7 @@ public final class DynamicElasticSession {
     private DynamicElasticState state = DynamicElasticState.INITIALIZING;
     private int iteration;
     private int stableIterations;
+    private int elasticStableIterations;
     private final long startedNanos = System.nanoTime();
     private String failureReason = "";
 
@@ -52,15 +53,19 @@ public final class DynamicElasticSession {
             return false;
         }
         DynamicElasticMetrics current = calculateMetrics();
-        boolean equilibriumConditions = current.connectionsSatisfied()
+        boolean elasticConditions = current.connectionsSatisfied()
                 == current.connectionCount()
                 && current.maximumNodeSpeed() <= settings.maximumEquilibriumSpeed();
-        stableIterations = equilibriumConditions ? stableIterations + 1 : 0;
+        elasticStableIterations = elasticConditions ? elasticStableIterations + 1 : 0;
+        boolean canonicalConditions = !settings.canonicalGeometry().angleConstraintsEnabled()
+                || current.localAnglesSatisfied() == current.localAngleCount()
+                && current.spatiallyValid();
+        stableIterations = elasticConditions && canonicalConditions ? stableIterations + 1 : 0;
         if (stableIterations >= settings.requiredStableIterations())
             state = DynamicElasticState.EQUILIBRIUM_REACHED;
         else if (iteration >= settings.maximumIterations())
             state = DynamicElasticState.MAX_ITERATIONS_REACHED;
-        else if (equilibriumConditions)
+        else if (elasticConditions)
             state = DynamicElasticState.NEAR_EQUILIBRIUM;
         return true;
     }
@@ -76,6 +81,7 @@ public final class DynamicElasticSession {
         nodes.forEach(node -> byId.put(node.id(), node));
         iteration = 0;
         stableIterations = 0;
+        elasticStableIterations = 0;
         failureReason = "";
         state = DynamicElasticState.INITIALIZING;
         enforceAnchors();
@@ -98,6 +104,8 @@ public final class DynamicElasticSession {
         }
         new DynamicElasticSpatialConstraints().addForces(graph, nodes, forces,
                 settings.spatial(), settings.randomSeed());
+        new DynamicElasticAngleConstraints().addForces(graph, byId, forces,
+                settings.canonicalGeometry());
         return forces;
     }
 
@@ -173,6 +181,7 @@ public final class DynamicElasticSession {
         double maximumSpeed = nodes.stream().filter(node -> !node.fixed())
                 .mapToDouble(node -> node.velocity().length()).max().orElse(0);
         SpatialMetrics spatial = spatialMetrics();
+        AngleMetrics angles = angleMetrics();
         int edgeCount = edgeMetrics.size();
         return new DynamicElasticMetrics(iteration, satisfied, edgeCount,
                 edgeCount == 0 ? 1 : accuracySum / edgeCount,
@@ -181,9 +190,58 @@ public final class DynamicElasticSession {
                 state, edgeMetrics, spatial.minimumNonNeighborDistance(),
                 spatial.edgeClearanceViolations(), spatial.meanLocalSpread(),
                 spatial.minimumLocalSpread(),
-                state == DynamicElasticState.EQUILIBRIUM_REACHED,
-                spatial.spatiallyValid());
+                elasticStableIterations >= settings.requiredStableIterations(),
+                spatial.spatiallyValid(), angles.count(), angles.satisfied(),
+                angles.meanErrorDegrees(), angles.maximumErrorDegrees(),
+                settings.canonicalGeometry().targetAngleDegrees(),
+                settings.canonicalGeometry().angleToleranceDegrees(),
+                settings.canonicalGeometry().angleConstraintsEnabled()
+                        && stableIterations >= settings.requiredStableIterations());
     }
+
+    private AngleMetrics angleMetrics() {
+        if (!settings.canonicalGeometry().angleConstraintsEnabled()
+                || graph.canonicalTopology() == null)
+            return new AngleMetrics(0, 0, 0, 0);
+        Map<Integer, java.util.Set<Integer>> adjacency = new HashMap<>();
+        for (int id = 0; id < graph.nodeCount(); id++) adjacency.put(id, new java.util.TreeSet<>());
+        for (DiscoveryConnection edge : graph.connections()) {
+            adjacency.get(edge.firstNodeId()).add(edge.secondNodeId());
+            adjacency.get(edge.secondNodeId()).add(edge.firstNodeId());
+        }
+        int count = 0, satisfied = 0;
+        double sum = 0, maximum = 0;
+        for (int center = 0; center < graph.nodeCount(); center++) {
+            int[] neighbor = adjacency.get(center).stream().mapToInt(Integer::intValue).toArray();
+            for (int first = 0; first < neighbor.length; first++)
+                for (int second = first + 1; second < neighbor.length; second++) {
+                    Vector3d u = new Vector3d(byId.get(neighbor[first]).position())
+                            .sub(byId.get(center).position());
+                    Vector3d v = new Vector3d(byId.get(neighbor[second]).position())
+                            .sub(byId.get(center).position());
+                    double error;
+                    if (u.lengthSquared() <= EPSILON || v.lengthSquared() <= EPSILON)
+                        error = 180;
+                    else {
+                        double cosine = Math.max(-1, Math.min(1,
+                                u.normalize().dot(v.normalize())));
+                        double angle = Math.toDegrees(Math.acos(cosine));
+                        error = Math.abs(angle
+                                - settings.canonicalGeometry().targetAngleDegrees());
+                    }
+                    count++;
+                    sum += error;
+                    maximum = Math.max(maximum, error);
+                    if (error <= settings.canonicalGeometry().angleToleranceDegrees())
+                        satisfied++;
+                }
+        }
+        return new AngleMetrics(count, satisfied, count == 0 ? 0 : sum / count, maximum);
+    }
+
+    private record AngleMetrics(int count, int satisfied,
+                                double meanErrorDegrees,
+                                double maximumErrorDegrees) {}
 
     private SpatialMetrics spatialMetrics() {
         java.util.Set<Long> edgeKeys = graph.connections().stream()

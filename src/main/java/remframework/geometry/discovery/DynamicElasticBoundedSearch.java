@@ -20,11 +20,13 @@ public final class DynamicElasticBoundedSearch {
             }
             boolean stableForN = false;
             int requestedAttempts = settings.exactNeighborsPerNode() == 2 ? 1
-                    : settings.topologyAttemptsPerNodeCount();
+                    : Math.min(settings.topologyAttemptsPerNodeCount(),
+                    settings.maximumUniqueTopologiesPerNodeCount());
             int uniqueAttempts = 0;
             java.util.Set<String> signatures = new java.util.HashSet<>();
+            int duplicatesSkipped = 0;
             for (int attempt = 0; uniqueAttempts < requestedAttempts && !stableForN
-                    && attempt < requestedAttempts * 100; attempt++) {
+                    && attempt < settings.topologyAttemptsPerNodeCount(); attempt++) {
                 FixedDegreeGraph graph;
                 try {
                     graph = generator.generate(n, settings.exactNeighborsPerNode(),
@@ -35,7 +37,16 @@ public final class DynamicElasticBoundedSearch {
                             exception.getMessage()));
                     continue;
                 }
-                if (!signatures.add(graph.topologySignature())) continue;
+                String canonicalSignature = CanonicalGraphSignature.of(
+                        graph.nodeCount(), graph.connections());
+                if (!signatures.add(canonicalSignature)) {
+                    duplicatesSkipped++;
+                    continue;
+                }
+                graph = new FixedDegreeGraph(graph.nodeCount(), graph.degree(),
+                        graph.connections(), graph.topologySignature(),
+                        graph.topologySource(), graph.canonicalTopology(),
+                        canonicalSignature, uniqueAttempts, duplicatesSkipped, attempt + 1);
                 uniqueAttempts++;
                 for (int seedIndex = 0; seedIndex < settings.seedsPerTopology(); seedIndex++) {
                     long seed = settings.elasticSettings().randomSeed() + seedIndex;
@@ -76,6 +87,6 @@ public final class DynamicElasticBoundedSearch {
                 s.linearVelocityDamping(), s.angularVelocityDamping(), s.maximumVelocity(),
                 s.maximumForce(), s.maximumEquilibriumSpeed(),
                 s.requiredStableIterations(), s.maximumIterations(),
-                s.workerUpdatesPerPublication(), seed, s.spatial());
+                s.workerUpdatesPerPublication(), seed, s.spatial(), s.canonicalGeometry());
     }
 }

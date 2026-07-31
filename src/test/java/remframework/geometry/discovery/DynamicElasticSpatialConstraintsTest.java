@@ -136,9 +136,144 @@ class DynamicElasticSpatialConstraintsTest {
         assertFalse(session.metrics().spatiallyValid());
     }
 
+    @Test void exactCubeHasTwentyFourSatisfiedCanonicalAngles() {
+        FixedDegreeGraph cube = CanonicalDynamicElasticTopology.CUBE.create(8);
+        DynamicElasticSession session = new DynamicElasticSession(cube,
+                canonicalSettings(10, 2, 10), exactCube(10));
+        DynamicElasticMetrics metrics = session.metrics();
+        assertEquals(24, metrics.localAngleCount());
+        assertEquals(24, metrics.localAnglesSatisfied());
+        assertEquals(0, metrics.maximumAngleErrorDegrees(), 1e-10);
+        session.step();
+        session.step();
+        assertTrue(session.metrics().elasticEquilibrium());
+        assertTrue(session.metrics().canonicalGeometryValid());
+    }
+
+    @Test void shearedCubeFailsCanonicalAngleValidity() {
+        List<DynamicElasticNode> sheared = exactCube(10);
+        for (int id = 4; id < 8; id++)
+            sheared.get(id).position().add(3, 0, 0);
+        DynamicElasticSession session = new DynamicElasticSession(
+                CanonicalDynamicElasticTopology.CUBE.create(8),
+                canonicalSettings(10, 1, 1), sheared);
+        assertTrue(session.metrics().localAnglesSatisfied() < 24);
+        assertFalse(session.metrics().canonicalGeometryValid());
+    }
+
+    @Test void angleEnergyAndCorrectionFollowOrthogonalityEnergy() {
+        assertEquals(0, DynamicElasticAngleConstraints.energy(
+                new Vector3d(1, 0, 0), new Vector3d(0, 1, 0), 90, 1), 1e-12);
+        assertTrue(DynamicElasticAngleConstraints.energy(
+                new Vector3d(1, 0, 0), new Vector3d(1, 1, 0), 90, 1) > 0);
+
+        List<DynamicElasticNode> sheared = exactCube(10);
+        for (int id = 4; id < 8; id++) sheared.get(id).position().add(4, 0, 0);
+        DynamicElasticSettings base = canonicalSettings(10, 100, 1);
+        DynamicElasticSettings angleOnly = new DynamicElasticSettings(10, .98, 0, .1,
+                0, 0, 0, 10, 10, 0, 100, 1, 1, 42,
+                DynamicElasticSpatialSettings.disabled(10),
+                new DynamicElasticCanonicalGeometrySettings(true, 90, 2, .5, false));
+        DynamicElasticSession session = new DynamicElasticSession(
+                CanonicalDynamicElasticTopology.CUBE.create(8), angleOnly, sheared);
+        double before = session.metrics().meanAngleErrorDegrees();
+        session.step();
+        assertTrue(session.metrics().meanAngleErrorDegrees() < before);
+    }
+
+    @Test void canonicalAnglesPreserveTopologyDegreeAnchorsAndDeterminism() {
+        FixedDegreeGraph cube = CanonicalDynamicElasticTopology.CUBE.create(8);
+        DynamicElasticSettings settings = canonicalSettings(10, 100, 100);
+        DynamicElasticSession first = new DynamicElasticSession(cube, settings);
+        DynamicElasticSession second = new DynamicElasticSession(cube, settings);
+        List<DiscoveryConnection> edges = cube.connections();
+        for (int i = 0; i < 20; i++) { first.step(); second.step(); }
+        assertEquals(edges, first.graph().connections());
+        assertTrue(adjacency(first.graph()).values().stream().allMatch(n -> n.size() == 3));
+        assertEquals(new Vector3d(), first.nodes().get(0).position());
+        assertEquals(new Vector3d(10, 0, 0), first.nodes().get(1).position());
+        assertEquals(first.nodes().stream().map(DynamicElasticNode::position).toList(),
+                second.nodes().stream().map(DynamicElasticNode::position).toList());
+    }
+
+    @Test void generatedGraphsHaveNoImplicitCubeAngles() {
+        FixedDegreeGraph generated = new FixedDegreeGraphGenerator().generate(8, 3, 42, 0);
+        DynamicElasticSession session = new DynamicElasticSession(generated,
+                DynamicElasticSettings.defaults(10, 42));
+        assertFalse(session.settings().canonicalGeometry().angleConstraintsEnabled());
+        assertEquals(0, session.metrics().localAngleCount());
+    }
+
+    @Test void canonicalSignaturesSkipRelabelledDuplicatesAndRetainDistinctGraphs() {
+        FixedDegreeGraph cube = CanonicalDynamicElasticTopology.CUBE.create(8);
+        List<DiscoveryConnection> relabelled = cube.connections().stream()
+                .map(e -> new DiscoveryConnection((e.firstNodeId() + 3) % 8,
+                        (e.secondNodeId() + 3) % 8)).toList();
+        String cubeSignature = CanonicalGraphSignature.of(8, cube.connections());
+        assertEquals(cubeSignature, CanonicalGraphSignature.of(8, relabelled));
+        FixedDegreeGraph wagner = new FixedDegreeGraphGenerator().generate(8, 3, 1, 0);
+        boolean foundDistinct = false;
+        for (int attempt = 0; attempt < 30 && !foundDistinct; attempt++) {
+            FixedDegreeGraph candidate = new FixedDegreeGraphGenerator()
+                    .generate(8, 3, 7, attempt);
+            foundDistinct = !candidate.canonicalGraphSignature().equals(cubeSignature);
+        }
+        assertTrue(foundDistinct);
+    }
+
+    @Test void statusCannotReportConvergenceForNineOfTwelveEdgesAndDisabledIsExplicit() {
+        DynamicElasticMetrics base = new DynamicElasticSession(
+                CanonicalDynamicElasticTopology.CUBE.create(8),
+                canonicalSettings(10, 2, 10), exactCube(10)).metrics();
+        DynamicElasticMetrics incomplete = new DynamicElasticMetrics(base.iteration(),
+                9, 12, base.meanDistanceAccuracy(), 75, 0, 100, 100,
+                DynamicElasticState.EQUILIBRIUM_REACHED, base.edges(),
+                base.minimumObservedNonNeighborDistance(), base.edgeClearanceViolations(),
+                base.meanLocalSpread(), base.minimumLocalSpread(), true, true,
+                24, 24, 0, 0, 90, 2, true);
+        assertEquals("Relaxation Required", DynamicElasticStatusReporter.label(incomplete));
+        assertEquals("Disabled", DynamicElasticStatusReporter.constraintState(false));
+    }
+
+    @Test void boundedEnumerationRetainsOnlyUniqueCanonicalSignatures() {
+        DynamicElasticSettings oneStep = DynamicElasticSettings.defaults(10, 42)
+                .withMaximumIterations(1);
+        DynamicElasticSearchSettings search = new DynamicElasticSearchSettings(
+                3, 8, 8, 20, 1,
+                DynamicElasticSearchPolicy.FIND_ALL_STABLE_CANDIDATES,
+                oneStep, 10);
+        List<DynamicElasticSearchRecord> records =
+                new DynamicElasticBoundedSearch().run(search).stream()
+                        .filter(record -> record.result() != null).toList();
+        Set<String> signatures = records.stream()
+                .map(record -> record.result().graph().canonicalGraphSignature())
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(signatures.size(), records.size());
+        assertTrue(records.stream().anyMatch(record ->
+                record.result().graph().generationAttempts()
+                        > record.result().graph().topologyIndex() + 1));
+    }
+
     private DynamicElasticSettings disabled(double target) {
         return DynamicElasticSettings.defaults(target, 42)
                 .withSpatial(DynamicElasticSpatialSettings.disabled(target));
+    }
+    private DynamicElasticSettings canonicalSettings(double target, int stable, int maximum) {
+        DynamicElasticSettings defaults = DynamicElasticSettings.defaults(target, 42);
+        return new DynamicElasticSettings(target, .98, defaults.springStrength(),
+                defaults.updateStrength(), defaults.velocityRetention(),
+                defaults.linearVelocityDamping(), defaults.angularVelocityDamping(),
+                defaults.maximumVelocity(), defaults.maximumForce(),
+                defaults.maximumEquilibriumSpeed(), stable, maximum, 1, 42,
+                DynamicElasticSpatialSettings.disabled(target),
+                DynamicElasticCanonicalGeometrySettings.forTopology(
+                        CanonicalDynamicElasticTopology.CUBE));
+    }
+    private List<DynamicElasticNode> exactCube(double side) {
+        return nodes(new Vector3d(0, 0, 0), new Vector3d(side, 0, 0),
+                new Vector3d(side, side, 0), new Vector3d(0, side, 0),
+                new Vector3d(0, 0, side), new Vector3d(side, 0, side),
+                new Vector3d(side, side, side), new Vector3d(0, side, side));
     }
     private List<DynamicElasticNode> nodes(Vector3d... positions) {
         return java.util.stream.IntStream.range(0, positions.length)

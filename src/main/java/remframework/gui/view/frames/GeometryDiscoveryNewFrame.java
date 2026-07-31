@@ -70,6 +70,10 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
     private boolean preventEdgeCrossings = true;
     private boolean encourageLocalSpread = true;
     private double spatialConstraintStrength = .20;
+    private boolean enforceCanonicalAngles = true;
+    private double angleToleranceDegrees = 2;
+    private double angleStrength = .01;
+    private int maximumUniqueTopologiesPerNodeCount = 100;
     private final GeometryDiscoveryWizardDraftStore draftStore =
             new GeometryDiscoveryWizardDraftStore(
                     Path.of("geometry-discovery-new-draft.properties"));
@@ -283,14 +287,32 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
                 relaxationIterations, 10_000_000, 100, 10);
         if (discoveryMode.equals("Fixed-Degree Dynamic Elastic")) {
             heading(c, "Spatial Constraints");
-            preventNodeOverlap = nk_check_label(c, "Prevent node overlap",
+            preventNodeOverlap = nk_check_label(c, "Prevent node overlap - "
+                            + (preventNodeOverlap ? "Enabled" : "Disabled"),
                     preventNodeOverlap, .65, .35);
-            preventEdgeCrossings = nk_check_label(c, "Prevent edge crossings",
+            preventEdgeCrossings = nk_check_label(c, "Prevent edge crossings - "
+                            + (preventEdgeCrossings ? "Enabled" : "Disabled"),
                     preventEdgeCrossings, .65, .35);
-            encourageLocalSpread = nk_check_label(c, "Encourage local 3D spread",
+            encourageLocalSpread = nk_check_label(c, "Encourage local 3D spread - "
+                            + (encourageLocalSpread ? "Enabled" : "Disabled"),
                     encourageLocalSpread, .65, .35);
             spatialConstraintStrength = formDouble(c, "Spatial constraint strength",
                     spatialConstraintStrength, 0, 100, .001);
+            if (dynamicTopologySource.equals("Canonical topology")
+                    && canonicalTopologyValue() != CanonicalDynamicElasticTopology.CYCLE) {
+                heading(c, "Canonical geometry constraints");
+                enforceCanonicalAngles = nk_check_label(c, "Enforce canonical angles - "
+                                + (enforceCanonicalAngles ? "Enabled" : "Disabled"),
+                        enforceCanonicalAngles, .65, .35);
+                label(c, String.format("Target angle: %.6g degrees",
+                        canonicalTargetAngle()));
+                angleToleranceDegrees = formDouble(c, "Angle tolerance",
+                        angleToleranceDegrees, 0, 180, .1);
+                angleStrength = formDouble(c, "Angle strength",
+                        angleStrength, 0, 100, .001);
+            } else if (dynamicTopologySource.equals("Generated fixed-degree topology")) {
+                label(c, "No canonical angle model is defined for this graph.");
+            }
         }
         if (Nuklear.nk_button_label(c, (relaxationAdvanced ? "Hide" : "Show")
                 + " Advanced Settings")) relaxationAdvanced = !relaxationAdvanced;
@@ -305,6 +327,11 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
     }
 
     private void search(NkContext c) {
+        if (discoveryMode.equals("Fixed-Degree Dynamic Elastic")) {
+            maximumUniqueTopologiesPerNodeCount = formInt(c,
+                    "Maximum unique topologies per N",
+                    maximumUniqueTopologiesPerNodeCount, 1, 100_000);
+        }
         try (MemoryStack stack = MemoryStack.stackPush()) {
             searchMode = formCombo(c, stack, "Search method",
                     new String[]{"Hill Climbing", "Simulated Annealing"},
@@ -592,6 +619,11 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         p.setProperty("encourageLocalSpread", Boolean.toString(encourageLocalSpread));
         p.setProperty("spatialConstraintStrength",
                 Double.toString(spatialConstraintStrength));
+        p.setProperty("enforceCanonicalAngles", Boolean.toString(enforceCanonicalAngles));
+        p.setProperty("angleToleranceDegrees", Double.toString(angleToleranceDegrees));
+        p.setProperty("angleStrength", Double.toString(angleStrength));
+        p.setProperty("maximumUniqueTopologiesPerNodeCount",
+                Integer.toString(maximumUniqueTopologiesPerNodeCount));
         p.setProperty("edgeProbability", Double.toString(edgeProbability));
         p.setProperty("initialization", initialization);
         p.setProperty("extent", Double.toString(extent));
@@ -630,6 +662,13 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
                 p.getProperty("encourageLocalSpread", Boolean.toString(encourageLocalSpread)));
         spatialConstraintStrength = decimal(p, "spatialConstraintStrength",
                 spatialConstraintStrength);
+        enforceCanonicalAngles = Boolean.parseBoolean(p.getProperty(
+                "enforceCanonicalAngles", Boolean.toString(enforceCanonicalAngles)));
+        angleToleranceDegrees = decimal(p, "angleToleranceDegrees", angleToleranceDegrees);
+        angleStrength = decimal(p, "angleStrength", angleStrength);
+        maximumUniqueTopologiesPerNodeCount = integer(p,
+                "maximumUniqueTopologiesPerNodeCount",
+                maximumUniqueTopologiesPerNodeCount);
         edgeProbability = decimal(p, "edgeProbability", edgeProbability);
         initialization = p.getProperty("initialization", initialization);
         extent = decimal(p, "extent", extent);
@@ -663,6 +702,10 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         preventEdgeCrossings = true;
         encourageLocalSpread = true;
         spatialConstraintStrength = .20;
+        enforceCanonicalAngles = true;
+        angleToleranceDegrees = 2;
+        angleStrength = .01;
+        maximumUniqueTopologiesPerNodeCount = 100;
         edgeProbability = .3;
         initialization = "Random Sphere";
         extent = 15;
@@ -693,7 +736,19 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
                 preventNodeOverlap, .70 * targetDistance,
                 preventEdgeCrossings, .10 * targetDistance,
                 encourageLocalSpread, spatialConstraintStrength);
-        return DynamicElasticSettings.defaults(targetDistance, seed).withSpatial(spatial);
+        DynamicElasticSettings result = DynamicElasticSettings.defaults(targetDistance, seed)
+                .withSpatial(spatial);
+        if (dynamicTopologySource.equals("Canonical topology")
+                && canonicalTopologyValue() != CanonicalDynamicElasticTopology.CYCLE)
+            result = result.withCanonicalGeometry(
+                    new DynamicElasticCanonicalGeometrySettings(enforceCanonicalAngles,
+                            canonicalTargetAngle(), angleToleranceDegrees,
+                            angleStrength, false));
+        return result;
+    }
+    private double canonicalTargetAngle() {
+        return canonicalTopologyValue() == CanonicalDynamicElasticTopology.TETRAHEDRON
+                ? Math.toDegrees(Math.acos(-1.0 / 3.0)) : 90;
     }
     private void heading(NkContext c, String text) {
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 5, 1);
