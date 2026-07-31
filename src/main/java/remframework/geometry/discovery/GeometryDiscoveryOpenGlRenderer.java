@@ -65,6 +65,7 @@ public final class GeometryDiscoveryOpenGlRenderer implements AutoCloseable {
 
         List<Float> points = new ArrayList<>();
         for (DiscoveryNode node : model.nodes()) {
+            if (!view.showVertices()) continue;
             boolean selected = java.util.Objects.equals(node.id(), view.selectedNodeId());
             float r = selected ? 1f : node.fixedPosition() && view.highlightFixedNodes() ? 1f : 0.2f;
             float g = selected ? 0.85f : node.fixedPosition() && view.highlightFixedNodes() ? 0.25f : 0.65f;
@@ -88,14 +89,17 @@ public final class GeometryDiscoveryOpenGlRenderer implements AutoCloseable {
                 center.y + (float) (view.distance() * Math.sin(pitch)),
                 center.z + (float) (view.distance() * Math.cos(pitch) * Math.cos(yaw)));
         float aspect = Math.max(1, width) / (float) Math.max(1, height);
+        float dynamicNear = (float) Math.max(0.001, view.distance() - fit.radius() * 1.5);
+        float dynamicFar = (float) Math.max(dynamicNear + 1,
+                view.distance() + fit.radius() * 3.0);
         Matrix4f projection = new Matrix4f();
         if (view.orthographic()) {
             float size = (float) Math.max(1, fit.radius() * 1.5);
             projection.setOrtho(-size * aspect, size * aspect, -size, size,
-                    (float) fit.nearPlane(), (float) fit.farPlane());
+                    dynamicNear, dynamicFar);
         } else {
             projection.setPerspective((float) Math.toRadians(45), aspect,
-                    (float) fit.nearPlane(), (float) fit.farPlane());
+                    dynamicNear, dynamicFar);
         }
         return projection.mul(new Matrix4f().lookAt(eye, center, new Vector3f(0, 1, 0)));
     }

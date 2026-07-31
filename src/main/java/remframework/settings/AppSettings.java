@@ -146,13 +146,23 @@ public class AppSettings extends AbstractSettings implements ISettings {
                 String value = getString(sFrame, key);
                 if (!value.isEmpty()) {
                     String[] array = value.split(",");
+                    if (array.length != 4) {
+                        System.err.println("Ignoring malformed frame bounds for '" + key
+                                + "': " + value);
+                        continue;
+                    }
 
                     NkRect rect = NkRect.create();
-                    rect.x(Float.parseFloat(array[0]));
-                    rect.y(Float.parseFloat(array[1]));
-                    rect.w(Float.parseFloat(array[2]));
-                    rect.h(Float.parseFloat(array[3]));
-                    frameRectMap.put(key, rect);
+                    try {
+                        rect.x(Float.parseFloat(array[0].trim()));
+                        rect.y(Float.parseFloat(array[1].trim()));
+                        rect.w(Float.parseFloat(array[2].trim()));
+                        rect.h(Float.parseFloat(array[3].trim()));
+                        frameRectMap.put(key, rect);
+                    } catch (NumberFormatException exception) {
+                        System.err.println("Ignoring malformed frame bounds for '" + key
+                                + "': " + value);
+                    }
                 }
             }
         }
@@ -181,7 +191,10 @@ public class AppSettings extends AbstractSettings implements ISettings {
         for (Map.Entry<String, NkRect> entry : frameRectMap.entrySet()) {
             String key   = entry.getKey();
             NkRect value = entry.getValue();
-            put(sFrame, key, value.x() + "," + value.y() + "," + value.w() + "," + value.h());
+            // Colons have INI meaning and can be present in dialog-generated frame names.
+            // Persist a safe key so frame layout cannot corrupt the settings file.
+            put(sFrame, key.replace(':', '_'),
+                    value.x() + "," + value.y() + "," + value.w() + "," + value.h());
         }
     }
 

@@ -33,6 +33,10 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
     }
 
     @Override protected void layout(NkContext c, int x, int y, int width, int height) {
+        if (controller.phasedWorkflow().generation().isPresent()) {
+            phase2Overview(c);
+            return;
+        }
         GeometryDiscoveryWorkspaceSnapshot snapshot = controller.workspace().snapshot();
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, GeometryDiscoveryDetailTab.values().length);
         for (GeometryDiscoveryDetailTab tab : GeometryDiscoveryDetailTab.values())
@@ -49,6 +53,36 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
             case SELECTED_NODE -> selectedNode(c, snapshot);
             case HISTORY -> history(c, snapshot);
         }
+    }
+
+    private void phase2Overview(NkContext c) {
+        GeometryConfigurationGenerationResult generation = controller.phasedWorkflow().generation().orElseThrow();
+        heading(c, "Phase 2 Geometry Discovery");
+        label(c, "Stage 1 status: " + generation.status().code() + " - " + generation.status().summary());
+        label(c, "Completion: " + (generation.metrics().enumerationComplete() ? "Complete" : "Incomplete")
+                + "    Examined: " + generation.metrics().configurationsExamined()
+                + "    Retained: " + generation.metrics().uniqueConfigurationsRetained());
+        GeometryConfigurationId selected = controller.phasedWorkflow().selectedConfiguration().orElse(null);
+        label(c, "Selected configuration: " + (selected == null ? "None" : selected));
+        if (selected != null) {
+            GeometryTestResult result = controller.phasedWorkflow().latestGeometryTest(selected);
+            if (result == null) label(c, "Stage 2: Geometry Test not started.");
+            else {
+                label(c, "Realization: " + result.realization().status());
+                label(c, "Face derivation: " + (result.faceDerivation() == null ? "not run" : result.faceDerivation().status().code()));
+                label(c, "Boundary validation: " + (result.boundary() == null ? "not run" : result.boundary().status().code()));
+                label(c, "Area: " + (result.area().available() ? "available" : "unavailable")
+                        + "    Volume: " + (result.volume().available() ? "available" : "unavailable"));
+                label(c, "Final status: " + result.status().code() + " - " + result.status().explanation());
+            }
+        }
+    }
+
+    private void heading(NkContext c, String text) {
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 3, 1);
+        Nuklear.nk_style_set_font(c, nuklearModel.getDefaultFontBold());
+        Nuklear.nk_label_wrap(c, text);
+        Nuklear.nk_style_set_font(c, nuklearModel.getDefaultFont());
     }
 
     private void overview(NkContext c, GeometryDiscoveryWorkspaceSnapshot snapshot) {

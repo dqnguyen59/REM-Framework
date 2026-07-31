@@ -583,8 +583,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                                     nodes.get(Math.floorMod(index + direction, nodes.size())).id());
                         }
                     }
-                    case GLFW.GLFW_KEY_F -> discoveryWorkspace.viewState().fitToView(
-                            discoveryWorkspace.workspace().snapshot().geometry().model());
+                    case GLFW.GLFW_KEY_F -> discoveryViewport.frameGeometry();
                     case GLFW.GLFW_KEY_P -> discoveryWorkspace.viewState().setOrthographic(
                             !discoveryWorkspace.viewState().orthographic());
                     case GLFW.GLFW_KEY_ESCAPE -> discoveryWorkspace.deactivateWorkspace();
@@ -1103,6 +1102,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         if (discoveryWorkspace.state().active()) {
             waitForNextFrameIsReady();
             PerformanceMonitor.start(Measurement.sendToGPU);
+            discoveryWorkspace.phasedWorkflow().advanceGeometryTestFrame();
             discoveryViewport.render(glWindow.getWidth(), glWindow.getHeight());
             PerformanceMonitor.stop(Measurement.sendToGPU);
             super.render(false);

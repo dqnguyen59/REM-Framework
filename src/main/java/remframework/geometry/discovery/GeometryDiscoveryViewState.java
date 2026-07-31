@@ -11,6 +11,7 @@ public final class GeometryDiscoveryViewState {
     private double distance = 10;
     private boolean orthographic;
     private boolean showNodeLabels = true;
+    private boolean showVertices = true;
     private boolean showConnections = true;
     private boolean showAxes = true;
     private boolean showBoundingBox = true;
@@ -67,6 +68,8 @@ public final class GeometryDiscoveryViewState {
     public void setSelectedNodeId(Integer value) { selectedNodeId = value; }
     public boolean showNodeLabels() { return showNodeLabels; }
     public void setShowNodeLabels(boolean value) { showNodeLabels = value; }
+    public boolean showVertices() { return showVertices; }
+    public void setShowVertices(boolean value) { showVertices = value; }
     public boolean showConnections() { return showConnections; }
     public void setShowConnections(boolean value) { showConnections = value; }
     public boolean showAxes() { return showAxes; }

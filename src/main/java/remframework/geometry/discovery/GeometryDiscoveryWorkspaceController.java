@@ -20,6 +20,7 @@ public final class GeometryDiscoveryWorkspaceController implements AutoCloseable
             new GeometryDiscoveryWorkflowResolver();
     private final GeometryDiscoveryPhasedWorkflow phasedWorkflow =
             new GeometryDiscoveryPhasedWorkflow();
+    private volatile GeometryDiscoveryRenderDiagnostics renderDiagnostics;
 
     public GeometryDiscoveryWorkspaceController() {
         preferences.load(state, viewState);
@@ -174,6 +175,12 @@ public final class GeometryDiscoveryWorkspaceController implements AutoCloseable
     public GeometryDiscoveryViewState viewState() { return viewState; }
     public GeometryDiscoveryWorkflowResolver workflowResolver() { return workflowResolver; }
     public GeometryDiscoveryPhasedWorkflow phasedWorkflow() { return phasedWorkflow; }
+    public void framePhase2Geometry() {
+        GeometryDiscoveryRenderModel model = phasedWorkflow.renderModel();
+        if (model != null) viewState.fitToView(model.model());
+    }
+    public GeometryDiscoveryRenderDiagnostics renderDiagnostics() { return renderDiagnostics; }
+    public void setRenderDiagnostics(GeometryDiscoveryRenderDiagnostics value) { renderDiagnostics = value; }
 
     public GeometryDiscoveryWorkspaceLayout layout(int width, int height) {
         int top = nuklearModel == null ? 30 : nuklearModel.getMenuBarHeight() + 4;
@@ -185,5 +192,6 @@ public final class GeometryDiscoveryWorkspaceController implements AutoCloseable
         deactivateWorkspace();
         preferences.save(state, viewState);
         workspace.close();
+        phasedWorkflow.close();
     }
 }

@@ -11,6 +11,12 @@ public final class GeometryDiscoveryViewport implements AutoCloseable {
     private double lastY;
     private boolean orbiting;
     private boolean panning;
+    private String lastConfigurationId = "";
+    private long lastRenderRevision = Long.MIN_VALUE;
+    private boolean lastTopologyPreview;
+    private GeometryDiscoveryRenderDiagnostics diagnostics = new GeometryDiscoveryRenderDiagnostics(
+            "", 0, 0, new org.joml.Vector3d(), 0, 1,
+            new org.joml.Vector3d(), new org.joml.Vector3d(), .01, 100, 0, false);
 
     public GeometryDiscoveryViewport(GeometryDiscoveryWorkspaceController controller) {
         this.controller = controller;
@@ -27,9 +33,36 @@ public final class GeometryDiscoveryViewport implements AutoCloseable {
         GL11.glScissor(bounds.x(), openGlY, bounds.width(), bounds.height());
         GL11.glClearColor(.055f, .065f, .08f, 1);
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-        GeometryDiscoveryResult geometry = displayedGeometry(snapshot);
-        renderer.render(geometry.model(), geometry.settings(),
+        GL11.glEnable(GL11.GL_DEPTH_TEST);
+        GL11.glDepthMask(true);
+        GeometryDiscoveryRenderModel phased = controller.phasedWorkflow().renderModel();
+        GeometryDiscoveryModel model;
+        GeometryDiscoverySettings settings;
+        String configurationId;
+        if (phased != null) {
+            model = phased.model();
+            settings = GeometryDiscoverySettings.defaults(1);
+            configurationId = phased.configurationId();
+            GeometryTestIncrementalSession incremental = controller.phasedWorkflow().incrementalSession();
+            boolean frameRequested = !configurationId.equals(lastConfigurationId)
+                    || phased.topologyPreview() != lastTopologyPreview
+                    || incremental != null && incremental.iteration() == 0;
+            if (frameRequested) {
+                controller.viewState().fitToView(model);
+            }
+            lastConfigurationId = configurationId;
+            lastTopologyPreview = phased.topologyPreview();
+            lastRenderRevision = phased.revision();
+        } else {
+            GeometryDiscoveryResult geometry = displayedGeometry(snapshot);
+            model = geometry.model();
+            settings = geometry.settings();
+            configurationId = "legacy:" + model.name();
+        }
+        renderer.render(model, settings,
                 controller.viewState(), bounds.width(), bounds.height());
+        diagnostics = diagnostics(configurationId, model, phased, bounds.width(), bounds.height());
+        controller.setRenderDiagnostics(diagnostics);
         GL11.glDisable(GL11.GL_SCISSOR_TEST);
     }
 
@@ -49,6 +82,14 @@ public final class GeometryDiscoveryViewport implements AutoCloseable {
     }
 
     public void scroll(double amount) { controller.viewState().zoom(amount * .12); }
+
+    public void frameGeometry() {
+        GeometryDiscoveryRenderModel phased = controller.phasedWorkflow().renderModel();
+        if (phased != null) controller.viewState().fitToView(phased.model());
+        else controller.viewState().fitToView(displayedGeometry(controller.workspace().snapshot()).model());
+    }
+
+    public GeometryDiscoveryRenderDiagnostics diagnostics() { return diagnostics; }
 
     public void select(double mouseX, double mouseY, int width, int height) {
         GeometryDiscoveryWorkspaceLayout.Bounds bounds =
@@ -94,5 +135,27 @@ public final class GeometryDiscoveryViewport implements AutoCloseable {
             case CURRENT_CANDIDATE -> snapshot.search() == null ? snapshot.geometry()
                     : snapshot.search().currentCandidate().geometryResult();
         };
+    }
+
+    private GeometryDiscoveryRenderDiagnostics diagnostics(String configurationId,
+            GeometryDiscoveryModel model, GeometryDiscoveryRenderModel phased,
+            int width, int height) {
+        GeometryViewFit fit = controller.viewState().calculateFit(model);
+        double yaw = Math.toRadians(controller.viewState().yaw());
+        double pitch = Math.toRadians(controller.viewState().pitch());
+        org.joml.Vector3d target = new org.joml.Vector3d(controller.viewState().center());
+        org.joml.Vector3d camera = new org.joml.Vector3d(
+                target.x + controller.viewState().distance() * Math.cos(pitch) * Math.sin(yaw),
+                target.y + controller.viewState().distance() * Math.sin(pitch),
+                target.z + controller.viewState().distance() * Math.cos(pitch) * Math.cos(yaw));
+        double cameraDistance = camera.distance(target);
+        double near = Math.max(0.001, controller.viewState().distance() - fit.radius() * 1.5);
+        double far = Math.max(near + 1, controller.viewState().distance() + fit.radius() * 3.0);
+        boolean intersects = cameraDistance + fit.radius() >= near
+                && cameraDistance - fit.radius() <= far;
+        return new GeometryDiscoveryRenderDiagnostics(configurationId, model.nodes().size(),
+                model.connections().size(), phased == null ? fit.center() : phased.transform().centroid(),
+                fit.radius(), phased == null ? 1 : phased.transform().displayScale(), camera,
+                target, near, far, cameraDistance, intersects);
     }
 }
