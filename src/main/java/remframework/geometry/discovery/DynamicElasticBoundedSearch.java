@@ -76,6 +76,6 @@ public final class DynamicElasticBoundedSearch {
                 s.linearVelocityDamping(), s.angularVelocityDamping(), s.maximumVelocity(),
                 s.maximumForce(), s.maximumEquilibriumSpeed(),
                 s.requiredStableIterations(), s.maximumIterations(),
-                s.workerUpdatesPerPublication(), seed);
+                s.workerUpdatesPerPublication(), seed, s.spatial());
     }
 }

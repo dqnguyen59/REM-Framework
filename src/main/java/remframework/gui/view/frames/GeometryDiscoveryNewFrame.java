@@ -64,6 +64,12 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
     private int renderedStep = 1;
     private String discoveryMode = "Geometry and Topology";
     private int exactNeighbors = 2;
+    private String dynamicTopologySource = "Generated fixed-degree topology";
+    private String canonicalTopology = "Cube";
+    private boolean preventNodeOverlap = true;
+    private boolean preventEdgeCrossings = true;
+    private boolean encourageLocalSpread = true;
+    private double spatialConstraintStrength = .20;
     private final GeometryDiscoveryWizardDraftStore draftStore =
             new GeometryDiscoveryWizardDraftStore(
                     Path.of("geometry-discovery-new-draft.properties"));
@@ -205,6 +211,19 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
 
     private void topology(NkContext c) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
+            if (discoveryMode.equals("Fixed-Degree Dynamic Elastic")) {
+                dynamicTopologySource = formCombo(c, stack, "Topology source",
+                        new String[]{"Canonical topology",
+                                "Generated fixed-degree topology"}, dynamicTopologySource);
+                if (dynamicTopologySource.equals("Canonical topology")) {
+                    canonicalTopology = formCombo(c, stack, "Canonical topology",
+                            new String[]{"Cycle", "Tetrahedron", "Cube"}, canonicalTopology);
+                    CanonicalDynamicElasticTopology selected = canonicalTopologyValue();
+                    exactNeighbors = selected.exactDegree();
+                    if (selected != CanonicalDynamicElasticTopology.CYCLE)
+                        nodes = selected.fixedNodeCount();
+                }
+            }
             topology = formCombo(c, stack, "Initial topology",
                     new String[]{"Line", "Ring", "Cubic Grid", "Random Tree",
                             "Random Connected Graph", "Complete Graph",
@@ -217,7 +236,8 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         targetDegree = formDouble(c, "Target initial neighbors per node",
                 targetDegree, 0, 31, .25);
         maximumDegree = formInt(c, "Maximum neighbors per node", maximumDegree, 0, 31);
-        if (discoveryMode.equals("Fixed-Degree Dynamic Elastic"))
+        if (discoveryMode.equals("Fixed-Degree Dynamic Elastic")
+                && dynamicTopologySource.equals("Generated fixed-degree topology"))
             exactNeighbors = formInt(c, "Exact neighbors per node",
                     exactNeighbors, 2, 3);
         if (topology.equals("Random Connected Graph"))
@@ -261,6 +281,17 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
                 minimumSeparation, 1_000_000, .5, .1f);
         relaxationIterations = Nuklear.nk_propertyi(c, "Maximum iterations", 1,
                 relaxationIterations, 10_000_000, 100, 10);
+        if (discoveryMode.equals("Fixed-Degree Dynamic Elastic")) {
+            heading(c, "Spatial Constraints");
+            preventNodeOverlap = nk_check_label(c, "Prevent node overlap",
+                    preventNodeOverlap, .65, .35);
+            preventEdgeCrossings = nk_check_label(c, "Prevent edge crossings",
+                    preventEdgeCrossings, .65, .35);
+            encourageLocalSpread = nk_check_label(c, "Encourage local 3D spread",
+                    encourageLocalSpread, .65, .35);
+            spatialConstraintStrength = formDouble(c, "Spatial constraint strength",
+                    spatialConstraintStrength, 0, 100, .001);
+        }
         if (Nuklear.nk_button_label(c, (relaxationAdvanced ? "Hide" : "Show")
                 + " Advanced Settings")) relaxationAdvanced = !relaxationAdvanced;
         if (relaxationAdvanced) {
@@ -379,6 +410,9 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
                 new FixedDegreeValidator().validate(nodes, exactNeighbors);
         label(c, "Name: " + name);
         label(c, "Mode: Fixed-Degree Dynamic Elastic");
+        label(c, "Topology source: " + dynamicTopologySource);
+        if (dynamicTopologySource.equals("Canonical topology"))
+            label(c, "Canonical topology: " + canonicalTopology);
         label(c, "Nodes: " + nodes + "    Exact neighbors: " + exactNeighbors);
         label(c, "Target edge distance: " + targetDistance);
         label(c, "Required accuracy: 98%");
@@ -408,7 +442,12 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
             controller.state().setDynamicElasticMaximumIterations(relaxationIterations);
             FixedDegreeValidation result = controller.workspace().createDynamicElastic(
                     nodes, exactNeighbors,
-                    DynamicElasticSettings.defaults(targetDistance, seed));
+                    dynamicSettings(),
+                    dynamicTopologySource.equals("Canonical topology")
+                            ? DynamicElasticTopologySource.CANONICAL_TOPOLOGY
+                            : DynamicElasticTopologySource.GENERATED_FIXED_DEGREE_TOPOLOGY,
+                    dynamicTopologySource.equals("Canonical topology")
+                            ? canonicalTopologyValue() : null);
             if (result.valid()) {
                 if (relax) controller.workspace().startRelaxation();
                 close();
@@ -546,6 +585,13 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         p.setProperty("targetDegree", Double.toString(targetDegree));
         p.setProperty("maximumDegree", Integer.toString(maximumDegree));
         p.setProperty("exactNeighbors", Integer.toString(exactNeighbors));
+        p.setProperty("dynamicTopologySource", dynamicTopologySource);
+        p.setProperty("canonicalTopology", canonicalTopology);
+        p.setProperty("preventNodeOverlap", Boolean.toString(preventNodeOverlap));
+        p.setProperty("preventEdgeCrossings", Boolean.toString(preventEdgeCrossings));
+        p.setProperty("encourageLocalSpread", Boolean.toString(encourageLocalSpread));
+        p.setProperty("spatialConstraintStrength",
+                Double.toString(spatialConstraintStrength));
         p.setProperty("edgeProbability", Double.toString(edgeProbability));
         p.setProperty("initialization", initialization);
         p.setProperty("extent", Double.toString(extent));
@@ -574,6 +620,16 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         targetDegree = decimal(p, "targetDegree", targetDegree);
         maximumDegree = integer(p, "maximumDegree", maximumDegree);
         exactNeighbors = integer(p, "exactNeighbors", exactNeighbors);
+        dynamicTopologySource = p.getProperty("dynamicTopologySource", dynamicTopologySource);
+        canonicalTopology = p.getProperty("canonicalTopology", canonicalTopology);
+        preventNodeOverlap = Boolean.parseBoolean(
+                p.getProperty("preventNodeOverlap", Boolean.toString(preventNodeOverlap)));
+        preventEdgeCrossings = Boolean.parseBoolean(
+                p.getProperty("preventEdgeCrossings", Boolean.toString(preventEdgeCrossings)));
+        encourageLocalSpread = Boolean.parseBoolean(
+                p.getProperty("encourageLocalSpread", Boolean.toString(encourageLocalSpread)));
+        spatialConstraintStrength = decimal(p, "spatialConstraintStrength",
+                spatialConstraintStrength);
         edgeProbability = decimal(p, "edgeProbability", edgeProbability);
         initialization = p.getProperty("initialization", initialization);
         extent = decimal(p, "extent", extent);
@@ -601,6 +657,12 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         targetDegree = 4;
         maximumDegree = 6;
         exactNeighbors = 2;
+        dynamicTopologySource = "Generated fixed-degree topology";
+        canonicalTopology = "Cube";
+        preventNodeOverlap = true;
+        preventEdgeCrossings = true;
+        encourageLocalSpread = true;
+        spatialConstraintStrength = .20;
         edgeProbability = .3;
         initialization = "Random Sphere";
         extent = 15;
@@ -622,6 +684,16 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
     private double decimal(Properties p, String key, double fallback) {
         try { return Double.parseDouble(p.getProperty(key)); }
         catch (RuntimeException ignored) { return fallback; }
+    }
+    private CanonicalDynamicElasticTopology canonicalTopologyValue() {
+        return CanonicalDynamicElasticTopology.valueOf(canonicalTopology.toUpperCase());
+    }
+    private DynamicElasticSettings dynamicSettings() {
+        DynamicElasticSpatialSettings spatial = new DynamicElasticSpatialSettings(
+                preventNodeOverlap, .70 * targetDistance,
+                preventEdgeCrossings, .10 * targetDistance,
+                encourageLocalSpread, spatialConstraintStrength);
+        return DynamicElasticSettings.defaults(targetDistance, seed).withSpatial(spatial);
     }
     private void heading(NkContext c, String text) {
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 5, 1);

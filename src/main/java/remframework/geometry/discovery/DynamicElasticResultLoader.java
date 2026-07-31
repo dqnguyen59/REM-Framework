@@ -44,6 +44,19 @@ public final class DynamicElasticResultLoader {
         double target = decimal(configuration, "targetDistance");
         DynamicElasticSettings defaults = DynamicElasticSettings.defaults(target,
                 configuration.getLong("randomSeed"));
+        DynamicElasticSpatialSettings spatial = new DynamicElasticSpatialSettings(
+                bool(configuration, "nonNeighborExclusionEnabled",
+                        defaults.spatial().nonNeighborExclusionEnabled()),
+                optionalDecimal(configuration, "minimumNonNeighborDistance",
+                        defaults.spatial().minimumNonNeighborDistance()),
+                bool(configuration, "edgeCrossingPreventionEnabled",
+                        defaults.spatial().edgeCrossingPreventionEnabled()),
+                optionalDecimal(configuration, "edgeClearanceDistance",
+                        defaults.spatial().edgeClearanceDistance()),
+                bool(configuration, "localSpreadEnabled",
+                        defaults.spatial().localSpreadEnabled()),
+                optionalDecimal(configuration, "spatialConstraintStrength",
+                        defaults.spatial().strength()));
         DynamicElasticSettings settings = new DynamicElasticSettings(target,
                 decimal(configuration, "requiredAccuracy"),
                 decimal(configuration, "springStrength"),
@@ -60,7 +73,7 @@ public final class DynamicElasticResultLoader {
                         ? defaults.workerUpdatesPerPublication()
                         : Math.toIntExact(configuration.getLong(
                                 "workerUpdatesPerPublication")),
-                defaults.randomSeed());
+                defaults.randomSeed(), spatial);
         String runId = toml.getString("runId");
         GeometryDiscoveryModel model = new GeometryDiscoveryModel(
                 runId == null ? path.getFileName().toString() : runId,
@@ -80,5 +93,13 @@ public final class DynamicElasticResultLoader {
         if (!(value instanceof Number number))
             throw new IllegalArgumentException("Missing numeric setting " + key + ".");
         return number.doubleValue();
+    }
+    private double optionalDecimal(TomlTable table, String key, double fallback) {
+        Object value = table.get(key);
+        return value instanceof Number number ? number.doubleValue() : fallback;
+    }
+    private boolean bool(TomlTable table, String key, boolean fallback) {
+        Boolean value = table.getBoolean(key);
+        return value == null ? fallback : value;
     }
 }

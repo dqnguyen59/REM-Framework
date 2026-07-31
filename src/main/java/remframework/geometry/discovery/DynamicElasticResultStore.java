@@ -17,7 +17,10 @@ public final class DynamicElasticResultStore {
     public static final String HEADER = "timestamp,runId,neighborsPerNode,nodeCount,"
             + "topologySignature,seed,targetDistance,requiredAccuracy,stable,resultStatus,"
             + "connectionsSatisfied,connectionCount,meanDistanceAccuracy,maximumNodeSpeed,"
-            + "iterations,elapsedMilliseconds,resultFile";
+            + "iterations,elapsedMilliseconds,resultFile,topologySource,canonicalTopology,"
+            + "minimumNonNeighborDistance,minimumObservedNonNeighborDistance,"
+            + "edgeClearanceViolations,meanLocalSpread,minimumLocalSpread,"
+            + "elasticEquilibrium,spatiallyValid";
     private final Path root;
 
     public DynamicElasticResultStore(Path root) { this.root = root; }
@@ -41,7 +44,12 @@ public final class DynamicElasticResultStore {
                 result.resultStatus() == DynamicElasticResultStatus.STABLE_CANDIDATE_FOUND,
                 result.resultStatus(), m.connectionsSatisfied(), m.connectionCount(),
                 m.meanDistanceAccuracy(), m.maximumNodeSpeed(), m.iteration(),
-                result.elapsedMilliseconds(), detail);
+                result.elapsedMilliseconds(), detail, result.graph().topologySource(),
+                result.graph().canonicalTopology(),
+                result.settings().spatial().minimumNonNeighborDistance(),
+                m.minimumObservedNonNeighborDistance(), m.edgeClearanceViolations(),
+                m.meanLocalSpread(), m.minimumLocalSpread(), m.elasticEquilibrium(),
+                m.spatiallyValid());
         Path csv = root.resolve("stable-results.csv");
         if (Files.notExists(csv))
             Files.writeString(csv, HEADER + System.lineSeparator(),
@@ -59,7 +67,7 @@ public final class DynamicElasticResultStore {
             if (line.isBlank() || line.equals(HEADER)) continue;
             try {
                 List<String> v = parseCsv(line);
-                if (v.size() != 17) continue;
+                if (v.size() != 26) continue;
                 rows.add(new DynamicElasticResultRow(Instant.parse(v.get(0)), v.get(1),
                         Integer.parseInt(v.get(2)), Integer.parseInt(v.get(3)), v.get(4),
                         Long.parseLong(v.get(5)), Double.parseDouble(v.get(6)),
@@ -67,7 +75,15 @@ public final class DynamicElasticResultStore {
                         DynamicElasticResultStatus.valueOf(v.get(9)), Integer.parseInt(v.get(10)),
                         Integer.parseInt(v.get(11)), Double.parseDouble(v.get(12)),
                         Double.parseDouble(v.get(13)), Integer.parseInt(v.get(14)),
-                        Long.parseLong(v.get(15)), Path.of(v.get(16))));
+                        Long.parseLong(v.get(15)), Path.of(v.get(16)),
+                        DynamicElasticTopologySource.valueOf(v.get(17)),
+                        v.get(18).isBlank() ? null
+                                : CanonicalDynamicElasticTopology.valueOf(
+                                        v.get(18).toUpperCase(java.util.Locale.ROOT)),
+                        Double.parseDouble(v.get(19)), Double.parseDouble(v.get(20)),
+                        Integer.parseInt(v.get(21)), Double.parseDouble(v.get(22)),
+                        Double.parseDouble(v.get(23)), Boolean.parseBoolean(v.get(24)),
+                        Boolean.parseBoolean(v.get(25))));
             } catch (RuntimeException ignored) {
                 // Defensive row loading: malformed rows do not hide valid rows.
             }
@@ -82,6 +98,9 @@ public final class DynamicElasticResultStore {
         out.append("neighborsPerNode = ").append(result.graph().degree()).append('\n');
         out.append("nodeCount = ").append(result.graph().nodeCount()).append('\n');
         line(out, "topologySignature", result.graph().topologySignature());
+        line(out, "topologySource", result.graph().topologySource().name());
+        line(out, "canonicalTopology", result.graph().canonicalTopology() == null ? ""
+                : result.graph().canonicalTopology().displayName());
         line(out, "resultStatus", result.resultStatus().name());
         line(out, "failureReason", result.failureReason());
         DynamicElasticSettings s = result.settings();
@@ -101,6 +120,15 @@ public final class DynamicElasticResultStore {
         out.append("workerUpdatesPerPublication = ")
                 .append(s.workerUpdatesPerPublication()).append('\n');
         out.append("randomSeed = ").append(s.randomSeed()).append('\n');
+        out.append("nonNeighborExclusionEnabled = ")
+                .append(s.spatial().nonNeighborExclusionEnabled()).append('\n');
+        number(out, "minimumNonNeighborDistance",
+                s.spatial().minimumNonNeighborDistance());
+        out.append("edgeCrossingPreventionEnabled = ")
+                .append(s.spatial().edgeCrossingPreventionEnabled()).append('\n');
+        number(out, "edgeClearanceDistance", s.spatial().edgeClearanceDistance());
+        out.append("localSpreadEnabled = ").append(s.spatial().localSpreadEnabled()).append('\n');
+        number(out, "spatialConstraintStrength", s.spatial().strength());
         DynamicElasticMetrics m = result.metrics();
         out.append("\n[metrics]\n");
         out.append("connectionsSatisfied = ").append(m.connectionsSatisfied()).append('\n');
@@ -109,6 +137,13 @@ public final class DynamicElasticResultStore {
         number(out, "maximumNodeSpeed", m.maximumNodeSpeed());
         out.append("iterations = ").append(m.iteration()).append('\n');
         out.append("stableIterations = ").append(m.stableIterations()).append('\n');
+        number(out, "minimumObservedNonNeighborDistance",
+                m.minimumObservedNonNeighborDistance());
+        out.append("edgeClearanceViolations = ").append(m.edgeClearanceViolations()).append('\n');
+        number(out, "meanLocalSpread", m.meanLocalSpread());
+        number(out, "minimumLocalSpread", m.minimumLocalSpread());
+        out.append("elasticEquilibrium = ").append(m.elasticEquilibrium()).append('\n');
+        out.append("spatiallyValid = ").append(m.spatiallyValid()).append('\n');
         for (DiscoveryConnection edge : result.graph().connections()) {
             out.append("\n[[connections]]\nfirst = ").append(edge.firstNodeId())
                     .append("\nsecond = ").append(edge.secondNodeId()).append('\n');
@@ -135,7 +170,13 @@ public final class DynamicElasticResultStore {
                 Integer.toString(r.connectionsSatisfied()), Integer.toString(r.connectionCount()),
                 Double.toString(r.meanDistanceAccuracy()), Double.toString(r.maximumNodeSpeed()),
                 Integer.toString(r.iterations()), Long.toString(r.elapsedMilliseconds()),
-                csvValue(r.resultFile().toString()));
+                csvValue(r.resultFile().toString()), r.topologySource().name(),
+                r.canonicalTopology() == null ? "" : r.canonicalTopology().displayName(),
+                Double.toString(r.minimumNonNeighborDistance()),
+                Double.toString(r.minimumObservedNonNeighborDistance()),
+                Integer.toString(r.edgeClearanceViolations()),
+                Double.toString(r.meanLocalSpread()), Double.toString(r.minimumLocalSpread()),
+                Boolean.toString(r.elasticEquilibrium()), Boolean.toString(r.spatiallyValid()));
     }
     private String csvValue(String value) {
         if (value.indexOf(',') < 0 && value.indexOf('"') < 0

@@ -283,13 +283,35 @@ public final class GeometryDiscoveryWorkspace implements AutoCloseable {
 
     public synchronized FixedDegreeValidation createDynamicElastic(
             int nodeCount, int exactNeighbors, DynamicElasticSettings settings) {
+        return createDynamicElastic(nodeCount, exactNeighbors, settings,
+                DynamicElasticTopologySource.GENERATED_FIXED_DEGREE_TOPOLOGY, null);
+    }
+
+    public synchronized FixedDegreeValidation createDynamicElastic(
+            int nodeCount, int exactNeighbors, DynamicElasticSettings settings,
+            DynamicElasticTopologySource topologySource,
+            CanonicalDynamicElasticTopology canonicalTopology) {
+        if (topologySource == DynamicElasticTopologySource.CANONICAL_TOPOLOGY) {
+            if (canonicalTopology == null)
+                return new FixedDegreeValidation(false,
+                        List.of("A canonical topology must be selected."), null, null);
+            nodeCount = canonicalTopology == CanonicalDynamicElasticTopology.CYCLE
+                    ? nodeCount : canonicalTopology.fixedNodeCount();
+            exactNeighbors = canonicalTopology.exactDegree();
+        }
         FixedDegreeValidation validation =
                 new FixedDegreeValidator().validate(nodeCount, exactNeighbors);
         if (!validation.valid()) return validation;
         try {
             stop();
-            FixedDegreeGraph graph = new FixedDegreeGraphGenerator().generate(
-                    nodeCount, exactNeighbors, settings.randomSeed(), 0);
+            FixedDegreeGraph graph = topologySource
+                    == DynamicElasticTopologySource.CANONICAL_TOPOLOGY
+                    ? canonicalTopology.create(nodeCount)
+                    : new FixedDegreeGraphGenerator().generate(
+                            nodeCount, exactNeighbors, settings.randomSeed(), 0);
+            if (canonicalTopology == CanonicalDynamicElasticTopology.CUBE)
+                settings = settings.withSpatial(
+                        settings.spatial().withLocalSpreadEnabled(true));
             DynamicElasticSettings configured = settings.withMaximumIterations(
                     state.dynamicElasticMaximumIterations());
             dynamicElasticSession = new DynamicElasticSession(graph, configured);

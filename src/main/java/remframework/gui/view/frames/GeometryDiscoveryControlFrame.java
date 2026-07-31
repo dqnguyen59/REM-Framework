@@ -218,6 +218,34 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 + " / " + metrics.requiredStableIterations());
         label(c, "Current iteration: " + metrics.iteration());
         label(c, "State: " + metrics.state());
+        heading(c, "Spatial Constraints");
+        label(c, String.format("Minimum non-neighbor distance: %.7g",
+                metrics.minimumObservedNonNeighborDistance()));
+        label(c, "Edge clearance violations: " + metrics.edgeClearanceViolations());
+        label(c, String.format("Mean local 3D spread: %.7g", metrics.meanLocalSpread()));
+        label(c, String.format("Minimum local 3D spread: %.7g",
+                metrics.minimumLocalSpread()));
+        label(c, "Elastic equilibrium: " + (metrics.elasticEquilibrium() ? "Yes" : "No"));
+        label(c, "Spatially valid: " + (metrics.spatiallyValid() ? "Yes" : "No"));
+        DynamicElasticSpatialSettings spatial = settings.spatial();
+        boolean overlap = nk_check_label(c, "Prevent node overlap",
+                spatial.nonNeighborExclusionEnabled(), .65, .35);
+        boolean crossings = nk_check_label(c, "Prevent edge crossings",
+                spatial.edgeCrossingPreventionEnabled(), .65, .35);
+        boolean spreadEnabled = nk_check_label(c, "Encourage local 3D spread",
+                spatial.localSpreadEnabled(), .65, .35);
+        double spatialStrength = dynamicProperty(c, "Spatial constraint strength",
+                spatial.strength(), 0, 100, .001);
+        if (overlap != spatial.nonNeighborExclusionEnabled()
+                || crossings != spatial.edgeCrossingPreventionEnabled()
+                || spreadEnabled != spatial.localSpreadEnabled()
+                || Math.abs(spatialStrength - spatial.strength()) > 1e-12) {
+            spatial = new DynamicElasticSpatialSettings(overlap,
+                    spatial.minimumNonNeighborDistance(), crossings,
+                    spatial.edgeClearanceDistance(), spreadEnabled, spatialStrength);
+            settings = settings.withSpatial(spatial);
+            controller.workspace().updateDynamicElasticSettings(settings);
+        }
         label(c, "Operation: " + controller.workspace()
                 .dynamicElasticOperation().label());
         boolean running = controller.workspace().dynamicElasticOperation()
@@ -263,6 +291,11 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         expander(c, "Advanced Settings", controller.state().relaxationAdvancedExpanded(),
                 value -> controller.state().setRelaxationAdvancedExpanded(value));
         if (controller.state().relaxationAdvancedExpanded()) {
+            double nonNeighborThreshold = dynamicProperty(c,
+                    "Minimum non-neighbor distance",
+                    settings.spatial().minimumNonNeighborDistance(), 0, 1e9, .1);
+            double edgeClearance = dynamicProperty(c, "Edge clearance distance",
+                    settings.spatial().edgeClearanceDistance(), 0, 1e9, .1);
             double spring = dynamicProperty(c, "Spring strength",
                     settings.springStrength(), 0, 100, .01);
             double update = dynamicProperty(c, "Update strength",
@@ -286,7 +319,13 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                     update, retention, linear, angular, maximumVelocity,
                     maximumForce, speedThreshold, stable,
                     settings.maximumIterations(),
-                    settings.workerUpdatesPerPublication(), settings.randomSeed());
+                    settings.workerUpdatesPerPublication(), settings.randomSeed(),
+                    new DynamicElasticSpatialSettings(
+                            settings.spatial().nonNeighborExclusionEnabled(),
+                            nonNeighborThreshold,
+                            settings.spatial().edgeCrossingPreventionEnabled(),
+                            edgeClearance, settings.spatial().localSpreadEnabled(),
+                            settings.spatial().strength()));
             if (!changed.equals(settings))
                 controller.workspace().updateDynamicElasticSettings(changed);
         }

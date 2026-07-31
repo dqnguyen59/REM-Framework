@@ -13,6 +13,12 @@ public final class DynamicElasticDiscoveryMain {
         int degree = Integer.parseInt(options.getOrDefault("neighbors", "2"));
         int nodes = Integer.parseInt(options.getOrDefault(
                 "nodes", degree == 2 ? "3" : "4"));
+        CanonicalDynamicElasticTopology canonical = canonical(options.get("canonical-topology"));
+        if (canonical != null) {
+            degree = canonical.exactDegree();
+            if (canonical != CanonicalDynamicElasticTopology.CYCLE)
+                nodes = canonical.fixedNodeCount();
+        }
         long seed = Long.parseLong(options.getOrDefault("seed", "42"));
         double target = Double.parseDouble(
                 options.getOrDefault("target-distance", "10"));
@@ -20,6 +26,10 @@ public final class DynamicElasticDiscoveryMain {
                 options.getOrDefault("required-accuracy", "98")) / 100;
         DynamicElasticSettings settings = DynamicElasticSettings
                 .defaults(target, seed).withRequiredAccuracy(accuracy);
+        boolean spatialEnabled = Boolean.parseBoolean(
+                options.getOrDefault("spatial-constraints", "true"));
+        if (!spatialEnabled)
+            settings = settings.withSpatial(DynamicElasticSpatialSettings.disabled(target));
         if (options.containsKey("maximum-nodes")) {
             runBounded(options, degree, nodes, settings);
             return;
@@ -32,12 +42,19 @@ public final class DynamicElasticDiscoveryMain {
             System.err.println("Nearest higher valid N: " + validation.nearestHigherValid());
             return;
         }
-        FixedDegreeGraph graph = new FixedDegreeGraphGenerator().generate(
-                nodes, degree, seed, 0);
+        FixedDegreeGraph graph = canonical == null
+                ? new FixedDegreeGraphGenerator().generate(nodes, degree, seed, 0)
+                : canonical.create(nodes);
+        if (canonical == CanonicalDynamicElasticTopology.CUBE && spatialEnabled)
+            settings = settings.withSpatial(settings.spatial().withLocalSpreadEnabled(true));
         DynamicElasticSession session = new DynamicElasticSession(graph, settings);
         System.out.println("REM Framework Dynamic Elastic Discovery");
         System.out.println("K=" + degree + ", N=" + nodes + ", edges="
                 + graph.connections().size() + ", seed=" + seed);
+        System.out.println("Topology source=" + graph.topologySource()
+                + ", canonical=" + (graph.canonicalTopology() == null ? ""
+                : graph.canonicalTopology().displayName())
+                + ", spatial constraints=" + spatialEnabled);
         while (!session.finished()) {
             session.step();
             if (session.iteration() % 1000 == 0) print(session.metrics());
@@ -92,6 +109,18 @@ public final class DynamicElasticDiscoveryMain {
                 metrics.connectionCount(), metrics.meanDistanceAccuracy() * 100,
                 metrics.maximumNodeSpeed(), metrics.stableIterations(),
                 metrics.requiredStableIterations(), metrics.state());
+        System.out.printf("minimumNonNeighbor=%.7g, clearanceViolations=%d, "
+                        + "meanLocalSpread=%.7g, minimumLocalSpread=%.7g, "
+                        + "elasticEquilibrium=%s, spatiallyValid=%s%n",
+                metrics.minimumObservedNonNeighborDistance(),
+                metrics.edgeClearanceViolations(), metrics.meanLocalSpread(),
+                metrics.minimumLocalSpread(), metrics.elasticEquilibrium(),
+                metrics.spatiallyValid());
+    }
+    private static CanonicalDynamicElasticTopology canonical(String value) {
+        if (value == null || value.isBlank()) return null;
+        return CanonicalDynamicElasticTopology.valueOf(
+                value.replace('-', '_').toUpperCase(java.util.Locale.ROOT));
     }
     private static Map<String, String> parse(String[] arguments) {
         Map<String, String> result = new HashMap<>();

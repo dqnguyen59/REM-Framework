@@ -154,6 +154,10 @@ class DynamicElasticDiscoveryTest {
         assertTrue(detail.contains("[[initialNodes]]"));
         assertTrue(detail.contains("[[finalNodes]]"));
         assertTrue(detail.contains("[[connections]]"));
+        assertTrue(detail.contains("topologySource"));
+        assertTrue(detail.contains("minimumNonNeighborDistance"));
+        assertTrue(detail.contains("elasticEquilibrium"));
+        assertTrue(detail.contains("spatiallyValid"));
         LoadedDynamicElasticResult loaded =
                 new DynamicElasticResultLoader().load(first.resultFile());
         assertEquals(3, loaded.model().nodes().size());

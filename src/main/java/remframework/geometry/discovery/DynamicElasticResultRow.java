@@ -9,5 +9,11 @@ public record DynamicElasticResultRow(
         double requiredAccuracy, boolean stable, DynamicElasticResultStatus status,
         int connectionsSatisfied, int connectionCount, double meanDistanceAccuracy,
         double maximumNodeSpeed, int iterations, long elapsedMilliseconds,
-        Path resultFile) {
+        Path resultFile, DynamicElasticTopologySource topologySource,
+        CanonicalDynamicElasticTopology canonicalTopology,
+        double minimumNonNeighborDistance,
+        double minimumObservedNonNeighborDistance,
+        int edgeClearanceViolations, double meanLocalSpread,
+        double minimumLocalSpread, boolean elasticEquilibrium,
+        boolean spatiallyValid) {
 }

@@ -14,9 +14,24 @@ public record DynamicElasticSettings(
         int requiredStableIterations,
         int maximumIterations,
         int workerUpdatesPerPublication,
-        long randomSeed) {
+        long randomSeed,
+        DynamicElasticSpatialSettings spatial) {
+
+    public DynamicElasticSettings(double targetDistance, double requiredAccuracy,
+            double springStrength, double updateStrength, double velocityRetention,
+            double linearVelocityDamping, double angularVelocityDamping,
+            double maximumVelocity, double maximumForce, double maximumEquilibriumSpeed,
+            int requiredStableIterations, int maximumIterations,
+            int workerUpdatesPerPublication, long randomSeed) {
+        this(targetDistance, requiredAccuracy, springStrength, updateStrength,
+                velocityRetention, linearVelocityDamping, angularVelocityDamping,
+                maximumVelocity, maximumForce, maximumEquilibriumSpeed,
+                requiredStableIterations, maximumIterations, workerUpdatesPerPublication,
+                randomSeed, DynamicElasticSpatialSettings.defaults(targetDistance));
+    }
 
     public DynamicElasticSettings {
+        if (spatial == null) throw new IllegalArgumentException("Spatial settings are required.");
         if (!positiveFinite(targetDistance)) throw new IllegalArgumentException(
                 "Target distance must be finite and positive.");
         if (!Double.isFinite(requiredAccuracy) || requiredAccuracy <= 0
@@ -40,7 +55,8 @@ public record DynamicElasticSettings(
     public static DynamicElasticSettings defaults(double targetDistance, long seed) {
         return new DynamicElasticSettings(targetDistance, .98, .08, .08,
                 .96, .01, .01, targetDistance * .2, targetDistance,
-                .0001, 100, 100_000, 25, seed);
+                .0001, 100, 100_000, 25, seed,
+                DynamicElasticSpatialSettings.defaults(targetDistance));
     }
 
     public DynamicElasticSettings withTargetDistance(double value) {
@@ -48,42 +64,59 @@ public record DynamicElasticSettings(
                 updateStrength, velocityRetention, linearVelocityDamping,
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, requiredStableIterations, maximumIterations,
-                workerUpdatesPerPublication, randomSeed);
+                workerUpdatesPerPublication, randomSeed,
+                scaleSpatial(spatial, targetDistance, value));
     }
     public DynamicElasticSettings withRequiredAccuracy(double value) {
         return new DynamicElasticSettings(targetDistance, value, springStrength,
                 updateStrength, velocityRetention, linearVelocityDamping,
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, requiredStableIterations, maximumIterations,
-                workerUpdatesPerPublication, randomSeed);
+                workerUpdatesPerPublication, randomSeed, spatial);
     }
     public DynamicElasticSettings withSpringStrength(double value) {
         return new DynamicElasticSettings(targetDistance, requiredAccuracy, value,
                 updateStrength, velocityRetention, linearVelocityDamping,
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, requiredStableIterations, maximumIterations,
-                workerUpdatesPerPublication, randomSeed);
+                workerUpdatesPerPublication, randomSeed, spatial);
     }
     public DynamicElasticSettings withUpdateStrength(double value) {
         return new DynamicElasticSettings(targetDistance, requiredAccuracy, springStrength,
                 value, velocityRetention, linearVelocityDamping, angularVelocityDamping,
                 maximumVelocity, maximumForce, maximumEquilibriumSpeed,
                 requiredStableIterations, maximumIterations, workerUpdatesPerPublication,
-                randomSeed);
+                randomSeed, spatial);
     }
     public DynamicElasticSettings withRequiredStableIterations(int value) {
         return new DynamicElasticSettings(targetDistance, requiredAccuracy, springStrength,
                 updateStrength, velocityRetention, linearVelocityDamping,
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, value, maximumIterations,
-                workerUpdatesPerPublication, randomSeed);
+                workerUpdatesPerPublication, randomSeed, spatial);
     }
     public DynamicElasticSettings withMaximumIterations(int value) {
         return new DynamicElasticSettings(targetDistance, requiredAccuracy, springStrength,
                 updateStrength, velocityRetention, linearVelocityDamping,
                 angularVelocityDamping, maximumVelocity, maximumForce,
                 maximumEquilibriumSpeed, requiredStableIterations, value,
-                workerUpdatesPerPublication, randomSeed);
+                workerUpdatesPerPublication, randomSeed, spatial);
+    }
+    public DynamicElasticSettings withSpatial(DynamicElasticSpatialSettings value) {
+        return new DynamicElasticSettings(targetDistance, requiredAccuracy, springStrength,
+                updateStrength, velocityRetention, linearVelocityDamping,
+                angularVelocityDamping, maximumVelocity, maximumForce,
+                maximumEquilibriumSpeed, requiredStableIterations, maximumIterations,
+                workerUpdatesPerPublication, randomSeed, value);
+    }
+    private static DynamicElasticSpatialSettings scaleSpatial(
+            DynamicElasticSpatialSettings value, double oldTarget, double newTarget) {
+        double scale = newTarget / oldTarget;
+        return new DynamicElasticSpatialSettings(value.nonNeighborExclusionEnabled(),
+                value.minimumNonNeighborDistance() * scale,
+                value.edgeCrossingPreventionEnabled(),
+                value.edgeClearanceDistance() * scale,
+                value.localSpreadEnabled(), value.strength());
     }
     private static boolean positiveFinite(double value) {
         return Double.isFinite(value) && value > 0;

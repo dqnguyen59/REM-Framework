@@ -96,6 +96,8 @@ public final class DynamicElasticSession {
             forces.get(first.id()).add(force);
             forces.get(second.id()).sub(force);
         }
+        new DynamicElasticSpatialConstraints().addForces(graph, nodes, forces,
+                settings.spatial(), settings.randomSeed());
         return forces;
     }
 
@@ -170,13 +172,77 @@ public final class DynamicElasticSession {
         }
         double maximumSpeed = nodes.stream().filter(node -> !node.fixed())
                 .mapToDouble(node -> node.velocity().length()).max().orElse(0);
+        SpatialMetrics spatial = spatialMetrics();
         int edgeCount = edgeMetrics.size();
         return new DynamicElasticMetrics(iteration, satisfied, edgeCount,
                 edgeCount == 0 ? 1 : accuracySum / edgeCount,
                 edgeCount == 0 ? 100 : 100.0 * satisfied / edgeCount,
                 maximumSpeed, stableIterations, settings.requiredStableIterations(),
-                state, edgeMetrics);
+                state, edgeMetrics, spatial.minimumNonNeighborDistance(),
+                spatial.edgeClearanceViolations(), spatial.meanLocalSpread(),
+                spatial.minimumLocalSpread(),
+                state == DynamicElasticState.EQUILIBRIUM_REACHED,
+                spatial.spatiallyValid());
     }
+
+    private SpatialMetrics spatialMetrics() {
+        java.util.Set<Long> edgeKeys = graph.connections().stream()
+                .map(DiscoveryConnection::undirectedKey)
+                .collect(java.util.stream.Collectors.toSet());
+        double minimumNonNeighbor = Double.MAX_VALUE;
+        for (int i = 0; i < nodes.size(); i++) for (int j = i + 1; j < nodes.size(); j++) {
+            DynamicElasticNode a = nodes.get(i), b = nodes.get(j);
+            long key = ((long) Math.min(a.id(), b.id()) << 32)
+                    | (Math.max(a.id(), b.id()) & 0xffffffffL);
+            if (!edgeKeys.contains(key))
+                minimumNonNeighbor = Math.min(minimumNonNeighbor,
+                        a.position().distance(b.position()));
+        }
+        int clearanceViolations = 0;
+        List<DiscoveryConnection> edges = graph.connections();
+        for (int i = 0; i < edges.size(); i++) for (int j = i + 1; j < edges.size(); j++) {
+            DiscoveryConnection a = edges.get(i), b = edges.get(j);
+            if (DynamicElasticSpatialConstraints.shareEndpoint(a, b)) continue;
+            double distance = DynamicElasticSpatialConstraints.closestPoints(
+                    byId.get(a.firstNodeId()).position(), byId.get(a.secondNodeId()).position(),
+                    byId.get(b.firstNodeId()).position(), byId.get(b.secondNodeId()).position())
+                    .distance();
+            if (distance < settings.spatial().edgeClearanceDistance()) clearanceViolations++;
+        }
+        Map<Integer, java.util.Set<Integer>> adjacency = new HashMap<>();
+        for (int id = 0; id < graph.nodeCount(); id++) adjacency.put(id, new java.util.TreeSet<>());
+        for (DiscoveryConnection edge : edges) {
+            adjacency.get(edge.firstNodeId()).add(edge.secondNodeId());
+            adjacency.get(edge.secondNodeId()).add(edge.firstNodeId());
+        }
+        double spreadSum = 0, minimumSpread = Double.MAX_VALUE;
+        int spreadCount = 0;
+        for (int id = 0; id < graph.nodeCount(); id++) {
+            if (adjacency.get(id).size() != 3) continue;
+            int[] neighbor = adjacency.get(id).stream().mapToInt(Integer::intValue).toArray();
+            Vector3d origin = byId.get(id).position();
+            double spread = DynamicElasticSpatialConstraints.localSpread(
+                    new Vector3d(byId.get(neighbor[0]).position()).sub(origin),
+                    new Vector3d(byId.get(neighbor[1]).position()).sub(origin),
+                    new Vector3d(byId.get(neighbor[2]).position()).sub(origin));
+            spreadSum += spread;
+            minimumSpread = Math.min(minimumSpread, spread);
+            spreadCount++;
+        }
+        if (spreadCount == 0) minimumSpread = 0;
+        boolean finiteGeometry = nodes.stream().allMatch(n -> n.position().isFinite());
+        boolean valid = finiteGeometry
+                && minimumNonNeighbor >= settings.spatial().minimumNonNeighborDistance()
+                && clearanceViolations == 0;
+        return new SpatialMetrics(minimumNonNeighbor, clearanceViolations,
+                spreadCount == 0 ? 0 : spreadSum / spreadCount, minimumSpread, valid);
+    }
+
+    private record SpatialMetrics(double minimumNonNeighborDistance,
+                                  int edgeClearanceViolations,
+                                  double meanLocalSpread,
+                                  double minimumLocalSpread,
+                                  boolean spatiallyValid) {}
 
     public DynamicElasticResult result() {
         DynamicElasticResultStatus status = switch (state) {

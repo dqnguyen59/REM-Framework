@@ -4,9 +4,24 @@ import java.util.List;
 
 public record FixedDegreeGraph(int nodeCount, int degree,
                                List<DiscoveryConnection> connections,
-                               String topologySignature) {
+                               String topologySignature,
+                               DynamicElasticTopologySource topologySource,
+                               CanonicalDynamicElasticTopology canonicalTopology) {
+    public FixedDegreeGraph(int nodeCount, int degree,
+                            List<DiscoveryConnection> connections,
+                            String topologySignature) {
+        this(nodeCount, degree, connections, topologySignature,
+                DynamicElasticTopologySource.GENERATED_FIXED_DEGREE_TOPOLOGY, null);
+    }
     public FixedDegreeGraph {
         connections = List.copyOf(connections);
+        if (topologySource == null)
+            throw new IllegalArgumentException("Topology source is required.");
+        if (topologySource == DynamicElasticTopologySource.CANONICAL_TOPOLOGY
+                && canonicalTopology == null)
+            throw new IllegalArgumentException("Canonical topology selection is required.");
+        if (topologySource == DynamicElasticTopologySource.GENERATED_FIXED_DEGREE_TOPOLOGY)
+            canonicalTopology = null;
         FixedDegreeValidation validation =
                 new FixedDegreeValidator().validate(nodeCount, degree);
         if (!validation.valid())
