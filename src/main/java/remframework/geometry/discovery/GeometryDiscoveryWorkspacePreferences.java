@@ -44,6 +44,14 @@ public final class GeometryDiscoveryWorkspacePreferences {
                     values.getProperty("maximumVisualizationSpeed", "false")));
             state.setPauseOnNewBest(Boolean.parseBoolean(
                     values.getProperty("pauseOnNewBest", "false")));
+            state.setDynamicElasticUpdatesPerSecond(Integer.parseInt(values.getProperty(
+                    "dynamicElasticVisualizationSpeed", "30")));
+            state.setDynamicElasticMaximumSpeed(Boolean.parseBoolean(values.getProperty(
+                    "dynamicElasticMaximumSpeed", "false")));
+            state.setDynamicElasticPublicationInterval(Integer.parseInt(values.getProperty(
+                    "dynamicElasticPublicationInterval", "1")));
+            state.setDynamicElasticMaximumIterations(Integer.parseInt(values.getProperty(
+                    "dynamicElasticMaximumIterations", "100000")));
         } catch (Exception exception) {
             System.err.println("Could not load Geometry Discovery preferences: "
                     + exception.getMessage());
@@ -71,6 +79,14 @@ public final class GeometryDiscoveryWorkspacePreferences {
         values.setProperty("maximumVisualizationSpeed",
                 Boolean.toString(state.maximumVisualizationSpeed()));
         values.setProperty("pauseOnNewBest", Boolean.toString(state.pauseOnNewBest()));
+        values.setProperty("dynamicElasticVisualizationSpeed",
+                Integer.toString(state.dynamicElasticUpdatesPerSecond()));
+        values.setProperty("dynamicElasticMaximumSpeed",
+                Boolean.toString(state.dynamicElasticMaximumSpeed()));
+        values.setProperty("dynamicElasticPublicationInterval",
+                Integer.toString(state.dynamicElasticPublicationInterval()));
+        values.setProperty("dynamicElasticMaximumIterations",
+                Integer.toString(state.dynamicElasticMaximumIterations()));
         try {
             if (path.getParent() != null) Files.createDirectories(path.getParent());
             try (OutputStream output = Files.newOutputStream(path)) {

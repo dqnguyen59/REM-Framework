@@ -47,12 +47,21 @@ public final class GeometryDiscoveryOpenGlRenderer implements AutoCloseable {
         GL30.glBindVertexArray(vao);
 
         List<Float> lines = new ArrayList<>();
-        if (view.showConnections()) addConnections(lines, model,
-                settings, view.edgeErrorColoring());
         if (view.showAxes()) addAxes(lines, fit);
         addGrid(lines, fit);
         if (view.showBoundingBox()) addBoundingBox(lines, model);
         draw(lines, GL11.GL_LINES, 1.5f);
+        if (view.showConnections()) {
+            List<Float> tooShort = new ArrayList<>();
+            List<Float> satisfied = new ArrayList<>();
+            List<Float> tooLong = new ArrayList<>();
+            addConnections(tooShort, satisfied, tooLong, model, settings,
+                    view.edgeErrorColoring());
+            // Width as well as color distinguishes the three states.
+            draw(tooShort, GL11.GL_LINES, 1.5f);
+            draw(tooLong, GL11.GL_LINES, 2.75f);
+            draw(satisfied, GL11.GL_LINES, 4f);
+        }
 
         List<Float> points = new ArrayList<>();
         for (DiscoveryNode node : model.nodes()) {
@@ -91,7 +100,8 @@ public final class GeometryDiscoveryOpenGlRenderer implements AutoCloseable {
         return projection.mul(new Matrix4f().lookAt(eye, center, new Vector3f(0, 1, 0)));
     }
 
-    private void addConnections(List<Float> vertices, GeometryDiscoveryModel model,
+    private void addConnections(List<Float> tooShort, List<Float> satisfied,
+                                List<Float> tooLong, GeometryDiscoveryModel model,
                                 GeometryDiscoverySettings settings, boolean errorColoring) {
         Map<Integer, DiscoveryNode> byId = new HashMap<>();
         for (DiscoveryNode node : model.nodes()) byId.put(node.id(), node);
@@ -99,12 +109,18 @@ public final class GeometryDiscoveryOpenGlRenderer implements AutoCloseable {
             DiscoveryNode a = byId.get(connection.firstNodeId());
             DiscoveryNode b = byId.get(connection.secondNodeId());
             if (a == null || b == null) continue;
-            double relativeError = Math.min(1, Math.abs(a.position().distance(b.position())
-                    - settings.targetDistance()) / settings.targetDistance());
-            float r = errorColoring ? (float) relativeError : 0.65f;
-            float g = errorColoring ? (float) (1 - relativeError) : 0.7f;
-            vertex(vertices, a.position(), r, g, 0.25f);
-            vertex(vertices, b.position(), r, g, 0.25f);
+            double distance = a.position().distance(b.position());
+            double signedError = (distance - settings.targetDistance())
+                    / settings.targetDistance();
+            double tolerance = Math.max(1e-9, settings.convergenceTolerance());
+            List<Float> vertices = Math.abs(signedError) <= tolerance ? satisfied
+                    : signedError < 0 ? tooShort : tooLong;
+            float r = !errorColoring ? .65f : signedError > tolerance ? .95f : .2f;
+            float g = !errorColoring ? .7f
+                    : Math.abs(signedError) <= tolerance ? .9f : .45f;
+            float blue = !errorColoring ? .25f : signedError < -tolerance ? 1f : .2f;
+            vertex(vertices, a.position(), r, g, blue);
+            vertex(vertices, b.position(), r, g, blue);
         }
     }
 

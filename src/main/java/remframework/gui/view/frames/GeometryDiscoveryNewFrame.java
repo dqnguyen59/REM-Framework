@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * Ordered setup wizard for constructing a fresh discovery experiment.
@@ -61,12 +62,18 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
             TopologyScoreWeights.forProfile(TopologyScoringProfile.WAVE_PROPAGATION);
     private String validationMessage = "";
     private int renderedStep = 1;
+    private String discoveryMode = "Geometry and Topology";
+    private int exactNeighbors = 2;
+    private final GeometryDiscoveryWizardDraftStore draftStore =
+            new GeometryDiscoveryWizardDraftStore(
+                    Path.of("geometry-discovery-new-draft.properties"));
 
     public GeometryDiscoveryNewFrame(NuklearModel model) {
         super(model);
         isDialog = true;
         windowOptions = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_BORDER
                 | Nuklear.NK_WINDOW_MOVABLE | Nuklear.NK_WINDOW_CLOSABLE;
+        restoreDraft();
     }
 
     @Override public String getTitle() { return "New Discovery"; }
@@ -81,6 +88,8 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 7);
         for (int i = 1; i <= 7; i++)
             if (Nuklear.nk_button_label(c, Integer.toString(i))) changeStep(i);
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        if (Nuklear.nk_button_label(c, "Reset to Defaults")) resetToDefaults();
         heading(c, step + ". " + title(step));
         int contentHeight = Math.max(130, height - 145);
         Nuklear.nk_layout_row_dynamic(c, contentHeight, 1);
@@ -117,12 +126,16 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
             if (validation.valid() || step < 6) changeStep(step + 1);
         }
         if (Nuklear.nk_button_label(c, "Cancel")) close();
+        saveDraft();
     }
 
     private void experiment(NkContext c) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             name = nk_label_edit(c, stack, "Experiment name", nameBuffer, name, .35, .65);
             description = multilineDescription(c, stack, description);
+            discoveryMode = formCombo(c, stack, "Discovery mode",
+                    new String[]{"Geometry and Topology",
+                            "Fixed-Degree Dynamic Elastic"}, discoveryMode);
             nodes = formInt(c, "Node count", nodes, 4, 32);
             String dimensions = nk_label_combo_options(c, stack, "Embedding dimension",
                     new String[]{"2D", "3D"}, dimension + "D", .35, .65);
@@ -204,6 +217,9 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         targetDegree = formDouble(c, "Target initial neighbors per node",
                 targetDegree, 0, 31, .25);
         maximumDegree = formInt(c, "Maximum neighbors per node", maximumDegree, 0, 31);
+        if (discoveryMode.equals("Fixed-Degree Dynamic Elastic"))
+            exactNeighbors = formInt(c, "Exact neighbors per node",
+                    exactNeighbors, 2, 3);
         if (topology.equals("Random Connected Graph"))
             edgeProbability = formDouble(c, "Edge probability",
                     edgeProbability, 0, 1, .05);
@@ -325,6 +341,10 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
     }
 
     private void review(NkContext c) {
+        if (discoveryMode.equals("Fixed-Degree Dynamic Elastic")) {
+            dynamicElasticReview(c);
+            return;
+        }
         DiscoveryExperimentConfiguration configuration = configuration();
         label(c, "Name: " + configuration.name());
         label(c, "Nodes: " + nodes + "    Dimension: " + dimension + "D");
@@ -352,6 +372,48 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
                 controller.workspace().createAndRelax(configuration));
         createButton(c, "Create and Start Topology Search", validation, () ->
                 controller.workspace().startDiscovery(configuration));
+    }
+
+    private void dynamicElasticReview(NkContext c) {
+        FixedDegreeValidation validation =
+                new FixedDegreeValidator().validate(nodes, exactNeighbors);
+        label(c, "Name: " + name);
+        label(c, "Mode: Fixed-Degree Dynamic Elastic");
+        label(c, "Nodes: " + nodes + "    Exact neighbors: " + exactNeighbors);
+        label(c, "Target edge distance: " + targetDistance);
+        label(c, "Required accuracy: 98%");
+        label(c, "Seed: " + seed);
+        if (!validation.valid()) {
+            label(c, String.join("\n", validation.messages()));
+            label(c, "Nearest lower valid node count: "
+                    + validation.nearestLowerValid());
+            label(c, "Nearest higher valid node count: "
+                    + validation.nearestHigherValid());
+        }
+        helpBlock(c, "Create Initial Candidate:\nBuilds and displays the fixed graph and "
+                + "random coordinates without running the elastic process.");
+        helpBlock(c, "Create and Relax Geometry:\nBuilds the fixed-degree candidate and "
+                + "runs smooth elastic relaxation. Connections remain unchanged.");
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 8, 3);
+        if (!validation.valid()) Nuklear.nk_widget_disable_begin(c);
+        boolean create = Nuklear.nk_button_label(c, "Create Initial Candidate");
+        boolean relax = Nuklear.nk_button_label(c, "Create and Relax Geometry");
+        boolean search = Nuklear.nk_button_label(c, "Create and Start Topology Search");
+        if (!validation.valid()) Nuklear.nk_widget_disable_end(c);
+        if (search)
+            nuklearModel.showWarningDialog("Fixed-Degree Dynamic Elastic",
+                    "Topology mutation is not part of Dynamic Elastic Discovery. "
+                            + "Use Create and Relax Geometry; its connections stay fixed.");
+        if ((create || relax) && validation.valid()) {
+            controller.state().setDynamicElasticMaximumIterations(relaxationIterations);
+            FixedDegreeValidation result = controller.workspace().createDynamicElastic(
+                    nodes, exactNeighbors,
+                    DynamicElasticSettings.defaults(targetDistance, seed));
+            if (result.valid()) {
+                if (relax) controller.workspace().startRelaxation();
+                close();
+            }
+        }
     }
 
     private void createButton(NkContext c, String text,
@@ -459,7 +521,107 @@ public final class GeometryDiscoveryNewFrame extends AbstractFrame {
         };
     }
     private void changeStep(int value) {
+        saveDraft();
         step = Math.max(1, Math.min(7, value));
+    }
+
+    @Override public void close() {
+        saveDraft();
+        super.close();
+    }
+
+    private void saveDraft() {
+        Properties p = new Properties();
+        p.setProperty("step", Integer.toString(step));
+        p.setProperty("name", name);
+        p.setProperty("description", description);
+        p.setProperty("discoveryMode", discoveryMode);
+        p.setProperty("dimension", Integer.toString(dimension));
+        p.setProperty("nodes", Integer.toString(nodes));
+        p.setProperty("seed", Long.toString(seed));
+        p.setProperty("profile", profile);
+        p.setProperty("topology", topology);
+        p.setProperty("neighborPolicy", neighborPolicy);
+        p.setProperty("minimumDegree", Integer.toString(minimumDegree));
+        p.setProperty("targetDegree", Double.toString(targetDegree));
+        p.setProperty("maximumDegree", Integer.toString(maximumDegree));
+        p.setProperty("exactNeighbors", Integer.toString(exactNeighbors));
+        p.setProperty("edgeProbability", Double.toString(edgeProbability));
+        p.setProperty("initialization", initialization);
+        p.setProperty("extent", Double.toString(extent));
+        p.setProperty("targetDistance", Double.toString(targetDistance));
+        p.setProperty("minimumSeparation", Double.toString(minimumSeparation));
+        p.setProperty("relaxationIterations", Integer.toString(relaxationIterations));
+        p.setProperty("workerIterations", Integer.toString(workerIterations));
+        p.setProperty("searchMode", searchMode);
+        p.setProperty("searchIterations", Integer.toString(searchIterations));
+        draftStore.save(p);
+    }
+
+    private void restoreDraft() {
+        Properties p = draftStore.load();
+        step = integer(p, "step", step);
+        name = p.getProperty("name", name);
+        description = p.getProperty("description", description);
+        discoveryMode = p.getProperty("discoveryMode", discoveryMode);
+        dimension = integer(p, "dimension", dimension);
+        nodes = integer(p, "nodes", nodes);
+        seed = longValue(p, "seed", seed);
+        profile = p.getProperty("profile", profile);
+        topology = p.getProperty("topology", topology);
+        neighborPolicy = p.getProperty("neighborPolicy", neighborPolicy);
+        minimumDegree = integer(p, "minimumDegree", minimumDegree);
+        targetDegree = decimal(p, "targetDegree", targetDegree);
+        maximumDegree = integer(p, "maximumDegree", maximumDegree);
+        exactNeighbors = integer(p, "exactNeighbors", exactNeighbors);
+        edgeProbability = decimal(p, "edgeProbability", edgeProbability);
+        initialization = p.getProperty("initialization", initialization);
+        extent = decimal(p, "extent", extent);
+        targetDistance = decimal(p, "targetDistance", targetDistance);
+        minimumSeparation = decimal(p, "minimumSeparation", minimumSeparation);
+        relaxationIterations = integer(p, "relaxationIterations", relaxationIterations);
+        workerIterations = integer(p, "workerIterations", workerIterations);
+        searchMode = p.getProperty("searchMode", searchMode);
+        searchIterations = integer(p, "searchIterations", searchIterations);
+        renderedStep = -1;
+    }
+    private void resetToDefaults() {
+        draftStore.reset();
+        step = 1;
+        name = "Wave lattice experiment 001";
+        description = "";
+        discoveryMode = "Geometry and Topology";
+        dimension = 3;
+        nodes = 12;
+        seed = 42;
+        profile = "Wave Propagation";
+        topology = "Random Connected Graph";
+        neighborPolicy = "Bounded";
+        minimumDegree = 3;
+        targetDegree = 4;
+        maximumDegree = 6;
+        exactNeighbors = 2;
+        edgeProbability = .3;
+        initialization = "Random Sphere";
+        extent = 15;
+        targetDistance = 10;
+        minimumSeparation = 5;
+        searchMode = "Simulated Annealing";
+        searchIterations = 5000;
+        renderedStep = -1;
+        validationMessage = "";
+    }
+    private int integer(Properties p, String key, int fallback) {
+        try { return Integer.parseInt(p.getProperty(key)); }
+        catch (RuntimeException ignored) { return fallback; }
+    }
+    private long longValue(Properties p, String key, long fallback) {
+        try { return Long.parseLong(p.getProperty(key)); }
+        catch (RuntimeException ignored) { return fallback; }
+    }
+    private double decimal(Properties p, String key, double fallback) {
+        try { return Double.parseDouble(p.getProperty(key)); }
+        catch (RuntimeException ignored) { return fallback; }
     }
     private void heading(NkContext c, String text) {
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 5, 1);

@@ -38,6 +38,17 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private double temperature = 1;
     private double coolingRate = .997;
     private int checkpointInterval = 100;
+    private int dynamicNodeCount = 3;
+    private int dynamicExactNeighbors = 2;
+    private long dynamicSeed = 42;
+    private List<DynamicElasticResultRow> dynamicResultRows = List.of();
+    private int resultDegreeFilter;
+    private int resultNodeFilter;
+    private String resultStatusFilter = "All";
+    private String resultRunFilter = "";
+    private final StringBuffer resultRunFilterBuffer = new StringBuffer();
+    private String dynamicSpeedValidation = "";
+    private String dynamicMaximumValidation = "";
 
     public GeometryDiscoveryControlFrame(NuklearModel model) {
         super(model);
@@ -94,6 +105,29 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         heading(c, "1. Candidate");
         primaryButton(c, "New Discovery", true, "", () ->
                 nuklearModel.showFrame(NuklearModel.Frame.geometryDiscoveryNew));
+        heading(c, "Fixed-Degree Dynamic Elastic");
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        dynamicExactNeighbors = Nuklear.nk_propertyi(c, "# Exact neighbors (2 or 3)",
+                2, dynamicExactNeighbors, 3, 1, 1);
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        dynamicNodeCount = Nuklear.nk_propertyi(c, "# Node count",
+                1, dynamicNodeCount, 32, 1, 1);
+        primaryButton(c, "Create Dynamic Elastic Candidate", true, "", () -> {
+            FixedDegreeValidation validation = controller.workspace().createDynamicElastic(
+                    dynamicNodeCount, dynamicExactNeighbors,
+                    DynamicElasticSettings.defaults(10, dynamicSeed));
+            if (!validation.valid()) {
+                String nearest = "\nNearest lower valid value: "
+                        + (validation.nearestLowerValid() == null ? "none"
+                        : validation.nearestLowerValid())
+                        + "\nNearest higher valid value: "
+                        + (validation.nearestHigherValid() == null ? "none"
+                        : validation.nearestHigherValid());
+                nuklearModel.showWarningDialog("Invalid fixed-degree graph",
+                        String.join("\n", validation.messages()) + nearest);
+            } else controller.state().setSelectedStage(
+                    GeometryDiscoveryWorkflowStage.GEOMETRY_RELAXATION);
+        });
         try (MemoryStack stack = MemoryStack.stackPush()) {
             selectedExample = nk_label_combo_options(c, stack, "Example", EXAMPLES,
                     selectedExample, .35, .65);
@@ -136,6 +170,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     }
 
     private void relaxationSection(NkContext c, GeometryDiscoveryWorkflowResolution workflow) {
+        if (controller.workspace().dynamicElasticActive()) {
+            dynamicElasticRelaxation(c);
+            return;
+        }
         GeometryDiscoveryWorkspaceSnapshot snapshot = controller.workspace().snapshot();
         GeometryDiscoveryResult geometry = snapshot.geometry();
         heading(c, "2. Geometry Relaxation");
@@ -163,6 +201,171 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 value -> controller.state().setRelaxationAdvancedExpanded(value));
         if (controller.state().relaxationAdvancedExpanded())
             relaxationAdvanced(c, geometry.settings());
+    }
+
+    private void dynamicElasticRelaxation(NkContext c) {
+        DynamicElasticMetrics metrics = controller.workspace().dynamicElasticMetrics();
+        DynamicElasticSettings settings = controller.workspace().dynamicElasticSettings();
+        heading(c, "2. Dynamic Elastic Relaxation");
+        label(c, "Connections satisfied: " + metrics.connectionsSatisfied()
+                + " / " + metrics.connectionCount());
+        label(c, String.format("Distance accuracy: %.3f%%",
+                metrics.meanDistanceAccuracy() * 100));
+        label(c, String.format("Satisfied connections: %.3f%%",
+                metrics.satisfiedConnectionPercentage()));
+        label(c, String.format("Maximum node speed: %.7g", metrics.maximumNodeSpeed()));
+        label(c, "Stable iterations: " + metrics.stableIterations()
+                + " / " + metrics.requiredStableIterations());
+        label(c, "Current iteration: " + metrics.iteration());
+        label(c, "State: " + metrics.state());
+        label(c, "Operation: " + controller.workspace()
+                .dynamicElasticOperation().label());
+        boolean running = controller.workspace().dynamicElasticOperation()
+                == DynamicElasticOperation.RUNNING_CONTINUOUSLY
+                || controller.workspace().dynamicElasticOperation()
+                == DynamicElasticOperation.RUNNING_UNTIL_EQUILIBRIUM;
+        boolean terminal = metrics.state() == DynamicElasticState.EQUILIBRIUM_REACHED
+                || metrics.state() == DynamicElasticState.NUMERICAL_FAILURE;
+        boolean maximumCanContinue = metrics.state()
+                != DynamicElasticState.MAX_ITERATIONS_REACHED
+                || controller.state().dynamicElasticMaximumIterations()
+                > metrics.iteration();
+        boolean mayRun = !running && !terminal && maximumCanContinue;
+        String runReason = terminal ? "The dynamic elastic run has reached a terminal state."
+                : !maximumCanContinue
+                ? "Increase Maximum iterations to continue from this state."
+                : "Dynamic elastic relaxation is already running.";
+        primaryButton(c, "Start", mayRun, runReason,
+                controller.workspace()::startRelaxation);
+        primaryButton(c, "Pause", running,
+                "Dynamic elastic relaxation is not running.", controller.workspace()::pause);
+        primaryButton(c, "Single Step", mayRun,
+                runReason,
+                controller.workspace()::singleRelaxationStep);
+        primaryButton(c, "Reset", !running,
+                "Pause the dynamic elastic run before resetting.",
+                controller.workspace()::resetExperiment);
+        primaryButton(c, "Run Until Equilibrium", mayRun, runReason,
+                controller.workspace()::runDynamicElasticUntilEquilibrium);
+        dynamicPlaybackControls(c, metrics, running);
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        double accuracyPercent = Nuklear.nk_propertyd(c, "Required accuracy (%)",
+                1, settings.requiredAccuracy() * 100, 100, .1, .05f);
+        accuracyPercent = Nuklear.nk_slide_float(c, 1,
+                (float) accuracyPercent, 100, .1f);
+        double required = accuracyPercent / 100;
+        double target = dynamicProperty(c, "Target distance",
+                settings.targetDistance(), 1e-9, 1e9, .1);
+        if (Math.abs(required - settings.requiredAccuracy()) > 1e-9
+                || Math.abs(target - settings.targetDistance()) > 1e-12)
+            controller.workspace().updateDynamicElasticSettings(
+                    settings.withRequiredAccuracy(required).withTargetDistance(target));
+        expander(c, "Advanced Settings", controller.state().relaxationAdvancedExpanded(),
+                value -> controller.state().setRelaxationAdvancedExpanded(value));
+        if (controller.state().relaxationAdvancedExpanded()) {
+            double spring = dynamicProperty(c, "Spring strength",
+                    settings.springStrength(), 0, 100, .01);
+            double update = dynamicProperty(c, "Update strength",
+                    settings.updateStrength(), 0, 100, .01);
+            double retention = dynamicProperty(c, "Velocity retention",
+                    settings.velocityRetention(), 0, 1, .01);
+            double linear = dynamicProperty(c, "Linear velocity damping",
+                    settings.linearVelocityDamping(), 0, 1, .01);
+            double angular = dynamicProperty(c, "Angular damping",
+                    settings.angularVelocityDamping(), 0, 1, .01);
+            double maximumVelocity = dynamicProperty(c, "Maximum velocity",
+                    settings.maximumVelocity(), 1e-12, 1e9, .1);
+            double maximumForce = dynamicProperty(c, "Maximum force",
+                    settings.maximumForce(), 1e-12, 1e9, .1);
+            double speedThreshold = dynamicProperty(c, "Speed threshold",
+                    settings.maximumEquilibriumSpeed(), 0, 1e9, .0001);
+            int stable = dynamicInteger(c, "Required stable iterations",
+                    settings.requiredStableIterations(), 1, 1_000_000);
+            DynamicElasticSettings changed = new DynamicElasticSettings(
+                    settings.targetDistance(), settings.requiredAccuracy(), spring,
+                    update, retention, linear, angular, maximumVelocity,
+                    maximumForce, speedThreshold, stable,
+                    settings.maximumIterations(),
+                    settings.workerUpdatesPerPublication(), settings.randomSeed());
+            if (!changed.equals(settings))
+                controller.workspace().updateDynamicElasticSettings(changed);
+        }
+    }
+
+    private void dynamicPlaybackControls(NkContext c, DynamicElasticMetrics metrics,
+                                         boolean running) {
+        heading(c, "Playback");
+        int speedIndex = DynamicElasticPlaybackPacing.speedSliderIndex(
+                controller.state().dynamicElasticUpdatesPerSecond(),
+                controller.state().dynamicElasticMaximumSpeed());
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        int selectedSpeedIndex = Nuklear.nk_slide_int(c, 0, speedIndex,
+                DynamicElasticPlaybackPacing.SPEEDS.length, 1);
+        boolean maximum = selectedSpeedIndex
+                == DynamicElasticPlaybackPacing.SPEEDS.length;
+        controller.state().setDynamicElasticMaximumSpeed(maximum);
+        if (!maximum) controller.state().setDynamicElasticUpdatesPerSecond(
+                DynamicElasticPlaybackPacing.speedAtSliderIndex(selectedSpeedIndex));
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 2);
+        Nuklear.nk_label(c, "Visualization speed", Nuklear.NK_TEXT_LEFT);
+        if (maximum) {
+            Nuklear.nk_label(c, "Maximum", Nuklear.NK_TEXT_LEFT);
+            dynamicSpeedValidation = "";
+        } else {
+            int entered = Nuklear.nk_propertyi(c, "# updates per second", 1,
+                    controller.state().dynamicElasticUpdatesPerSecond(), 1000, 1, 1);
+            if (DynamicElasticPlaybackPacing.validSpeed(entered)) {
+                controller.state().setDynamicElasticUpdatesPerSecond(entered);
+                dynamicSpeedValidation = "";
+            } else if (entered != controller.state().dynamicElasticUpdatesPerSecond()) {
+                dynamicSpeedValidation = "Choose 1, 2, 5, 10, 20, 30, 50, 100, "
+                        + "200, 500, 1000, or Maximum.";
+            }
+        }
+        if (!dynamicSpeedValidation.isBlank()) label(c, dynamicSpeedValidation);
+
+        int publicationIndex = DynamicElasticPlaybackPacing.publicationSliderIndex(
+                controller.state().dynamicElasticPublicationInterval());
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        int selectedPublication = Nuklear.nk_slide_int(c, 0, publicationIndex,
+                DynamicElasticPlaybackPacing.PUBLICATION_INTERVALS.length - 1, 1);
+        controller.state().setDynamicElasticPublicationInterval(
+                DynamicElasticPlaybackPacing.PUBLICATION_INTERVALS[selectedPublication]);
+        label(c, "Update viewport every "
+                + controller.state().dynamicElasticPublicationInterval()
+                + (controller.state().dynamicElasticPublicationInterval() == 1
+                ? " iteration" : " iterations"));
+
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        if (running) Nuklear.nk_widget_disable_begin(c);
+        int enteredMaximum = Nuklear.nk_propertyi(c, "Maximum iterations", 1,
+                controller.state().dynamicElasticMaximumIterations(),
+                Integer.MAX_VALUE, 1, 100);
+        if (running) Nuklear.nk_widget_disable_end(c);
+        if (!running && enteredMaximum
+                != controller.state().dynamicElasticMaximumIterations()) {
+            if (enteredMaximum < metrics.iteration()) {
+                dynamicMaximumValidation = "Current iteration is already "
+                        + metrics.iteration() + ". Reset the experiment or choose a "
+                        + "maximum greater than " + metrics.iteration() + ".";
+            } else if (controller.workspace().updateDynamicElasticMaximumIterations(
+                    enteredMaximum)) {
+                dynamicMaximumValidation = "";
+            }
+        }
+        if (!dynamicMaximumValidation.isBlank()) label(c, dynamicMaximumValidation);
+    }
+
+    private double dynamicProperty(NkContext c, String label, double value,
+                                   double minimum, double maximum, double step) {
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        return Nuklear.nk_propertyd(c, label, minimum, value, maximum, step,
+                (float) Math.max(1e-9, step * .1));
+    }
+    private int dynamicInteger(NkContext c, String label, int value,
+                               int minimum, int maximum) {
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
+        return Nuklear.nk_propertyi(c, label, minimum, value, maximum, 1, 1);
     }
 
     private void relaxationAdvanced(NkContext c, GeometryDiscoverySettings settings) {
@@ -356,6 +559,84 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             controller.state().setArchiveExpanded(true);
             controller.state().setSelectedDetailTab(GeometryDiscoveryDetailTab.HISTORY);
         });
+        heading(c, "Dynamic Elastic Discovery Results");
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 2);
+        resultDegreeFilter = Nuklear.nk_propertyi(c, "# Exact neighbors (0 = all)",
+                0, resultDegreeFilter, 3, 1, 1);
+        resultNodeFilter = Nuklear.nk_propertyi(c, "# Nodes (0 = all)",
+                0, resultNodeFilter, 32, 1, 1);
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            resultStatusFilter = nk_label_combo_options(c, stack, "Status",
+                    new String[]{"All", "STABLE_CANDIDATE_FOUND",
+                            "NO_EQUILIBRIUM_FOUND", "NO_VALID_TOPOLOGY_GENERATED",
+                            "IMPOSSIBLE_GRAPH_PARAMETERS", "NUMERICAL_FAILURE"},
+                    resultStatusFilter, .35, .65);
+            resultRunFilter = nk_label_edit(c, stack, "Date or run ID",
+                    resultRunFilterBuffer, resultRunFilter, .35, .65);
+        }
+        primaryButton(c, "Reload Discovery Results", true, "", () -> {
+            try {
+                dynamicResultRows = DynamicElasticResultStore.defaults().loadRows();
+            } catch (Exception exception) {
+                nuklearModel.showErrorDialog("Discovery Results", exception.getMessage());
+            }
+        });
+        if (dynamicResultRows.isEmpty()) {
+            try {
+                dynamicResultRows = DynamicElasticResultStore.defaults().loadRows();
+            } catch (Exception ignored) {
+                // The workspace remains usable when the optional result index is malformed.
+            }
+        }
+        dynamicResultRows.stream().filter(row ->
+                        (resultDegreeFilter == 0
+                                || row.neighborsPerNode() == resultDegreeFilter)
+                        && (resultNodeFilter == 0 || row.nodeCount() == resultNodeFilter)
+                        && ("All".equals(resultStatusFilter)
+                                || row.status().name().equals(resultStatusFilter))
+                        && (resultRunFilter.isBlank()
+                                || row.runId().contains(resultRunFilter)
+                                || row.timestamp().toString().contains(resultRunFilter)))
+                .limit(20).forEach(row -> dynamicResultRow(c, row));
+    }
+
+    private void dynamicResultRow(NkContext c, DynamicElasticResultRow row) {
+        label(c, "K=" + row.neighborsPerNode() + " N=" + row.nodeCount()
+                + " " + row.status());
+        label(c, String.format("Accuracy %.3f%%; satisfied %d/%d; speed %.5g",
+                row.meanDistanceAccuracy() * 100, row.connectionsSatisfied(),
+                row.connectionCount(), row.maximumNodeSpeed()));
+        label(c, "Iterations " + row.iterations() + "; elapsed "
+                + row.elapsedMilliseconds() + " ms; run " + row.runId());
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 3);
+        if (Nuklear.nk_button_label(c, "Open Result"))
+            nuklearModel.showWarningDialog("Dynamic Elastic Result",
+                    "Run: " + row.runId() + "\nStatus: " + row.status()
+                            + "\nFile: " + row.resultFile());
+        if (Nuklear.nk_button_label(c, "Show Final Geometry"))
+            controller.workspace().loadDynamicElasticResult(row.resultFile());
+        if (Nuklear.nk_button_label(c, "Open Result File")) {
+            try {
+                if (!java.awt.Desktop.isDesktopSupported())
+                    throw new IllegalStateException("Desktop file opening is unavailable.");
+                java.awt.Desktop.getDesktop().open(row.resultFile().toFile());
+            } catch (Exception exception) {
+                nuklearModel.showErrorDialog("Open Result File",
+                        exception.getMessage() + "\n" + row.resultFile());
+            }
+        }
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 2);
+        if (Nuklear.nk_button_label(c, "Export Candidate")) {
+            controller.workspace().loadDynamicElasticResult(row.resultFile());
+            try {
+                controller.workspace().exportCurrent(Path.of(
+                        "lattice/candidates/" + row.runId() + "-candidate.toml"));
+            } catch (Exception exception) {
+                nuklearModel.showErrorDialog("Geometry Discovery", exception.getMessage());
+            }
+        }
+        if (Nuklear.nk_button_label(c, "Compare With Current"))
+            controller.workspace().compareDynamicResult(row.resultFile());
     }
 
     private TopologySearchSettings searchSettings() {

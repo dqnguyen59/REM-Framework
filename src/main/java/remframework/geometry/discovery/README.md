@@ -5,6 +5,30 @@ generating and relaxing candidate finite graph geometries. It does not execute
 inside the REM simulation loop and does not use or modify REM node mechanics,
 occupancy, transport, rendering, or the active runtime lattice.
 
+## Fixed-degree Dynamic Elastic Discovery
+
+Dynamic Elastic Discovery is a separate fixed-topology experiment supporting
+exact neighbor counts `K = 2` and `K = 3`. A deterministic connected regular
+graph is generated before integration begins; only node positions and
+velocities evolve afterward. Nodes 0 and 1 are discovery-only anchors at the
+origin and `[L, 0, 0]`.
+
+Each connected pair applies the symmetric force
+`springStrength * (distance - targetDistance) * direction`. A result is stable
+only when every connection meets the required accuracy and maximum node speed
+remains below its threshold for the configured consecutive updates.
+
+Run it without OpenGL using:
+
+```shell
+mvn exec:java \
+  -Dexec.mainClass=remframework.geometry.discovery.DynamicElasticDiscoveryMain \
+  -Dexec.args="--neighbors 3 --nodes 8 --seed 42 --target-distance 10 --required-accuracy 98"
+```
+
+Summaries append to `lattice/discovery-results/stable-results.csv`; detailed
+unique TOML runs are written below `lattice/discovery-results/runs/`.
+
 Version 0.1 optimizes coordinates for a supplied topology. Connected pairs use
 a squared edge-length objective, while unconnected pairs receive bounded
 short-range repulsion. Node 0 is anchored at the origin and node 1 is constrained

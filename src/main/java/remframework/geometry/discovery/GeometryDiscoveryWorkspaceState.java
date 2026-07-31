@@ -35,6 +35,12 @@ public final class GeometryDiscoveryWorkspaceState {
             DiscoveryVisualizationUpdateTrigger.ACCEPTED_MUTATION;
     private volatile boolean maximumVisualizationSpeed;
     private volatile boolean pauseOnNewBest;
+    private volatile int dynamicElasticUpdatesPerSecond =
+            DynamicElasticPlaybackPacing.DEFAULT_SPEED;
+    private volatile boolean dynamicElasticMaximumSpeed;
+    private volatile int dynamicElasticPublicationInterval =
+            DynamicElasticPlaybackPacing.DEFAULT_PUBLICATION_INTERVAL;
+    private volatile int dynamicElasticMaximumIterations = 100_000;
 
     public boolean open() { return open; }
     void setOpen(boolean value) { open = value; }
@@ -114,4 +120,34 @@ public final class GeometryDiscoveryWorkspaceState {
     }
     public boolean pauseOnNewBest() { return pauseOnNewBest; }
     public void setPauseOnNewBest(boolean value) { pauseOnNewBest = value; }
+    public int dynamicElasticUpdatesPerSecond() {
+        return dynamicElasticUpdatesPerSecond;
+    }
+    public void setDynamicElasticUpdatesPerSecond(int value) {
+        if (!DynamicElasticPlaybackPacing.validSpeed(value))
+            throw new IllegalArgumentException(
+                    "Unsupported Dynamic Elastic visualization speed.");
+        dynamicElasticUpdatesPerSecond = value;
+    }
+    public boolean dynamicElasticMaximumSpeed() { return dynamicElasticMaximumSpeed; }
+    public void setDynamicElasticMaximumSpeed(boolean value) {
+        dynamicElasticMaximumSpeed = value;
+    }
+    public int dynamicElasticPublicationInterval() {
+        return dynamicElasticPublicationInterval;
+    }
+    public void setDynamicElasticPublicationInterval(int value) {
+        if (!DynamicElasticPlaybackPacing.validPublicationInterval(value))
+            throw new IllegalArgumentException(
+                    "Unsupported Dynamic Elastic publication interval.");
+        dynamicElasticPublicationInterval = value;
+    }
+    public int dynamicElasticMaximumIterations() {
+        return dynamicElasticMaximumIterations;
+    }
+    public void setDynamicElasticMaximumIterations(int value) {
+        if (value < 1) throw new IllegalArgumentException(
+                "Maximum iterations must be at least 1.");
+        dynamicElasticMaximumIterations = value;
+    }
 }

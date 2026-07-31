@@ -39,6 +39,21 @@ public final class GeometryDiscoveryNodeFrame extends AbstractFrame {
                 + adjacency.get(selected).stream().map(String::valueOf)
                 .collect(Collectors.joining(", ")));
         label(c, "Edge distances=" + local.neighborDistances());
+        if (controller.workspace().dynamicElasticActive()) {
+            DynamicElasticSettings settings =
+                    controller.workspace().dynamicElasticSettings();
+            label(c, String.format("Dynamic target distance=%.7g",
+                    settings.targetDistance()));
+            controller.workspace().dynamicElasticMetrics().edges().stream()
+                    .filter(edge -> edge.firstNodeId() == selected
+                            || edge.secondNodeId() == selected)
+                    .forEach(edge -> label(c, String.format(
+                            "Edge %d-%d distance=%.7g relativeError=%.6g "
+                                    + "accuracy=%.3f%% satisfied=%s",
+                            edge.firstNodeId(), edge.secondNodeId(), edge.distance(),
+                            edge.relativeError(), edge.accuracy() * 100,
+                            edge.satisfied())));
+        }
         label(c, String.format("Bias %.6g tensor %.6g", d.normalizedDirectionalBias(),
                 d.tensorIsotropyError()));
         label(c, "Pairwise dots=" + d.pairwiseDotProducts());

@@ -17,6 +17,7 @@ buildNumber.properties
 /private/
 qfs.ini
 geometry-discovery-workspace.properties
+geometry-discovery-new-draft.properties
 *.xcf
 
 # log files
