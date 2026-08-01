@@ -1,7 +1,9 @@
+format_version = 3
 node_count = 8
 exact_degree = 3
 intended_dimension = "THREE_D"
+experiment_profile = "CONVEX_POLYHEDRAL_VOLUME"
 symmetry_filter = "BOTH"
-maximum_configurations = 1000
-enumeration_time_millis = 30000
+maximum_configurations = 100000
+enumeration_time_millis = 60000000
 generation_strategy = "EXHAUSTIVE_BACKTRACKING"

@@ -76,7 +76,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private int phase2InitialRealizations = 1;
     private int phase2SearchLimit = 100_000;
     private PlanarityRealizationMode phase2PlanarityMode=PlanarityRealizationMode.STRICT_2D_COORDINATES;
-    private AngleConditionMode phase2AngleMode=AngleConditionMode.MEASURE_ONLY;
+    private AngleConditionMode phase2AngleMode=AngleConditionMode.REQUIRE_EQUAL_ANGLES;
     private double phase2PlaneStrength=.08,phase2AngleStrength=.01;
     private boolean showVertices = true, showEdges = true, showLabels = true,
             showCandidateFaces = true, showBoundaryFaces = true, showRejectedFaces = false,
