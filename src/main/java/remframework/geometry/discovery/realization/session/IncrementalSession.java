@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.SplittableRandom;
 import remframework.geometry.discovery.eligibility.*;
 import remframework.geometry.discovery.measurement.regularity.*;
+import remframework.geometry.discovery.experiment.*;
 
 /**
  * Bounded, render-friendly facade over the existing DynamicElasticSession.
@@ -129,6 +130,7 @@ public final class IncrementalSession {
         if (scientificState == ScientificState.CONVERGED) return SessionState.CONVERGED;
         if (scientificState == ScientificState.SEARCH_LIMIT_REACHED) return SessionState.EXHAUSTED;
         if (scientificState == ScientificState.FAILED) return SessionState.FAILED;
+        if (scientificState == ScientificState.QUALIFICATION_FAILED) return SessionState.FAILED;
         return switch (executionState) {
             case IDLE -> SessionState.READY;
             case RUNNING -> SessionState.RUNNING;
@@ -141,6 +143,23 @@ public final class IncrementalSession {
     public synchronized int convergenceIteration() { return convergenceIteration; }
     public synchronized TestResult result() { return finalResult; }
     public synchronized String stopReason() { return stopReason; }
+    public synchronized ExperimentConvergenceDiagnostics convergenceDiagnostics() {
+        List<Vector3d> coordinates=currentCoordinates();
+        List<Integer> cycle=orderedCycle(configuration);
+        TwoDRegularityMetrics regularity=new TwoDRegularityCalculator().calculate(configuration,coordinates,cycle,
+                request.targetEdgeLength(),request.edgeTolerance(),request.planarityTolerance(),
+                request.degeneracyTolerance(),request.angleTolerance(),request.angleConditionMode());
+        double maximumEdgeError=elastic.metrics().edges().stream().mapToDouble(edge->Math.abs(edge.distance()-edge.targetDistance())).max().orElse(0);
+        double mean=regularity.planeDistances().stream().mapToDouble(Double::doubleValue).average().orElse(0);
+        double rms=Math.sqrt(regularity.planeDistances().stream().mapToDouble(v->v*v).average().orElse(0));
+        String angle=switch(request.angleConditionMode()){case NONE->"NOT_APPLICABLE";case MEASURE_ONLY->"MEASURE_ONLY";case REQUIRE_EQUAL_ANGLES->regularity.equalAngles()?"PASS":"FAIL";};
+        return new ExperimentConvergenceDiagnostics(iteration(),maximumEdgeError,
+                regularity.maximumPlaneDeviation(),mean,rms,request.planarityTolerance(),
+                regularity.interiorAngles().variance(),regularity.maximumAngleTargetDeviation(),
+                regularity.equalEdges()?"PASS":"FAIL",regularity.planar()?"PASS":"FAIL",angle,
+                regularity.simpleBoundary()?"PASS":"FAIL",regularity.positiveArea()?"PASS":"FAIL",
+                elastic.metrics().elasticEquilibrium()&&regularity.valid());
+    }
     public Configuration configuration() { return configuration; }
 
     private void initializeAttempt() {
@@ -150,13 +169,24 @@ public final class IncrementalSession {
                 .withMaximumIterations(Math.min(request.searchLimit(),
                         request.relaxationSettings().maximumIterations()))
                 .withCanonicalGeometry(DynamicElasticCanonicalGeometrySettings.disabled());
+        GeometryEmbeddingDimension initializationDimension=request.experimentProfile()==ExperimentProfile.CLOSED_2D_AREA
+                && request.planarityMode()!=PlanarityRealizationMode.STRICT_2D_COORDINATES
+                ? GeometryEmbeddingDimension.THREE_D:request.dimension();
         initialCoordinates = initializeCoordinates(configuration.nodeCount(),
-                request.dimension(), request.targetEdgeLength(), seed);
+                initializationDimension, request.targetEdgeLength(), seed);
         List<DynamicElasticNode> nodes = new ArrayList<>();
         for (int id = 0; id < initialCoordinates.size(); id++)
             nodes.add(new DynamicElasticNode(id, initialCoordinates.get(id),
                     new Vector3d(), id < 2));
         elastic = new DynamicElasticSession(graph, settings, nodes);
+        if(request.experimentProfile()==ExperimentProfile.CLOSED_2D_AREA){
+            boolean strict=request.planarityMode()==PlanarityRealizationMode.STRICT_2D_COORDINATES;
+            boolean constrained=request.planarityMode()==PlanarityRealizationMode.PLANE_CONSTRAINT;
+            double targetDegrees=Math.toDegrees((configuration.nodeCount()-2.0)*Math.PI/configuration.nodeCount());
+            elastic.configureTwoDimensionalProfile(strict,constrained,request.planeRestoringStrength(),
+                    request.planarityTolerance(),request.angleConditionMode()==AngleConditionMode.REQUIRE_EQUAL_ANGLES,
+                    targetDegrees,Math.toDegrees(request.angleTolerance()),request.angleRestoringStrength());
+        }
     }
 
     private void finishAttempt() {
@@ -164,7 +194,8 @@ public final class IncrementalSession {
         DynamicElasticResult elasticResult = elastic.result();
         if (elasticResult.resultStatus() == DynamicElasticResultStatus.STABLE_CANDIDATE_FOUND) {
             finalResult = finalizeResult(configuration, request, elasticResult);
-            scientificState = ScientificState.CONVERGED;
+            scientificState = finalResult.status().code()==GeometryConfigurationStatusCode.VALID_CANDIDATE
+                    ? ScientificState.CONVERGED : ScientificState.QUALIFICATION_FAILED;
             convergenceIteration = iteration();
             return;
         }
@@ -218,7 +249,7 @@ public final class IncrementalSession {
                 realizationStatus, List.of(diagnostic));
         if (!realization.converged()) {
             GeometryConfigurationStatus status = GeometryConfigurationStatus.of(diagnostic);
-            return new TestResult(configuration.id(), request.experimentProfile(), eligibility,
+            return new TestResult(configuration.id(), request.experimentProfile(),request.planarityMode(),request.angleConditionMode(), eligibility,
                     configuration.graphSymmetry(), realization, null, null, null,
                     AreaResult.unavailable(status), VolumeResult.unavailable(status), null, null,
                     GeometryOptimizationResult.notAttempted(), null, status);
@@ -251,7 +282,7 @@ public final class IncrementalSession {
                 GeometryConfigurationStage.COMPLETE, GeometryConfigurationStatusCode.VALID_CANDIDATE,
                 "Valid candidate", "Realization, boundary, non-degeneracy, and profile-specific geometric qualification passed."))
                 : boundary.status();
-        return new TestResult(configuration.id(), request.experimentProfile(), eligibility,
+        return new TestResult(configuration.id(), request.experimentProfile(),request.planarityMode(),request.angleConditionMode(), eligibility,
                 configuration.graphSymmetry(), realization, faces, boundary, symmetry, area, volume,
                 twoD, threeD, GeometryOptimizationResult.notAttempted(), null, status);
     }
@@ -273,6 +304,12 @@ public final class IncrementalSession {
             }
             result.add(position);
         }
+        return result;
+    }
+
+    private static List<Integer> orderedCycle(Configuration configuration){
+        List<Integer> result=new ArrayList<>();int previous=-1,current=0;
+        do{result.add(current);List<Integer> neighbors=configuration.adjacency().get(current);int next=neighbors.get(0)==previous?neighbors.get(1):neighbors.get(0);previous=current;current=next;}while(current!=0&&result.size()<=configuration.nodeCount());
         return result;
     }
 

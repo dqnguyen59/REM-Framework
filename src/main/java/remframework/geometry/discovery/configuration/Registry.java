@@ -29,4 +29,5 @@ public final class Registry {
     public synchronized void attach(TestResult result){if(!configurations.containsKey(result.configurationId()))throw new IllegalArgumentException("Unknown configuration ID.");tests.computeIfAbsent(result.configurationId(),ignored->new ArrayList<>()).add(result);}
     public synchronized void clearTests(ConfigurationId id){tests.remove(id);}
     public synchronized List<TestResult> tests(ConfigurationId id){return List.copyOf(tests.getOrDefault(id,List.of()));}
+    public synchronized void clear(){configurations.clear();tests.clear();}
 }

@@ -50,6 +50,8 @@ public final class TwoDRegularityCalculator {
         if (!consecutiveDistinct) failures.add("Consecutive boundary vertices coincide.");
         Statistics edgeStats = Statistics.of(edges), angleStats = Statistics.of(interior);
         double targetInterior = (n - 2.0) * Math.PI / n, targetTurn = 2 * Math.PI / n;
+        List<Double> interiorDeviations=interior.stream().map(value->value-targetInterior).toList();
+        List<Double> turningDeviations=turning.stream().map(value->Math.abs(value)-targetTurn).toList();
         double maxDeviation = interior.stream().mapToDouble(v -> Math.abs(v - targetInterior)).max().orElse(Double.NaN);
         boolean equalEdges = edges.stream().allMatch(v -> Math.abs(v - edgeTarget) <= edgeTolerance);
         if (!equalEdges) failures.add("Connected-edge target tolerance is not satisfied.");
@@ -58,12 +60,16 @@ public final class TwoDRegularityCalculator {
             failures.add("Interior angles exceed the explicitly required equality tolerance.");
         double perimeter = edges.stream().mapToDouble(Double::doubleValue).sum();
         double circularity = perimeter > 0 ? 4 * Math.PI * area / (perimeter * perimeter) : Double.NaN;
+        double maximumPlaneDeviation=distances.stream().mapToDouble(Double::doubleValue).max().orElse(0);
+        double meanPlaneDeviation=distances.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+        double rmsPlaneDeviation=Math.sqrt(distances.stream().mapToDouble(value->value*value).average().orElse(0));
         boolean valid = topology && planar && simple && positiveArea && consecutiveDistinct && equalEdges
                 && (angleMode != AngleConditionMode.REQUIRE_EQUAL_ANGLES || equalAngles);
         return new TwoDRegularityMetrics(valid, planar, simple, signedArea != 0, positiveArea,
                 equalEdges, equalAngles, distances, normal, edgeStats, angleStats,
                 Statistics.of(turning), Statistics.of(radii), targetInterior, targetTurn,
-                maxDeviation, area, perimeter, circularity, failures);
+                maxDeviation,interiorDeviations,turningDeviations,centroid,maximumPlaneDeviation,
+                meanPlaneDeviation,rmsPlaneDeviation,planarityTolerance,area, perimeter, circularity, failures);
     }
     private static Vector3d projectedAxis(Vector3d n) {
         Vector3d seed = Math.abs(n.x) < .8 ? new Vector3d(1,0,0) : new Vector3d(0,1,0);

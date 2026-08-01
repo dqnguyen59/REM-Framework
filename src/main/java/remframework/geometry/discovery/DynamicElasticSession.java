@@ -34,6 +34,14 @@ public final class DynamicElasticSession {
     private int elasticStableIterations;
     private final long startedNanos = System.nanoTime();
     private String failureReason = "";
+    private boolean strictTwoDimensional;
+    private boolean planeConstraint;
+    private double planeRestoringStrength;
+    private double planarityTolerance = 1e-7;
+    private boolean cycleAngleConstraint;
+    private double cycleTargetAngleDegrees;
+    private double cycleAngleToleranceDegrees;
+    private double cycleAngleStrength;
 
     public DynamicElasticSession(FixedDegreeGraph graph, DynamicElasticSettings settings) {
         this(graph, settings, initialize(graph.nodeCount(), settings));
@@ -54,6 +62,7 @@ public final class DynamicElasticSession {
         Map<Integer, Vector3d> forces = calculateForces();
         clampForces(forces);
         integrate(forces);
+        enforceProfilePlane();
         applyAngularDamping();
         enforceAnchors();
         iteration++;
@@ -70,7 +79,10 @@ public final class DynamicElasticSession {
         boolean canonicalConditions = !settings.canonicalGeometry().angleConstraintsEnabled()
                 || current.localAnglesSatisfied() == current.localAngleCount()
                 && current.spatiallyValid();
-        stableIterations = elasticConditions && canonicalConditions ? stableIterations + 1 : 0;
+        boolean planeConditions = !planeConstraint || maximumPlaneDeviation() <= planarityTolerance;
+        boolean cycleAngleConditions = !cycleAngleConstraint || maximumCycleAngleErrorDegrees() <= cycleAngleToleranceDegrees;
+        stableIterations = elasticConditions && canonicalConditions && planeConditions && cycleAngleConditions
+                ? stableIterations + 1 : 0;
         if (stableIterations >= settings.requiredStableIterations())
             state = DynamicElasticState.EQUILIBRIUM_REACHED;
         else if (iteration >= settings.maximumIterations())
@@ -116,7 +128,51 @@ public final class DynamicElasticSession {
                 settings.spatial(), settings.randomSeed());
         new DynamicElasticAngleConstraints().addForces(graph, byId, forces,
                 settings.canonicalGeometry());
+        if (cycleAngleConstraint)
+            new DynamicElasticAngleConstraints().addCycleForces(graph, byId, forces,
+                    cycleTargetAngleDegrees, cycleAngleStrength);
+        if (planeConstraint)
+            nodes.stream().filter(node -> !node.fixed()).forEach(node ->
+                    forces.get(node.id()).z -= planeRestoringStrength * node.position().z);
         return forces;
+    }
+
+    public void configureTwoDimensionalProfile(boolean strict, boolean constrained,
+            double restoringStrength, double tolerance, boolean requireEqualAngles,
+            double targetAngleDegrees, double angleToleranceDegrees, double angleStrength) {
+        strictTwoDimensional = strict;
+        planeConstraint = constrained;
+        planeRestoringStrength = restoringStrength;
+        planarityTolerance = tolerance;
+        cycleAngleConstraint = requireEqualAngles;
+        cycleTargetAngleDegrees = targetAngleDegrees;
+        cycleAngleToleranceDegrees = angleToleranceDegrees;
+        cycleAngleStrength = angleStrength;
+        enforceProfilePlane();
+    }
+
+    private void enforceProfilePlane() {
+        if (!strictTwoDimensional) return;
+        nodes.forEach(node -> { node.position().z = 0; node.velocity().z = 0; });
+    }
+
+    public double maximumPlaneDeviation() {
+        return nodes.stream().mapToDouble(node -> Math.abs(node.position().z)).max().orElse(0);
+    }
+
+    public double maximumCycleAngleErrorDegrees() {
+        if (graph.degree() != 2) return Double.NaN;
+        Map<Integer, java.util.Set<Integer>> adjacency = new HashMap<>();
+        for (int id=0;id<graph.nodeCount();id++) adjacency.put(id,new java.util.TreeSet<>());
+        graph.connections().forEach(edge->{adjacency.get(edge.firstNodeId()).add(edge.secondNodeId());adjacency.get(edge.secondNodeId()).add(edge.firstNodeId());});
+        double maximum=0;
+        for(int center=0;center<graph.nodeCount();center++){int[] neighbor=adjacency.get(center).stream().mapToInt(Integer::intValue).toArray();
+            Vector3d a=new Vector3d(byId.get(neighbor[0]).position()).sub(byId.get(center).position());
+            Vector3d b=new Vector3d(byId.get(neighbor[1]).position()).sub(byId.get(center).position());
+            if(a.lengthSquared()<=EPSILON||b.lengthSquared()<=EPSILON)return 180;
+            double angle=Math.toDegrees(Math.acos(Math.max(-1,Math.min(1,a.normalize().dot(b.normalize())))));
+            maximum=Math.max(maximum,Math.abs(angle-cycleTargetAngleDegrees));}
+        return maximum;
     }
 
     private void clampForces(Map<Integer, Vector3d> forces) {

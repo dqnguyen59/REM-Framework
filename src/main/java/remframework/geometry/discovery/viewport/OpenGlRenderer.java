@@ -69,8 +69,8 @@ public final class OpenGlRenderer implements AutoCloseable {
         List<Float> lines = new ArrayList<>();
         if (view.showAxes()) addAxes(lines, fit);
         addGrid(lines, fit);
-        if (view.showBoundingBox()) addBoundingBox(lines, model);
         draw(lines, GL11.GL_LINES, 1.5f);
+        if(view.showBoundingBox()){List<Float> boundingBox=new ArrayList<>();addBoundingBox(boundingBox,model);draw(boundingBox,GL11.GL_LINES,1f);}
         if (view.showConnections()) {
             List<Float> tooShort = new ArrayList<>();
             List<Float> satisfied = new ArrayList<>();
@@ -182,7 +182,7 @@ public final class OpenGlRenderer implements AutoCloseable {
                 new Vector3d(min.x, max.y, max.z), new Vector3d(max.x, max.y, max.z)};
         int[][] edges = {{0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},
                 {0,4},{1,5},{2,6},{3,7}};
-        for (int[] edge : edges) line(v, c[edge[0]], c[edge[1]], 0.7f, 0.4f, 0.15f);
+        for (int[] edge : edges) line(v, c[edge[0]], c[edge[1]], 0.18f, 0.62f, 0.68f);
     }
 
     private void line(List<Float> v, Vector3d a, Vector3d b, float r, float g, float blue) {

@@ -9,6 +9,7 @@ import remframework.geometry.discovery.ui.*;
 import remframework.geometry.discovery.graph.canonical.*;
 import remframework.geometry.discovery.graph.symmetry.*;
 import remframework.geometry.discovery.optimization.*;
+import remframework.geometry.discovery.measurement.regularity.*;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
@@ -25,12 +26,12 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
     private final WorkspaceController controller =
             GeometryDiscoveryWorkspaceManager.getInstance();
     private int phase2DetailsTab;
-    private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification",
-            "Realization", "Faces and Boundary", "Measurement", "Diagnostics"};
+    private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification", "Eligibility",
+            "Realization", "Faces and Boundary", "2D Regularity", "Measurement", "Diagnostics"};
 
     public GeometryDiscoveryMetricsFrame(NuklearModel model) {
         super(model);
-        windowOptions = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_BORDER;
+        windowOptions = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_BORDER | Nuklear.NK_WINDOW_NO_SCROLLBAR;
     }
 
     @Override public String getTitle() { return "Discovery Details"; }
@@ -84,10 +85,12 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
                 case 0 -> phase2Summary(c, generation, configuration, result);
                 case 1 -> phase2Topology(c, configuration);
                 case 2 -> phase2Classification(c, generation, configuration);
-                case 3 -> phase2Realization(c, result);
-                case 4 -> phase2FacesBoundary(c, result);
-                case 5 -> phase2Measurement(c, result);
-                case 6 -> phase2Diagnostics(c, generation, configuration, result);
+                case 3 -> phase2Eligibility(c,result);
+                case 4 -> phase2Realization(c, result);
+                case 5 -> phase2FacesBoundary(c, result);
+                case 6 -> phase2Regularity2d(c,result);
+                case 7 -> phase2Measurement(c, result);
+                case 8 -> phase2Diagnostics(c, generation, configuration, result);
                 default -> { }
             }
             Nuklear.nk_group_end(c);
@@ -134,10 +137,30 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
             label(c, "Scientific state: " + session.scientificState());
             label(c, "Iteration: " + session.iteration() + "    Convergence iteration: " + session.convergenceIteration());
             label(c, "Edge-length error: " + session.metrics().meanDistanceAccuracy());
+            ExperimentConvergenceDiagnostics d=session.convergenceDiagnostics();
+            label(c,"Edge-length constraint: "+d.edgeConstraint()+"    Planarity: "+d.planarity());
+            label(c,"Angle condition: "+d.angleCondition()+"    Simple boundary: "+d.simpleBoundary());
+            label(c,"Area qualification: "+d.areaQualification()+"    Full experiment converged: "+d.fullExperimentConverged());
         }
         label(c, "Target edge length: configured Geometry Test request");
         label(c, "Equal-edge realization: " + StatusPresentation.equalEdgeConclusion(session, result));
         label(c, "Target geometry: Not established");
+    }
+
+    private void phase2Eligibility(NkContext c,TestResult result){if(result==null){label(c,"Eligibility: Not tested");return;}label(c,"Topology eligibility: "+result.eligibility().status());label(c,result.eligibility().conclusion());result.eligibility().conditions().forEach(condition->label(c,condition.condition()+": "+condition.outcome()+" - "+condition.explanation()));}
+
+    private void phase2Regularity2d(NkContext c,TestResult result){
+        if(result==null||result.twoDRegularity()==null){label(c,"2D regularity: Not available");return;}
+        TwoDRegularityMetrics m=result.twoDRegularity();
+        label(c,"Plane: point="+m.planePoint()+" normal="+m.planeNormal());
+        label(c,"Planarity: "+(m.planar()?"PASS":"FAIL")+" tolerance="+m.planarityTolerance());
+        label(c,"Planarity mode: "+result.planarityMode()+"    Angle condition: "+result.angleConditionMode());
+        label(c,"Plane deviation max="+m.maximumPlaneDeviation()+" mean="+m.meanPlaneDeviation()+" RMS="+m.rmsPlaneDeviation());
+        for(int i=0;i<m.interiorAngles().values().size();i++)label(c,"Vertex "+i+": plane distance="+m.planeDistances().get(i)+" interior="+m.interiorAngles().values().get(i)+" turning="+m.turningAngles().values().get(i)+" interior deviation="+m.interiorAngleTargetDeviations().get(i)+" turning deviation="+m.turningAngleTargetDeviations().get(i));
+        label(c,"Target interior="+m.targetInteriorAngle()+" target turning="+m.targetTurningAngle());
+        label(c,"Interior mean="+m.interiorAngles().mean()+" min="+m.interiorAngles().minimum()+" max="+m.interiorAngles().maximum()+" range="+m.interiorAngles().range()+" variance="+m.interiorAngles().variance()+" stddev="+m.interiorAngles().standardDeviation()+" maximum target deviation="+m.maximumAngleTargetDeviation());
+        label(c,"Angle regularity: "+switch(result.angleConditionMode()){case NONE->"NOT_APPLICABLE";case MEASURE_ONLY->"MEASURED";case REQUIRE_EQUAL_ANGLES->m.equalAngles()?"PASSED":"FAILED";});
+        label(c,"Regular polygon realization: "+(m.equalEdges()&&m.equalAngles()?"YES":"NO"));
     }
 
     private void phase2FacesBoundary(NkContext c, TestResult result) {

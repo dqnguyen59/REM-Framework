@@ -6,6 +6,8 @@ import remframework.geometry.discovery.configuration.ConfigurationRequest;
 import remframework.geometry.discovery.configuration.GenerationResult;
 import remframework.geometry.discovery.eligibility.TopologyEligibilityAnalyzer;
 import remframework.geometry.discovery.experiment.ExperimentProfile;
+import remframework.geometry.discovery.experiment.AngleConditionMode;
+import remframework.geometry.discovery.experiment.PlanarityRealizationMode;
 import remframework.geometry.discovery.measurement.regularity.TwoDRegularityCalculator;
 import remframework.geometry.discovery.optimization.AreaOptimizer;
 import remframework.geometry.discovery.realization.session.TestRequest;
@@ -21,7 +23,7 @@ public final class EmergentGeometryExperimentsMain {
 
     public static void main(String[] args) {
         areaExperiment("A", 4);
-        areaExperiment("B", 6);
+        areaExperiment("B", 5);
         volumeExperimentC();
         cubicGraphExperimentD();
     }
@@ -29,10 +31,15 @@ public final class EmergentGeometryExperimentsMain {
     private static void areaExperiment(String name, int n) {
         Configuration selected = generate(n, 2, ExperimentProfile.CLOSED_2D_AREA).configurations().get(0);
         TestResult baseline = run(selected, ExperimentProfile.CLOSED_2D_AREA);
-        System.out.printf("Experiment %s N=%d K=2 eligibility=%s realization=%s area=%.9f angleVariance=%.9g centroidRadiusVariance=%.9g%n",
+        double maximumEdgeError=baseline.twoDRegularity().edgeLengths().values().stream().mapToDouble(value->Math.abs(value-1)).max().orElse(0);
+        System.out.printf("Experiment %s N=%d K=2 mode=STRICT_2D_COORDINATES angle=MEASURE_ONLY iterationsPerRenderedFrame=1 eligibility=%s realization=%s maxEdgeError=%.9g area=%.9f maxPlaneDeviation=%.9g angleVariance=%.9g maxAngleDeviation=%.9g centroidRadiusVariance=%.9g%n",
                 name, n, baseline.eligibility().status(), baseline.realization().status(),
-                baseline.twoDRegularity().area(), baseline.twoDRegularity().interiorAngles().variance(),
+                maximumEdgeError,baseline.twoDRegularity().area(),baseline.twoDRegularity().maximumPlaneDeviation(),baseline.twoDRegularity().interiorAngles().variance(),baseline.twoDRegularity().maximumAngleTargetDeviation(),
                 baseline.twoDRegularity().centroidRadii().variance());
+        TestResult equalAngles=run(selected,ExperimentProfile.CLOSED_2D_AREA,AngleConditionMode.REQUIRE_EQUAL_ANGLES);
+        System.out.printf("  mode=STRICT_2D_COORDINATES angle=REQUIRE_EQUAL_ANGLES realization=%s candidate=%s angleVariance=%s maxAngleDeviation=%s regularPolygon=%s%n",
+                equalAngles.realization().status(),equalAngles.status().code(),equalAngles.twoDRegularity()==null?"unavailable":equalAngles.twoDRegularity().interiorAngles().variance(),
+                equalAngles.twoDRegularity()==null?"unavailable":equalAngles.twoDRegularity().maximumAngleTargetDeviation(),equalAngles.twoDRegularity()!=null&&equalAngles.twoDRegularity().equalEdges()&&equalAngles.twoDRegularity().equalAngles());
         GeometryOptimizationResult optimization = new AreaOptimizer().maximize2d(selected,
                 baseline.realization(), baseline.boundary(), 1, 10_000);
         var optimized = new TwoDRegularityCalculator().calculate(selected,
@@ -79,8 +86,12 @@ public final class EmergentGeometryExperimentsMain {
                 GraphSymmetryFilter.BOTH,1000,Duration.ofSeconds(30),null,null,profile));
     }
     private static TestResult run(Configuration configuration,ExperimentProfile profile) {
+        return run(configuration,profile,AngleConditionMode.MEASURE_ONLY);
+    }
+    private static TestResult run(Configuration configuration,ExperimentProfile profile,AngleConditionMode angleMode) {
         return new TestSession(configuration,new TestRequest(configuration.id(),profile.intendedDimension(),1,
                 SEED,4,DynamicElasticSettings.defaults(1,SEED),GeometrySymmetryPolicy.MEASURE_ONLY,100_000,
-                profile,null,null,null,0,0,0,0)).run();
+                profile,angleMode,null,null,0,0,0,angleMode==AngleConditionMode.REQUIRE_EQUAL_ANGLES?Math.toRadians(2):0,
+                PlanarityRealizationMode.STRICT_2D_COORDINATES,.08,.05)).run();
     }
 }

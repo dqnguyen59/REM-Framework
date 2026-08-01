@@ -75,6 +75,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private long phase2Seed = 42;
     private int phase2InitialRealizations = 1;
     private int phase2SearchLimit = 100_000;
+    private PlanarityRealizationMode phase2PlanarityMode=PlanarityRealizationMode.STRICT_2D_COORDINATES;
+    private AngleConditionMode phase2AngleMode=AngleConditionMode.MEASURE_ONLY;
+    private double phase2PlaneStrength=.08,phase2AngleStrength=.01;
     private boolean showVertices = true, showEdges = true, showLabels = true,
             showCandidateFaces = true, showBoundaryFaces = true, showRejectedFaces = false,
             showNormals = false, showSelfIntersections = true, showViewportDiagnostics = false,
@@ -176,13 +179,14 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         phase2TimeLimitSeconds = dynamicInteger(c, "Enumeration time limit (seconds)", phase2TimeLimitSeconds, 1, 86_400);
         primaryButton(c, "Generate Configurations", true, "", () -> {
             try {
+                phase2SelectedConfiguration = null;
+                phase2LatestResult = null;
+                phase2StoredResult = null;
                 ConfigurationRequest request = new ConfigurationRequest(phase2NodeCount,
                         phase2ExactDegree, phase2Dimension, phase2SymmetryFilter,
                         phase2MaximumConfigurations, java.time.Duration.ofSeconds(phase2TimeLimitSeconds),
                         null, Path.of("lattice/geometry-discovery/configuration-sets"), phase2ExperimentProfile);
                 controller.phasedWorkflow().generateConfigurations(request);
-                phase2SelectedConfiguration = null;
-                phase2LatestResult = null;
             } catch (Exception exception) { nuklearModel.showErrorDialog("Configuration generation", exception.getMessage()); }
         });
         primaryButton(c, "Reopen Persisted Configuration Set", true, "", () -> {
@@ -260,6 +264,20 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         phase2Seed = dynamicInteger(c, "Random seed", (int) phase2Seed, Integer.MIN_VALUE, Integer.MAX_VALUE);
         phase2InitialRealizations = dynamicInteger(c, "Initial realizations / seeds", phase2InitialRealizations, 1, 100);
         phase2SearchLimit = dynamicInteger(c, "Geometry search limit", phase2SearchLimit, 1, Integer.MAX_VALUE);
+        if(phase2ExperimentProfile==ExperimentProfile.CLOSED_2D_AREA)try(MemoryStack stack=MemoryStack.stackPush()){
+            String plane=nk_label_combo_options(c,stack,"Planarity realization mode",
+                    new String[]{"Strict 2D coordinates","Plane constraint","Measure only"},
+                    switch(phase2PlanarityMode){case STRICT_2D_COORDINATES->"Strict 2D coordinates";case PLANE_CONSTRAINT->"Plane constraint";case MEASURE_ONLY->"Measure only";},.4,.6);
+            phase2PlanarityMode=switch(plane){case "Plane constraint"->PlanarityRealizationMode.PLANE_CONSTRAINT;case "Measure only"->PlanarityRealizationMode.MEASURE_ONLY;default->PlanarityRealizationMode.STRICT_2D_COORDINATES;};
+            String angle=nk_label_combo_options(c,stack,"Angle condition",
+                    new String[]{"None","Measure only","Require equal angles"},
+                    switch(phase2AngleMode){case NONE->"None";case MEASURE_ONLY->"Measure only";case REQUIRE_EQUAL_ANGLES->"Require equal angles";},.4,.6);
+            phase2AngleMode=switch(angle){case "None"->AngleConditionMode.NONE;case "Require equal angles"->AngleConditionMode.REQUIRE_EQUAL_ANGLES;default->AngleConditionMode.MEASURE_ONLY;};
+        }
+        if(phase2PlanarityMode==PlanarityRealizationMode.PLANE_CONSTRAINT)
+            phase2PlaneStrength=dynamicProperty(c,"Plane-restoring strength",phase2PlaneStrength,0,100,.01);
+        if(phase2AngleMode==AngleConditionMode.REQUIRE_EQUAL_ANGLES)
+            phase2AngleStrength=dynamicProperty(c,"Angle-restoring strength",phase2AngleStrength,0,100,.01);
         controller.phasedWorkflow().setVisualizationIterationsPerFrame(
                 dynamicInteger(c, "Visualization iterations per frame",
                         controller.phasedWorkflow().visualizationIterationsPerFrame(), 1, 10000));
@@ -279,8 +297,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                             new TestRequest(selected.id(), phase2Dimension, phase2TargetDistance,
                                     phase2Seed, phase2InitialRealizations, null,
                                     GeometrySymmetryPolicy.MEASURE_ONLY, phase2SearchLimit,
-                                    phase2ExperimentProfile, AngleConditionMode.MEASURE_ONLY,
-                                    RegularityMode.MEASURE_ONLY, OptimizationObjective.NONE,0,0,0,0));
+                                    phase2ExperimentProfile, phase2AngleMode,
+                                    RegularityMode.MEASURE_ONLY, OptimizationObjective.NONE,0,0,0,0,
+                                    phase2PlanarityMode,phase2PlaneStrength,phase2AngleStrength));
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry Test", exception.getMessage()); }
         });
@@ -330,6 +349,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                         + " spatiallyValid=" + incremental.metrics().spatiallyValid()
                         + " realizationStatus=" + incremental.state());
                 if (!incremental.stopReason().isBlank()) label(c, "Diagnostic: " + incremental.stopReason());
+                ExperimentConvergenceDiagnostics live=incremental.convergenceDiagnostics();
+                label(c,String.format("Maximum edge error: %.7g    Maximum plane deviation: %.7g",live.maximumConnectedEdgeError(),live.maximumPlaneDeviation()));
+                label(c,String.format("Angle variance: %.7g    Maximum angle deviation: %.7g",live.angleVariance(),live.maximumAngleDeviation()));
+                label(c,"Edge="+live.edgeConstraint()+" Planarity="+live.planarity()+" Angle="+live.angleCondition()+" Boundary="+live.simpleBoundary()+" Area="+live.areaQualification());
             }
             heading(c, "Stage 2 - Realization");
             label(c, "Geometry-test state: " + StatusPresentation.realizationState(incremental));

@@ -10,9 +10,15 @@ public record TwoDRegularityMetrics(boolean valid, boolean planar, boolean simpl
         Statistics edgeLengths, Statistics interiorAngles, Statistics turningAngles,
         Statistics centroidRadii, double targetInteriorAngle,
         double targetTurningAngle, double maximumAngleTargetDeviation,
+        List<Double> interiorAngleTargetDeviations, List<Double> turningAngleTargetDeviations,
+        Vector3d planePoint, double maximumPlaneDeviation, double meanPlaneDeviation,
+        double rmsPlaneDeviation, double planarityTolerance,
         double area, double perimeter, double circularity, List<String> failures) {
     public TwoDRegularityMetrics {
         planeDistances = List.copyOf(planeDistances); planeNormal = new Vector3d(planeNormal);
         failures = List.copyOf(failures);
+        interiorAngleTargetDeviations=List.copyOf(interiorAngleTargetDeviations);
+        turningAngleTargetDeviations=List.copyOf(turningAngleTargetDeviations);
+        planePoint=new Vector3d(planePoint);
     }
 }

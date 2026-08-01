@@ -23,7 +23,8 @@ import remframework.geometry.discovery.graph.canonical.*;
 import remframework.geometry.discovery.graph.symmetry.*;
 import remframework.geometry.discovery.optimization.*;
 public record TestResult(ConfigurationId configurationId,
-        ExperimentProfile experimentProfile, TopologyEligibilityReport eligibility,
+        ExperimentProfile experimentProfile, PlanarityRealizationMode planarityMode,
+        AngleConditionMode angleConditionMode, TopologyEligibilityReport eligibility,
         GraphSymmetryClassification graphSymmetry,Realization realization,
         FaceDerivationResult faceDerivation,ClosedBoundaryResult boundary,
         GeometricSymmetryResult geometricSymmetry,AreaResult area,VolumeResult volume,
@@ -34,7 +35,7 @@ public record TestResult(ConfigurationId configurationId,
             Realization realization, FaceDerivationResult faceDerivation, ClosedBoundaryResult boundary,
             GeometricSymmetryResult geometricSymmetry, AreaResult area, VolumeResult volume,
             GeometryOptimizationResult optimization, GeometryConfigurationStatus status) {
-        this(configurationId, null, null, graphSymmetry, realization, faceDerivation, boundary,
+        this(configurationId, null, null, null, null, graphSymmetry, realization, faceDerivation, boundary,
                 geometricSymmetry, area, volume, null, null, optimization, null, status);
     }
 }

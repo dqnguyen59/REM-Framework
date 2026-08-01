@@ -14,6 +14,7 @@ public final class StatusPresentation {
             case INITIALIZED -> "INITIALIZED";
             case RELAXING -> "RELAXING";
             case CONVERGED -> "REALIZED";
+            case QUALIFICATION_FAILED -> "EDGE_REALIZATION_FOUND; EXPERIMENT_QUALIFICATION_FAILED";
             case SEARCH_LIMIT_REACHED -> "NO_REALIZATION_FOUND_WITHIN_SEARCH_LIMITS";
             case FAILED -> "FAILED";
         };
@@ -23,7 +24,8 @@ public final class StatusPresentation {
         if (session == null && result == null) return "Not tested";
         if (result != null && result.realization() != null && result.realization().converged())
             return "Found";
-        if (session != null && session.scientificState() == ScientificState.CONVERGED)
+        if (session != null && (session.scientificState() == ScientificState.CONVERGED
+                || session.scientificState() == ScientificState.QUALIFICATION_FAILED))
             return "Found";
         if ((session != null && session.scientificState() == ScientificState.SEARCH_LIMIT_REACHED)
                 || (result != null && result.realization() != null

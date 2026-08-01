@@ -26,7 +26,9 @@ public record TestRequest(ConfigurationId configurationId,
         GeometrySymmetryPolicy symmetryPolicy,int searchLimit, ExperimentProfile experimentProfile,
         AngleConditionMode angleConditionMode, RegularityMode regularityMode,
         OptimizationObjective optimizationObjective, double edgeTolerance,
-        double planarityTolerance, double degeneracyTolerance, double angleTolerance) {
+        double planarityTolerance, double degeneracyTolerance, double angleTolerance,
+        PlanarityRealizationMode planarityMode, double planeRestoringStrength,
+        double angleRestoringStrength) {
     public TestRequest {
         if(configurationId==null||dimension==null)throw new IllegalArgumentException("A selected configuration and dimension are required.");
         if(!Double.isFinite(targetEdgeLength)||targetEdgeLength<=0||initialRealizations<1||searchLimit<1)throw new IllegalArgumentException("Geometry-test limits must be positive and finite.");
@@ -42,11 +44,25 @@ public record TestRequest(ConfigurationId configurationId,
         planarityTolerance=planarityTolerance>0?planarityTolerance:1e-7;
         degeneracyTolerance=degeneracyTolerance>0?degeneracyTolerance:1e-9;
         angleTolerance=angleTolerance>0?angleTolerance:1e-6;
+        planarityMode=planarityMode==null?PlanarityRealizationMode.STRICT_2D_COORDINATES:planarityMode;
+        planeRestoringStrength=planeRestoringStrength>=0&&Double.isFinite(planeRestoringStrength)?planeRestoringStrength:.08;
+        angleRestoringStrength=angleRestoringStrength>=0&&Double.isFinite(angleRestoringStrength)?angleRestoringStrength:.01;
     }
     public TestRequest(ConfigurationId configurationId, GeometryEmbeddingDimension dimension,
             double targetEdgeLength,long randomSeed,int initialRealizations,
             DynamicElasticSettings relaxationSettings,GeometrySymmetryPolicy symmetryPolicy,int searchLimit){
         this(configurationId,dimension,targetEdgeLength,randomSeed,initialRealizations,
                 relaxationSettings,symmetryPolicy,searchLimit,null,null,null,null,0,0,0,0);
+    }
+    public TestRequest(ConfigurationId configurationId, GeometryEmbeddingDimension dimension,
+            double targetEdgeLength,long randomSeed,int initialRealizations,
+            DynamicElasticSettings relaxationSettings,GeometrySymmetryPolicy symmetryPolicy,int searchLimit,
+            ExperimentProfile experimentProfile,AngleConditionMode angleConditionMode,
+            RegularityMode regularityMode,OptimizationObjective optimizationObjective,double edgeTolerance,
+            double planarityTolerance,double degeneracyTolerance,double angleTolerance) {
+        this(configurationId,dimension,targetEdgeLength,randomSeed,initialRealizations,relaxationSettings,
+                symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,
+                optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,
+                angleTolerance,null,.08,.01);
     }
 }

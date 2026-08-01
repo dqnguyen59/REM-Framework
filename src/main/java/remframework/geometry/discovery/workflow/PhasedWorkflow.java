@@ -48,7 +48,19 @@ public final class PhasedWorkflow {
         return thread;
     });
     private final AtomicBoolean frameAdvanceScheduled = new AtomicBoolean();
-    public synchronized GenerationResult generateConfigurations(ConfigurationRequest request)throws IOException{generation=generator.generate(request);registry.registerAll(generation.configurations());if(request.outputDirectory()!=null)new ConfigurationStore(request.outputDirectory()).save(generation);return generation;}
+    public synchronized GenerationResult generateConfigurations(ConfigurationRequest request)throws IOException{
+        beginGenerationTransaction();
+        GenerationResult generated=generator.generate(request);
+        generation=generated;
+        registry.registerAll(generated.configurations());
+        if(request.outputDirectory()!=null)new ConfigurationStore(request.outputDirectory()).save(generated);
+        return generated;
+    }
+    public synchronized void beginGenerationTransaction(){
+        if(incrementalSession!=null)incrementalSession.stop();
+        generation=null;selected=null;incrementalSession=null;activeRequest=null;activeResult=null;
+        persistedResultPath=null;reopenedCoordinates=List.of();registry.clear();renderRevision++;
+    }
     public synchronized void reopen(Path setDirectory)throws IOException{List<Configuration> values=new ConfigurationStore(setDirectory.getParent()).reopen(setDirectory);registry.registerAll(values);selected=null;if(!values.isEmpty()){Configuration first=values.getFirst();ConfigurationRequest request=ConfigurationRequest.exhaustive(first.nodeCount(),first.exactDegree(),GeometryEmbeddingDimension.THREE_D);GeometryConfigurationDiagnostic diagnostic=GeometryConfigurationDiagnostic.info(GeometryConfigurationStage.COMPLETE,GeometryConfigurationStatusCode.ENUMERATION_COMPLETE,"Configuration set reopened","Previously generated topology records were loaded without repeating enumeration.");generation=new GenerationResult(setDirectory.getFileName().toString(),request,values,new Metrics(0,values.size(),0,(int)values.stream().filter(v->v.automorphismGroupSize()>1).count(),(int)values.stream().filter(v->v.automorphismGroupSize()==1).count(),0,true),GeometryConfigurationStatus.of(diagnostic));}}
     public synchronized void selectForGeometryTest(ConfigurationId id){if(registry.find(id).isEmpty())throw new IllegalArgumentException("Unknown configuration ID.");if(incrementalSession!=null)incrementalSession.stop();selected=id;incrementalSession=null;activeRequest=null;activeResult=null;reopenedCoordinates=List.of();persistedResultPath=null;renderRevision++;}
     public synchronized Optional<ConfigurationId> selectedConfiguration(){return Optional.ofNullable(selected);}
@@ -91,6 +103,7 @@ public final class PhasedWorkflow {
     public synchronized SessionState geometryTestSessionState() { return incrementalSession == null ? SessionState.READY : incrementalSession.state(); }
     public synchronized ExecutionState geometryExecutionState() { return incrementalSession == null ? ExecutionState.IDLE : incrementalSession.executionState(); }
     public synchronized ScientificState geometryScientificState() { return incrementalSession == null ? ScientificState.INITIALIZED : incrementalSession.scientificState(); }
+    public synchronized ExperimentConvergenceDiagnostics convergenceDiagnostics(){return incrementalSession==null?null:incrementalSession.convergenceDiagnostics();}
     public synchronized IncrementalSession incrementalSession() { return incrementalSession; }
     public synchronized RenderModel renderModel() {
         if (selected == null) return null;
@@ -123,7 +136,7 @@ public final class PhasedWorkflow {
                 : current.experimentProfile() == ExperimentProfile.CLOSED_2D_AREA
                     ? new AreaOptimizer().maximize2d(registry.find(selected).orElseThrow(),current.realization(),current.boundary(),targetEdgeLength,iterations)
                     : new VolumeOptimizer().maximize3d(registry.find(selected).orElseThrow(),current.realization(),current.boundary(),targetEdgeLength,iterations);
-        TestResult optimized = new TestResult(current.configurationId(),current.experimentProfile(),current.eligibility(),current.graphSymmetry(),
+        TestResult optimized = new TestResult(current.configurationId(),current.experimentProfile(),current.planarityMode(),current.angleConditionMode(),current.eligibility(),current.graphSymmetry(),
                 current.realization(),current.faceDerivation(),current.boundary(),current.geometricSymmetry(),current.area(),current.volume(),
                 current.twoDRegularity(),current.threeDRegularity(),optimization,current.optimizationComparison(),current.status());
         registry.attach(optimized);

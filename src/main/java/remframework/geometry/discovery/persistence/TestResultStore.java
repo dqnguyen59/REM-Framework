@@ -36,6 +36,8 @@ public final class TestResultStore {
         Path file = directory.resolve(result.configurationId() + "-" + Instant.now().toEpochMilli() + ".toml");
         String text = "format_version = 3\nconfiguration_id = \"" + result.configurationId() + "\"\n"
                 + "experiment_profile = \"" + (result.experimentProfile() == null ? "LEGACY_UNSPECIFIED" : result.experimentProfile()) + "\"\n"
+                + "planarity_mode = \"" + (result.planarityMode() == null ? "LEGACY_UNSPECIFIED" : result.planarityMode()) + "\"\n"
+                + "angle_condition_mode = \"" + (result.angleConditionMode() == null ? "LEGACY_UNSPECIFIED" : result.angleConditionMode()) + "\"\n"
                 + "eligibility_status = \"" + (result.eligibility() == null ? "NOT_RECORDED" : result.eligibility().status()) + "\"\n"
                 + "eligibility_reason = \"" + escape(result.eligibility() == null ? "Legacy result" : result.eligibility().conclusion()) + "\"\n"
                 + "status = \"" + result.status().code() + "\"\n"
@@ -61,7 +63,19 @@ public final class TestResultStore {
                     + "regularity_2d_circularity = " + metrics.circularity() + "\n"
                     + "regularity_2d_edge_variance = " + metrics.edgeLengths().variance() + "\n"
                     + "regularity_2d_angle_variance = " + metrics.interiorAngles().variance() + "\n"
-                    + "regularity_2d_centroid_radius_variance = " + metrics.centroidRadii().variance() + "\n";
+                    + "regularity_2d_centroid_radius_variance = " + metrics.centroidRadii().variance() + "\n"
+                    + "planarity_passed = " + metrics.planar() + "\n"
+                    + "maximum_plane_deviation = " + metrics.maximumPlaneDeviation() + "\n"
+                    + "mean_plane_deviation = " + metrics.meanPlaneDeviation() + "\n"
+                    + "rms_plane_deviation = " + metrics.rmsPlaneDeviation() + "\n"
+                    + "planarity_tolerance = " + metrics.planarityTolerance() + "\n"
+                    + "target_interior_angle = " + metrics.targetInteriorAngle() + "\n"
+                    + "target_turning_angle = " + metrics.targetTurningAngle() + "\n"
+                    + "maximum_angle_target_deviation = " + metrics.maximumAngleTargetDeviation() + "\n";
+            for(int i=0;i<metrics.interiorAngles().values().size();i++)
+                text += "vertex_angle_"+i+" = ["+metrics.interiorAngles().values().get(i)+", "
+                        +metrics.turningAngles().values().get(i)+", "+metrics.interiorAngleTargetDeviations().get(i)
+                        +", "+metrics.turningAngleTargetDeviations().get(i)+", "+metrics.planeDistances().get(i)+"]\n";
         }
         if (result.threeDRegularity() != null) {
             var metrics = result.threeDRegularity();

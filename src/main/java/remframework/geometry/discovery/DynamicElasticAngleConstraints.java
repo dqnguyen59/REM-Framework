@@ -38,6 +38,18 @@ public final class DynamicElasticAngleConstraints {
         }
     }
 
+    public void addCycleForces(FixedDegreeGraph graph, Map<Integer, DynamicElasticNode> nodes,
+            Map<Integer, Vector3d> forces, double targetAngleDegrees, double strength) {
+        if (strength == 0) return;
+        Map<Integer, Set<Integer>> adjacency = adjacency(graph);
+        double targetCosine = Math.cos(Math.toRadians(targetAngleDegrees));
+        for (int center = 0; center < graph.nodeCount(); center++) {
+            int[] neighbors = adjacency.get(center).stream().mapToInt(Integer::intValue).sorted().toArray();
+            if (neighbors.length == 2)
+                addPair(center, neighbors[0], neighbors[1], nodes, forces, targetCosine, strength);
+        }
+    }
+
     private void addPair(int centerId, int firstId, int secondId,
                          Map<Integer, DynamicElasticNode> nodes,
                          Map<Integer, Vector3d> forces,
