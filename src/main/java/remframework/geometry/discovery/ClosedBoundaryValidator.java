@@ -1,13 +1,23 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 import java.util.*;
 public final class ClosedBoundaryValidator {
-    public ClosedBoundaryResult validate(GeometryConfiguration graph,GeometryRealization r,FaceDerivationResult f){
+    public ClosedBoundaryResult validate(Configuration graph,Realization r,FaceDerivationResult f){
         if(!f.unique()){var d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.BOUNDARY_VALIDATION,GeometryConfigurationStatusCode.FACES_NOT_DERIVABLE,"Boundary unavailable","A unique face set is required before boundary validation.");return new ClosedBoundaryResult(false,false,false,false,false,0,List.of(),GeometryConfigurationStatus.of(d),List.of(d));}
         if(r.dimension()==GeometryEmbeddingDimension.TWO_D){boolean cycle=f.faces().size()==1&&f.faces().get(0).nodeIds().size()==graph.nodeCount();boolean crossing=cycle&&selfIntersects(f.faces().get(0),r);boolean closed=cycle&&!crossing;var code=crossing?GeometryConfigurationStatusCode.SELF_INTERSECTING:closed?GeometryConfigurationStatusCode.CLOSED_BOUNDARY:GeometryConfigurationStatusCode.OPEN_BOUNDARY;var d=closed?GeometryConfigurationDiagnostic.info(GeometryConfigurationStage.BOUNDARY_VALIDATION,code,"Closed polygon boundary","One non-self-intersecting simple cycle contains every graph node."):GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.BOUNDARY_VALIDATION,code,crossing?"Self-intersecting polygon":"Open or ambiguous boundary",crossing?"Non-adjacent polygon edges intersect, so area is unavailable.":"A unique simple polygon boundary was not established.");return new ClosedBoundaryResult(closed,closed,closed,closed,crossing,closed?1:0,f.faces(),GeometryConfigurationStatus.of(d),List.of(d));}
         Map<Long,Integer> use=new HashMap<>();for(DerivedFace face:f.faces()){List<Integer> ids=face.nodeIds();for(int i=0;i<ids.size();i++){int a=ids.get(i),b=ids.get((i+1)%ids.size());long key=((long)Math.min(a,b)<<32)|(Math.max(a,b)&0xffffffffL);use.merge(key,1,Integer::sum);}}
         boolean manifold=use.values().stream().allMatch(v->v==2);boolean allEdges=graph.edges().stream().allMatch(e->use.getOrDefault(e.undirectedKey(),0)==2);boolean closed=manifold&&allEdges&&!f.faces().isEmpty();int euler=graph.nodeCount()-graph.edges().size()+f.faces().size();var code=closed?GeometryConfigurationStatusCode.CLOSED_BOUNDARY:(manifold?GeometryConfigurationStatusCode.OPEN_BOUNDARY:GeometryConfigurationStatusCode.NON_MANIFOLD_BOUNDARY);var d=closed?GeometryConfigurationDiagnostic.info(GeometryConfigurationStage.BOUNDARY_VALIDATION,code,"Closed boundary","Every graph edge belongs to exactly two planar faces; V-E+F = "+euler+". Euler characteristic is diagnostic, not proof."):GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.BOUNDARY_VALIDATION,code,"Boundary invalid","Every boundary edge must belong to exactly two faces; V-E+F = "+euler+".");return new ClosedBoundaryResult(closed,closed,manifold,closed,false,euler,f.faces(),GeometryConfigurationStatus.of(d),List.of(d));
     }
-    private boolean selfIntersects(DerivedFace face,GeometryRealization realization){List<Integer> ids=face.nodeIds();for(int i=0;i<ids.size();i++)for(int j=i+1;j<ids.size();j++){if(j==i+1||i==0&&j==ids.size()-1)continue;org.joml.Vector3d a=realization.finalCoordinates().get(ids.get(i)),b=realization.finalCoordinates().get(ids.get((i+1)%ids.size())),c=realization.finalCoordinates().get(ids.get(j)),d=realization.finalCoordinates().get(ids.get((j+1)%ids.size()));if(intersects(a,b,c,d))return true;}return false;}
+    private boolean selfIntersects(DerivedFace face,Realization realization){List<Integer> ids=face.nodeIds();for(int i=0;i<ids.size();i++)for(int j=i+1;j<ids.size();j++){if(j==i+1||i==0&&j==ids.size()-1)continue;org.joml.Vector3d a=realization.finalCoordinates().get(ids.get(i)),b=realization.finalCoordinates().get(ids.get((i+1)%ids.size())),c=realization.finalCoordinates().get(ids.get(j)),d=realization.finalCoordinates().get(ids.get((j+1)%ids.size()));if(intersects(a,b,c,d))return true;}return false;}
     private boolean intersects(org.joml.Vector3d a,org.joml.Vector3d b,org.joml.Vector3d c,org.joml.Vector3d d){double o1=orient(a,b,c),o2=orient(a,b,d),o3=orient(c,d,a),o4=orient(c,d,b);return o1*o2<-1e-14&&o3*o4<-1e-14;}
     private double orient(org.joml.Vector3d a,org.joml.Vector3d b,org.joml.Vector3d c){return(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);}
 }

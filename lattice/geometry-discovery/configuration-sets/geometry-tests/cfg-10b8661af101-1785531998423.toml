@@ -1,0 +1,12 @@
+configuration_id = "cfg-10b8661af101"
+status = "NON_MANIFOLD_BOUNDARY"
+explanation = "Every boundary edge must belong to exactly two faces; V-E+F = 1."
+realization_found = true
+unique_faces = true
+closed_boundary = false
+area_available = false
+volume_available = false
+saved_at = "2026-07-31T21:06:38.423187894Z"
+coordinate_0 = [0.0, 0.0, 0.0]
+coordinate_1 = [1.0, 0.0, 0.0]
+coordinate_2 = [0.499970054660602, -0.7257551462253589, -0.4724677429723977]

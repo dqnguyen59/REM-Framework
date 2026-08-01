@@ -1,0 +1,7 @@
+node_count = 6
+exact_degree = 3
+intended_dimension = "THREE_D"
+symmetry_filter = "BOTH"
+maximum_configurations = 1000
+enumeration_time_millis = 180000
+generation_strategy = "EXHAUSTIVE_BACKTRACKING"

@@ -1,4 +1,14 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,7 +22,7 @@ public final class GeometryDiscoveryWorkspacePreferences {
 
     public GeometryDiscoveryWorkspacePreferences(Path path) { this.path = path; }
 
-    public void load(GeometryDiscoveryWorkspaceState state, GeometryDiscoveryViewState view) {
+    public void load(GeometryDiscoveryWorkspaceState state, ViewState view) {
         if (Files.notExists(path)) return;
         Properties values = new Properties();
         try (InputStream input = Files.newInputStream(path)) {
@@ -58,7 +68,7 @@ public final class GeometryDiscoveryWorkspacePreferences {
         }
     }
 
-    public void save(GeometryDiscoveryWorkspaceState state, GeometryDiscoveryViewState view) {
+    public void save(GeometryDiscoveryWorkspaceState state, ViewState view) {
         Properties values = new Properties();
         values.setProperty("scoringProfile", state.scoringProfile().name());
         values.setProperty("outputDirectory", state.outputDirectory().toString());

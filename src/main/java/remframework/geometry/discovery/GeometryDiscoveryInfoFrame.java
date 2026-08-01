@@ -1,4 +1,14 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
@@ -126,7 +136,7 @@ final class GeometryDiscoveryInfoFrame extends AbstractFrame {
         if (Nuklear.nk_button_label(context, "Correction +"))
             visualizer.updateSettings(settings.withMaximumCorrection(
                     settings.maximumCorrection() * 1.25));
-        GeometryDiscoveryViewState view = visualizer.viewState();
+        ViewState view = visualizer.viewState();
         Nuklear.nk_layout_row_dynamic(context, rowHeightEdit, 3);
         if (Nuklear.nk_button_label(context, "Labels " + on(view.showNodeLabels())))
             view.setShowNodeLabels(!view.showNodeLabels());

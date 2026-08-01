@@ -1,4 +1,14 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +33,7 @@ class GeometryDiscoveryWorkspaceTest {
     }
 
     @Test void workspaceLifecyclePreservesLatticeAndRestoresSimulation() {
-        GeometryDiscoveryWorkspaceController controller =
+        WorkspaceController controller =
                 GeometryDiscoveryWorkspaceManager.getInstance();
         RemModel rem = new RemModel();
         rem.startSimulation();
@@ -95,8 +105,8 @@ class GeometryDiscoveryWorkspaceTest {
     }
 
     @Test void profilesOverridesComparisonAndExportsUseExistingServices() throws Exception {
-        GeometryDiscoveryWorkspaceController controller =
-                new GeometryDiscoveryWorkspaceController();
+        WorkspaceController controller =
+                new WorkspaceController();
         controller.selectProfile(TopologyScoringProfile.WAVE_PROPAGATION);
         assertEquals(TopologyScoreWeights.forProfile(TopologyScoringProfile.WAVE_PROPAGATION),
                 controller.state().scoreWeights());
@@ -121,7 +131,7 @@ class GeometryDiscoveryWorkspaceTest {
     @Test void preferencesPersistOnlyStoppedUiState() {
         Path path = temp.resolve("workspace.properties");
         GeometryDiscoveryWorkspaceState state = new GeometryDiscoveryWorkspaceState();
-        GeometryDiscoveryViewState view = new GeometryDiscoveryViewState();
+        ViewState view = new ViewState();
         state.setScoringProfile(TopologyScoringProfile.CENTROSYMMETRIC);
         state.setOutputDirectory(Path.of("lattice/experiments"));
         state.setCurrentSource(Path.of("candidate.toml"));
@@ -130,7 +140,7 @@ class GeometryDiscoveryWorkspaceTest {
                 new GeometryDiscoveryWorkspacePreferences(path);
         preferences.save(state, view);
         GeometryDiscoveryWorkspaceState restored = new GeometryDiscoveryWorkspaceState();
-        GeometryDiscoveryViewState restoredView = new GeometryDiscoveryViewState();
+        ViewState restoredView = new ViewState();
         preferences.load(restored, restoredView);
         assertEquals(TopologyScoringProfile.CENTROSYMMETRIC, restored.scoringProfile());
         assertEquals(Path.of("candidate.toml"), restored.currentSource());

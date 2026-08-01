@@ -1,4 +1,14 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.lwjgl.glfw.Callbacks;
 import org.lwjgl.glfw.GLFW;
@@ -77,8 +87,8 @@ public final class GeometryDiscoveryVisualizerMain {
                 nuklearModel, visualizer, outputDirectory));
         installCallbacks(window, visualizer, nuklearController);
 
-        try (GeometryDiscoveryOpenGlRenderer renderer =
-                     new GeometryDiscoveryOpenGlRenderer()) {
+        try (OpenGlRenderer renderer =
+                     new OpenGlRenderer()) {
             int frames = 0;
             while (!GLFW.glfwWindowShouldClose(window)
                     && (frameLimit <= 0 || frames < frameLimit)) {

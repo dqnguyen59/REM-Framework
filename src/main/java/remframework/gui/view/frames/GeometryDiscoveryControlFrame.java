@@ -1,9 +1,18 @@
 package remframework.gui.view.frames;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
-import remframework.geometry.discovery.*;
 import remframework.helpers.Constants;
 import remframework.gui.model.AbstractDialogModel.ConfirmState;
 import remframework.gui.model.DialogFileModel;
@@ -22,7 +31,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private static final String[] PROFILES = {"General Geometry", "Wave Propagation",
             "Centrosymmetric", "Tetrahedral", "Cubic Runtime"};
     private static final String[] SEARCH_METHODS = {"Hill Climbing", "Simulated Annealing"};
-    private final GeometryDiscoveryWorkspaceController controller =
+    private final WorkspaceController controller =
             GeometryDiscoveryWorkspaceManager.getInstance();
     private DialogFileModel candidateDialog;
     private final Deque<Path> recentCandidates = new ArrayDeque<>();
@@ -50,16 +59,16 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private String dynamicSpeedValidation = "";
     private String dynamicMaximumValidation = "";
     private boolean phase2Mode = true;
-    private GeometryDiscoveryPhase phase2Stage = GeometryDiscoveryPhase.CONFIGURATION_GENERATION;
+    private Phase phase2Stage = Phase.CONFIGURATION_GENERATION;
     private int phase2NodeCount = 4;
     private int phase2ExactDegree = 2;
     private GeometryEmbeddingDimension phase2Dimension = GeometryEmbeddingDimension.THREE_D;
     private GraphSymmetryFilter phase2SymmetryFilter = GraphSymmetryFilter.BOTH;
     private int phase2MaximumConfigurations = 1000;
     private int phase2TimeLimitSeconds = 30;
-    private GeometryConfigurationId phase2SelectedConfiguration;
-    private GeometryTestResult phase2LatestResult;
-    private GeometryTestStoredResult phase2StoredResult;
+    private ConfigurationId phase2SelectedConfiguration;
+    private TestResult phase2LatestResult;
+    private StoredResult phase2StoredResult;
     private double phase2TargetDistance = 1;
     private long phase2Seed = 42;
     private int phase2InitialRealizations = 1;
@@ -91,7 +100,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         processCandidateDialog();
         if (phase2Mode) {
             phasedStageTabs(c);
-            if (phase2Stage == GeometryDiscoveryPhase.CONFIGURATION_GENERATION)
+            if (phase2Stage == Phase.CONFIGURATION_GENERATION)
                 phase2ConfigurationGeneration(c);
             else phase2GeometryTest(c);
             return;
@@ -128,13 +137,13 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
 
     private void phasedStageTabs(NkContext c) {
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 3);
-        if (Nuklear.nk_button_label(c, phase2Stage == GeometryDiscoveryPhase.CONFIGURATION_GENERATION
+        if (Nuklear.nk_button_label(c, phase2Stage == Phase.CONFIGURATION_GENERATION
                 ? "> Stage 1: Configuration Generation and Classification"
                 : "Stage 1: Configuration Generation and Classification"))
-            phase2Stage = GeometryDiscoveryPhase.CONFIGURATION_GENERATION;
-        if (Nuklear.nk_button_label(c, phase2Stage == GeometryDiscoveryPhase.GEOMETRY_TEST
+            phase2Stage = Phase.CONFIGURATION_GENERATION;
+        if (Nuklear.nk_button_label(c, phase2Stage == Phase.GEOMETRY_TEST
                 ? "> Stage 2: Geometry Test" : "Stage 2: Geometry Test"))
-            phase2Stage = GeometryDiscoveryPhase.GEOMETRY_TEST;
+            phase2Stage = Phase.GEOMETRY_TEST;
         if (Nuklear.nk_button_label(c, "Legacy Discovery Tools")) phase2Mode = false;
     }
 
@@ -160,7 +169,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         phase2TimeLimitSeconds = dynamicInteger(c, "Enumeration time limit (seconds)", phase2TimeLimitSeconds, 1, 86_400);
         primaryButton(c, "Generate Configurations", true, "", () -> {
             try {
-                GeometryConfigurationRequest request = new GeometryConfigurationRequest(phase2NodeCount,
+                ConfigurationRequest request = new ConfigurationRequest(phase2NodeCount,
                         phase2ExactDegree, phase2Dimension, phase2SymmetryFilter,
                         phase2MaximumConfigurations, java.time.Duration.ofSeconds(phase2TimeLimitSeconds),
                         null, Path.of("lattice/geometry-discovery/configuration-sets"));
@@ -178,9 +187,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Configuration set", exception.getMessage()); }
         });
-        GeometryConfigurationGenerationResult generation = controller.phasedWorkflow().generation().orElse(null);
+        GenerationResult generation = controller.phasedWorkflow().generation().orElse(null);
         if (generation == null) { label(c, "No configuration set generated."); return; }
-        GeometryConfigurationMetrics metrics = generation.metrics();
+        Metrics metrics = generation.metrics();
         heading(c, "Generation status");
         label(c, "Status: " + generation.status().code() + " - " + generation.status().summary());
         label(c, "Completion: " + (metrics.enumerationComplete() ? "Complete" : "Incomplete"));
@@ -190,7 +199,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 + "    Elapsed: " + metrics.elapsedMilliseconds() + " ms");
         if (!generation.status().mayContinue()) label(c, "Diagnostic: " + generation.status().explanation());
         heading(c, "Retained configurations");
-        for (GeometryConfigurationTableRow row : controller.phasedWorkflow().tableRows()) {
+        // Keep the candidate list independently scrollable so detail text never pushes rows away.
+        Nuklear.nk_layout_row_dynamic(c, 220, 1);
+        if (Nuklear.nk_group_begin(c, "Phase2ConfigurationList", 0)) {
+        for (ConfigurationTableRow row : controller.phasedWorkflow().tableRows()) {
             boolean selected = row.configurationId().equals(phase2SelectedConfiguration);
             Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 4, 1);
             String text = (selected ? "> " : "") + row.configurationId() + "  N=" + row.nodeCount() + " K=" + row.exactDegree()
@@ -202,29 +214,40 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 phase2LatestResult = null;
             }
         }
+        Nuklear.nk_group_end(c);
+        }
         if (phase2SelectedConfiguration != null) {
-            label(c, GeometryDiscoveryPhasedWorkflow.TOPOLOGY_PREVIEW_LABEL);
-            GeometryConfiguration selected = controller.phasedWorkflow().selectedConfigurationRecord().orElse(null);
-            if (selected != null) label(c, "Topology preview: " + selected.edges());
+            label(c, PhasedWorkflow.TOPOLOGY_PREVIEW_LABEL);
+            Configuration selected = controller.phasedWorkflow().selectedConfigurationRecord().orElse(null);
+            if (selected != null) {
+                heading(c, "Selected configuration");
+                label(c, selected.id() + "  N=" + selected.nodeCount() + " K=" + selected.exactDegree()
+                        + " edges=" + selected.edges().size() + " symmetry=" + selected.graphSymmetry()
+                        + " automorphisms=" + selected.automorphismGroupSize());
+                label(c, "Stage 2: " + selectedGeometrySummary());
+            }
             primaryButton(c, "Frame Geometry", true, "", controller::framePhase2Geometry);
             primaryButton(c, "Select for Geometry Test", true, "", () -> {
                 controller.phasedWorkflow().selectForGeometryTest(phase2SelectedConfiguration);
-                phase2Stage = GeometryDiscoveryPhase.GEOMETRY_TEST;
+                phase2Stage = Phase.GEOMETRY_TEST;
             });
         }
     }
 
     private void phase2GeometryTest(NkContext c) {
         heading(c, "Stage 2 - Geometry Test");
-        GeometryConfiguration selected = controller.phasedWorkflow().selectedConfigurationRecord().orElse(null);
+        Configuration selected = controller.phasedWorkflow().selectedConfigurationRecord().orElse(null);
         if (selected == null) {
             label(c, "Select exactly one configuration in Stage 1 before starting Geometry Test.");
-            primaryButton(c, "Return to Configuration Generation", true, "", () -> phase2Stage = GeometryDiscoveryPhase.CONFIGURATION_GENERATION);
+            primaryButton(c, "Return to Configuration Generation", true, "", () -> phase2Stage = Phase.CONFIGURATION_GENERATION);
             return;
         }
         label(c, "Immutable selected configuration: " + selected.id());
         label(c, "Canonical identity: " + selected.canonicalGraphLabel());
-        label(c, "N=" + selected.nodeCount() + " K=" + selected.exactDegree() + " graph symmetry=" + selected.graphSymmetry());
+        label(c, "N=" + selected.nodeCount() + " K=" + selected.exactDegree()
+                + " edges=" + selected.edges().size() + " graph symmetry=" + selected.graphSymmetry()
+                + " automorphisms=" + selected.automorphismGroupSize());
+        label(c, "N and K constrain vertex count and degree only; target geometry is not established.");
         phase2TargetDistance = dynamicProperty(c, "Target connected-edge length", phase2TargetDistance, 1e-9, 1e9, .1);
         phase2Seed = dynamicInteger(c, "Random seed", (int) phase2Seed, Integer.MIN_VALUE, Integer.MAX_VALUE);
         phase2InitialRealizations = dynamicInteger(c, "Initial realizations / seeds", phase2InitialRealizations, 1, 100);
@@ -233,33 +256,33 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 dynamicInteger(c, "Visualization iterations per frame",
                         controller.phasedWorkflow().visualizationIterationsPerFrame(), 1, 10000));
         label(c, "Initialization and relaxation use existing scientific defaults; canonical angle constraints remain disabled.");
-        GeometryTestResult result = phase2LatestResult != null ? phase2LatestResult
+        TestResult result = phase2LatestResult != null ? phase2LatestResult
                 : controller.phasedWorkflow().latestGeometryTest(selected.id());
-        GeometryTestSessionState sessionState = controller.phasedWorkflow().geometryTestSessionState();
-        primaryButton(c, "Start Geometry Test", sessionState == GeometryTestSessionState.READY
-                || sessionState == GeometryTestSessionState.PAUSED,
-                "The selected session is already active or finished.", () -> {
+        SessionState sessionState = controller.phasedWorkflow().geometryTestSessionState();
+        ExecutionState executionState = controller.phasedWorkflow().geometryExecutionState();
+        primaryButton(c, "Start Geometry Test", executionState != ExecutionState.RUNNING,
+                "The selected session is already active.", () -> {
             try {
-                if (sessionState == GeometryTestSessionState.PAUSED) {
+                if (executionState == ExecutionState.PAUSED) {
                     controller.phasedWorkflow().resumeSelectedGeometryTest();
                 } else {
                     phase2LatestResult = null;
                     controller.phasedWorkflow().startSelectedGeometryTest(
-                            new GeometryTestRequest(selected.id(), phase2Dimension, phase2TargetDistance,
+                            new TestRequest(selected.id(), phase2Dimension, phase2TargetDistance,
                                     phase2Seed, phase2InitialRealizations, null,
                                     GeometrySymmetryPolicy.MEASURE_ONLY, phase2SearchLimit));
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry Test", exception.getMessage()); }
         });
-        primaryButton(c, "Pause", sessionState == GeometryTestSessionState.RUNNING,
+        primaryButton(c, "Pause", executionState == ExecutionState.RUNNING,
                 "The selected session is not running.", controller.phasedWorkflow()::pauseSelectedGeometryTest);
-        primaryButton(c, "Resume", sessionState == GeometryTestSessionState.PAUSED,
+        primaryButton(c, "Resume", executionState == ExecutionState.PAUSED,
                 "The selected session is not paused.", controller.phasedWorkflow()::resumeSelectedGeometryTest);
-        primaryButton(c, "Step", sessionState == GeometryTestSessionState.READY
-                || sessionState == GeometryTestSessionState.PAUSED,
+        primaryButton(c, "Step", sessionState == SessionState.READY
+                || sessionState == SessionState.PAUSED,
                 "Pause or initialize the selected session before stepping.", controller.phasedWorkflow()::stepSelectedGeometryTest);
-        primaryButton(c, "Stop", sessionState == GeometryTestSessionState.RUNNING
-                || sessionState == GeometryTestSessionState.PAUSED,
+        primaryButton(c, "Stop", executionState == ExecutionState.RUNNING
+                || executionState == ExecutionState.PAUSED,
                 "The selected session is not active.", controller.phasedWorkflow()::stopSelectedGeometryTest);
         primaryButton(c, "Reset", true, "", () -> { controller.phasedWorkflow().resetSelectedGeometryTest(); phase2LatestResult = null; });
         primaryButton(c, "Save Geometry-Test Result", result != null, "Run Geometry Test before saving a result.", () -> {
@@ -273,10 +296,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                     var file = sets.filter(path -> path.getFileName().toString().endsWith(".toml")
                                     && path.toString().contains("geometry-tests"))
                             .sorted().reduce((first, second) -> second).orElseThrow();
-                    phase2StoredResult = new GeometryTestResultStore().load(file);
+                    phase2StoredResult = new TestResultStore().load(file);
                     controller.phasedWorkflow().reopenStoredResult(phase2StoredResult);
                     phase2SelectedConfiguration = phase2StoredResult.configurationId();
-                    phase2Stage = GeometryDiscoveryPhase.GEOMETRY_TEST;
+                    phase2Stage = Phase.GEOMETRY_TEST;
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry-test result", exception.getMessage()); }
         });
@@ -284,10 +307,13 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         if (result == null) {
             if (phase2StoredResult != null)
                 label(c, "Reopened stored result: " + phase2StoredResult.status() + " - " + phase2StoredResult.explanation());
-            GeometryTestIncrementalSession incremental = controller.phasedWorkflow().incrementalSession();
+            IncrementalSession incremental = controller.phasedWorkflow().incrementalSession();
             if (incremental == null) label(c, "Geometry test has not started.");
             else {
-                label(c, "Session: " + incremental.state() + "    Iteration: " + incremental.iteration());
+                label(c, "Execution: " + incremental.executionState() + "    Realization: "
+                        + incremental.scientificState() + "    Iteration: " + incremental.iteration());
+                if (incremental.convergenceIteration() >= 0)
+                    label(c, "Scientific milestone iteration: " + incremental.convergenceIteration());
                 label(c, String.format("Edge-length accuracy: %.6f    Maximum speed: %.6g",
                         incremental.metrics().meanDistanceAccuracy(), incremental.metrics().maximumNodeSpeed()));
                 label(c, "Convergence: elasticEquilibrium=" + incremental.metrics().elasticEquilibrium()
@@ -295,6 +321,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                         + " realizationStatus=" + incremental.state());
                 if (!incremental.stopReason().isBlank()) label(c, "Diagnostic: " + incremental.stopReason());
             }
+            heading(c, "Stage 2 - Realization");
+            label(c, "Geometry-test state: " + StatusPresentation.realizationState(incremental));
+            label(c, "Equal-edge realization: " + StatusPresentation.equalEdgeConclusion(incremental, null));
             return;
         }
         phase2ResultSections(c, result);
@@ -302,9 +331,13 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             label(c, "Reopened stored result: " + phase2StoredResult.status() + " - " + phase2StoredResult.explanation());
     }
 
-    private void phase2ResultSections(NkContext c, GeometryTestResult result) {
-        heading(c, "Realization"); label(c, result.realization().status() + " - converged=" + result.realization().converged()
+    private void phase2ResultSections(NkContext c, TestResult result) {
+        heading(c, "Stage 2 - Realization"); label(c, (result.realization().converged() ? "EQUAL_EDGE_REALIZATION_FOUND" : result.realization().status()) + " - converged=" + result.realization().converged()
                 + ", effective dimension=" + result.realization().effectiveDimension());
+        label(c, "Target geometry: Not established");
+        label(c, "Geometry-test state: " + StatusPresentation.realizationState(controller.phasedWorkflow().incrementalSession()));
+        label(c, "Equal-edge realization: " + StatusPresentation.equalEdgeConclusion(
+                controller.phasedWorkflow().incrementalSession(), result));
         heading(c, "Face derivation"); label(c, result.faceDerivation() == null ? "Not run" : result.faceDerivation().status().code() + " - unique=" + result.faceDerivation().unique());
         heading(c, "Boundary validation"); label(c, result.boundary() == null ? "Not run" : result.boundary().status().code() + " - closed=" + result.boundary().closed() + " - " + result.boundary().status().explanation());
         heading(c, "Measurement");
@@ -325,6 +358,61 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         label(c, "Optimization result: " + result.optimization().summary());
         label(c, "Final status: " + result.status().code() + " - " + result.status().explanation());
         if (!result.status().mayContinue()) label(c, "Failure diagnostic: " + result.status().summary());
+        heading(c, "Candidate Eligibility");
+        label(c, "Equal-edge realization found: " + yesNo(result.realization() != null && result.realization().converged()));
+        label(c, "Faces derived: " + yesNo(result.faceDerivation() != null && !result.faceDerivation().faces().isEmpty()));
+        label(c, "Unique face set: " + yesNo(result.faceDerivation() != null && result.faceDerivation().unique()));
+        label(c, "Closed boundary: " + yesNo(result.boundary() != null && result.boundary().closed()));
+        label(c, "Manifold boundary: " + yesNo(result.boundary() != null && result.boundary().manifold()));
+        label(c, "Area available: " + yesNo(result.area().available()));
+        label(c, "Volume available: " + yesNo(result.volume().available()));
+        label(c, "Valid geometry candidate: " + yesNo(result.status().code() == GeometryConfigurationStatusCode.VALID_CANDIDATE));
+        label(c, "Non-manifold boundary means the proposed surface fails manifold edge-incidence rules.");
+        label(c, "Valid candidate requires all selected realization, boundary, and measurement requirements.");
+    }
+
+    private void phase2ConfigurationSummary(NkContext c, Configuration selected) {
+        heading(c, "Stage 1 - Configuration");
+        TopologyInspection topology = TopologyInspection.from(selected);
+        label(c, "Configuration ID: " + selected.id());
+        label(c, "Status: " + StatusPresentation.configurationSummary(selected.status()));
+        label(c, "Vertices N=" + topology.vertexCount() + "    Regular degree K=" + topology.expectedDegree()
+                + "    Edges E=" + topology.edgeCount() + " (E = N*K/2 = "
+                + (topology.vertexCount() * topology.expectedDegree() / 2) + ")");
+        label(c, "Connected: " + yesNo(selected.connected()) + "    Simple graph: " + yesNo(topology.simpleGraph()) + "    Regular: "
+                + yesNo(topology.degreeMismatches().isEmpty()));
+        label(c, "Canonical encoding: " + selected.canonicalGraphLabel());
+        label(c, "Graph symmetry: " + selected.graphSymmetry()
+                + " (automorphisms=" + selected.automorphismGroupSize() + ")");
+        label(c, "Vertex-transitive: " + yesNo(selected.graphSymmetry() == GraphSymmetryClassification.HIGHLY_SYMMETRIC)
+                + "    Enumeration: " + (selected.enumerationComplete() ? "Complete" : "Incomplete"));
+        label(c, "Graph symmetry describes automorphisms, not geometric symmetry.");
+        label(c, "Vertex-transitive means graph automorphisms can move every vertex to every other vertex.");
+    }
+
+    private void phase2TopologyInspection(NkContext c, Configuration selected) {
+        heading(c, "Topology inspection");
+        TopologyInspection topology = TopologyInspection.from(selected);
+        label(c, "Vertices: " + topology.vertexCount() + "    Connections / edges: " + topology.edgeCount()
+                + "    Expected regular degree: " + topology.expectedDegree());
+        label(c, "Adjacency symmetric: " + yesNo(topology.adjacencySymmetric())
+                + "    Undirected edge list unique: Yes");
+        for (int i = 0; i < topology.adjacencyLines().size(); i++) {
+            String suffix = topology.degreeMismatches().contains(i) ? "  <-- degree mismatch" : "";
+            label(c, topology.adjacencyLines().get(i) + suffix);
+        }
+        label(c, "Edge list:");
+        for (String edge : topology.edgeLines()) label(c, edge);
+    }
+
+    private static String yesNo(boolean value) { return value ? "Yes" : "No"; }
+
+    private String selectedGeometrySummary() {
+        IncrementalSession session = controller.phasedWorkflow().incrementalSession();
+        TestResult result = phase2LatestResult != null ? phase2LatestResult
+                : phase2SelectedConfiguration == null ? null
+                : controller.phasedWorkflow().latestGeometryTest(phase2SelectedConfiguration);
+        return StatusPresentation.equalEdgeConclusion(session, result);
     }
 
     private void visualizationToggles(NkContext c) {
@@ -346,7 +434,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         controller.viewState().setShowAxes(showWorldAxes);
         controller.viewState().setShowBoundingBox(showBoundingBox);
         if (showViewportDiagnostics && controller.renderDiagnostics() != null) {
-            GeometryDiscoveryRenderDiagnostics d = controller.renderDiagnostics();
+            RenderDiagnostics d = controller.renderDiagnostics();
             label(c, "Render model " + d.configurationId() + ": vertices=" + d.renderedVertexCount()
                     + " edges=" + d.renderedEdgeCount() + " scale=" + d.displayScale());
             label(c, "Centroid=" + d.geometryCentroid() + " radius=" + d.geometryBoundingRadius());

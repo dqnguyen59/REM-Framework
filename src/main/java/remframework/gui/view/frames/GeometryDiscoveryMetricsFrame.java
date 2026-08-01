@@ -1,8 +1,17 @@
 package remframework.gui.view.frames;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
-import remframework.geometry.discovery.*;
 import remframework.gui.model.NuklearModel;
 import remframework.helpers.Constants;
 
@@ -13,8 +22,11 @@ import java.util.List;
  * of being presented as one dense paragraph.
  */
 public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
-    private final GeometryDiscoveryWorkspaceController controller =
+    private final WorkspaceController controller =
             GeometryDiscoveryWorkspaceManager.getInstance();
+    private int phase2DetailsTab;
+    private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification",
+            "Realization", "Faces and Boundary", "Measurement", "Diagnostics"};
 
     public GeometryDiscoveryMetricsFrame(NuklearModel model) {
         super(model);
@@ -56,26 +68,101 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
     }
 
     private void phase2Overview(NkContext c) {
-        GeometryConfigurationGenerationResult generation = controller.phasedWorkflow().generation().orElseThrow();
-        heading(c, "Phase 2 Geometry Discovery");
-        label(c, "Stage 1 status: " + generation.status().code() + " - " + generation.status().summary());
-        label(c, "Completion: " + (generation.metrics().enumerationComplete() ? "Complete" : "Incomplete")
-                + "    Examined: " + generation.metrics().configurationsExamined()
-                + "    Retained: " + generation.metrics().uniqueConfigurationsRetained());
-        GeometryConfigurationId selected = controller.phasedWorkflow().selectedConfiguration().orElse(null);
+        GenerationResult generation = controller.phasedWorkflow().generation().orElseThrow();
+        heading(c, "Discovery Details - Geometry Discovery");
+        ConfigurationId selected = controller.phasedWorkflow().selectedConfiguration().orElse(null);
         label(c, "Selected configuration: " + (selected == null ? "None" : selected));
-        if (selected != null) {
-            GeometryTestResult result = controller.phasedWorkflow().latestGeometryTest(selected);
-            if (result == null) label(c, "Stage 2: Geometry Test not started.");
-            else {
-                label(c, "Realization: " + result.realization().status());
-                label(c, "Face derivation: " + (result.faceDerivation() == null ? "not run" : result.faceDerivation().status().code()));
-                label(c, "Boundary validation: " + (result.boundary() == null ? "not run" : result.boundary().status().code()));
-                label(c, "Area: " + (result.area().available() ? "available" : "unavailable")
-                        + "    Volume: " + (result.volume().available() ? "available" : "unavailable"));
-                label(c, "Final status: " + result.status().code() + " - " + result.status().explanation());
+        Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, PHASE2_TABS.length);
+        for (int i = 0; i < PHASE2_TABS.length; i++)
+            if (Nuklear.nk_button_label(c, (phase2DetailsTab == i ? "> " : "") + PHASE2_TABS[i])) phase2DetailsTab = i;
+        Nuklear.nk_layout_row_dynamic(c, 260, 1);
+        if (Nuklear.nk_group_begin(c, "GeometryDiscoveryPhase2Details", 0)) {
+            Configuration configuration = selected == null ? null
+                    : controller.phasedWorkflow().selectedConfigurationRecord().orElse(null);
+            TestResult result = selected == null ? null : controller.phasedWorkflow().latestGeometryTest(selected);
+            switch (phase2DetailsTab) {
+                case 0 -> phase2Summary(c, generation, configuration, result);
+                case 1 -> phase2Topology(c, configuration);
+                case 2 -> phase2Classification(c, generation, configuration);
+                case 3 -> phase2Realization(c, result);
+                case 4 -> phase2FacesBoundary(c, result);
+                case 5 -> phase2Measurement(c, result);
+                case 6 -> phase2Diagnostics(c, generation, configuration, result);
+                default -> { }
             }
+            Nuklear.nk_group_end(c);
         }
+    }
+
+    private void phase2Summary(NkContext c, GenerationResult generation, Configuration configuration, TestResult result) {
+        if (configuration == null) { label(c, "No configuration selected."); return; }
+        label(c, "Configuration ID: " + configuration.id());
+        label(c, "Generation status: " + configuration.status().code() + " - " + configuration.status().summary());
+        label(c, "N=" + configuration.nodeCount() + "    K=" + configuration.exactDegree() + "    Edges=" + configuration.edges().size());
+        label(c, "Realization: " + (result == null ? "Not tested" : result.realization().converged() ? "EQUAL_EDGE_REALIZATION_FOUND" : result.realization().status()));
+        label(c, "Boundary: " + (result == null || result.boundary() == null ? "Undetermined" : result.boundary().status().code()));
+        label(c, "Candidate eligibility: " + (result != null && result.status().code() == GeometryConfigurationStatusCode.VALID_CANDIDATE ? "Yes" : "No"));
+        label(c, "N and K constrain vertex count and degree only. They do not uniquely determine topology or geometry.");
+    }
+
+    private void phase2Topology(NkContext c, Configuration configuration) {
+        if (configuration == null) { label(c, "No configuration selected."); return; }
+        TopologyInspection t = TopologyInspection.from(configuration);
+        label(c, "Canonical encoding: " + configuration.canonicalGraphLabel());
+        label(c, "Connected=" + configuration.connected() + " simple=" + t.simpleGraph() + " regular=" + t.degreeMismatches().isEmpty());
+        for (String line : t.adjacencyLines()) label(c, line);
+        label(c, "Canonical undirected edge list:");
+        for (String line : t.edgeLines()) label(c, line);
+        label(c, "Degrees: " + java.util.stream.IntStream.range(0, t.adjacency().size()).mapToObj(i -> i + "=" + t.adjacency().get(i).size()).collect(java.util.stream.Collectors.joining(", ")));
+    }
+
+    private void phase2Classification(NkContext c, GenerationResult generation, Configuration configuration) {
+        if (configuration == null) { label(c, "No configuration selected."); return; }
+        label(c, "Automorphism-group size: " + configuration.automorphismGroupSize());
+        label(c, "Graph symmetry: " + configuration.graphSymmetry());
+        label(c, "Vertex transitivity: " + (configuration.graphSymmetry() == GraphSymmetryClassification.HIGHLY_SYMMETRIC ? "Yes" : "No / not classified as highly symmetric"));
+        label(c, "Enumeration completeness: " + configuration.enumerationComplete());
+        label(c, "Reference cube topology: Not established");
+        label(c, "N=8, K=3 does not imply a cube; graph identity must be checked independently.");
+    }
+
+    private void phase2Realization(NkContext c, TestResult result) {
+        IncrementalSession session = controller.phasedWorkflow().incrementalSession();
+        if (session == null && result == null) { label(c, "Equal-edge realization: Not tested"); return; }
+        if (session != null) {
+            label(c, "Execution state: " + session.executionState());
+            label(c, "Scientific state: " + session.scientificState());
+            label(c, "Iteration: " + session.iteration() + "    Convergence iteration: " + session.convergenceIteration());
+            label(c, "Edge-length error: " + session.metrics().meanDistanceAccuracy());
+        }
+        label(c, "Target edge length: configured Geometry Test request");
+        label(c, "Equal-edge realization: " + StatusPresentation.equalEdgeConclusion(session, result));
+        label(c, "Target geometry: Not established");
+    }
+
+    private void phase2FacesBoundary(NkContext c, TestResult result) {
+        if (result == null) { label(c, "Faces: Undetermined"); label(c, "Boundary: Undetermined"); return; }
+        label(c, "Derived faces: " + (result.faceDerivation() == null ? "Not run" : result.faceDerivation().faces()));
+        label(c, "Unique face set: " + (result.faceDerivation() == null ? "Undetermined" : result.faceDerivation().unique()));
+        label(c, "Boundary: " + (result.boundary() == null ? "Undetermined" : result.boundary().status().code()));
+        if (result.boundary() != null) label(c, "Closed=" + result.boundary().closed() + " manifold=" + result.boundary().manifold() + " self-intersecting=" + result.boundary().selfIntersecting());
+    }
+
+    private void phase2Measurement(NkContext c, TestResult result) {
+        if (result == null) { label(c, "Area eligibility: Not tested"); label(c, "Volume eligibility: Not tested"); return; }
+        label(c, "Area: " + (result.area().available() ? result.area().absoluteArea() : "unavailable"));
+        label(c, "Volume: " + (result.volume().available() ? result.volume().absoluteVolume() : "unavailable"));
+        label(c, "Optimization: " + (result.optimization().attempted() ? result.optimization().summary() : "not attempted"));
+    }
+
+    private void phase2Diagnostics(NkContext c, GenerationResult generation, Configuration configuration, TestResult result) {
+        if (configuration != null) {
+            label(c, "ConfigurationStatus: " + configuration.status().code());
+            label(c, configuration.status().explanation());
+            for (GeometryConfigurationDiagnostic d : configuration.diagnostics()) label(c, d.stage() + ": " + d.code() + " - " + d.explanation());
+        }
+        if (result != null) { label(c, "Result status: " + result.status().code()); label(c, result.status().explanation()); }
+        else label(c, "Equal-edge realization: Not tested");
     }
 
     private void heading(NkContext c, String text) {

@@ -1,10 +1,19 @@
 package remframework.gui.view.frames;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
-import remframework.geometry.discovery.*;
 import remframework.gui.model.NuklearModel;
 
 import java.nio.file.Path;
@@ -17,7 +26,7 @@ import java.util.Properties;
  * Ordered setup wizard for constructing a fresh discovery experiment.
  */
 public final class GeometryDiscoveryNewFrame extends AbstractFrame {
-    private final GeometryDiscoveryWorkspaceController controller =
+    private final WorkspaceController controller =
             GeometryDiscoveryWorkspaceManager.getInstance();
     private int step = 1;
     private String name = "Wave lattice experiment 001";

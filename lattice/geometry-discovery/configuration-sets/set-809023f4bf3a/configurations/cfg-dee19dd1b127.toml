@@ -1,0 +1,14 @@
+configuration_id = "cfg-dee19dd1b127"
+node_count = 8
+exact_degree = 3
+canonical_graph_label = "8:0000111000111110011010100000"
+isomorphism_class_id = "dee19dd1b127"
+automorphism_group_size = 12
+graph_symmetry = "SYMMETRIC"
+connected = true
+generation_index = 1
+generation_method = "EXHAUSTIVE_BACKTRACKING"
+enumeration_complete = true
+status = "GENERATED"
+created_at = "2026-07-31T21:29:58.610586558Z"
+edges = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 4], [2, 5], [3, 6], [3, 7], [4, 6], [4, 7], [5, 6], [5, 7]]

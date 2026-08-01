@@ -1,0 +1,13 @@
+configuration_id = "cfg-6d9d964b1991"
+status = "FACES_NOT_DERIVABLE"
+explanation = "A unique face set is required before boundary validation."
+realization_found = true
+unique_faces = false
+closed_boundary = false
+area_available = false
+volume_available = false
+saved_at = "2026-07-31T21:07:08.193465898Z"
+coordinate_0 = [0.0, 0.0, 0.0]
+coordinate_1 = [1.0, 0.0, 0.0]
+coordinate_2 = [0.4115735101750272, -0.8157977439637157, -0.40612029984729164]
+coordinate_3 = [0.26542860724037187, -0.44613297123199563, 0.5114572678081284]

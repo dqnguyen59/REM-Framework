@@ -1,4 +1,14 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import java.nio.file.Path;
 
@@ -43,21 +53,21 @@ public final class GeometryDiscoveryWorkspaceState {
     private volatile int dynamicElasticMaximumIterations = 100_000;
 
     public boolean open() { return open; }
-    void setOpen(boolean value) { open = value; }
+    public void setOpen(boolean value) { open = value; }
     public boolean active() { return active; }
-    void setActive(boolean value) { active = value; }
+    public void setActive(boolean value) { active = value; }
     public boolean remWasRunning() { return remWasRunning; }
-    void setRemWasRunning(boolean value) { remWasRunning = value; }
+    public void setRemWasRunning(boolean value) { remWasRunning = value; }
     public Path currentSource() { return currentSource; }
     void setCurrentSource(Path value) { currentSource = value; }
     public Path outputDirectory() { return outputDirectory; }
     public void setOutputDirectory(Path value) { outputDirectory = value; }
     public TopologyScoringProfile scoringProfile() { return scoringProfile; }
-    void setScoringProfile(TopologyScoringProfile value) { scoringProfile = value; }
+    public void setScoringProfile(TopologyScoringProfile value) { scoringProfile = value; }
     public TopologyScoreWeights scoreWeights() { return scoreWeights; }
-    void setScoreWeights(TopologyScoreWeights value) { scoreWeights = value; }
+    public void setScoreWeights(TopologyScoreWeights value) { scoreWeights = value; }
     public boolean weightsOverridden() { return weightsOverridden; }
-    void setWeightsOverridden(boolean value) { weightsOverridden = value; }
+    public void setWeightsOverridden(boolean value) { weightsOverridden = value; }
     public boolean showOnlyNonZeroScoreComponents() { return showOnlyNonZeroScoreComponents; }
     public void setShowOnlyNonZeroScoreComponents(boolean value) {
         showOnlyNonZeroScoreComponents = value;

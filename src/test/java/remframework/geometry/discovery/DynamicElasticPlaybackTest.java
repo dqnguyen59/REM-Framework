@@ -1,4 +1,14 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -139,10 +149,10 @@ class DynamicElasticPlaybackTest {
         saved.setDynamicElasticMaximumSpeed(true);
         saved.setDynamicElasticPublicationInterval(25);
         saved.setDynamicElasticMaximumIterations(12345);
-        preferences.save(saved, new GeometryDiscoveryViewState());
+        preferences.save(saved, new ViewState());
 
         GeometryDiscoveryWorkspaceState loaded = new GeometryDiscoveryWorkspaceState();
-        preferences.load(loaded, new GeometryDiscoveryViewState());
+        preferences.load(loaded, new ViewState());
         assertEquals(100, loaded.dynamicElasticUpdatesPerSecond());
         assertTrue(loaded.dynamicElasticMaximumSpeed());
         assertEquals(25, loaded.dynamicElasticPublicationInterval());

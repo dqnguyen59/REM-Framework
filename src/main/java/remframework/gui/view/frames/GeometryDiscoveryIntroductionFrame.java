@@ -1,13 +1,23 @@
 package remframework.gui.view.frames;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
-import remframework.geometry.discovery.GeometryDiscoveryWorkspaceController;
+import remframework.geometry.discovery.workflow.WorkspaceController;
 import remframework.geometry.discovery.GeometryDiscoveryWorkspaceManager;
 import remframework.gui.model.NuklearModel;
 
 public final class GeometryDiscoveryIntroductionFrame extends AbstractFrame {
-    private final GeometryDiscoveryWorkspaceController controller =
+    private final WorkspaceController controller =
             GeometryDiscoveryWorkspaceManager.getInstance();
     public GeometryDiscoveryIntroductionFrame(NuklearModel model) {
         super(model);

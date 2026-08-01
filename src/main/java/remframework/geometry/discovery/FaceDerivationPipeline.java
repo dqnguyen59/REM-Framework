@@ -1,11 +1,21 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.joml.Vector3d;
 import java.util.*;
 
 public final class FaceDerivationPipeline {
     private static final double TOLERANCE=1e-7;
-    public FaceDerivationResult derive(GeometryConfiguration graph,GeometryRealization realization){
+    public FaceDerivationResult derive(Configuration graph,Realization realization){
         List<DerivedFace> candidates=new ArrayList<>(); Set<String> seen=new TreeSet<>();
         if(realization.dimension()==GeometryEmbeddingDimension.TWO_D){
             List<Integer> boundary=cycleBoundary(graph);
@@ -30,7 +40,7 @@ public final class FaceDerivationPipeline {
     }
     private boolean chordless(List<Integer> c,boolean[][] a){int n=c.size();for(int i=0;i<n;i++)for(int j=i+1;j<n;j++)if(a[c.get(i)][c.get(j)]&&j!=i+1&&!(i==0&&j==n-1))return false;return true;}
     private double planarity(List<Integer> c,List<Vector3d> p){if(c.size()<=3)return 0;Vector3d o=p.get(c.get(0));Vector3d normal=new Vector3d(p.get(c.get(1))).sub(o).cross(new Vector3d(p.get(c.get(2))).sub(o));if(normal.lengthSquared()<1e-20)return Double.POSITIVE_INFINITY;normal.normalize();double max=0;for(int id:c)max=Math.max(max,Math.abs(new Vector3d(p.get(id)).sub(o).dot(normal)));return max;}
-    private List<Integer> cycleBoundary(GeometryConfiguration g){if(g.nodeCount()<3||g.adjacency().stream().anyMatch(v->v.size()!=2))return null;List<Integer> r=new ArrayList<>();int prev=-1,current=0;do{r.add(current);List<Integer> n=g.adjacency().get(current);int next=n.get(0)==prev?n.get(1):n.get(0);prev=current;current=next;}while(current!=0&&r.size()<=g.nodeCount());return current==0&&r.size()==g.nodeCount()?r:null;}
+    private List<Integer> cycleBoundary(Configuration g){if(g.nodeCount()<3||g.adjacency().stream().anyMatch(v->v.size()!=2))return null;List<Integer> r=new ArrayList<>();int prev=-1,current=0;do{r.add(current);List<Integer> n=g.adjacency().get(current);int next=n.get(0)==prev?n.get(1):n.get(0);prev=current;current=next;}while(current!=0&&r.size()<=g.nodeCount());return current==0&&r.size()==g.nodeCount()?r:null;}
     static String key(List<Integer> c){List<Integer> x=canonicalCycle(c);return x.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining("-"));}
     static List<Integer> canonicalCycle(List<Integer> c){int n=c.size(),min=Collections.min(c),at=c.indexOf(min);List<Integer>a=new ArrayList<>(),b=new ArrayList<>();for(int i=0;i<n;i++){a.add(c.get((at+i)%n));b.add(c.get((at-i+n)%n));}for(int i=0;i<n;i++){int cmp=Integer.compare(a.get(i),b.get(i));if(cmp<0)return a;if(cmp>0)return b;}return a;}
 }

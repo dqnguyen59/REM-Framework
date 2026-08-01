@@ -1,4 +1,14 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -7,7 +17,7 @@ import java.util.List;
 public final class GeometryDiscoveryVisualizer {
     private final GeometryDiscoveryModel sourceModel;
     private final String sourceDescription;
-    private final GeometryDiscoveryViewState viewState = new GeometryDiscoveryViewState();
+    private final ViewState viewState = new ViewState();
     private TopologySearchMetadata topologySearchMetadata;
     private GeometryDiscoverySession session;
     private int iterationsPerFrame = 1;
@@ -75,7 +85,7 @@ public final class GeometryDiscoveryVisualizer {
     }
 
     public GeometryDiscoverySession session() { return session; }
-    public GeometryDiscoveryViewState viewState() { return viewState; }
+    public ViewState viewState() { return viewState; }
     public GeometryDiscoveryResult result() { return session.result(); }
     public String sourceDescription() { return sourceDescription; }
     public TopologySearchMetadata topologySearchMetadata() { return topologySearchMetadata; }

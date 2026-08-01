@@ -1,4 +1,14 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -80,8 +90,8 @@ class GeometryDiscoveryWorkflowTest {
     }
 
     @Test void profileSelectionUpdatesEvaluationWeights() {
-        GeometryDiscoveryWorkspaceController controller =
-                new GeometryDiscoveryWorkspaceController();
+        WorkspaceController controller =
+                new WorkspaceController();
         try {
             controller.selectProfile(TopologyScoringProfile.WAVE_PROPAGATION);
             assertEquals(TopologyScoringProfile.WAVE_PROPAGATION,

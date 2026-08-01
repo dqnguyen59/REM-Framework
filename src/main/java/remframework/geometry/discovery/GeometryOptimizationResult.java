@@ -1,6 +1,16 @@
 package remframework.geometry.discovery;
-public record GeometryOptimizationResult(boolean attempted, GeometryRealization baseline,
-        GeometryRealization optimized, double baselineMeasure,double optimizedMeasure,
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
+public record GeometryOptimizationResult(boolean attempted, Realization baseline,
+        Realization optimized, double baselineMeasure,double optimizedMeasure,
         double relativeImprovement,boolean constraintsPreserved,
         GeometrySymmetryPolicy symmetryPolicy, Boolean symmetricAfterOptimization,
         int iterationCount, String summary) {

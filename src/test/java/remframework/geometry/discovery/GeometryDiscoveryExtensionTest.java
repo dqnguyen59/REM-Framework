@@ -1,4 +1,14 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
@@ -68,11 +78,11 @@ class GeometryDiscoveryExtensionTest {
 
     @Test
     void fitToViewHandlesOneTwoAndThreeDimensionalCandidates() {
-        GeometryDiscoveryViewState view = new GeometryDiscoveryViewState();
+        ViewState view = new ViewState();
         for (GeometryDiscoveryModel model : List.of(GeometryDiscoveryExamples.line(10),
                 GeometryDiscoveryExamples.squareCycle(10),
                 GeometryDiscoveryExamples.smallCubic(10))) {
-            GeometryViewFit fit = view.fitToView(model);
+            ViewFit fit = view.fitToView(model);
             assertTrue(fit.center().isFinite());
             assertTrue(fit.radius() > 0);
             assertTrue(fit.cameraDistance() > fit.radius());
@@ -82,7 +92,7 @@ class GeometryDiscoveryExtensionTest {
 
     @Test
     void emptyAndSingleNodeViewModelsAreSafe() {
-        GeometryDiscoveryViewState view = new GeometryDiscoveryViewState();
+        ViewState view = new ViewState();
         GeometryDiscoveryModel empty = new GeometryDiscoveryModel("empty", "empty",
                 List.of(), List.of());
         GeometryDiscoveryModel single = new GeometryDiscoveryModel("single", "single",

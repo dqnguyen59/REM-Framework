@@ -1,0 +1,9 @@
+set_id = "set-809023f4bf3a"
+configurations_examined = 19355
+unique_retained = 5
+isomorphic_duplicates_removed = 19315
+symmetric_count = 5
+asymmetric_count = 0
+elapsed_milliseconds = 441
+enumeration_complete = true
+status = "ENUMERATION_COMPLETE"

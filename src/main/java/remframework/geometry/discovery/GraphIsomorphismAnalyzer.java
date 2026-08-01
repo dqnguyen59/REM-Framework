@@ -1,4 +1,14 @@
 package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
 
 import java.util.List;
 
@@ -27,7 +37,7 @@ public final class GraphIsomorphismAnalyzer {
         }
         return false;
     }
-    static boolean[][] matrix(int n, List<DiscoveryConnection> edges) {
+    public static boolean[][] matrix(int n, List<DiscoveryConnection> edges) {
         boolean[][] result=new boolean[n][n];
         for (DiscoveryConnection e:edges) result[e.firstNodeId()][e.secondNodeId()]
                 = result[e.secondNodeId()][e.firstNodeId()]=true;
