@@ -12,6 +12,8 @@ import remframework.geometry.discovery.optimization.*;
 import remframework.geometry.discovery.eligibility.*;
 import remframework.geometry.discovery.experiment.*;
 import remframework.geometry.discovery.measurement.regularity.*;
+import remframework.geometry.discovery.reference.ReferenceTopologyMatch;
+import remframework.geometry.discovery.reference.ReferenceTopology;
 import remframework.geometry.discovery.*;
 import remframework.geometry.discovery.configuration.*;
 import remframework.geometry.discovery.realization.session.*;
@@ -31,12 +33,27 @@ public record TestResult(ConfigurationId configurationId,
         TwoDRegularityMetrics twoDRegularity, ThreeDRegularityMetrics threeDRegularity,
         ThreeDConditionReport threeDConditionReport,
         GeometryOptimizationResult optimization, OptimizationComparison optimizationComparison,
-        GeometryConfigurationStatus status) {
+        GeometryConfigurationStatus status, BenchmarkPreset benchmarkPreset,
+        ReferenceTopologyMatch referenceTopologyMatch) {
     public TestResult(ConfigurationId configurationId, GraphSymmetryClassification graphSymmetry,
             Realization realization, FaceDerivationResult faceDerivation, ClosedBoundaryResult boundary,
             GeometricSymmetryResult geometricSymmetry, AreaResult area, VolumeResult volume,
             GeometryOptimizationResult optimization, GeometryConfigurationStatus status) {
         this(configurationId, null, null, null, null, graphSymmetry, realization, faceDerivation, boundary,
-                geometricSymmetry, area, volume, null, null, null, optimization, null, status);
+                geometricSymmetry, area, volume, null, null, null, optimization, null, status,
+                BenchmarkPreset.NONE, null);
+    }
+
+    public boolean benchmarkTopologyRequirementPassed() {
+        return benchmarkPreset == null || benchmarkPreset == BenchmarkPreset.NONE
+                || referenceTopologyMatch != null
+                && referenceTopologyMatch.topology() == ReferenceTopology.CUBE_GRAPH;
+    }
+
+    public boolean selectedBenchmarkPassed() {
+        if (!benchmarkTopologyRequirementPassed()) return false;
+        if (benchmarkPreset == null || benchmarkPreset == BenchmarkPreset.NONE) return true;
+        return status.code() == GeometryConfigurationStatusCode.VALID_CANDIDATE
+                && threeDConditionReport != null && threeDConditionReport.constrainedExperimentPassed();
     }
 }

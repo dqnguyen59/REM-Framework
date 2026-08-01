@@ -23,6 +23,7 @@ import remframework.geometry.discovery.optimization.*;
 import org.joml.Matrix4f;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
@@ -94,6 +95,7 @@ public final class OpenGlRenderer implements AutoCloseable {
         }
         GL11.glPointSize(11f);
         draw(points, GL11.GL_POINTS, 1f);
+        if (view.showNodeLabels()) drawCanonicalLabels(model, matrix, width, height);
         GL30.glBindVertexArray(0);
         GL20.glUseProgram(0);
     }
@@ -204,6 +206,36 @@ public final class OpenGlRenderer implements AutoCloseable {
         GL11.glLineWidth(lineWidth);
         GL11.glDrawArrays(mode, 0, data.length / 6);
     }
+
+    /** Screen-space line glyphs are camera-facing and retain a constant pixel size while zooming. */
+    private void drawCanonicalLabels(GeometryDiscoveryModel model, Matrix4f viewProjection,
+                                     int width, int height) {
+        List<Float> glyphs = new ArrayList<>();
+        float pixelX = 2f / Math.max(1, width), pixelY = 2f / Math.max(1, height);
+        for (DiscoveryNode node : model.nodes()) {
+            Vector4f projected = new Vector4f((float)node.position().x, (float)node.position().y,
+                    (float)node.position().z, 1).mul(viewProjection);
+            if (projected.w <= 0) continue;
+            float x = projected.x / projected.w + 8 * pixelX;
+            float y = projected.y / projected.w + 6 * pixelY;
+            String text = Integer.toString(node.id());
+            for (int i=0;i<text.length();i++) addDigit(glyphs, text.charAt(i)-'0',
+                    x+i*7*pixelX, y, pixelX, pixelY);
+        }
+        GL20.glUniformMatrix4fv(matrixLocation, false, new Matrix4f().get(new float[16]));
+        draw(glyphs, GL11.GL_LINES, 2f);
+        GL20.glUniformMatrix4fv(matrixLocation, false, viewProjection.get(new float[16]));
+    }
+
+    private void addDigit(List<Float> values, int digit, float x, float y, float px, float py) {
+        int mask = new int[]{0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f}[digit];
+        float[][] segments={{0,10,5,10},{5,10,5,5},{5,5,5,0},{0,0,5,0},
+                {0,5,0,0},{0,10,0,5},{0,5,5,5}};
+        for(int s=0;s<7;s++)if((mask&(1<<s))!=0){float[] q=segments[s];
+            screenVertex(values,x+q[0]*px,y+q[1]*py);screenVertex(values,x+q[2]*px,y+q[3]*py);}
+    }
+
+    private void screenVertex(List<Float> values,float x,float y){values.add(x);values.add(y);values.add(0f);values.add(.95f);values.add(.95f);values.add(.8f);}
 
     private int createProgram() {
         String vertex = """

@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.SplittableRandom;
 import remframework.geometry.discovery.eligibility.*;
 import remframework.geometry.discovery.measurement.regularity.*;
+import remframework.geometry.discovery.reference.ReferenceTopologyRecognizer;
 import remframework.geometry.discovery.experiment.*;
 
 /**
@@ -256,7 +257,8 @@ public final class IncrementalSession {
             return new TestResult(configuration.id(), request.experimentProfile(),request.planarityMode(),request.angleConditionMode(), eligibility,
                     configuration.graphSymmetry(), realization, null, null, null,
                     AreaResult.unavailable(status), VolumeResult.unavailable(status), null, null, null,
-                    GeometryOptimizationResult.notAttempted(), null, status);
+                    GeometryOptimizationResult.notAttempted(), null, status,
+                    request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration));
         }
         FaceDerivationResult faces = new FaceDerivationPipeline().derive(configuration, realization);
         ClosedBoundaryResult boundary = new ClosedBoundaryValidator().validate(configuration,
@@ -292,7 +294,8 @@ public final class IncrementalSession {
                 : boundary.status();
         return new TestResult(configuration.id(), request.experimentProfile(),request.planarityMode(),request.angleConditionMode(), eligibility,
                 configuration.graphSymmetry(), realization, faces, boundary, symmetry, area, volume,
-                twoD, threeD,threeDConditions, GeometryOptimizationResult.notAttempted(), null, status);
+                twoD, threeD,threeDConditions, GeometryOptimizationResult.notAttempted(), null, status,
+                request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration));
     }
 
     static List<Vector3d> initializeCoordinates(int count, GeometryEmbeddingDimension dimension,

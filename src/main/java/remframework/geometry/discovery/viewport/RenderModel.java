@@ -28,7 +28,10 @@ import java.util.List;
 /** Immutable render adapter for topology previews and incremental realizations. */
 public record RenderModel(String configurationId,
         GeometryDiscoveryModel model, DisplayTransform transform,
-        boolean topologyPreview, long revision) {
+        boolean topologyPreview, long revision, List<CanonicalNodeLabel> nodeLabels) {
+    public RenderModel {
+        nodeLabels = List.copyOf(nodeLabels);
+    }
     public static RenderModel topologyPreview(Configuration configuration,
             long revision) {
         List<Vector3d> coordinates = new ArrayList<>();
@@ -58,7 +61,9 @@ public record RenderModel(String configurationId,
                 preview ? "Graph visualization only - not a geometric realization."
                         : "Display-only transform of an emergent geometry realization.",
                 nodes, configuration.edges());
+        List<CanonicalNodeLabel> labels = nodes.stream().map(node ->
+                new CanonicalNodeLabel(node.id(), Integer.toString(node.id()), node.position())).toList();
         return new RenderModel(configuration.id().toString(), model,
-                transform, preview, revision);
+                transform, preview, revision, labels);
     }
 }

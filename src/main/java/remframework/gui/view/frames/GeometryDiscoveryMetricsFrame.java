@@ -10,6 +10,8 @@ import remframework.geometry.discovery.graph.canonical.*;
 import remframework.geometry.discovery.graph.symmetry.*;
 import remframework.geometry.discovery.optimization.*;
 import remframework.geometry.discovery.measurement.regularity.*;
+import remframework.geometry.discovery.reference.*;
+import remframework.geometry.discovery.experiment.BenchmarkPreset;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
@@ -106,6 +108,7 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
         label(c, "Realization: " + (result == null ? "Not tested" : result.realization().converged() ? "EQUAL_EDGE_REALIZATION_FOUND" : result.realization().status()));
         label(c, "Boundary: " + (result == null || result.boundary() == null ? "Undetermined" : result.boundary().status().code()));
         label(c, "Candidate eligibility: " + (result != null && result.status().code() == GeometryConfigurationStatusCode.VALID_CANDIDATE ? "Yes" : "No"));
+        if(result!=null&&result.benchmarkPreset()!=BenchmarkPreset.NONE){label(c,"Benchmark preset: "+result.benchmarkPreset());label(c,"Required cube topology match: "+(result.benchmarkTopologyRequirementPassed()?"PASS":"FAIL"));label(c,"Selected benchmark: "+(result.selectedBenchmarkPassed()?"PASSED":"FAILED"));}
         label(c, "N and K constrain vertex count and degree only. They do not uniquely determine topology or geometry.");
     }
 
@@ -126,8 +129,12 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
         label(c, "Graph symmetry: " + configuration.graphSymmetry());
         label(c, "Vertex transitivity: " + (configuration.graphSymmetry() == GraphSymmetryClassification.HIGHLY_SYMMETRIC ? "Yes" : "No / not classified as highly symmetric"));
         label(c, "Enumeration completeness: " + configuration.enumerationComplete());
-        label(c, "Reference cube topology: Not established");
-        label(c, "N=8, K=3 does not imply a cube; graph identity must be checked independently.");
+        ReferenceTopologyMatch match = new ReferenceTopologyRecognizer().recognize(configuration);
+        label(c, "Reference topology: " + match.topology());
+        label(c, "Exact reference match: " + (match.exactMatch() ? "Yes" : "No"));
+        label(c, "Matching method: " + match.matchingMethod());
+        label(c, "Reference version: " + match.referenceVersion());
+        label(c, match.explanation());
     }
 
     private void phase2Realization(NkContext c, TestResult result) {

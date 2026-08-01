@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * reported incomplete instead of being sampled.
  */
 public final class ConfigurationGenerator {
-    public static final int MAX_EXHAUSTIVE_N = 20;
+    public static final int MAX_EXHAUSTIVE_N = 8;
     private final GraphIsomorphismAnalyzer isomorphism = new GraphIsomorphismAnalyzer();
     private final Canonicalizer canonicalizer = new Canonicalizer();
     private final AutomorphismAnalyzer automorphisms = new AutomorphismAnalyzer();

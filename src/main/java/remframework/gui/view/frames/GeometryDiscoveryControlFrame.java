@@ -86,6 +86,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             phase2EdgeMidpointRadii=RegularityMode.MEASURE_ONLY,phase2NormalAlignment=RegularityMode.MEASURE_ONLY;
     private FacePlaneRadiusMode phase2FacePlaneRadii=FacePlaneRadiusMode.MEASURE_ONLY;
     private GeometryCenterDefinition phase2CenterDefinition=GeometryCenterDefinition.VERTEX_CENTROID;
+    private BenchmarkPreset phase2BenchmarkPreset=BenchmarkPreset.NONE;
     private double phase2FacePlanarityTolerance=1e-7,phase2RegularityTolerance=1e-6,phase2RelativeRegularityTolerance=1e-6;
     private boolean showVertices = true, showEdges = true, showLabels = true,
             showCandidateFaces = true, showBoundaryFaces = true, showRejectedFaces = false,
@@ -228,6 +229,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 4, 1);
             String text = (selected ? "> " : "") + row.configurationId() + "  N=" + row.nodeCount() + " K=" + row.exactDegree()
                     + " edges=" + row.edgeCount() + " aut=" + row.automorphismCount() + " " + row.symmetry()
+                    + " reference=" + row.referenceTopology()
                     + " profile=" + row.experimentProfile() + " topology=" + row.topologyStatus()
                     + " eligibility=" + row.eligibilityStatus() + " geometry=" + row.geometryTestStatus();
             if (Nuklear.nk_button_label(c, text)) {
@@ -285,6 +287,11 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             phase2AngleMode=switch(angle){case "None"->AngleConditionMode.NONE;case "Require equal angles"->AngleConditionMode.REQUIRE_EQUAL_ANGLES;default->AngleConditionMode.MEASURE_ONLY;};
         }
         if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA)try(MemoryStack stack=MemoryStack.stackPush()){
+            String benchmark=nk_label_combo_options(c,stack,"Benchmark preset",
+                    new String[]{"None","Cube emergent benchmark","Cube constrained benchmark"},
+                    switch(phase2BenchmarkPreset){case NONE->"None";case CUBE_EMERGENT_BENCHMARK->"Cube emergent benchmark";case CUBE_CONSTRAINED_BENCHMARK->"Cube constrained benchmark";},.45,.55);
+            BenchmarkPreset selectedPreset=switch(benchmark){case "Cube emergent benchmark"->BenchmarkPreset.CUBE_EMERGENT_BENCHMARK;case "Cube constrained benchmark"->BenchmarkPreset.CUBE_CONSTRAINED_BENCHMARK;default->BenchmarkPreset.NONE;};
+            if(selectedPreset!=phase2BenchmarkPreset){phase2BenchmarkPreset=selectedPreset;ThreeDExperimentConditions preset=BenchmarkPresets.conditions(selectedPreset);phase2FacePlanarity=preset.facePlanarity();phase2FaceAngles=preset.faceAngles();phase2Dihedrals=preset.dihedrals();phase2VertexRadii=preset.vertexRadii();phase2FaceCentroidRadii=preset.faceCentroidRadii();phase2EdgeMidpointRadii=preset.edgeMidpointRadii();phase2FacePlaneRadii=preset.facePlaneRadii();phase2NormalAlignment=preset.normalCenterAlignment();}
             phase2FacePlanarity="Measure only".equals(nk_label_combo_options(c,stack,"Face planarity condition",new String[]{"Require planar faces","Measure only"},phase2FacePlanarity==FacePlanarityMode.REQUIRE_PLANAR_FACES?"Require planar faces":"Measure only",.45,.55))?FacePlanarityMode.MEASURE_ONLY:FacePlanarityMode.REQUIRE_PLANAR_FACES;
             phase2FaceAngles=switch(nk_label_combo_options(c,stack,"Face-angle condition",new String[]{"None","Measure only","Require equal within each face"},modeLabel(phase2FaceAngles),.45,.55)){case "None"->FaceAngleConditionMode.NONE;case "Require equal within each face"->FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE;default->FaceAngleConditionMode.MEASURE_ONLY;};
             phase2Dihedrals=switch(nk_label_combo_options(c,stack,"Dihedral-angle condition",new String[]{"None","Measure only","Require equal dihedrals"},modeLabel(phase2Dihedrals),.45,.55)){case "None"->DihedralConditionMode.NONE;case "Require equal dihedrals"->DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES;default->DihedralConditionMode.MEASURE_ONLY;};
@@ -325,7 +332,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                                     new ThreeDExperimentConditions(phase2FacePlanarity,phase2FaceAngles,phase2Dihedrals,
                                             phase2VertexRadii,phase2FaceCentroidRadii,phase2EdgeMidpointRadii,
                                             phase2FacePlaneRadii,phase2NormalAlignment,phase2CenterDefinition,
-                                            phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance)));
+                                            phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance),
+                                    phase2BenchmarkPreset));
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry Test", exception.getMessage()); }
         });
@@ -392,6 +400,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
 
     private void phase2ResultSections(NkContext c, TestResult result) {
         heading(c, "Eligibility");
+        label(c, "Benchmark preset: " + result.benchmarkPreset());
+        if(result.benchmarkPreset()!=BenchmarkPreset.NONE)label(c,"Required exact CUBE_GRAPH topology: "+(result.benchmarkTopologyRequirementPassed()?"PASS":"FAIL"));
         label(c, "Profile: " + result.experimentProfile() + "    Stage 2 eligibility: " + result.eligibility().status());
         label(c, "Reason: " + result.eligibility().conclusion());
         result.eligibility().conditions().forEach(condition -> label(c, condition.condition() + ": " + condition.outcome() + " - " + condition.explanation()));
