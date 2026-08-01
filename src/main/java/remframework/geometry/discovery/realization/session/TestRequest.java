@@ -28,7 +28,7 @@ public record TestRequest(ConfigurationId configurationId,
         OptimizationObjective optimizationObjective, double edgeTolerance,
         double planarityTolerance, double degeneracyTolerance, double angleTolerance,
         PlanarityRealizationMode planarityMode, double planeRestoringStrength,
-        double angleRestoringStrength) {
+        double angleRestoringStrength, ThreeDExperimentConditions threeDConditions) {
     public TestRequest {
         if(configurationId==null||dimension==null)throw new IllegalArgumentException("A selected configuration and dimension are required.");
         if(!Double.isFinite(targetEdgeLength)||targetEdgeLength<=0||initialRealizations<1||searchLimit<1)throw new IllegalArgumentException("Geometry-test limits must be positive and finite.");
@@ -47,6 +47,7 @@ public record TestRequest(ConfigurationId configurationId,
         planarityMode=planarityMode==null?PlanarityRealizationMode.STRICT_2D_COORDINATES:planarityMode;
         planeRestoringStrength=planeRestoringStrength>=0&&Double.isFinite(planeRestoringStrength)?planeRestoringStrength:.08;
         angleRestoringStrength=angleRestoringStrength>=0&&Double.isFinite(angleRestoringStrength)?angleRestoringStrength:.01;
+        threeDConditions=threeDConditions==null?ThreeDExperimentConditions.defaults():threeDConditions;
     }
     public TestRequest(ConfigurationId configurationId, GeometryEmbeddingDimension dimension,
             double targetEdgeLength,long randomSeed,int initialRealizations,
@@ -63,6 +64,18 @@ public record TestRequest(ConfigurationId configurationId,
         this(configurationId,dimension,targetEdgeLength,randomSeed,initialRealizations,relaxationSettings,
                 symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,
                 optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,
-                angleTolerance,null,.08,.01);
+                angleTolerance,null,.08,.01,null);
+    }
+    public TestRequest(ConfigurationId configurationId, GeometryEmbeddingDimension dimension,
+            double targetEdgeLength,long randomSeed,int initialRealizations,
+            DynamicElasticSettings relaxationSettings,GeometrySymmetryPolicy symmetryPolicy,int searchLimit,
+            ExperimentProfile experimentProfile,AngleConditionMode angleConditionMode,
+            RegularityMode regularityMode,OptimizationObjective optimizationObjective,double edgeTolerance,
+            double planarityTolerance,double degeneracyTolerance,double angleTolerance,
+            PlanarityRealizationMode planarityMode,double planeRestoringStrength,double angleRestoringStrength){
+        this(configurationId,dimension,targetEdgeLength,randomSeed,initialRealizations,relaxationSettings,
+                symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,
+                optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,angleTolerance,
+                planarityMode,planeRestoringStrength,angleRestoringStrength,null);
     }
 }

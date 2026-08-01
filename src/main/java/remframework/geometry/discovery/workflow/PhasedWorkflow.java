@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import remframework.geometry.discovery.eligibility.*;
 import remframework.geometry.discovery.experiment.ExperimentProfile;
+import remframework.geometry.discovery.measurement.regularity.*;
 /** UI-facing model for the two explicit research stages. Selection never starts geometry. */
 public final class PhasedWorkflow {
     public static final String TOPOLOGY_PREVIEW_LABEL="Graph visualization only - not a geometric realization.";
@@ -136,9 +137,15 @@ public final class PhasedWorkflow {
                 : current.experimentProfile() == ExperimentProfile.CLOSED_2D_AREA
                     ? new AreaOptimizer().maximize2d(registry.find(selected).orElseThrow(),current.realization(),current.boundary(),targetEdgeLength,iterations)
                     : new VolumeOptimizer().maximize3d(registry.find(selected).orElseThrow(),current.realization(),current.boundary(),targetEdgeLength,iterations);
+        OptimizationComparison comparison=current.optimizationComparison();
+        if(current.experimentProfile()!=ExperimentProfile.CLOSED_2D_AREA&&optimization.attempted()&&optimization.optimized()!=null&&current.threeDRegularity()!=null){
+            Configuration graph=registry.find(selected).orElseThrow();FaceDerivationResult faces=new FaceDerivationPipeline().derive(graph,optimization.optimized());ClosedBoundaryResult boundary=new ClosedBoundaryValidator().validate(graph,optimization.optimized(),faces);
+            ThreeDRegularityMetrics optimizedMetrics=new ThreeDRegularityCalculator().calculate(graph,optimization.optimized().finalCoordinates(),boundary,targetEdgeLength,current.threeDRegularity().centerDefinition(),current.threeDConditionReport()==null?1e-7:current.threeDConditionReport().conditions().facePlanarityTolerance());
+            if(optimizedMetrics.applicable()){Map<String,MetricChange> changes=new LinkedHashMap<>();changes.put("volume",MetricChange.of(current.volume().absoluteVolume(),optimization.optimizedMeasure()));changes.put("facePlaneRadiusVariance",MetricChange.of(current.threeDRegularity().facePlaneRadii().variance(),optimizedMetrics.facePlaneRadii().variance()));changes.put("normalCenterAlignmentVariance",MetricChange.of(current.threeDRegularity().normalCenterAlignments().variance(),optimizedMetrics.normalCenterAlignments().variance()));changes.put("vertexRadiusVariance",MetricChange.of(current.threeDRegularity().vertexRadii().variance(),optimizedMetrics.vertexRadii().variance()));changes.put("faceCentroidRadiusVariance",MetricChange.of(current.threeDRegularity().faceCenterRadii().variance(),optimizedMetrics.faceCenterRadii().variance()));changes.put("edgeMidpointRadiusVariance",MetricChange.of(current.threeDRegularity().edgeMidpointRadii().variance(),optimizedMetrics.edgeMidpointRadii().variance()));changes.put("dihedralAngleVariance",MetricChange.of(current.threeDRegularity().interiorDihedralAngles().variance(),optimizedMetrics.interiorDihedralAngles().variance()));current.threeDRegularity().faceAreaByEdgeCount().forEach((edgeCount,statistics)->{Statistics after=optimizedMetrics.faceAreaByEdgeCount().get(edgeCount);if(after!=null)changes.put("faceAreaVariance.edgeCount."+edgeCount,MetricChange.of(statistics.variance(),after.variance()));});comparison=new OptimizationComparison(changes,"Measured comparison only; no regularity condition was added to the volume objective.");}
+        }
         TestResult optimized = new TestResult(current.configurationId(),current.experimentProfile(),current.planarityMode(),current.angleConditionMode(),current.eligibility(),current.graphSymmetry(),
                 current.realization(),current.faceDerivation(),current.boundary(),current.geometricSymmetry(),current.area(),current.volume(),
-                current.twoDRegularity(),current.threeDRegularity(),optimization,current.optimizationComparison(),current.status());
+                current.twoDRegularity(),current.threeDRegularity(),current.threeDConditionReport(),optimization,comparison,current.status());
         registry.attach(optimized);
         return optimized;
     }

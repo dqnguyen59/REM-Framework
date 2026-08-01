@@ -79,11 +79,18 @@ public final class TestResultStore {
         }
         if (result.threeDRegularity() != null) {
             var metrics = result.threeDRegularity();
-            text += "regularity_3d_edge_variance = " + metrics.edgeLengths().variance() + "\n"
+            text += "geometry_center_definition = \""+metrics.centerDefinition()+"\"\n"
+                    + "geometry_center = ["+metrics.geometryCenter().x+", "+metrics.geometryCenter().y+", "+metrics.geometryCenter().z+"]\n"
+                    + "regularity_3d_applicable = "+metrics.applicable()+"\n"
+                    + "regularity_3d_edge_variance = " + metrics.edgeLengths().variance() + "\n"
                     + "regularity_3d_dihedral_variance = " + metrics.interiorDihedralAngles().variance() + "\n"
                     + "regularity_3d_vertex_radius_variance = " + metrics.vertexRadii().variance() + "\n"
                     + "regularity_3d_face_center_radius_variance = " + metrics.faceCenterRadii().variance() + "\n"
-                    + "regularity_3d_edge_midpoint_radius_variance = " + metrics.edgeMidpointRadii().variance() + "\n";
+                    + "regularity_3d_edge_midpoint_radius_variance = " + metrics.edgeMidpointRadii().variance() + "\n"
+                    + "regularity_3d_face_plane_radius_variance = "+metrics.facePlaneRadii().variance()+"\n"
+                    + "regularity_3d_normal_alignment_variance = "+metrics.normalCenterAlignments().variance()+"\n";
+            for(int i=0;i<metrics.facePlanes().size();i++){var face=metrics.facePlanes().get(i);text+="face_plane_"+i+" = \""+escape(face.faceId()+"|"+face.planar()+"|"+face.maximumDeviation()+"|"+face.meanDeviation()+"|"+face.rmsDeviation()+"|"+face.facePlaneRadius()+"|"+face.normalCenterAlignment()+"|"+face.orientation())+"\"\n";}
+            if(result.threeDConditionReport()!=null)text+="three_d_conditions = \""+escape(result.threeDConditionReport().conditions().toString())+"\"\nthree_d_condition_conclusions = \""+escape(result.threeDConditionReport().conclusions().toString())+"\"\n";
         }
         if (result.realization() != null) {
             for (int i = 0; i < result.realization().finalCoordinates().size(); i++) {
@@ -92,6 +99,7 @@ public final class TestResultStore {
                         + coordinate.y + ", " + coordinate.z + "]\n";
             }
         }
+        if(result.optimizationComparison()!=null)for(var entry:result.optimizationComparison().changes().entrySet())text+="optimization_change_"+entry.getKey()+" = ["+entry.getValue().baseline()+", "+entry.getValue().optimized()+", "+entry.getValue().absoluteChange()+", "+entry.getValue().relativeChange()+"]\n";
         Files.writeString(file, text, StandardCharsets.UTF_8);
         return file;
     }

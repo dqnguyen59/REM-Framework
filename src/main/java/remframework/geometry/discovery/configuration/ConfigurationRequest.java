@@ -27,7 +27,8 @@ import remframework.geometry.discovery.experiment.ExperimentProfile;
 public record ConfigurationRequest(int nodeCount, int exactDegree,
         GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
         int maximumConfigurations, Duration enumerationTimeLimit,
-        String generationStrategy, Path outputDirectory, ExperimentProfile experimentProfile) {
+        String generationStrategy, Path outputDirectory, ExperimentProfile experimentProfile,
+        int maximumDirectCycleNodes) {
     public ConfigurationRequest {
         intendedDimension = intendedDimension == null ? GeometryEmbeddingDimension.THREE_D : intendedDimension;
         symmetryFilter = symmetryFilter == null ? GraphSymmetryFilter.BOTH : symmetryFilter;
@@ -37,17 +38,25 @@ public record ConfigurationRequest(int nodeCount, int exactDegree,
                 ? (intendedDimension == GeometryEmbeddingDimension.TWO_D
                     ? ExperimentProfile.CLOSED_2D_AREA : ExperimentProfile.CLOSED_3D_VOLUME)
                 : experimentProfile;
+        maximumDirectCycleNodes=maximumDirectCycleNodes>0?maximumDirectCycleNodes:10_000;
     }
     public ConfigurationRequest(int nodeCount, int exactDegree,
             GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
             int maximumConfigurations, Duration enumerationTimeLimit,
             String generationStrategy, Path outputDirectory) {
         this(nodeCount, exactDegree, intendedDimension, symmetryFilter, maximumConfigurations,
-                enumerationTimeLimit, generationStrategy, outputDirectory, null);
+                enumerationTimeLimit, generationStrategy, outputDirectory, null,10_000);
+    }
+    public ConfigurationRequest(int nodeCount, int exactDegree,
+            GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
+            int maximumConfigurations, Duration enumerationTimeLimit,
+            String generationStrategy, Path outputDirectory, ExperimentProfile experimentProfile) {
+        this(nodeCount,exactDegree,intendedDimension,symmetryFilter,maximumConfigurations,
+                enumerationTimeLimit,generationStrategy,outputDirectory,experimentProfile,10_000);
     }
     public static ConfigurationRequest exhaustive(int n, int k,
             GeometryEmbeddingDimension dimension) {
         return new ConfigurationRequest(n, k, dimension, GraphSymmetryFilter.BOTH,
-                10_000, Duration.ofSeconds(30), "EXHAUSTIVE_BACKTRACKING", null, null);
+                10_000, Duration.ofSeconds(30), "EXHAUSTIVE_BACKTRACKING", null, null,10_000);
     }
 }

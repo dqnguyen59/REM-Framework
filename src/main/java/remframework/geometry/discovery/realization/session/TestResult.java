@@ -29,6 +29,7 @@ public record TestResult(ConfigurationId configurationId,
         FaceDerivationResult faceDerivation,ClosedBoundaryResult boundary,
         GeometricSymmetryResult geometricSymmetry,AreaResult area,VolumeResult volume,
         TwoDRegularityMetrics twoDRegularity, ThreeDRegularityMetrics threeDRegularity,
+        ThreeDConditionReport threeDConditionReport,
         GeometryOptimizationResult optimization, OptimizationComparison optimizationComparison,
         GeometryConfigurationStatus status) {
     public TestResult(ConfigurationId configurationId, GraphSymmetryClassification graphSymmetry,
@@ -36,6 +37,6 @@ public record TestResult(ConfigurationId configurationId,
             GeometricSymmetryResult geometricSymmetry, AreaResult area, VolumeResult volume,
             GeometryOptimizationResult optimization, GeometryConfigurationStatus status) {
         this(configurationId, null, null, null, null, graphSymmetry, realization, faceDerivation, boundary,
-                geometricSymmetry, area, volume, null, null, optimization, null, status);
+                geometricSymmetry, area, volume, null, null, null, optimization, null, status);
     }
 }

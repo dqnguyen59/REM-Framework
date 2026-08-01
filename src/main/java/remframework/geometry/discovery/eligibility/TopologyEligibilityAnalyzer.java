@@ -56,9 +56,11 @@ public final class TopologyEligibilityAnalyzer {
         checks.add(ConditionResult.pass("VERTEX_CONNECTIVITY", "Vertex connectivity is " + vertexConnectivity + "."));
         checks.add(ConditionResult.pass("EDGE_CONNECTIVITY", "Edge connectivity is " + edgeConnectivity + "."));
 
-        AutomorphismAnalyzer.Result symmetry = simple && n <= 12
-                ? new AutomorphismAnalyzer().analyze(n, edges)
-                : new AutomorphismAnalyzer.Result(0, false);
+        boolean cycleFamily=simple&&connected&&expectedDegree==2&&regular&&n>=3;
+        AutomorphismAnalyzer.Result symmetry = cycleFamily
+                ?new AutomorphismAnalyzer.Result(2L*n,true)
+                :simple && n <= 12?new AutomorphismAnalyzer().analyze(n, edges)
+                :new AutomorphismAnalyzer.Result(0, false);
         List<List<Integer>> faces = simple && connected ? sphericalFaceSet(adjacency, edges.size()) : List.of();
         Boolean planar = simple && connected ? !faces.isEmpty() : false;
 

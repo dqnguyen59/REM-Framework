@@ -26,6 +26,7 @@ import java.util.Deque;
 import java.util.List;
 
 public final class GeometryDiscoveryControlFrame extends AbstractFrame {
+    public static List<String> profileConditionControls(ExperimentProfile profile){return profile==ExperimentProfile.CLOSED_2D_AREA?List.of("Global planarity mode","Polygon angle condition"):List.of("Face planarity condition","Face-angle condition","Dihedral-angle condition","Vertex-radius condition","Face-centroid-radius condition","Edge-midpoint-radius condition","Face-plane-radius condition","Normal-center alignment condition","Center definition","Face-planarity tolerance","Absolute regularity tolerance","Relative regularity tolerance");}
     private static final String[] EXAMPLES = {"Line", "Square", "Tetrahedron", "Small Cubic",
             "Line Reference", "Equilateral Reference", "Tetrahedral Reference",
             "Octahedral Reference"};
@@ -78,6 +79,14 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private PlanarityRealizationMode phase2PlanarityMode=PlanarityRealizationMode.STRICT_2D_COORDINATES;
     private AngleConditionMode phase2AngleMode=AngleConditionMode.REQUIRE_EQUAL_ANGLES;
     private double phase2PlaneStrength=.08,phase2AngleStrength=.01;
+    private FacePlanarityMode phase2FacePlanarity=FacePlanarityMode.REQUIRE_PLANAR_FACES;
+    private FaceAngleConditionMode phase2FaceAngles=FaceAngleConditionMode.MEASURE_ONLY;
+    private DihedralConditionMode phase2Dihedrals=DihedralConditionMode.MEASURE_ONLY;
+    private RegularityMode phase2VertexRadii=RegularityMode.MEASURE_ONLY,phase2FaceCentroidRadii=RegularityMode.MEASURE_ONLY,
+            phase2EdgeMidpointRadii=RegularityMode.MEASURE_ONLY,phase2NormalAlignment=RegularityMode.MEASURE_ONLY;
+    private FacePlaneRadiusMode phase2FacePlaneRadii=FacePlaneRadiusMode.MEASURE_ONLY;
+    private GeometryCenterDefinition phase2CenterDefinition=GeometryCenterDefinition.VERTEX_CENTROID;
+    private double phase2FacePlanarityTolerance=1e-7,phase2RegularityTolerance=1e-6,phase2RelativeRegularityTolerance=1e-6;
     private boolean showVertices = true, showEdges = true, showLabels = true,
             showCandidateFaces = true, showBoundaryFaces = true, showRejectedFaces = false,
             showNormals = false, showSelfIntersections = true, showViewportDiagnostics = false,
@@ -162,7 +171,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             String experiment = nk_label_combo_options(c, stack, "Experiment profile",
                     new String[]{"Closed 2D area", "Closed 3D volume", "Convex polyhedral volume"},
                     switch (phase2ExperimentProfile) { case CLOSED_2D_AREA -> "Closed 2D area"; case CLOSED_3D_VOLUME -> "Closed 3D volume"; case CONVEX_POLYHEDRAL_VOLUME -> "Convex polyhedral volume"; }, .4, .6);
-            phase2ExperimentProfile = switch (experiment) { case "Closed 2D area" -> ExperimentProfile.CLOSED_2D_AREA; case "Convex polyhedral volume" -> ExperimentProfile.CONVEX_POLYHEDRAL_VOLUME; default -> ExperimentProfile.CLOSED_3D_VOLUME; };
+            ExperimentProfile selectedExperiment = switch (experiment) { case "Closed 2D area" -> ExperimentProfile.CLOSED_2D_AREA; case "Convex polyhedral volume" -> ExperimentProfile.CONVEX_POLYHEDRAL_VOLUME; default -> ExperimentProfile.CLOSED_3D_VOLUME; };
+            if(selectedExperiment!=phase2ExperimentProfile){phase2ExperimentProfile=selectedExperiment;phase2SelectedConfiguration=null;phase2LatestResult=null;phase2StoredResult=null;controller.phasedWorkflow().beginGenerationTransaction();}
             phase2Dimension = phase2ExperimentProfile.intendedDimension();
             String dimension = nk_label_combo_options(c, stack, "Intended dimension",
                     new String[]{"2D", "3D"}, phase2Dimension == GeometryEmbeddingDimension.TWO_D ? "2D" : "3D", .4, .6);
@@ -274,6 +284,18 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                     switch(phase2AngleMode){case NONE->"None";case MEASURE_ONLY->"Measure only";case REQUIRE_EQUAL_ANGLES->"Require equal angles";},.4,.6);
             phase2AngleMode=switch(angle){case "None"->AngleConditionMode.NONE;case "Require equal angles"->AngleConditionMode.REQUIRE_EQUAL_ANGLES;default->AngleConditionMode.MEASURE_ONLY;};
         }
+        if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA)try(MemoryStack stack=MemoryStack.stackPush()){
+            phase2FacePlanarity="Measure only".equals(nk_label_combo_options(c,stack,"Face planarity condition",new String[]{"Require planar faces","Measure only"},phase2FacePlanarity==FacePlanarityMode.REQUIRE_PLANAR_FACES?"Require planar faces":"Measure only",.45,.55))?FacePlanarityMode.MEASURE_ONLY:FacePlanarityMode.REQUIRE_PLANAR_FACES;
+            phase2FaceAngles=switch(nk_label_combo_options(c,stack,"Face-angle condition",new String[]{"None","Measure only","Require equal within each face"},modeLabel(phase2FaceAngles),.45,.55)){case "None"->FaceAngleConditionMode.NONE;case "Require equal within each face"->FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE;default->FaceAngleConditionMode.MEASURE_ONLY;};
+            phase2Dihedrals=switch(nk_label_combo_options(c,stack,"Dihedral-angle condition",new String[]{"None","Measure only","Require equal dihedrals"},modeLabel(phase2Dihedrals),.45,.55)){case "None"->DihedralConditionMode.NONE;case "Require equal dihedrals"->DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES;default->DihedralConditionMode.MEASURE_ONLY;};
+            phase2VertexRadii=regularityMode(c,stack,"Vertex-radius condition",phase2VertexRadii);
+            phase2FaceCentroidRadii=regularityMode(c,stack,"Face-centroid-radius condition",phase2FaceCentroidRadii);
+            phase2EdgeMidpointRadii=regularityMode(c,stack,"Edge-midpoint-radius condition",phase2EdgeMidpointRadii);
+            phase2FacePlaneRadii=switch(nk_label_combo_options(c,stack,"Face-plane-radius condition",new String[]{"None","Measure only","Require equal face-plane radii"},modeLabel(phase2FacePlaneRadii),.45,.55)){case "None"->FacePlaneRadiusMode.NONE;case "Require equal face-plane radii"->FacePlaneRadiusMode.REQUIRE_EQUAL_FACE_PLANE_RADII;default->FacePlaneRadiusMode.MEASURE_ONLY;};
+            phase2NormalAlignment=regularityMode(c,stack,"Normal-center alignment",phase2NormalAlignment);
+            nk_label_combo_options(c,stack,"Center definition",new String[]{"Vertex centroid"},"Vertex centroid",.45,.55);phase2CenterDefinition=GeometryCenterDefinition.VERTEX_CENTROID;
+        }
+        if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA){phase2FacePlanarityTolerance=dynamicProperty(c,"Face-planarity tolerance",phase2FacePlanarityTolerance,1e-12,1,.000001);phase2RegularityTolerance=dynamicProperty(c,"Absolute regularity tolerance",phase2RegularityTolerance,1e-12,1,.000001);phase2RelativeRegularityTolerance=dynamicProperty(c,"Relative regularity tolerance",phase2RelativeRegularityTolerance,1e-12,1,.000001);}
         if(phase2PlanarityMode==PlanarityRealizationMode.PLANE_CONSTRAINT)
             phase2PlaneStrength=dynamicProperty(c,"Plane-restoring strength",phase2PlaneStrength,0,100,.01);
         if(phase2AngleMode==AngleConditionMode.REQUIRE_EQUAL_ANGLES)
@@ -299,7 +321,11 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                                     GeometrySymmetryPolicy.MEASURE_ONLY, phase2SearchLimit,
                                     phase2ExperimentProfile, phase2AngleMode,
                                     RegularityMode.MEASURE_ONLY, OptimizationObjective.NONE,0,0,0,0,
-                                    phase2PlanarityMode,phase2PlaneStrength,phase2AngleStrength));
+                                    phase2PlanarityMode,phase2PlaneStrength,phase2AngleStrength,
+                                    new ThreeDExperimentConditions(phase2FacePlanarity,phase2FaceAngles,phase2Dihedrals,
+                                            phase2VertexRadii,phase2FaceCentroidRadii,phase2EdgeMidpointRadii,
+                                            phase2FacePlaneRadii,phase2NormalAlignment,phase2CenterDefinition,
+                                            phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance)));
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry Test", exception.getMessage()); }
         });
@@ -487,6 +513,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private String phase2SymmetryFilterLabel() {
         return switch (phase2SymmetryFilter) { case SYMMETRIC_ONLY -> "Symmetric only"; case ASYMMETRIC_ONLY -> "Asymmetric only"; case BOTH -> "Both"; };
     }
+    private RegularityMode regularityMode(NkContext c,MemoryStack stack,String label,RegularityMode current){String value=nk_label_combo_options(c,stack,label,new String[]{"None","Measure only","Require within tolerance"},modeLabel(current),.45,.55);return switch(value){case "None"->RegularityMode.NONE;case "Require within tolerance"->RegularityMode.REQUIRE_WITHIN_TOLERANCE;default->RegularityMode.MEASURE_ONLY;};}
+    private String modeLabel(Object mode){String name=((Enum<?>)mode).name();if(name.equals("NONE"))return "None";if(name.equals("MEASURE_ONLY"))return "Measure only";if(name.contains("FACE_PLANE"))return "Require equal face-plane radii";if(name.contains("WITHIN_EACH_FACE"))return "Require equal within each face";if(name.contains("DIHEDRAL"))return "Require equal dihedrals";return "Require within tolerance";}
 
     private void candidateSection(NkContext c) {
         GeometryDiscoveryWorkspaceSnapshot snapshot = controller.workspace().snapshot();

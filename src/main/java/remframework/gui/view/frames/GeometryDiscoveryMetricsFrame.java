@@ -27,7 +27,7 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
             GeometryDiscoveryWorkspaceManager.getInstance();
     private int phase2DetailsTab;
     private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification", "Eligibility",
-            "Realization", "Faces and Boundary", "2D Regularity", "Measurement", "Diagnostics"};
+            "Realization", "Faces and Boundary", "2D Regularity", "3D Regularity", "Measurement", "Diagnostics"};
 
     public GeometryDiscoveryMetricsFrame(NuklearModel model) {
         super(model);
@@ -89,8 +89,9 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
                 case 4 -> phase2Realization(c, result);
                 case 5 -> phase2FacesBoundary(c, result);
                 case 6 -> phase2Regularity2d(c,result);
-                case 7 -> phase2Measurement(c, result);
-                case 8 -> phase2Diagnostics(c, generation, configuration, result);
+                case 7 -> phase2Regularity3d(c,result);
+                case 8 -> phase2Measurement(c, result);
+                case 9 -> phase2Diagnostics(c, generation, configuration, result);
                 default -> { }
             }
             Nuklear.nk_group_end(c);
@@ -162,6 +163,24 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
         label(c,"Angle regularity: "+switch(result.angleConditionMode()){case NONE->"NOT_APPLICABLE";case MEASURE_ONLY->"MEASURED";case REQUIRE_EQUAL_ANGLES->m.equalAngles()?"PASSED":"FAILED";});
         label(c,"Regular polygon realization: "+(m.equalEdges()&&m.equalAngles()?"YES":"NO"));
     }
+
+    private void phase2Regularity3d(NkContext c,TestResult result){
+        if(result==null||result.threeDRegularity()==null){label(c,"3D regularity: Not applicable");return;}
+        ThreeDRegularityMetrics m=result.threeDRegularity();label(c,"Center definition: "+m.centerDefinition()+"    Center: "+m.geometryCenter());
+        label(c,"Metrics applicability: "+m.applicable()+" - "+m.applicabilityReason());
+        if(!m.applicable())return;
+        for(FacePlaneDiagnostic face:m.facePlanes())label(c,face.faceId()+": planar="+face.planar()+" max="+face.maximumDeviation()+" mean="+face.meanDeviation()+" RMS="+face.rmsDeviation()+" tolerance="+face.tolerance()+" normal="+face.outwardNormal()+" orientation="+face.orientation()+" plane radius="+face.facePlaneRadius()+" normal-center alignment="+face.normalCenterAlignment());
+        statistics(c,"Face-plane radii",m.facePlaneRadii());label(c,"Face-plane maximum mean deviation="+m.maximumFacePlaneRadiusDeviationFromMean()+" relative maximum deviation="+m.relativeMaximumFacePlaneRadiusDeviation());
+        statistics(c,"Vertex radii",m.vertexRadii());statistics(c,"Face-centroid radii",m.faceCenterRadii());statistics(c,"Edge-midpoint radii",m.edgeMidpointRadii());statistics(c,"Normal-center alignment",m.normalCenterAlignments());
+        label(c,"Maximum normal alignment deviation from 1="+m.maximumNormalAlignmentDeviationFromOne());
+        for(FaceMetrics face:m.faces())label(c,face.faceId()+" edgeCount="+face.edgeCount()+" target interior="+face.targetInteriorAngle()+" angle variance="+face.interiorAngles().variance()+" max target deviation="+face.maximumInteriorTargetDeviation());
+        label(c,"Interior dihedral convention; edge-angle pairs: "+m.dihedralEdgeAngles());statistics(c,"Interior dihedral angles",m.interiorDihedralAngles());
+        label(c,"Face-area variance by edge count: "+m.faceAreaByEdgeCount());label(c,"Face-angle variance groups: "+m.faceAngleVarianceByEdgeCount());
+        if(result.threeDConditionReport()!=null){label(c,"Basic valid 3D candidate: "+result.threeDConditionReport().basicValidCandidate());label(c,"Selected constrained experiment passed: "+result.threeDConditionReport().constrainedExperimentPassed());label(c,"Active conditions: "+result.threeDConditionReport().conditions());label(c,"Conclusions: "+result.threeDConditionReport().conclusions());}
+        label(c,"Equal face-plane radii verifies plane distances only; no common insphere is claimed.");
+    }
+
+    private void statistics(NkContext c,String name,Statistics s){label(c,name+": values="+s.values()+" mean="+s.mean()+" min="+s.minimum()+" max="+s.maximum()+" range="+s.range()+" variance="+s.variance()+" stddev="+s.standardDeviation());}
 
     private void phase2FacesBoundary(NkContext c, TestResult result) {
         if (result == null) { label(c, "Faces: Undetermined"); label(c, "Boundary: Undetermined"); return; }

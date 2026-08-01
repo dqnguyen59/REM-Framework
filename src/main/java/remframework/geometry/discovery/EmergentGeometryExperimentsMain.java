@@ -13,6 +13,7 @@ import remframework.geometry.discovery.optimization.AreaOptimizer;
 import remframework.geometry.discovery.realization.session.TestRequest;
 import remframework.geometry.discovery.realization.session.TestResult;
 import remframework.geometry.discovery.realization.session.TestSession;
+import remframework.geometry.discovery.viewport.RenderModel;
 
 import java.time.Duration;
 
@@ -22,11 +23,14 @@ public final class EmergentGeometryExperimentsMain {
     private EmergentGeometryExperimentsMain() { }
 
     public static void main(String[] args) {
+        directLargeCycleExperiment();
         areaExperiment("A", 4);
         areaExperiment("B", 5);
         volumeExperimentC();
         cubicGraphExperimentD();
     }
+
+    private static void directLargeCycleExperiment(){long started=System.nanoTime();GenerationResult generated=generate(100,2,ExperimentProfile.CLOSED_2D_AREA);long elapsed=(System.nanoTime()-started)/1_000_000;Configuration cycle=generated.configurations().getFirst();var eligibility=new TopologyEligibilityAnalyzer().analyze(cycle,ExperimentProfile.CLOSED_2D_AREA);System.out.printf("Direct cycle N=100 strategy=%s retained=%d examined=%d complete=%s edges=%d automorphisms=%d elapsedMs=%d eligibility=%s viewportNodes=%d%n",cycle.generationMethod(),generated.configurations().size(),generated.metrics().configurationsExamined(),generated.metrics().enumerationComplete(),cycle.edges().size(),cycle.automorphismGroupSize(),elapsed,eligibility.status(),RenderModel.topologyPreview(cycle,1).model().nodes().size());TestResult regular=run(cycle,ExperimentProfile.CLOSED_2D_AREA,AngleConditionMode.REQUIRE_EQUAL_ANGLES);System.out.printf("  equal-angle realization=%s candidate=%s regularPolygon=%s maxAngleDeviation=%s%n",regular.realization().status(),regular.status().code(),regular.twoDRegularity()!=null&&regular.twoDRegularity().equalEdges()&&regular.twoDRegularity().equalAngles(),regular.twoDRegularity()==null?"unavailable":regular.twoDRegularity().maximumAngleTargetDeviation());}
 
     private static void areaExperiment(String name, int n) {
         Configuration selected = generate(n, 2, ExperimentProfile.CLOSED_2D_AREA).configurations().get(0);
@@ -63,6 +67,7 @@ public final class EmergentGeometryExperimentsMain {
         if (m != null) System.out.printf("  edgeVar=%.9g dihedralVar=%.9g vertexRadiusVar=%.9g faceCenterRadiusVar=%.9g edgeMidpointRadiusVar=%.9g faceGroups=%s%n",
                 m.edgeLengths().variance(),m.interiorDihedralAngles().variance(),m.vertexRadii().variance(),
                 m.faceCenterRadii().variance(),m.edgeMidpointRadii().variance(),m.faceAreaByEdgeCount().keySet());
+        if(m!=null)System.out.printf("  planarFaces=%d/%d facePlaneRadii=%s facePlaneRadiusVariance=%.9g normalAlignments=%s normalAlignmentVariance=%.9g center=%s:%s%n",m.facePlanes().stream().filter(remframework.geometry.discovery.measurement.regularity.FacePlaneDiagnostic::planar).count(),m.facePlanes().size(),m.facePlaneRadii().values(),m.facePlaneRadii().variance(),m.normalCenterAlignments().values(),m.normalCenterAlignments().variance(),m.centerDefinition(),m.geometryCenter());
     }
 
     private static void cubicGraphExperimentD() {

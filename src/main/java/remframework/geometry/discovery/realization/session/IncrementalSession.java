@@ -174,6 +174,10 @@ public final class IncrementalSession {
                 ? GeometryEmbeddingDimension.THREE_D:request.dimension();
         initialCoordinates = initializeCoordinates(configuration.nodeCount(),
                 initializationDimension, request.targetEdgeLength(), seed);
+        if(request.experimentProfile()==ExperimentProfile.CLOSED_2D_AREA
+                &&request.angleConditionMode()==AngleConditionMode.REQUIRE_EQUAL_ANGLES
+                &&request.planarityMode()==PlanarityRealizationMode.STRICT_2D_COORDINATES)
+            initialCoordinates=regularCycleCoordinates(configuration.nodeCount(),request.targetEdgeLength());
         List<DynamicElasticNode> nodes = new ArrayList<>();
         for (int id = 0; id < initialCoordinates.size(); id++)
             nodes.add(new DynamicElasticNode(id, initialCoordinates.get(id),
@@ -251,7 +255,7 @@ public final class IncrementalSession {
             GeometryConfigurationStatus status = GeometryConfigurationStatus.of(diagnostic);
             return new TestResult(configuration.id(), request.experimentProfile(),request.planarityMode(),request.angleConditionMode(), eligibility,
                     configuration.graphSymmetry(), realization, null, null, null,
-                    AreaResult.unavailable(status), VolumeResult.unavailable(status), null, null,
+                    AreaResult.unavailable(status), VolumeResult.unavailable(status), null, null, null,
                     GeometryOptimizationResult.notAttempted(), null, status);
         }
         FaceDerivationResult faces = new FaceDerivationPipeline().derive(configuration, realization);
@@ -263,6 +267,7 @@ public final class IncrementalSession {
         VolumeResult volume = measures.volume(realization, boundary);
         TwoDRegularityMetrics twoD = null;
         ThreeDRegularityMetrics threeD = null;
+        ThreeDConditionReport threeDConditions = null;
         boolean qualified = false;
         if (request.dimension() == GeometryEmbeddingDimension.TWO_D && !faces.faces().isEmpty()) {
             twoD = new TwoDRegularityCalculator().calculate(configuration, coordinates,
@@ -274,8 +279,11 @@ public final class IncrementalSession {
         } else if (request.dimension() == GeometryEmbeddingDimension.THREE_D && boundary.closed()
                 && volume.available() && volume.absoluteVolume() > request.degeneracyTolerance()) {
             threeD = new ThreeDRegularityCalculator().calculate(configuration, coordinates,
-                    boundary, request.targetEdgeLength());
-            qualified = true;
+                    boundary, request.targetEdgeLength(),request.threeDConditions().centerDefinition(),
+                    request.threeDConditions().facePlanarityTolerance());
+            qualified = request.threeDConditions().facePlanarity()!=FacePlanarityMode.REQUIRE_PLANAR_FACES
+                    ||threeD.facePlanes().stream().allMatch(FacePlaneDiagnostic::planar);
+            threeDConditions=new ThreeDConditionEvaluator().evaluate(qualified,threeD,request.threeDConditions());
         }
         GeometryConfigurationStatus status = qualified
                 ? GeometryConfigurationStatus.of(GeometryConfigurationDiagnostic.info(
@@ -284,7 +292,7 @@ public final class IncrementalSession {
                 : boundary.status();
         return new TestResult(configuration.id(), request.experimentProfile(),request.planarityMode(),request.angleConditionMode(), eligibility,
                 configuration.graphSymmetry(), realization, faces, boundary, symmetry, area, volume,
-                twoD, threeD, GeometryOptimizationResult.notAttempted(), null, status);
+                twoD, threeD,threeDConditions, GeometryOptimizationResult.notAttempted(), null, status);
     }
 
     static List<Vector3d> initializeCoordinates(int count, GeometryEmbeddingDimension dimension,
@@ -312,6 +320,7 @@ public final class IncrementalSession {
         do{result.add(current);List<Integer> neighbors=configuration.adjacency().get(current);int next=neighbors.get(0)==previous?neighbors.get(1):neighbors.get(0);previous=current;current=next;}while(current!=0&&result.size()<=configuration.nodeCount());
         return result;
     }
+    private static List<Vector3d> regularCycleCoordinates(int count,double edgeLength){List<Vector3d> result=new ArrayList<>();Vector3d current=new Vector3d();result.add(new Vector3d(current));for(int edge=0;edge<count-1;edge++){double direction=edge*2*Math.PI/count;current.add(edgeLength*Math.cos(direction),edgeLength*Math.sin(direction),0);result.add(new Vector3d(current));}return result;}
 
     private static int effectiveDimension(List<Vector3d> coordinates) {
         return coordinates.stream().mapToDouble(coordinate -> Math.abs(coordinate.z))

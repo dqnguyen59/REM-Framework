@@ -1,31 +1,11 @@
 package remframework.geometry.discovery.configuration;
+
 import remframework.geometry.discovery.*;
-import remframework.geometry.discovery.configuration.*;
-import remframework.geometry.discovery.realization.session.*;
-import remframework.geometry.discovery.viewport.*;
-import remframework.geometry.discovery.workflow.*;
-import remframework.geometry.discovery.persistence.*;
-import remframework.geometry.discovery.ui.*;
-import remframework.geometry.discovery.graph.canonical.*;
-import remframework.geometry.discovery.graph.symmetry.*;
-import remframework.geometry.discovery.optimization.*;
-import remframework.geometry.discovery.*;
-import remframework.geometry.discovery.configuration.*;
-import remframework.geometry.discovery.realization.session.*;
-import remframework.geometry.discovery.viewport.*;
-import remframework.geometry.discovery.workflow.*;
-import remframework.geometry.discovery.persistence.*;
-import remframework.geometry.discovery.ui.*;
-import remframework.geometry.discovery.graph.canonical.*;
-import remframework.geometry.discovery.graph.symmetry.*;
-import remframework.geometry.discovery.optimization.*;
+import remframework.geometry.discovery.graph.canonical.Canonicalizer;
+import remframework.geometry.discovery.graph.symmetry.AutomorphismAnalyzer;
 
 import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -34,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * reported incomplete instead of being sampled.
  */
 public final class ConfigurationGenerator {
-    public static final int MAX_EXHAUSTIVE_N = 8;
+    public static final int MAX_EXHAUSTIVE_N = 20;
     private final GraphIsomorphismAnalyzer isomorphism = new GraphIsomorphismAnalyzer();
     private final Canonicalizer canonicalizer = new Canonicalizer();
     private final AutomorphismAnalyzer automorphisms = new AutomorphismAnalyzer();
@@ -43,6 +23,8 @@ public final class ConfigurationGenerator {
         long started=System.nanoTime();
         GeometryConfigurationStatus invalid=validate(request);
         if(invalid!=null) return result(request,List.of(),0,0,started,false,invalid);
+        if(request.exactDegree()==2&&request.nodeCount()>=3)
+            return directCycle(request,started);
         if(request.nodeCount()>MAX_EXHAUSTIVE_N) {
             var d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.GRAPH_GENERATION,
                     GeometryConfigurationStatusCode.ENUMERATION_LIMIT_REACHED,
@@ -87,6 +69,42 @@ public final class ConfigurationGenerator {
                 "Enumeration incomplete","The configured time or retained-configuration limit was reached.");
         return result(request,configurations,examined[0],duplicates[0],started,complete,
                 GeometryConfigurationStatus.of(d));
+    }
+
+    private GenerationResult directCycle(ConfigurationRequest request,long started){
+        if(request.nodeCount()>request.maximumDirectCycleNodes()){
+            var d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.GRAPH_GENERATION,
+                    GeometryConfigurationStatusCode.RESOURCE_LIMIT_REACHED,"Direct cycle safety limit exceeded",
+                    "Direct cycle construction is configured through N = "+request.maximumDirectCycleNodes()+".");
+            return result(request,List.of(),0,0,started,false,GeometryConfigurationStatus.of(d));
+        }
+        ConfigurationRequest effectiveRequest=new ConfigurationRequest(request.nodeCount(),request.exactDegree(),
+                request.intendedDimension(),request.symmetryFilter(),request.maximumConfigurations(),
+                request.enumerationTimeLimit(),"DIRECT_CYCLE_CONSTRUCTION",request.outputDirectory(),
+                request.experimentProfile(),request.maximumDirectCycleNodes());
+        List<DiscoveryConnection> edges=new ArrayList<>();
+        for(int node=0;node<request.nodeCount()-1;node++)edges.add(new DiscoveryConnection(node,node+1));
+        edges.add(new DiscoveryConnection(request.nodeCount()-1,0));
+        String label=request.nodeCount()<=MAX_EXHAUSTIVE_N
+                ?canonicalizer.canonicalLabel(request.nodeCount(),edges)
+                :CanonicalGraphSignature.of(request.nodeCount(),edges);
+        long groupSize=2L*request.nodeCount();
+        List<Configuration> configurations=new ArrayList<>();
+        if(request.symmetryFilter().accepts(groupSize)){
+            String hash=shortHash(label);
+            var diagnostic=GeometryConfigurationDiagnostic.info(GeometryConfigurationStage.COMPLETE,
+                    GeometryConfigurationStatusCode.GENERATED,"Cycle constructed exactly",
+                    "The unique connected simple 2-regular topology C_"+request.nodeCount()+" was constructed directly.");
+            configurations.add(new Configuration(new ConfigurationId("cfg-"+hash),request.nodeCount(),2,
+                    edges,null,label,hash,groupSize,GraphSymmetryClassification.HIGHLY_SYMMETRIC,true,1,
+                    "DIRECT_CYCLE_CONSTRUCTION",true,GeometryConfigurationStatus.of(diagnostic),List.of(diagnostic),
+                    Instant.now(),Map.of("embeddingDimension",request.intendedDimension().name(),
+                            "vertexTransitive","true","generationStrategy","DIRECT_CYCLE_CONSTRUCTION")));
+        }
+        var complete=GeometryConfigurationDiagnostic.info(GeometryConfigurationStage.COMPLETE,
+                GeometryConfigurationStatusCode.ENUMERATION_COMPLETE,"Direct cycle construction complete",
+                "Exactly one non-isomorphic connected simple 2-regular graph exists for N >= 3.");
+        return result(effectiveRequest,configurations,1,0,started,true,GeometryConfigurationStatus.of(complete));
     }
 
     private void enumerate(int n,int k,boolean[][] adjacency,int[] degree,
