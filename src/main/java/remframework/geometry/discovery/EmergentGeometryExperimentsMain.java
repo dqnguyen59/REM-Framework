@@ -1,18 +1,86 @@
 package remframework.geometry.discovery;
-import remframework.geometry.discovery.*;
-import remframework.geometry.discovery.configuration.*;
-import remframework.geometry.discovery.realization.session.*;
-import remframework.geometry.discovery.viewport.*;
-import remframework.geometry.discovery.workflow.*;
-import remframework.geometry.discovery.persistence.*;
-import remframework.geometry.discovery.ui.*;
-import remframework.geometry.discovery.graph.canonical.*;
-import remframework.geometry.discovery.graph.symmetry.*;
-import remframework.geometry.discovery.optimization.*;
+
+import remframework.geometry.discovery.configuration.Configuration;
+import remframework.geometry.discovery.configuration.ConfigurationGenerator;
+import remframework.geometry.discovery.configuration.ConfigurationRequest;
+import remframework.geometry.discovery.configuration.GenerationResult;
+import remframework.geometry.discovery.eligibility.TopologyEligibilityAnalyzer;
+import remframework.geometry.discovery.experiment.ExperimentProfile;
+import remframework.geometry.discovery.measurement.regularity.TwoDRegularityCalculator;
+import remframework.geometry.discovery.optimization.AreaOptimizer;
+import remframework.geometry.discovery.realization.session.TestRequest;
+import remframework.geometry.discovery.realization.session.TestResult;
+import remframework.geometry.discovery.realization.session.TestSession;
+
 import java.time.Duration;
-/** Reproducible command-line runner for the Phase 2 initial manual experiments. */
+
+/** Reproducible headless representative scientific experiments. */
 public final class EmergentGeometryExperimentsMain {
-    private EmergentGeometryExperimentsMain(){}
-    public static void main(String[] args){run("A",4,2,GeometryEmbeddingDimension.TWO_D,true);run("B",4,3,GeometryEmbeddingDimension.THREE_D,true);run("C",8,3,GeometryEmbeddingDimension.THREE_D,false);}
-    private static void run(String name,int n,int k,GeometryEmbeddingDimension dimension,boolean testFirst){ConfigurationRequest request=new ConfigurationRequest(n,k,dimension,GraphSymmetryFilter.BOTH,1000,Duration.ofSeconds(30),null,null);GenerationResult generated=new ConfigurationGenerator().generate(request);System.out.printf("Experiment %s: retained=%d complete=%s status=%s%n",name,generated.configurations().size(),generated.metrics().enumerationComplete(),generated.status().code());if(!testFirst||generated.configurations().isEmpty()){System.out.println("  no configuration selected; geometry tests not started");return;}Configuration selected=generated.configurations().get(0);TestRequest test=new TestRequest(selected.id(),dimension,1,20260731L,4,DynamicElasticSettings.defaults(1,20260731L),GeometrySymmetryPolicy.MEASURE_ONLY,100_000);TestResult result=new TestSession(selected,test).run();System.out.printf("  selected=%s graphSymmetry=%s realization=%s faces=%s boundary=%s area=%s volume=%s final=%s%n",selected.id(),selected.graphSymmetry(),result.realization().status(),result.faceDerivation()!=null&&result.faceDerivation().unique(),result.boundary()!=null&&result.boundary().closed(),result.area().available()?result.area().absoluteArea():"unavailable",result.volume().available()?result.volume().absoluteVolume():"unavailable",result.status().code());if(name.equals("A")&&result.boundary()!=null&&result.boundary().closed()){GeometryOptimizationResult optimization=new AreaOptimizer().maximize2d(selected,result.realization(),result.boundary(),1,10_000);System.out.printf("  area optimization: baseline=%.9f optimized=%.9f improvement=%.3f%% constraints=%s symmetryRequired=%s symmetricAfter=%s%n",optimization.baselineMeasure(),optimization.optimizedMeasure(),100*optimization.relativeImprovement(),optimization.constraintsPreserved(),optimization.symmetryPolicy(),optimization.symmetricAfterOptimization());}}
+    private static final long SEED = 20260731L;
+    private EmergentGeometryExperimentsMain() { }
+
+    public static void main(String[] args) {
+        areaExperiment("A", 4);
+        areaExperiment("B", 6);
+        volumeExperimentC();
+        cubicGraphExperimentD();
+    }
+
+    private static void areaExperiment(String name, int n) {
+        Configuration selected = generate(n, 2, ExperimentProfile.CLOSED_2D_AREA).configurations().get(0);
+        TestResult baseline = run(selected, ExperimentProfile.CLOSED_2D_AREA);
+        System.out.printf("Experiment %s N=%d K=2 eligibility=%s realization=%s area=%.9f angleVariance=%.9g centroidRadiusVariance=%.9g%n",
+                name, n, baseline.eligibility().status(), baseline.realization().status(),
+                baseline.twoDRegularity().area(), baseline.twoDRegularity().interiorAngles().variance(),
+                baseline.twoDRegularity().centroidRadii().variance());
+        GeometryOptimizationResult optimization = new AreaOptimizer().maximize2d(selected,
+                baseline.realization(), baseline.boundary(), 1, 10_000);
+        var optimized = new TwoDRegularityCalculator().calculate(selected,
+                optimization.optimized().finalCoordinates(), baseline.boundary().orientedFaces().get(0).nodeIds(),
+                1, .02, 1e-7, 1e-9, 1e-6,
+                remframework.geometry.discovery.experiment.AngleConditionMode.MEASURE_ONLY);
+        System.out.printf("  %s area=%.9f angleVariance=%.9g centroidRadiusVariance=%.9g revalidated=%s deltaAngleVariance=%.9g deltaCentroidRadiusVariance=%.9g%n",
+                optimization.constraintsPreserved()?"BEST_AREA_FOUND_WITHIN_OPTIMIZATION_LIMITS":"OPTIMIZED_GEOMETRY_REJECTED",
+                optimized.area(), optimized.interiorAngles().variance(), optimized.centroidRadii().variance(),
+                optimized.valid(), optimized.interiorAngles().variance()-baseline.twoDRegularity().interiorAngles().variance(),
+                optimized.centroidRadii().variance()-baseline.twoDRegularity().centroidRadii().variance());
+    }
+
+    private static void volumeExperimentC() {
+        Configuration selected = generate(4, 3, ExperimentProfile.CLOSED_3D_VOLUME).configurations().get(0);
+        TestResult result = run(selected, ExperimentProfile.CLOSED_3D_VOLUME);
+        var m = result.threeDRegularity();
+        System.out.printf("Experiment C N=4 K=3 eligibility=%s realization=%s faces=%s boundary=%s volume=%s candidate=%s%n",
+                result.eligibility().status(), result.realization().status(), result.faceDerivation().faces().size(),
+                result.boundary().status().code(), result.volume().available()?result.volume().absoluteVolume():"unavailable", result.status().code());
+        if (m != null) System.out.printf("  edgeVar=%.9g dihedralVar=%.9g vertexRadiusVar=%.9g faceCenterRadiusVar=%.9g edgeMidpointRadiusVar=%.9g faceGroups=%s%n",
+                m.edgeLengths().variance(),m.interiorDihedralAngles().variance(),m.vertexRadii().variance(),
+                m.faceCenterRadii().variance(),m.edgeMidpointRadii().variance(),m.faceAreaByEdgeCount().keySet());
+    }
+
+    private static void cubicGraphExperimentD() {
+        GenerationResult generated = generate(8, 3, ExperimentProfile.CLOSED_3D_VOLUME);
+        TopologyEligibilityAnalyzer analyzer = new TopologyEligibilityAnalyzer();
+        System.out.printf("Experiment D N=8 K=3 connected non-isomorphic configurations=%d%n", generated.configurations().size());
+        for (Configuration configuration : generated.configurations())
+            System.out.printf("  %s CLOSED_2D_AREA=%s CLOSED_3D_VOLUME=%s CONVEX_POLYHEDRAL_VOLUME=%s%n",
+                    configuration.id(), analyzer.analyze(configuration,ExperimentProfile.CLOSED_2D_AREA).status(),
+                    analyzer.analyze(configuration,ExperimentProfile.CLOSED_3D_VOLUME).status(),
+                    analyzer.analyze(configuration,ExperimentProfile.CONVEX_POLYHEDRAL_VOLUME).status());
+        Configuration selected = generated.configurations().get(0); TestResult result = run(selected,ExperimentProfile.CLOSED_3D_VOLUME);
+        System.out.printf("  selected=%s realization=%s faces=%s boundary=%s volume=%s candidate=%s%n",
+                selected.id(),result.realization().status(),result.faceDerivation()==null?"not-derived":result.faceDerivation().faces().size(),
+                result.boundary()==null?"not-tested":result.boundary().status().code(),
+                result.volume().available()?result.volume().absoluteVolume():"unavailable",result.status().code());
+    }
+
+    private static GenerationResult generate(int n,int k,ExperimentProfile profile) {
+        return new ConfigurationGenerator().generate(new ConfigurationRequest(n,k,profile.intendedDimension(),
+                GraphSymmetryFilter.BOTH,1000,Duration.ofSeconds(30),null,null,profile));
+    }
+    private static TestResult run(Configuration configuration,ExperimentProfile profile) {
+        return new TestSession(configuration,new TestRequest(configuration.id(),profile.intendedDimension(),1,
+                SEED,4,DynamicElasticSettings.defaults(1,SEED),GeometrySymmetryPolicy.MEASURE_ONLY,100_000,
+                profile,null,null,null,0,0,0,0)).run();
+    }
 }

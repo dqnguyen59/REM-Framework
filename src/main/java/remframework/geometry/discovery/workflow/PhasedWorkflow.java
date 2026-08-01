@@ -26,6 +26,8 @@ import org.joml.Vector3d;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import remframework.geometry.discovery.eligibility.*;
+import remframework.geometry.discovery.experiment.ExperimentProfile;
 /** UI-facing model for the two explicit research stages. Selection never starts geometry. */
 public final class PhasedWorkflow {
     public static final String TOPOLOGY_PREVIEW_LABEL="Graph visualization only - not a geometric realization.";
@@ -104,7 +106,7 @@ public final class PhasedWorkflow {
         }
         return RenderModel.realization(configuration, incrementalSession.currentCoordinates(), renderRevision);
     }
-    public synchronized List<ConfigurationTableRow> tableRows(){return registry.configurations().stream().map(c->{List<TestResult> tests=registry.tests(c.id());TestResult last=tests.isEmpty()?null:tests.get(tests.size()-1);return new ConfigurationTableRow(c.id(),c.nodeCount(),c.exactDegree(),c.edges().size(),c.graphSymmetry(),c.automorphismGroupSize(),c.graphSymmetry()==GraphSymmetryClassification.HIGHLY_SYMMETRIC,c.status().code(),last!=null,last==null?GeometryConfigurationStatusCode.GEOMETRY_TEST_NOT_STARTED:last.status().code(),c.status().summary());}).toList();}
+    public synchronized List<ConfigurationTableRow> tableRows(){ExperimentProfile profile=generation==null?ExperimentProfile.CLOSED_3D_VOLUME:generation.request().experimentProfile();return registry.configurations().stream().map(c->{List<TestResult> tests=registry.tests(c.id());TestResult last=tests.isEmpty()?null:tests.get(tests.size()-1);TopologyEligibilityReport eligibility=new TopologyEligibilityAnalyzer().analyze(c,profile);return new ConfigurationTableRow(c.id(),c.nodeCount(),c.exactDegree(),c.edges().size(),c.graphSymmetry(),c.automorphismGroupSize(),eligibility.vertexTransitive(),profile,c.status().code(),eligibility.status(),c.status().code(),last!=null,last==null?GeometryConfigurationStatusCode.GEOMETRY_TEST_NOT_STARTED:last.status().code(),eligibility.conclusion());}).toList();}
     public synchronized List<TestResult> geometryTests(ConfigurationId id){return registry.tests(id);}
     public synchronized TestResult latestGeometryTest(ConfigurationId id){List<TestResult> values=registry.tests(id);return values.isEmpty()?null:values.get(values.size()-1);}
     public synchronized Path saveLatestGeometryTest(Path configurationSetDirectory, ConfigurationId id) throws IOException {
@@ -116,13 +118,14 @@ public final class PhasedWorkflow {
         if (selected == null) throw new IllegalStateException("Select one configuration before optimization.");
         TestResult current = latestGeometryTest(selected);
         if (current == null) throw new IllegalStateException("Run Geometry Test before optimization.");
-        GeometryOptimizationResult optimization = current.boundary() != null && current.boundary().closed()
-                ? new AreaOptimizer().maximize2d(registry.find(selected).orElseThrow(),
-                current.realization(), current.boundary(), targetEdgeLength, iterations)
-                : GeometryOptimizationResult.notAttempted();
-        TestResult optimized = new TestResult(current.configurationId(), current.graphSymmetry(),
-                current.realization(), current.faceDerivation(), current.boundary(), current.geometricSymmetry(),
-                current.area(), current.volume(), optimization, current.status());
+        GeometryOptimizationResult optimization = current.boundary() == null || !current.boundary().closed()
+                ? GeometryOptimizationResult.notAttempted()
+                : current.experimentProfile() == ExperimentProfile.CLOSED_2D_AREA
+                    ? new AreaOptimizer().maximize2d(registry.find(selected).orElseThrow(),current.realization(),current.boundary(),targetEdgeLength,iterations)
+                    : new VolumeOptimizer().maximize3d(registry.find(selected).orElseThrow(),current.realization(),current.boundary(),targetEdgeLength,iterations);
+        TestResult optimized = new TestResult(current.configurationId(),current.experimentProfile(),current.eligibility(),current.graphSymmetry(),
+                current.realization(),current.faceDerivation(),current.boundary(),current.geometricSymmetry(),current.area(),current.volume(),
+                current.twoDRegularity(),current.threeDRegularity(),optimization,current.optimizationComparison(),current.status());
         registry.attach(optimized);
         return optimized;
     }

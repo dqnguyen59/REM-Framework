@@ -9,6 +9,7 @@ import remframework.geometry.discovery.ui.*;
 import remframework.geometry.discovery.graph.canonical.*;
 import remframework.geometry.discovery.graph.symmetry.*;
 import remframework.geometry.discovery.optimization.*;
+import remframework.geometry.discovery.experiment.*;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
@@ -63,6 +64,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private int phase2NodeCount = 4;
     private int phase2ExactDegree = 2;
     private GeometryEmbeddingDimension phase2Dimension = GeometryEmbeddingDimension.THREE_D;
+    private ExperimentProfile phase2ExperimentProfile = ExperimentProfile.CLOSED_3D_VOLUME;
     private GraphSymmetryFilter phase2SymmetryFilter = GraphSymmetryFilter.BOTH;
     private int phase2MaximumConfigurations = 1000;
     private int phase2TimeLimitSeconds = 30;
@@ -154,9 +156,14 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         phase2ExactDegree = dynamicInteger(c, "Exact neighbors per node (K)", phase2ExactDegree, 0,
                 Math.max(0, phase2NodeCount - 1));
         try (MemoryStack stack = MemoryStack.stackPush()) {
+            String experiment = nk_label_combo_options(c, stack, "Experiment profile",
+                    new String[]{"Closed 2D area", "Closed 3D volume", "Convex polyhedral volume"},
+                    switch (phase2ExperimentProfile) { case CLOSED_2D_AREA -> "Closed 2D area"; case CLOSED_3D_VOLUME -> "Closed 3D volume"; case CONVEX_POLYHEDRAL_VOLUME -> "Convex polyhedral volume"; }, .4, .6);
+            phase2ExperimentProfile = switch (experiment) { case "Closed 2D area" -> ExperimentProfile.CLOSED_2D_AREA; case "Convex polyhedral volume" -> ExperimentProfile.CONVEX_POLYHEDRAL_VOLUME; default -> ExperimentProfile.CLOSED_3D_VOLUME; };
+            phase2Dimension = phase2ExperimentProfile.intendedDimension();
             String dimension = nk_label_combo_options(c, stack, "Intended dimension",
                     new String[]{"2D", "3D"}, phase2Dimension == GeometryEmbeddingDimension.TWO_D ? "2D" : "3D", .4, .6);
-            phase2Dimension = "2D".equals(dimension) ? GeometryEmbeddingDimension.TWO_D : GeometryEmbeddingDimension.THREE_D;
+            phase2Dimension = phase2ExperimentProfile.intendedDimension();
             String filter = nk_label_combo_options(c, stack, "Graph symmetry filter",
                     new String[]{"Symmetric only", "Asymmetric only", "Both"}, phase2SymmetryFilterLabel(), .4, .6);
             phase2SymmetryFilter = switch (filter) {
@@ -172,7 +179,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 ConfigurationRequest request = new ConfigurationRequest(phase2NodeCount,
                         phase2ExactDegree, phase2Dimension, phase2SymmetryFilter,
                         phase2MaximumConfigurations, java.time.Duration.ofSeconds(phase2TimeLimitSeconds),
-                        null, Path.of("lattice/geometry-discovery/configuration-sets"));
+                        null, Path.of("lattice/geometry-discovery/configuration-sets"), phase2ExperimentProfile);
                 controller.phasedWorkflow().generateConfigurations(request);
                 phase2SelectedConfiguration = null;
                 phase2LatestResult = null;
@@ -207,7 +214,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 4, 1);
             String text = (selected ? "> " : "") + row.configurationId() + "  N=" + row.nodeCount() + " K=" + row.exactDegree()
                     + " edges=" + row.edgeCount() + " aut=" + row.automorphismCount() + " " + row.symmetry()
-                    + " vertex-transitive=" + row.vertexTransitive() + " geometry=" + row.geometryTestStatus();
+                    + " profile=" + row.experimentProfile() + " topology=" + row.topologyStatus()
+                    + " eligibility=" + row.eligibilityStatus() + " geometry=" + row.geometryTestStatus();
             if (Nuklear.nk_button_label(c, text)) {
                 phase2SelectedConfiguration = row.configurationId();
                 controller.phasedWorkflow().selectForGeometryTest(row.configurationId());
@@ -270,7 +278,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                     controller.phasedWorkflow().startSelectedGeometryTest(
                             new TestRequest(selected.id(), phase2Dimension, phase2TargetDistance,
                                     phase2Seed, phase2InitialRealizations, null,
-                                    GeometrySymmetryPolicy.MEASURE_ONLY, phase2SearchLimit));
+                                    GeometrySymmetryPolicy.MEASURE_ONLY, phase2SearchLimit,
+                                    phase2ExperimentProfile, AngleConditionMode.MEASURE_ONLY,
+                                    RegularityMode.MEASURE_ONLY, OptimizationObjective.NONE,0,0,0,0));
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry Test", exception.getMessage()); }
         });
@@ -332,6 +342,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     }
 
     private void phase2ResultSections(NkContext c, TestResult result) {
+        heading(c, "Eligibility");
+        label(c, "Profile: " + result.experimentProfile() + "    Stage 2 eligibility: " + result.eligibility().status());
+        label(c, "Reason: " + result.eligibility().conclusion());
+        result.eligibility().conditions().forEach(condition -> label(c, condition.condition() + ": " + condition.outcome() + " - " + condition.explanation()));
         heading(c, "Stage 2 - Realization"); label(c, (result.realization().converged() ? "EQUAL_EDGE_REALIZATION_FOUND" : result.realization().status()) + " - converged=" + result.realization().converged()
                 + ", effective dimension=" + result.realization().effectiveDimension());
         label(c, "Target geometry: Not established");
@@ -344,8 +358,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         primaryButton(c, "Calculate Area", result.boundary() != null && result.boundary().closed(), "Area requires a validated unique closed boundary.", () -> {});
         primaryButton(c, "Calculate Volume", result.boundary() != null && result.boundary().closed() && phase2Dimension == GeometryEmbeddingDimension.THREE_D, "Volume requires a validated unique closed 3D boundary.", () -> {});
         label(c, "Area: " + (result.area().available() ? result.area().absoluteArea() : "unavailable") + "    Volume: " + (result.volume().available() ? result.volume().absoluteVolume() : "unavailable"));
+        if(result.twoDRegularity()!=null){heading(c,"2D Regularity");var m=result.twoDRegularity();label(c,"edge variance="+m.edgeLengths().variance()+" angle variance="+m.interiorAngles().variance()+" centroid-radius variance="+m.centroidRadii().variance());label(c,"perimeter="+m.perimeter()+" circularity=4*pi*A/P^2="+m.circularity());}
+        if(result.threeDRegularity()!=null){heading(c,"3D Regularity");var m=result.threeDRegularity();label(c,"edge variance="+m.edgeLengths().variance()+" interior-dihedral variance="+m.interiorDihedralAngles().variance());label(c,"vertex-radius variance="+m.vertexRadii().variance()+" face-center-radius variance="+m.faceCenterRadii().variance()+" edge-midpoint-radius variance="+m.edgeMidpointRadii().variance());}
         heading(c, "Optimization");
-        boolean optimizationAllowed = result.boundary() != null && result.boundary().closed() && result.area().available();
+        boolean optimizationAllowed = result.boundary() != null && result.boundary().closed() && (result.area().available() || result.volume().available());
         primaryButton(c, "Run Optimization", optimizationAllowed, "Optimization requires a valid closed boundary and baseline measurement.", () -> {
             try { phase2LatestResult = controller.phasedWorkflow().optimizeSelectedGeometryTest(phase2TargetDistance, phase2SearchLimit); }
             catch (Exception exception) { nuklearModel.showErrorDialog("Optimization", exception.getMessage()); }

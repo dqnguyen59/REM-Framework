@@ -11,6 +11,16 @@ import remframework.geometry.discovery.graph.symmetry.*;
 import remframework.geometry.discovery.optimization.*;
 
 public enum GeometryDiscoveryDetailTab {
+    SUMMARY("Summary"),
+    ELIGIBILITY("Eligibility"),
+    REALIZATION("Realization"),
+    FACES("Faces"),
+    BOUNDARY("Boundary"),
+    REGULARITY_2D("2D Regularity"),
+    REGULARITY_3D("3D Regularity"),
+    MEASUREMENT("Measurement"),
+    OPTIMIZATION("Optimization"),
+    DIAGNOSTICS("Diagnostics"),
     OVERVIEW("Overview"),
     GEOMETRY("Geometry"),
     TOPOLOGY("Topology"),

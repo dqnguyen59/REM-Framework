@@ -34,7 +34,10 @@ public final class TestResultStore {
         Path directory = configurationSetDirectory.resolve("geometry-tests");
         Files.createDirectories(directory);
         Path file = directory.resolve(result.configurationId() + "-" + Instant.now().toEpochMilli() + ".toml");
-        String text = "configuration_id = \"" + result.configurationId() + "\"\n"
+        String text = "format_version = 3\nconfiguration_id = \"" + result.configurationId() + "\"\n"
+                + "experiment_profile = \"" + (result.experimentProfile() == null ? "LEGACY_UNSPECIFIED" : result.experimentProfile()) + "\"\n"
+                + "eligibility_status = \"" + (result.eligibility() == null ? "NOT_RECORDED" : result.eligibility().status()) + "\"\n"
+                + "eligibility_reason = \"" + escape(result.eligibility() == null ? "Legacy result" : result.eligibility().conclusion()) + "\"\n"
                 + "status = \"" + result.status().code() + "\"\n"
                 + "explanation = \"" + escape(result.status().explanation()) + "\"\n"
                 + "realization_found = " + (result.realization() != null && result.realization().converged()) + "\n"
@@ -43,6 +46,31 @@ public final class TestResultStore {
                 + "area_available = " + result.area().available() + "\n"
                 + "volume_available = " + result.volume().available() + "\n"
                 + "saved_at = \"" + Instant.now() + "\"\n";
+        if (result.eligibility() != null) {
+            int conditionIndex = 0;
+            for (var condition : result.eligibility().conditions()) {
+                text += "eligibility_condition_" + conditionIndex + " = \""
+                        + escape(condition.condition() + "|" + condition.outcome() + "|" + condition.explanation()) + "\"\n";
+                conditionIndex++;
+            }
+        }
+        if (result.twoDRegularity() != null) {
+            var metrics = result.twoDRegularity();
+            text += "regularity_2d_area = " + metrics.area() + "\n"
+                    + "regularity_2d_perimeter = " + metrics.perimeter() + "\n"
+                    + "regularity_2d_circularity = " + metrics.circularity() + "\n"
+                    + "regularity_2d_edge_variance = " + metrics.edgeLengths().variance() + "\n"
+                    + "regularity_2d_angle_variance = " + metrics.interiorAngles().variance() + "\n"
+                    + "regularity_2d_centroid_radius_variance = " + metrics.centroidRadii().variance() + "\n";
+        }
+        if (result.threeDRegularity() != null) {
+            var metrics = result.threeDRegularity();
+            text += "regularity_3d_edge_variance = " + metrics.edgeLengths().variance() + "\n"
+                    + "regularity_3d_dihedral_variance = " + metrics.interiorDihedralAngles().variance() + "\n"
+                    + "regularity_3d_vertex_radius_variance = " + metrics.vertexRadii().variance() + "\n"
+                    + "regularity_3d_face_center_radius_variance = " + metrics.faceCenterRadii().variance() + "\n"
+                    + "regularity_3d_edge_midpoint_radius_variance = " + metrics.edgeMidpointRadii().variance() + "\n";
+        }
         if (result.realization() != null) {
             for (int i = 0; i < result.realization().finalCoordinates().size(); i++) {
                 var coordinate = result.realization().finalCoordinates().get(i);

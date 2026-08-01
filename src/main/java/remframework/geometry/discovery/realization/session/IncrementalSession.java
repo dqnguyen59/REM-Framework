@@ -25,6 +25,8 @@ import org.joml.Vector3d;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.SplittableRandom;
+import remframework.geometry.discovery.eligibility.*;
+import remframework.geometry.discovery.measurement.regularity.*;
 
 /**
  * Bounded, render-friendly facade over the existing DynamicElasticSession.
@@ -184,6 +186,8 @@ public final class IncrementalSession {
 
     static TestResult finalizeResult(Configuration configuration,
             TestRequest request, DynamicElasticResult result) {
+        TopologyEligibilityReport eligibility = new TopologyEligibilityAnalyzer()
+                .analyze(configuration, request.experimentProfile());
         List<Vector3d> initial = result.initialNodes().stream()
                 .map(node -> new Vector3d(node.position())).toList();
         List<Vector3d> coordinates = result.finalNodes().stream()
@@ -214,9 +218,10 @@ public final class IncrementalSession {
                 realizationStatus, List.of(diagnostic));
         if (!realization.converged()) {
             GeometryConfigurationStatus status = GeometryConfigurationStatus.of(diagnostic);
-            return new TestResult(configuration.id(), configuration.graphSymmetry(), realization,
-                    null, null, null, AreaResult.unavailable(status), VolumeResult.unavailable(status),
-                    GeometryOptimizationResult.notAttempted(), status);
+            return new TestResult(configuration.id(), request.experimentProfile(), eligibility,
+                    configuration.graphSymmetry(), realization, null, null, null,
+                    AreaResult.unavailable(status), VolumeResult.unavailable(status), null, null,
+                    GeometryOptimizationResult.notAttempted(), null, status);
         }
         FaceDerivationResult faces = new FaceDerivationPipeline().derive(configuration, realization);
         ClosedBoundaryResult boundary = new ClosedBoundaryValidator().validate(configuration,
@@ -225,13 +230,30 @@ public final class IncrementalSession {
         GeometryMeasureCalculator measures = new GeometryMeasureCalculator();
         AreaResult area = measures.area(realization, boundary);
         VolumeResult volume = measures.volume(realization, boundary);
-        GeometryConfigurationStatus status = boundary.closed()
+        TwoDRegularityMetrics twoD = null;
+        ThreeDRegularityMetrics threeD = null;
+        boolean qualified = false;
+        if (request.dimension() == GeometryEmbeddingDimension.TWO_D && !faces.faces().isEmpty()) {
+            twoD = new TwoDRegularityCalculator().calculate(configuration, coordinates,
+                    faces.faces().get(0).nodeIds(), request.targetEdgeLength(), request.edgeTolerance(),
+                    request.planarityTolerance(), request.degeneracyTolerance(), request.angleTolerance(),
+                    request.angleConditionMode());
+            qualified = twoD.valid();
+            if (!qualified) { area = AreaResult.unavailable(boundary.status()); }
+        } else if (request.dimension() == GeometryEmbeddingDimension.THREE_D && boundary.closed()
+                && volume.available() && volume.absoluteVolume() > request.degeneracyTolerance()) {
+            threeD = new ThreeDRegularityCalculator().calculate(configuration, coordinates,
+                    boundary, request.targetEdgeLength());
+            qualified = true;
+        }
+        GeometryConfigurationStatus status = qualified
                 ? GeometryConfigurationStatus.of(GeometryConfigurationDiagnostic.info(
                 GeometryConfigurationStage.COMPLETE, GeometryConfigurationStatusCode.VALID_CANDIDATE,
-                "Valid candidate", "A realization and unique closed boundary were established; eligible measures were calculated."))
+                "Valid candidate", "Realization, boundary, non-degeneracy, and profile-specific geometric qualification passed."))
                 : boundary.status();
-        return new TestResult(configuration.id(), configuration.graphSymmetry(), realization,
-                faces, boundary, symmetry, area, volume, GeometryOptimizationResult.notAttempted(), status);
+        return new TestResult(configuration.id(), request.experimentProfile(), eligibility,
+                configuration.graphSymmetry(), realization, faces, boundary, symmetry, area, volume,
+                twoD, threeD, GeometryOptimizationResult.notAttempted(), null, status);
     }
 
     static List<Vector3d> initializeCoordinates(int count, GeometryEmbeddingDimension dimension,
