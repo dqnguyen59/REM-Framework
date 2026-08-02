@@ -47,6 +47,7 @@ public final class ViewState {
     private SelectedElement selectedElement;
     private Integer selectedNodeId;
     private long fitInvocationCount;
+    private int workflowPanelWidth=GeometryDiscoveryWorkspaceLayout.PREFERRED_LEFT_WIDTH;
 
     public ViewFit fitToView(GeometryDiscoveryModel model) {
         fitInvocationCount++;
@@ -133,4 +134,6 @@ public final class ViewState {
     public boolean showSelectedEdgeLengthOnly(){return showSelectedEdgeLengthOnly;} public void setShowSelectedEdgeLengthOnly(boolean v){showSelectedEdgeLengthOnly=v;}
     public boolean showEdgeError(){return showEdgeError;} public void setShowEdgeError(boolean v){showEdgeError=v;}
     public boolean showEdgeTarget(){return showEdgeTarget;} public void setShowEdgeTarget(boolean v){showEdgeTarget=v;}
+    public int workflowPanelWidth(){return workflowPanelWidth;}
+    public void setWorkflowPanelWidth(int value){workflowPanelWidth=Math.max(GeometryDiscoveryWorkspaceLayout.MINIMUM_WORKFLOW_WIDTH,value);}
 }

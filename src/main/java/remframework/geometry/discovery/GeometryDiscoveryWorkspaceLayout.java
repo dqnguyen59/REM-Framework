@@ -18,12 +18,13 @@ public record GeometryDiscoveryWorkspaceLayout(
         Bounds workflow, Bounds status, Bounds details, Bounds viewport,
         int topBarHeight, int statusBarHeight) {
 
-    public static final int PREFERRED_LEFT_WIDTH = 335;
+    public static final int PREFERRED_LEFT_WIDTH = 435;
     public static final int PREFERRED_RIGHT_WIDTH = 360;
     public static final int PREFERRED_BOTTOM_HEIGHT = 285;
     public static final int MINIMUM_VIEWPORT_WIDTH = 320;
     public static final int MINIMUM_VIEWPORT_HEIGHT = 200;
     public static final int MINIMUM_PANEL_WIDTH = 150;
+    public static final int MINIMUM_WORKFLOW_WIDTH = 300;
     public static final int MINIMUM_BOTTOM_HEIGHT = 120;
 
     public static GeometryDiscoveryWorkspaceLayout calculate(
@@ -32,6 +33,11 @@ public record GeometryDiscoveryWorkspaceLayout(
     }
     public static GeometryDiscoveryWorkspaceLayout calculate(
             int width,int height,int topBarHeight,int statusBarHeight,int desiredBottomHeight){
+        return calculate(width,height,topBarHeight,statusBarHeight,desiredBottomHeight,PREFERRED_LEFT_WIDTH);
+    }
+    public static GeometryDiscoveryWorkspaceLayout calculate(
+            int width,int height,int topBarHeight,int statusBarHeight,
+            int desiredBottomHeight,int desiredLeftWidth){
         int w = Math.max(1, width);
         int h = Math.max(1, height);
         int top = clamp(topBarHeight, 0, Math.max(0, h - 1));
@@ -41,7 +47,8 @@ public record GeometryDiscoveryWorkspaceLayout(
         int viewportMinimumWidth = Math.min(MINIMUM_VIEWPORT_WIDTH,
                 Math.max(80, w / 3));
         int sideBudget = Math.max(0, w - viewportMinimumWidth);
-        int left = Math.min(PREFERRED_LEFT_WIDTH, sideBudget / 2);
+        int maximumLeft=Math.max(0,w-PREFERRED_RIGHT_WIDTH-viewportMinimumWidth);
+        int left = clamp(desiredLeftWidth,Math.min(MINIMUM_WORKFLOW_WIDTH,maximumLeft),maximumLeft);
         int right = Math.min(PREFERRED_RIGHT_WIDTH, sideBudget - left);
         if (sideBudget >= MINIMUM_PANEL_WIDTH * 2) {
             left = Math.max(MINIMUM_PANEL_WIDTH, left);

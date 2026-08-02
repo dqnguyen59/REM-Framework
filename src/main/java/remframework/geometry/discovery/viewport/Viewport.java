@@ -32,6 +32,7 @@ public final class Viewport implements AutoCloseable {
     private boolean orbiting;
     private boolean panning;
     private boolean resizingDetails;
+    private boolean resizingWorkflow;
     private int windowWidth=1,windowHeight=1;
     private String lastConfigurationId = "";
     private long lastRenderRevision = Long.MIN_VALUE;
@@ -93,6 +94,7 @@ public final class Viewport implements AutoCloseable {
     }
 
     public void cursor(double x, double y) {
+        if(resizingWorkflow)controller.viewState().setWorkflowPanelWidth((int)x);
         if(resizingDetails){controller.setDiscoveryDetailsHeight((int)Math.max(GeometryDiscoveryWorkspaceLayout.MINIMUM_BOTTOM_HEIGHT,controller.layout(windowWidth,windowHeight).details().bottom()-y));}
         if (orbiting) controller.viewState().orbit((x - lastX) * .3, (y - lastY) * .3);
         if (panning) controller.viewState().pan(-(x - lastX) * .01, (y - lastY) * .01, 0);
@@ -101,6 +103,9 @@ public final class Viewport implements AutoCloseable {
     }
 
     public void button(int button, int action, int width, int height) {
+        GeometryDiscoveryWorkspaceLayout.Bounds workflow=controller.layout(width,height).workflow();
+        if(button==0&&action==1&&Math.abs(lastX-workflow.right())<=6){resizingWorkflow=true;orbiting=false;return;}
+        if(button==0&&action==0&&resizingWorkflow){resizingWorkflow=false;return;}
         GeometryDiscoveryWorkspaceLayout.Bounds detail=controller.layout(width,height).details();
         if(button==0&&action==1&&Math.abs(lastY-detail.y())<=6){resizingDetails=true;return;}
         if(button==0&&action==0&&resizingDetails){resizingDetails=false;return;}

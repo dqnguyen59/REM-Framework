@@ -206,7 +206,8 @@ public final class WorkspaceController implements AutoCloseable {
     public GeometryDiscoveryWorkspaceLayout layout(int width, int height) {
         int top = nuklearModel == null ? 30 : nuklearModel.getMenuBarHeight() + 4;
         return GeometryDiscoveryWorkspaceLayout.calculate(
-                width, height, top, Constants.STATUS_BAR_HEIGHT,discoveryDetailsHeight);
+                width, height, top, Constants.STATUS_BAR_HEIGHT,discoveryDetailsHeight,
+                viewState.workflowPanelWidth());
     }
     public int discoveryDetailsHeight(){return discoveryDetailsHeight;}
     public void setDiscoveryDetailsHeight(int value){discoveryDetailsHeight=Math.max(GeometryDiscoveryWorkspaceLayout.MINIMUM_BOTTOM_HEIGHT,value);}

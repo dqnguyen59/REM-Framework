@@ -40,6 +40,8 @@ public final class GeometryDiscoveryWorkspacePreferences {
             view.setShowAxes(Boolean.parseBoolean(values.getProperty("showAxes", "true")));
             view.setShowBoundingBox(Boolean.parseBoolean(
                     values.getProperty("showBoundingBox", "true")));
+            view.setWorkflowPanelWidth(Integer.parseInt(values.getProperty("workflowPanelWidth",
+                    Integer.toString(GeometryDiscoveryWorkspaceLayout.PREFERRED_LEFT_WIDTH))));
             state.setGuidedMode(Boolean.parseBoolean(values.getProperty("guidedMode", "true")));
             state.setIntroductionDismissed(Boolean.parseBoolean(
                     values.getProperty("introductionDismissed", "false")));
@@ -78,6 +80,7 @@ public final class GeometryDiscoveryWorkspacePreferences {
         values.setProperty("showConnections", Boolean.toString(view.showConnections()));
         values.setProperty("showAxes", Boolean.toString(view.showAxes()));
         values.setProperty("showBoundingBox", Boolean.toString(view.showBoundingBox()));
+        values.setProperty("workflowPanelWidth",Integer.toString(view.workflowPanelWidth()));
         values.setProperty("guidedMode", Boolean.toString(state.guidedMode()));
         values.setProperty("introductionDismissed",
                 Boolean.toString(state.introductionDismissed()));

@@ -30,6 +30,25 @@ class GeometryDiscoveryLayoutTest {
             assertTrue(GeometryDiscoveryWorkspaceLayout.calculate(1280,height,30,30).workflow().height()>0);
     }
 
+    @Test void workflowSplitterUsesExpandedDefaultAndClampsForViewport(){
+        GeometryDiscoveryWorkspaceLayout defaults=GeometryDiscoveryWorkspaceLayout.calculate(1400,800,30,30);
+        assertEquals(GeometryDiscoveryWorkspaceLayout.PREFERRED_LEFT_WIDTH,defaults.workflow().width());
+        assertTrue(defaults.workflow().width()>=GeometryDiscoveryWorkspaceLayout.MINIMUM_WORKFLOW_WIDTH);
+        GeometryDiscoveryWorkspaceLayout narrow=GeometryDiscoveryWorkspaceLayout.calculate(900,600,30,30,285,800);
+        assertTrue(narrow.viewport().width()>=Math.min(GeometryDiscoveryWorkspaceLayout.MINIMUM_VIEWPORT_WIDTH,300));
+        GeometryDiscoveryWorkspaceLayout resized=GeometryDiscoveryWorkspaceLayout.calculate(1400,800,30,30,285,520);
+        assertEquals(520,resized.workflow().width());
+    }
+
+    @Test void workflowSplitterWidthRoundTripsWithoutAffectingSelection() throws Exception{
+        Path path=Files.createTempFile("geometry-workspace",".properties");Files.deleteIfExists(path);
+        GeometryDiscoveryWorkspaceState state=new GeometryDiscoveryWorkspaceState();ViewState view=new ViewState();
+        view.setWorkflowPanelWidth(512);SelectedElement selection=SelectedElement.edge(1,2);view.setSelectedElement(selection);
+        GeometryDiscoveryWorkspacePreferences preferences=new GeometryDiscoveryWorkspacePreferences(path);preferences.save(state,view);
+        ViewState reopened=new ViewState();preferences.load(new GeometryDiscoveryWorkspaceState(),reopened);
+        assertEquals(512,reopened.workflowPanelWidth());assertSame(selection,view.selectedElement());
+    }
+
     @Test void fixedRegionsRemainAttachedAcrossResizeAndExcludeViewport() {
         GeometryDiscoveryWorkspaceLayout first =
                 GeometryDiscoveryWorkspaceLayout.calculate(1280, 800, 30, 30);
