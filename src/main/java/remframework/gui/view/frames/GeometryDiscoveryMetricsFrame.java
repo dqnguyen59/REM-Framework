@@ -31,7 +31,7 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
             GeometryDiscoveryWorkspaceManager.getInstance();
     private int phase2DetailsTab;
     private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification", "Parameter Derivation", "Generation Strategy", "Face Composition", "Eligibility",
-            "Realization", "Faces and Boundary", "2D Regularity", "3D Regularity", "Measurement", "Diagnostics"};
+            "Realization", "Faces and Boundary", "2D Regularity", "3D Regularity", "Measurement", "Diagnostics", "Selected Element"};
 
     public GeometryDiscoveryMetricsFrame(NuklearModel model) {
         super(model);
@@ -99,11 +99,14 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
                 case 10 -> phase2Regularity3d(c,result);
                 case 11 -> phase2Measurement(c, result);
                 case 12 -> phase2Diagnostics(c, generation, configuration, result);
+                case 13 -> phase2SelectedElement(c);
                 default -> { }
             }
             Nuklear.nk_group_end(c);
         }
     }
+
+    private void phase2SelectedElement(NkContext c){SelectedElement selected=controller.viewState().selectedElement();RenderModel model=controller.phasedWorkflow().renderModel();IncrementalSession session=controller.phasedWorkflow().incrementalSession();if(selected==null||model==null||session==null){label(c,"Select a center, vertex, edge, or face in the viewport.");return;}SelectedElementMeasurements m=ElementMeasurementCalculator.measure(model,selected,session.request().targetEdgeLength(),session.request().edgeTolerance());label(c,"Canonical selection: "+selected.type()+" "+selected.id());label(c,"Snapshot revision: "+m.revision());label(c,"Position: "+m.position());label(c,"Vertex IDs: "+m.vertexIds());label(c,"Edge IDs: "+m.edgeIds());label(c,"Face IDs: "+m.faceIds());label(c,"Length="+m.length()+" target="+m.targetLength()+" absolute error="+m.error()+" tolerance="+m.tolerance()+" ratio="+m.ratio());label(c,"Midpoint="+m.midpoint()+" center distance="+m.centerDistance());label(c,"Area="+m.area()+" perimeter="+m.perimeter()+" planarity error="+m.planarityError());label(c,"Interior angles radians="+m.angles());label(c,"Interior angles degrees="+m.angles().stream().map(Math::toDegrees).toList());label(c,"Centroid="+m.centroid()+" normal="+m.normal());label(c,"Orientation="+m.state()+" signed outward alignment="+m.outwardAlignment());label(c,"Face Distance (center to plane)="+m.facePlaneDistance());label(c,"Face-Center Distance="+m.faceCentroidDistance());}
 
     private void phase2GenerationStrategy(NkContext c,GenerationResult generation){GenerationDiagnostics g=generation.generationDiagnostics();label(c,"Strategy: "+g.strategy()+" version="+g.strategyVersion()+" workers="+g.workerCount());label(c,"Construction method: "+g.constructionMethod());label(c,"Normalized parameters: "+generation.request().normalizedGraphRequest());label(c,"Completeness: "+g.completeness());label(c,"Search limits: "+g.searchLimits());label(c,"States examined="+g.partialStatesExamined()+" pruned="+g.partialStatesPruned());label(c,"Completed candidates="+g.completedCandidates()+" duplicate candidates="+g.duplicateCandidates()+" retained="+g.retainedConfigurations());label(c,"Pruning diagnostics: "+g.pruningCounts());label(c,g.explanation());}
 

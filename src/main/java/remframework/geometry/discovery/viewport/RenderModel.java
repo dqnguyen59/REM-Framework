@@ -31,12 +31,13 @@ import java.util.concurrent.atomic.AtomicLong;
 public record RenderModel(String configurationId,
         GeometryDiscoveryModel model, DisplayTransform transform,
         boolean topologyPreview, long revision, List<CanonicalNodeLabel> nodeLabels,
-        List<DerivedFace> derivedFaces) {
+        List<DerivedFace> derivedFaces, List<Vector3d> scientificCoordinates) {
     private static final ConcurrentHashMap<String,List<DerivedFace>> FACE_CACHE=new ConcurrentHashMap<>();
     private static final AtomicLong FACE_COMPLEX_BUILDS=new AtomicLong();
     public RenderModel {
         nodeLabels = List.copyOf(nodeLabels);
         derivedFaces=List.copyOf(derivedFaces);
+        scientificCoordinates=scientificCoordinates.stream().map(Vector3d::new).toList();
     }
     public static RenderModel topologyPreview(Configuration configuration,
             long revision) {
@@ -74,7 +75,7 @@ public record RenderModel(String configurationId,
                 new CanonicalNodeLabel(node.id(), Integer.toString(node.id()), node.position())).toList();
         String faceKey=configuration.id()+":"+configuration.provenance().getOrDefault("combinatorialFaces","");List<DerivedFace> faces=FACE_CACHE.computeIfAbsent(faceKey,ignored->{FACE_COMPLEX_BUILDS.incrementAndGet();return new remframework.geometry.discovery.eligibility.TopologyEligibilityAnalyzer().deriveTopologicalFaces(configuration).stream().map(cycle->new DerivedFace("face-"+cycle,cycle,true,true,0)).toList();});
         return new RenderModel(configuration.id().toString(), model,
-                transform, preview, revision, labels,faces);
+                transform, preview, revision, labels,faces,scientificCoordinates);
         }finally{DevelopmentTimingDiagnostics.record("viewport.topology-preview-construction",System.nanoTime()-started);}
     }
     public static long faceComplexBuildCount(){return FACE_COMPLEX_BUILDS.get();}

@@ -39,6 +39,12 @@ public final class ViewState {
     private boolean edgeErrorColoring = true;
     private boolean showNeighborDistanceLabels;
     private boolean showDerivedFaces=true,showAcceptedFaces=true,showRejectedFaces,showFaceNormals;
+    private boolean showGeometryCenter=true,showCenterLabel=true,showCenterToFaceLines;
+    private boolean showCenterToVertexLines,showSelectedFaceNormalOnly,showNormalAlignmentState;
+    private boolean showEdgeLengths,showSelectedEdgeLengthOnly=true,showEdgeError,showEdgeTarget;
+    private double normalDisplayLength=.35;
+    private SelectionFilters selectionFilters=SelectionFilters.all();
+    private SelectedElement selectedElement;
     private Integer selectedNodeId;
     private long fitInvocationCount;
 
@@ -89,7 +95,11 @@ public final class ViewState {
     public boolean orthographic() { return orthographic; }
     public void setOrthographic(boolean value) { orthographic = value; }
     public Integer selectedNodeId() { return selectedNodeId; }
-    public void setSelectedNodeId(Integer value) { selectedNodeId = value; }
+    public void setSelectedNodeId(Integer value) { selectedNodeId = value; selectedElement=value==null?null:SelectedElement.vertex(value); }
+    public SelectedElement selectedElement(){return selectedElement;}
+    public void setSelectedElement(SelectedElement value){selectedElement=value;selectedNodeId=value!=null&&value.type()==SelectedElement.Type.VERTEX?Integer.valueOf(value.id()):null;}
+    public SelectionFilters selectionFilters(){return selectionFilters;}
+    public void setSelectionFilters(SelectionFilters value){selectionFilters=value;}
     public boolean showNodeLabels() { return showNodeLabels; }
     public void setShowNodeLabels(boolean value) { showNodeLabels = value; }
     public boolean showVertices() { return showVertices; }
@@ -112,4 +122,15 @@ public final class ViewState {
     public boolean showAcceptedFaces(){return showAcceptedFaces;} public void setShowAcceptedFaces(boolean v){showAcceptedFaces=v;}
     public boolean showRejectedFaces(){return showRejectedFaces;} public void setShowRejectedFaces(boolean v){showRejectedFaces=v;}
     public boolean showFaceNormals(){return showFaceNormals;} public void setShowFaceNormals(boolean v){showFaceNormals=v;}
+    public boolean showGeometryCenter(){return showGeometryCenter;} public void setShowGeometryCenter(boolean v){showGeometryCenter=v;}
+    public boolean showCenterLabel(){return showCenterLabel;} public void setShowCenterLabel(boolean v){showCenterLabel=v;}
+    public boolean showCenterToFaceLines(){return showCenterToFaceLines;} public void setShowCenterToFaceLines(boolean v){showCenterToFaceLines=v;}
+    public boolean showCenterToVertexLines(){return showCenterToVertexLines;} public void setShowCenterToVertexLines(boolean v){showCenterToVertexLines=v;}
+    public boolean showSelectedFaceNormalOnly(){return showSelectedFaceNormalOnly;} public void setShowSelectedFaceNormalOnly(boolean v){showSelectedFaceNormalOnly=v;}
+    public boolean showNormalAlignmentState(){return showNormalAlignmentState;} public void setShowNormalAlignmentState(boolean v){showNormalAlignmentState=v;}
+    public double normalDisplayLength(){return normalDisplayLength;} public void setNormalDisplayLength(double v){normalDisplayLength=Math.max(.01,v);}
+    public boolean showEdgeLengths(){return showEdgeLengths;} public void setShowEdgeLengths(boolean v){showEdgeLengths=v;}
+    public boolean showSelectedEdgeLengthOnly(){return showSelectedEdgeLengthOnly;} public void setShowSelectedEdgeLengthOnly(boolean v){showSelectedEdgeLengthOnly=v;}
+    public boolean showEdgeError(){return showEdgeError;} public void setShowEdgeError(boolean v){showEdgeError=v;}
+    public boolean showEdgeTarget(){return showEdgeTarget;} public void setShowEdgeTarget(boolean v){showEdgeTarget=v;}
 }

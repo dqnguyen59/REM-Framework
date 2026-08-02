@@ -126,19 +126,20 @@ public final class Viewport implements AutoCloseable {
                 controller.layout(width, height).viewport();
         if (mouseX < bounds.x() || mouseX >= bounds.right()
                 || mouseY < bounds.y() || mouseY >= bounds.bottom()) {
-            controller.viewState().setSelectedNodeId(null);
+            controller.viewState().setSelectedElement(null);
             return;
         }
         double localX = mouseX - bounds.x();
         double localY = mouseY - bounds.y();
-        GeometryDiscoveryModel model = displayedGeometry(
-                controller.workspace().snapshot()).model();
+        RenderModel renderModel=controller.phasedWorkflow().renderModel();
+        GeometryDiscoveryModel model=renderModel==null?displayedGeometry(controller.workspace().snapshot()).model():renderModel.model();
         ViewFit fit = controller.viewState().calculateFit(model);
         Matrix4f matrix = renderer.viewProjection(controller.viewState(), fit,
                 bounds.width(), bounds.height());
-        Integer closest = null;
+        SelectedElement closest = null;
         double closestDistance = 14;
-        for (DiscoveryNode node : model.nodes()) {
+        SelectionFilters filters=controller.viewState().selectionFilters();
+        if(filters.vertices())for (DiscoveryNode node : model.nodes()) {
             Vector4f projected = new Vector4f((float) node.position().x,
                     (float) node.position().y, (float) node.position().z, 1).mul(matrix);
             if (projected.w <= 0) continue;
@@ -147,11 +148,27 @@ public final class Viewport implements AutoCloseable {
             double distance = Math.hypot(localX - screenX, localY - screenY);
             if (distance < closestDistance) {
                 closestDistance = distance;
-                closest = node.id();
+                closest = SelectedElement.vertex(node.id());
             }
         }
-        controller.viewState().setSelectedNodeId(closest);
+        if(closest==null&&filters.center()&&renderModel!=null&&controller.viewState().showGeometryCenter()){
+            double[] q=screen(new org.joml.Vector3d(),matrix,bounds.width(),bounds.height());
+            if(q!=null&&Math.hypot(localX-q[0],localY-q[1])<16)closest=SelectedElement.center();
+        }
+        if(closest==null&&filters.edges())for(DiscoveryConnection edge:model.connections()){
+            double[] a=screen(model.nodes().get(edge.firstNodeId()).position(),matrix,bounds.width(),bounds.height());
+            double[] b=screen(model.nodes().get(edge.secondNodeId()).position(),matrix,bounds.width(),bounds.height());
+            if(a!=null&&b!=null&&segmentDistance(localX,localY,a[0],a[1],b[0],b[1])<8){closest=SelectedElement.edge(edge.firstNodeId(),edge.secondNodeId());break;}
+        }
+        if(closest==null&&filters.faces()&&renderModel!=null)for(DerivedFace face:renderModel.derivedFaces()){
+            java.util.List<double[]> polygon=new java.util.ArrayList<>();for(int id:face.nodeIds()){double[] q=screen(model.nodes().get(id).position(),matrix,bounds.width(),bounds.height());if(q!=null)polygon.add(q);}if(polygon.size()==face.nodeIds().size()&&inside(localX,localY,polygon)){closest=SelectedElement.face(face.id());break;}
+        }
+        controller.viewState().setSelectedElement(closest);
     }
+
+    private static double[] screen(org.joml.Vector3d p,Matrix4f matrix,int width,int height){Vector4f q=new Vector4f((float)p.x,(float)p.y,(float)p.z,1).mul(matrix);return q.w<=0?null:new double[]{(q.x/q.w*.5+.5)*width,(1-(q.y/q.w*.5+.5))*height};}
+    private static double segmentDistance(double px,double py,double ax,double ay,double bx,double by){double dx=bx-ax,dy=by-ay;double d=dx*dx+dy*dy;if(d==0)return Math.hypot(px-ax,py-ay);double t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/d));return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));}
+    private static boolean inside(double x,double y,java.util.List<double[]> p){boolean result=false;for(int i=0,j=p.size()-1;i<p.size();j=i++){double[] a=p.get(i),b=p.get(j);if((a[1]>y)!=(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])result=!result;}return result;}
 
     @Override public void close() { renderer.close(); }
 

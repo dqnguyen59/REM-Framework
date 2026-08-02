@@ -111,7 +111,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private boolean showVertices = true, showEdges = true, showLabels = true,
             showCandidateFaces = true, showBoundaryFaces = true, showRejectedFaces = false,
             showNormals = false, showSelfIntersections = true, showViewportDiagnostics = false,
-            showWorldAxes = true, showBoundingBox = true;
+            showWorldAxes = true, showBoundingBox = true,showCenter=true,showCenterLabel=true,
+            showCenterFaceLines,showCenterVertexLines,selectVertices=true,selectEdges=true,
+            selectFaces=true,selectCenter=true,selectedNormalOnly,showEdgeLengths;
 
     public GeometryDiscoveryControlFrame(NuklearModel model) {
         super(model);
@@ -598,11 +600,20 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         showCandidateFaces = nk_check_label(c, "Candidate faces", showCandidateFaces, .65, .35);
         showBoundaryFaces = nk_check_label(c, "Accepted boundary faces", showBoundaryFaces, .65, .35);
         showRejectedFaces = nk_check_label(c, "Rejected faces", showRejectedFaces, .65, .35);
-        showNormals = nk_check_label(c, "Normals", showNormals, .65, .35);
+        showNormals = nk_check_label(c, "Show All Face Normals", showNormals, .65, .35);
+        selectedNormalOnly=nk_check_label(c,"Show Selected Face Normal Only",selectedNormalOnly,.65,.35);
         controller.viewState().setShowDerivedFaces(showCandidateFaces);
         controller.viewState().setShowAcceptedFaces(showBoundaryFaces);
         controller.viewState().setShowRejectedFaces(showRejectedFaces);
         controller.viewState().setShowFaceNormals(showNormals);
+        controller.viewState().setShowSelectedFaceNormalOnly(selectedNormalOnly);
+        showCenter=nk_check_label(c,"Show Geometry Center",showCenter,.65,.35);
+        showCenterLabel=nk_check_label(c,"Show Center Label",showCenterLabel,.65,.35);
+        showCenterFaceLines=nk_check_label(c,"Show Center-to-Face Lines",showCenterFaceLines,.65,.35);
+        showCenterVertexLines=nk_check_label(c,"Show Center-to-Vertex Lines",showCenterVertexLines,.65,.35);
+        controller.viewState().setShowGeometryCenter(showCenter);controller.viewState().setShowCenterLabel(showCenterLabel);controller.viewState().setShowCenterToFaceLines(showCenterFaceLines);controller.viewState().setShowCenterToVertexLines(showCenterVertexLines);
+        heading(c,"Viewport Selection");selectVertices=nk_check_label(c,"Select vertices",selectVertices,.65,.35);selectEdges=nk_check_label(c,"Select edges",selectEdges,.65,.35);selectFaces=nk_check_label(c,"Select faces",selectFaces,.65,.35);selectCenter=nk_check_label(c,"Select center",selectCenter,.65,.35);controller.viewState().setSelectionFilters(new SelectionFilters(selectVertices,selectEdges,selectFaces,selectCenter));
+        showEdgeLengths=nk_check_label(c,"Show Edge Lengths",showEdgeLengths,.65,.35);controller.viewState().setShowEdgeLengths(showEdgeLengths);
         showSelfIntersections = nk_check_label(c, "Detected self-intersections", showSelfIntersections, .65, .35);
         showViewportDiagnostics = nk_check_label(c, "Viewport diagnostics", showViewportDiagnostics, .65, .35);
         showWorldAxes = nk_check_label(c, "World axes", showWorldAxes, .65, .35);
