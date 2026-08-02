@@ -30,7 +30,9 @@ public record TestRequest(ConfigurationId configurationId,
         PlanarityRealizationMode planarityMode, double planeRestoringStrength,
         double angleRestoringStrength, ThreeDExperimentConditions threeDConditions,
         BenchmarkPreset benchmarkPreset, ThreeDConstraintStrengths threeDConstraintStrengths,
-        FaceComposition faceComposition) {
+        FaceComposition faceComposition, PrimaryParameterMode primaryParameterMode,
+        SurfaceTopologyAssumption surfaceTopologyAssumption,
+        ParameterDerivationReport parameterDerivation) {
     public TestRequest {
         if(configurationId==null||dimension==null)throw new IllegalArgumentException("A selected configuration and dimension are required.");
         if(!Double.isFinite(targetEdgeLength)||targetEdgeLength<=0||initialRealizations<1||searchLimit<1)throw new IllegalArgumentException("Geometry-test limits must be positive and finite.");
@@ -55,6 +57,8 @@ public record TestRequest(ConfigurationId configurationId,
         threeDConditions=threeDConditions==null?BenchmarkPresets.conditions(benchmarkPreset):threeDConditions;
         threeDConstraintStrengths=threeDConstraintStrengths==null?ThreeDConstraintStrengths.defaults():threeDConstraintStrengths;
         faceComposition=faceComposition==null?FaceComposition.discover():faceComposition;
+        primaryParameterMode=primaryParameterMode==null?PrimaryParameterMode.NODE_COUNT:primaryParameterMode;
+        surfaceTopologyAssumption=surfaceTopologyAssumption==null?SurfaceTopologyAssumption.SPHERE_LIKE:surfaceTopologyAssumption;
     }
     public TestRequest(ConfigurationId configurationId,
             GeometryEmbeddingDimension dimension,double targetEdgeLength,long randomSeed,
@@ -70,7 +74,26 @@ public record TestRequest(ConfigurationId configurationId,
                 relaxationSettings,symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,
                 regularityMode,optimizationObjective,edgeTolerance,planarityTolerance,
                 degeneracyTolerance,angleTolerance,planarityMode,planeRestoringStrength,
-                angleRestoringStrength,threeDConditions,benchmarkPreset,threeDConstraintStrengths,null);
+                angleRestoringStrength,threeDConditions,benchmarkPreset,threeDConstraintStrengths,null,
+                null,null,null);
+    }
+    public TestRequest(ConfigurationId configurationId,
+            GeometryEmbeddingDimension dimension,double targetEdgeLength,long randomSeed,
+            int initialRealizations,DynamicElasticSettings relaxationSettings,
+            GeometrySymmetryPolicy symmetryPolicy,int searchLimit, ExperimentProfile experimentProfile,
+            AngleConditionMode angleConditionMode, RegularityMode regularityMode,
+            OptimizationObjective optimizationObjective, double edgeTolerance,
+            double planarityTolerance, double degeneracyTolerance, double angleTolerance,
+            PlanarityRealizationMode planarityMode, double planeRestoringStrength,
+            double angleRestoringStrength, ThreeDExperimentConditions threeDConditions,
+            BenchmarkPreset benchmarkPreset, ThreeDConstraintStrengths threeDConstraintStrengths,
+            FaceComposition faceComposition) {
+        this(configurationId,dimension,targetEdgeLength,randomSeed,initialRealizations,
+                relaxationSettings,symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,
+                regularityMode,optimizationObjective,edgeTolerance,planarityTolerance,
+                degeneracyTolerance,angleTolerance,planarityMode,planeRestoringStrength,
+                angleRestoringStrength,threeDConditions,benchmarkPreset,threeDConstraintStrengths,
+                faceComposition,null,null,null);
     }
     public TestRequest(ConfigurationId configurationId, GeometryEmbeddingDimension dimension,
             double targetEdgeLength,long randomSeed,int initialRealizations,
@@ -109,8 +132,10 @@ public record TestRequest(ConfigurationId configurationId,
                 experimentProfile, angleConditionMode, regularityMode, optimizationObjective,
                 edgeTolerance, planarityTolerance, degeneracyTolerance, angleTolerance,
                 planarityMode, planeRestoringStrength, angleRestoringStrength,
-                BenchmarkPresets.conditions(preset), preset, ThreeDConstraintStrengths.defaults(),faceComposition);
+                BenchmarkPresets.conditions(preset), preset, ThreeDConstraintStrengths.defaults(),faceComposition,
+                primaryParameterMode,surfaceTopologyAssumption,parameterDerivation);
     }
-    public TestRequest withRandomSeed(long seed){return new TestRequest(configurationId,dimension,targetEdgeLength,seed,initialRealizations,relaxationSettings,symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,angleTolerance,planarityMode,planeRestoringStrength,angleRestoringStrength,threeDConditions,benchmarkPreset,threeDConstraintStrengths,faceComposition);}
-    public TestRequest withFaceComposition(FaceComposition value){return new TestRequest(configurationId,dimension,targetEdgeLength,randomSeed,initialRealizations,relaxationSettings,symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,angleTolerance,planarityMode,planeRestoringStrength,angleRestoringStrength,threeDConditions,benchmarkPreset,threeDConstraintStrengths,value);}
+    public TestRequest withRandomSeed(long seed){return new TestRequest(configurationId,dimension,targetEdgeLength,seed,initialRealizations,relaxationSettings,symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,angleTolerance,planarityMode,planeRestoringStrength,angleRestoringStrength,threeDConditions,benchmarkPreset,threeDConstraintStrengths,faceComposition,primaryParameterMode,surfaceTopologyAssumption,parameterDerivation);}
+    public TestRequest withFaceComposition(FaceComposition value){return new TestRequest(configurationId,dimension,targetEdgeLength,randomSeed,initialRealizations,relaxationSettings,symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,angleTolerance,planarityMode,planeRestoringStrength,angleRestoringStrength,threeDConditions,benchmarkPreset,threeDConstraintStrengths,value,primaryParameterMode,surfaceTopologyAssumption,parameterDerivation);}
+    public TestRequest withParameterDerivation(ConfigurationRequest generation){return new TestRequest(configurationId,dimension,targetEdgeLength,randomSeed,initialRealizations,relaxationSettings,symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,angleTolerance,planarityMode,planeRestoringStrength,angleRestoringStrength,threeDConditions,benchmarkPreset,threeDConstraintStrengths,faceComposition,generation.primaryParameterMode(),generation.surfaceTopologyAssumption(),generation.parameterDerivation());}
 }

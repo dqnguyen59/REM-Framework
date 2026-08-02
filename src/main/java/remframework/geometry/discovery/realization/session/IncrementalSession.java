@@ -273,7 +273,7 @@ public final class IncrementalSession {
                     configuration.graphSymmetry(), realization, null, null, null,
                     AreaResult.unavailable(status), VolumeResult.unavailable(status), null, null, null,
                     GeometryOptimizationResult.notAttempted(), null, status,
-                    request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed(),request.faceComposition());
+                    request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed(),request.faceComposition(),request.primaryParameterMode(),request.surfaceTopologyAssumption(),request.parameterDerivation());
         }
         FaceDerivationResult faces = new FaceDerivationPipeline().derive(configuration, realization);
         ClosedBoundaryResult boundary = new ClosedBoundaryValidator().validate(configuration,
@@ -314,7 +314,7 @@ public final class IncrementalSession {
         return new TestResult(configuration.id(), request.experimentProfile(),request.planarityMode(),request.angleConditionMode(), eligibility,
                 configuration.graphSymmetry(), realization, faces, boundary, symmetry, area, volume,
                 twoD, threeD,threeDConditions, GeometryOptimizationResult.notAttempted(), null, status,
-                request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed(),request.faceComposition());
+                request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed(),request.faceComposition(),request.primaryParameterMode(),request.surfaceTopologyAssumption(),request.parameterDerivation());
     }
 
     static List<Vector3d> initializeCoordinates(int count, GeometryEmbeddingDimension dimension,

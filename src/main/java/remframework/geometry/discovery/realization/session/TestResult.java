@@ -36,7 +36,9 @@ public record TestResult(ConfigurationId configurationId,
         GeometryConfigurationStatus status, BenchmarkPreset benchmarkPreset,
         ReferenceTopologyMatch referenceTopologyMatch,
         ThreeDConstraintStrengths threeDConstraintStrengths,long requestedSeed,
-        FaceComposition faceComposition) {
+        FaceComposition faceComposition,PrimaryParameterMode primaryParameterMode,
+        SurfaceTopologyAssumption surfaceTopologyAssumption,
+        ParameterDerivationReport parameterDerivation) {
     public TestResult(ConfigurationId configurationId,
             ExperimentProfile experimentProfile, PlanarityRealizationMode planarityMode,
             AngleConditionMode angleConditionMode, TopologyEligibilityReport eligibility,
@@ -53,7 +55,8 @@ public record TestResult(ConfigurationId configurationId,
                 graphSymmetry,realization,faceDerivation,boundary,geometricSymmetry,area,volume,
                 twoDRegularity,threeDRegularity,threeDConditionReport,optimization,
                 optimizationComparison,status,benchmarkPreset,referenceTopologyMatch,
-                threeDConstraintStrengths,requestedSeed,FaceComposition.discover());
+                threeDConstraintStrengths,requestedSeed,FaceComposition.discover(),
+                PrimaryParameterMode.NODE_COUNT,SurfaceTopologyAssumption.SPHERE_LIKE,null);
     }
     public TestResult(ConfigurationId configurationId, GraphSymmetryClassification graphSymmetry,
             Realization realization, FaceDerivationResult faceDerivation, ClosedBoundaryResult boundary,
@@ -61,7 +64,8 @@ public record TestResult(ConfigurationId configurationId,
             GeometryOptimizationResult optimization, GeometryConfigurationStatus status) {
         this(configurationId, null, null, null, null, graphSymmetry, realization, faceDerivation, boundary,
                 geometricSymmetry, area, volume, null, null, null, optimization, null, status,
-                BenchmarkPreset.NONE, null,null,realization==null?0:realization.seed(),FaceComposition.discover());
+                BenchmarkPreset.NONE, null,null,realization==null?0:realization.seed(),FaceComposition.discover(),
+                PrimaryParameterMode.NODE_COUNT,SurfaceTopologyAssumption.SPHERE_LIKE,null);
     }
 
     public boolean benchmarkTopologyRequirementPassed() {

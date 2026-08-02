@@ -29,7 +29,11 @@ public record ConfigurationRequest(int nodeCount, int exactDegree,
         GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
         int maximumConfigurations, Duration enumerationTimeLimit,
         String generationStrategy, Path outputDirectory, ExperimentProfile experimentProfile,
-        int maximumDirectCycleNodes, FaceComposition faceComposition) {
+        int maximumDirectCycleNodes, FaceComposition faceComposition,
+        PrimaryParameterMode primaryParameterMode, Integer authoritativeNodeCount,
+        Long authoritativeFaceCount, ExactFaceCounts exactFaceCounts,
+        SurfaceTopologyAssumption surfaceTopologyAssumption,
+        ParameterDerivationReport parameterDerivation) {
     public ConfigurationRequest {
         intendedDimension = intendedDimension == null ? GeometryEmbeddingDimension.THREE_D : intendedDimension;
         symmetryFilter = symmetryFilter == null ? GraphSymmetryFilter.BOTH : symmetryFilter;
@@ -41,20 +45,35 @@ public record ConfigurationRequest(int nodeCount, int exactDegree,
                 : experimentProfile;
         maximumDirectCycleNodes=maximumDirectCycleNodes>0?maximumDirectCycleNodes:10_000;
         faceComposition=faceComposition==null?FaceComposition.discover():faceComposition;
+        primaryParameterMode=primaryParameterMode==null?PrimaryParameterMode.NODE_COUNT:primaryParameterMode;
+        surfaceTopologyAssumption=surfaceTopologyAssumption==null
+                ?SurfaceTopologyAssumption.SPHERE_LIKE:surfaceTopologyAssumption;
+        if(primaryParameterMode==PrimaryParameterMode.NODE_COUNT&&authoritativeNodeCount==null)
+            authoritativeNodeCount=nodeCount;
+        exactFaceCounts=exactFaceCounts==null?new ExactFaceCounts(java.util.Map.of()):exactFaceCounts;
+        parameterDerivation=ParameterDerivation.derive(primaryParameterMode,authoritativeNodeCount,
+                authoritativeFaceCount,exactFaceCounts,exactDegree,experimentProfile,faceComposition,
+                surfaceTopologyAssumption);
+        if(parameterDerivation.derivedVertexCount()!=null
+                &&parameterDerivation.derivedVertexCount()>0
+                &&parameterDerivation.derivedVertexCount()<=Integer.MAX_VALUE)
+            nodeCount=Math.toIntExact(parameterDerivation.derivedVertexCount());
     }
     public ConfigurationRequest(int nodeCount, int exactDegree,
             GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
             int maximumConfigurations, Duration enumerationTimeLimit,
             String generationStrategy, Path outputDirectory) {
         this(nodeCount, exactDegree, intendedDimension, symmetryFilter, maximumConfigurations,
-                enumerationTimeLimit, generationStrategy, outputDirectory, null,10_000,null);
+                enumerationTimeLimit, generationStrategy, outputDirectory, null,10_000,null,
+                null,null,null,null,null,null);
     }
     public ConfigurationRequest(int nodeCount, int exactDegree,
             GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
             int maximumConfigurations, Duration enumerationTimeLimit,
             String generationStrategy, Path outputDirectory, ExperimentProfile experimentProfile) {
         this(nodeCount,exactDegree,intendedDimension,symmetryFilter,maximumConfigurations,
-                enumerationTimeLimit,generationStrategy,outputDirectory,experimentProfile,10_000,null);
+                enumerationTimeLimit,generationStrategy,outputDirectory,experimentProfile,10_000,null,
+                null,null,null,null,null,null);
     }
     public ConfigurationRequest(int nodeCount, int exactDegree,
             GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
@@ -63,17 +82,44 @@ public record ConfigurationRequest(int nodeCount, int exactDegree,
             int maximumDirectCycleNodes) {
         this(nodeCount,exactDegree,intendedDimension,symmetryFilter,maximumConfigurations,
                 enumerationTimeLimit,generationStrategy,outputDirectory,experimentProfile,
-                maximumDirectCycleNodes,null);
+                maximumDirectCycleNodes,null,null,null,null,null,null,null);
     }
     public static ConfigurationRequest exhaustive(int n, int k,
             GeometryEmbeddingDimension dimension) {
         return new ConfigurationRequest(n, k, dimension, GraphSymmetryFilter.BOTH,
-                10_000, Duration.ofSeconds(30), "EXHAUSTIVE_BACKTRACKING", null, null,10_000,null);
+                10_000, Duration.ofSeconds(30), "EXHAUSTIVE_BACKTRACKING", null, null,10_000,null,
+                null,null,null,null,null,null);
     }
 
     public ConfigurationRequest withFaceComposition(FaceComposition value) {
         return new ConfigurationRequest(nodeCount, exactDegree, intendedDimension, symmetryFilter,
                 maximumConfigurations, enumerationTimeLimit, generationStrategy, outputDirectory,
-                experimentProfile, maximumDirectCycleNodes, value);
+                experimentProfile, maximumDirectCycleNodes, value,primaryParameterMode,
+                authoritativeNodeCount,authoritativeFaceCount,exactFaceCounts,
+                surfaceTopologyAssumption,null);
+    }
+
+    public NormalizedGraphRequest normalizedGraphRequest() {
+        if(!parameterDerivation.arithmeticFeasible())
+            throw new IllegalStateException("Cannot normalize an arithmetically invalid request.");
+        return new NormalizedGraphRequest(nodeCount,exactDegree,
+                parameterDerivation.derivedEdgeCount(),parameterDerivation.derivedFaceCount(),
+                faceComposition,surfaceTopologyAssumption,primaryParameterMode,parameterDerivation);
+    }
+
+    public static ConfigurationRequest byFaceCount(long faceCount,int k,
+            GeometryEmbeddingDimension dimension,ExperimentProfile profile) {
+        return new ConfigurationRequest(0,k,dimension,GraphSymmetryFilter.BOTH,10_000,
+                Duration.ofSeconds(30),"EXHAUSTIVE_BACKTRACKING",null,profile,10_000,
+                null,PrimaryParameterMode.FACE_COUNT,null,faceCount,null,
+                SurfaceTopologyAssumption.SPHERE_LIKE,null);
+    }
+
+    public static ConfigurationRequest byFaceComposition(ExactFaceCounts counts,int k,
+            GeometryEmbeddingDimension dimension,ExperimentProfile profile) {
+        return new ConfigurationRequest(0,k,dimension,GraphSymmetryFilter.BOTH,10_000,
+                Duration.ofSeconds(30),"EXHAUSTIVE_BACKTRACKING",null,profile,10_000,
+                null,PrimaryParameterMode.FACE_COMPOSITION,null,null,counts,
+                SurfaceTopologyAssumption.SPHERE_LIKE,null);
     }
 }

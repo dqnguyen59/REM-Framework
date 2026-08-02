@@ -7,8 +7,6 @@ import remframework.geometry.discovery.graph.symmetry.AutomorphismAnalyzer;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import remframework.geometry.discovery.experiment.FaceCompositionMode;
-import remframework.geometry.discovery.experiment.FaceCompositionArithmetic;
 
 /**
  * Deterministic exhaustive generation of connected simple regular graphs.
@@ -23,22 +21,24 @@ public final class ConfigurationGenerator {
 
     public GenerationResult generate(ConfigurationRequest request) {
         long started=System.nanoTime();
-        GeometryConfigurationStatus invalid=validate(request);
-        if(invalid!=null) return result(request,List.of(),0,0,started,false,invalid);
-        if(request.faceComposition().mode()==FaceCompositionMode.UNIFORM_FACE_SIZE) {
-            FaceCompositionArithmetic arithmetic=FaceCompositionArithmetic.evaluate(request.nodeCount(),
-                    request.exactDegree(),request.faceComposition().commonFaceEdgeCount(),
-                    request.experimentProfile());
-            if(!arithmetic.passed()) {
-                var d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.REQUEST_VALIDATION,
-                        GeometryConfigurationStatusCode.FACE_COMPOSITION_ARITHMETICALLY_IMPOSSIBLE,
-                        "Face composition arithmetically impossible", arithmetic.explanation());
-                return result(request,List.of(),0,0,started,false,GeometryConfigurationStatus.of(d));
-            }
+        if(request==null)return result(null,List.of(),0,0,started,false,validate(null));
+        if(request!=null&&request.primaryParameterMode()==PrimaryParameterMode.NODE_COUNT) {
+            GeometryConfigurationStatus invalid=validate(request);
+            if(invalid!=null)return result(request,List.of(),0,0,started,false,invalid);
         }
-        if(request.exactDegree()==2&&request.nodeCount()>=3)
+        if(request!=null&&!request.parameterDerivation().arithmeticFeasible()) {
+            var report=request.parameterDerivation();
+            var d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.REQUEST_VALIDATION,
+                    report.primaryStatus(),"Primary-parameter preflight failed",report.explanation());
+            return result(request,List.of(),0,0,started,false,GeometryConfigurationStatus.of(d));
+        }
+        NormalizedGraphRequest normalized=request.normalizedGraphRequest();
+        GeometryConfigurationStatus invalid=request!=null&&request.primaryParameterMode()==PrimaryParameterMode.NODE_COUNT
+                ?null:validate(request);
+        if(invalid!=null) return result(request,List.of(),0,0,started,false,invalid);
+        if(normalized.exactDegree()==2&&normalized.nodeCount()>=3)
             return directCycle(request,started);
-        if(request.nodeCount()>MAX_EXHAUSTIVE_N) {
+        if(normalized.nodeCount()>MAX_EXHAUSTIVE_N) {
             var d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.GRAPH_GENERATION,
                     GeometryConfigurationStatusCode.ENUMERATION_LIMIT_REACHED,
                     "Exhaustive range exceeded", "Exact enumeration is supported through N = "
@@ -48,17 +48,17 @@ public final class ConfigurationGenerator {
         long deadline=System.nanoTime()+(long)(request.enumerationTimeLimit().toNanos());
         List<List<DiscoveryConnection>> representatives=new ArrayList<>();
         long[] examined={0}, duplicates={0}; AtomicBoolean limited=new AtomicBoolean();
-        enumerate(request.nodeCount(),request.exactDegree(),new boolean[request.nodeCount()][request.nodeCount()],
-                new int[request.nodeCount()],representatives,examined,duplicates,deadline,
+        enumerate(normalized.nodeCount(),normalized.exactDegree(),new boolean[normalized.nodeCount()][normalized.nodeCount()],
+                new int[normalized.nodeCount()],representatives,examined,duplicates,deadline,
                 request.maximumConfigurations(),limited);
         List<Configuration> configurations=new ArrayList<>();
         record Classified(String label,List<DiscoveryConnection> edges,
                           AutomorphismAnalyzer.Result symmetry) {}
         List<Classified> classified=new ArrayList<>();
         for(List<DiscoveryConnection> edges:representatives) {
-            var symmetry=automorphisms.analyze(request.nodeCount(),edges);
+            var symmetry=automorphisms.analyze(normalized.nodeCount(),edges);
             if(request.symmetryFilter().accepts(symmetry.groupSize()))
-                classified.add(new Classified(canonicalizer.canonicalLabel(request.nodeCount(),edges),edges,symmetry));
+                classified.add(new Classified(canonicalizer.canonicalLabel(normalized.nodeCount(),edges),edges,symmetry));
         }
         classified.sort(Comparator.comparing(Classified::label));
         boolean complete=!limited.get(); Instant created=Instant.now();
@@ -69,7 +69,7 @@ public final class ConfigurationGenerator {
                     "Connected simple "+request.exactDegree()+"-regular graph retained as one isomorphism class.");
             var status=GeometryConfigurationStatus.of(diagnostic);
             configurations.add(new Configuration(new ConfigurationId("cfg-"+hash),
-                    request.nodeCount(),request.exactDegree(),c.edges(),null,c.label(),hash,
+                    normalized.nodeCount(),normalized.exactDegree(),c.edges(),null,c.label(),hash,
                     c.symmetry().groupSize(),c.symmetry().classification(),true,i+1,
                     request.generationStrategy(),complete,status,List.of(diagnostic),created,
                     Map.of("embeddingDimension",request.intendedDimension().name())));
@@ -94,7 +94,10 @@ public final class ConfigurationGenerator {
         ConfigurationRequest effectiveRequest=new ConfigurationRequest(request.nodeCount(),request.exactDegree(),
                 request.intendedDimension(),request.symmetryFilter(),request.maximumConfigurations(),
                 request.enumerationTimeLimit(),"DIRECT_CYCLE_CONSTRUCTION",request.outputDirectory(),
-                request.experimentProfile(),request.maximumDirectCycleNodes(),request.faceComposition());
+                request.experimentProfile(),request.maximumDirectCycleNodes(),request.faceComposition(),
+                request.primaryParameterMode(),request.authoritativeNodeCount(),
+                request.authoritativeFaceCount(),request.exactFaceCounts(),
+                request.surfaceTopologyAssumption(),null);
         List<DiscoveryConnection> edges=new ArrayList<>();
         for(int node=0;node<request.nodeCount()-1;node++)edges.add(new DiscoveryConnection(node,node+1));
         edges.add(new DiscoveryConnection(request.nodeCount()-1,0));

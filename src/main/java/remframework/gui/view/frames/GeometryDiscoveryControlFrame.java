@@ -26,6 +26,9 @@ import java.util.Deque;
 import java.util.List;
 
 public final class GeometryDiscoveryControlFrame extends AbstractFrame {
+    public static List<String> primaryAuthoritativeControls(PrimaryParameterMode mode){return switch(mode){case NODE_COUNT->List.of("Node count N","Exact degree K");case FACE_COUNT->List.of("Total face count F","Exact degree K");case FACE_COMPOSITION->List.of("Exact face counts F_m","Exact degree K");};}
+    public static List<String> primaryDerivedReadOnlyFields(PrimaryParameterMode mode){return switch(mode){case NODE_COUNT->List.of("Expected edge count E","Expected face count F");case FACE_COUNT->List.of("Derived node count N","Derived edge count E");case FACE_COMPOSITION->List.of("Derived total faces F","Derived edge count E","Derived node count N");};}
+    public static boolean generationEnabled(ParameterDerivationReport report){return report!=null&&report.arithmeticFeasible();}
     public static List<String> profileConditionControls(ExperimentProfile profile){return profile==ExperimentProfile.CLOSED_2D_AREA?List.of("Global planarity mode","Polygon angle condition"):List.of("Face planarity condition","Face-angle condition","Dihedral-angle condition","Vertex-radius condition","Face-centroid-radius condition","Edge-midpoint-radius condition","Face-plane-radius condition","Normal-center alignment condition","Center definition","Face-planarity tolerance","Absolute regularity tolerance","Relative regularity tolerance");}
     private static final String[] EXAMPLES = {"Line", "Square", "Tetrahedron", "Small Cubic",
             "Line Reference", "Equilateral Reference", "Tetrahedral Reference",
@@ -63,6 +66,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private boolean phase2Mode = true;
     private Phase phase2Stage = Phase.CONFIGURATION_GENERATION;
     private int phase2NodeCount = 4;
+    private PrimaryParameterMode phase2PrimaryParameterMode=PrimaryParameterMode.NODE_COUNT;
+    private int phase2FaceCount=4;
+    private final java.util.TreeMap<Integer,Long> phase2ExactFaceCounts=new java.util.TreeMap<>(java.util.Map.of(3,2L,4,3L));
+    private String phase2PrimarySignature="";
     private int phase2ExactDegree = 2;
     private GeometryEmbeddingDimension phase2Dimension = GeometryEmbeddingDimension.THREE_D;
     private ExperimentProfile phase2ExperimentProfile = ExperimentProfile.CLOSED_3D_VOLUME;
@@ -168,10 +175,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private void phase2ConfigurationGeneration(NkContext c) {
         heading(c, "Stage 1 - Configuration Generation and Classification");
         label(c, "Graphs are topology-only. Coordinates, faces, area, and volume are not generated here.");
-        phase2NodeCount = dynamicInteger(c, "Nodes (N)", phase2NodeCount, 1, 1_000_000);
-        phase2ExactDegree = dynamicInteger(c, "Exact neighbors per node (K)", phase2ExactDegree, 0,
-                Math.max(0, phase2NodeCount - 1));
         try (MemoryStack stack = MemoryStack.stackPush()) {
+            String primary=nk_label_combo_options(c,stack,"Primary parameters",
+                    new String[]{"Node count","Face count","Face composition"},switch(phase2PrimaryParameterMode){case NODE_COUNT->"Node count";case FACE_COUNT->"Face count";case FACE_COMPOSITION->"Face composition";},.4,.6);
+            phase2PrimaryParameterMode=switch(primary){case "Face count"->PrimaryParameterMode.FACE_COUNT;case "Face composition"->PrimaryParameterMode.FACE_COMPOSITION;default->PrimaryParameterMode.NODE_COUNT;};
             String experiment = nk_label_combo_options(c, stack, "Experiment profile",
                     new String[]{"Closed 2D area", "Closed 3D volume", "Convex polyhedral volume"},
                     switch (phase2ExperimentProfile) { case CLOSED_2D_AREA -> "Closed 2D area"; case CLOSED_3D_VOLUME -> "Closed 3D volume"; case CONVEX_POLYHEDRAL_VOLUME -> "Convex polyhedral volume"; }, .4, .6);
@@ -195,21 +202,39 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 default -> GraphSymmetryFilter.BOTH;
             };
         }
+        if(phase2PrimaryParameterMode==PrimaryParameterMode.NODE_COUNT)
+            phase2NodeCount=dynamicInteger(c,"Node count N",phase2NodeCount,1,1_000_000);
+        else if(phase2PrimaryParameterMode==PrimaryParameterMode.FACE_COUNT)
+            phase2FaceCount=dynamicInteger(c,"Total face count F",phase2FaceCount,1,Integer.MAX_VALUE);
+        else {
+            for(var entry:List.copyOf(phase2ExactFaceCounts.entrySet())){
+                int size=dynamicInteger(c,"Face size m",entry.getKey(),3,Integer.MAX_VALUE);
+                int count=dynamicInteger(c,"Exact count F_"+entry.getKey(),Math.toIntExact(entry.getValue()),0,Integer.MAX_VALUE);
+                if(size!=entry.getKey()){phase2ExactFaceCounts.remove(entry.getKey());phase2ExactFaceCounts.put(size,(long)count);}
+                else phase2ExactFaceCounts.put(size,(long)count);
+            }
+            Nuklear.nk_layout_row_dynamic(c,rowHeightEdit,2);
+            if(Nuklear.nk_button_label(c,"Add face-count row")){int size=phase2ExactFaceCounts.isEmpty()?3:phase2ExactFaceCounts.lastKey()+1;phase2ExactFaceCounts.put(size,0L);}
+            if(Nuklear.nk_button_label(c,"Remove last row")&&!phase2ExactFaceCounts.isEmpty())phase2ExactFaceCounts.pollLastEntry();
+        }
+        phase2ExactDegree=dynamicInteger(c,"Exact neighbors per node (K)",phase2ExactDegree,0,Integer.MAX_VALUE);
         if(phase2FaceCompositionMode==FaceCompositionMode.UNIFORM_FACE_SIZE)
             phase2CommonFaceEdgeCount=dynamicInteger(c,"Common face size",phase2CommonFaceEdgeCount,3,Integer.MAX_VALUE);
+        ConfigurationRequest preview=phase2Request(null);
+        ParameterDerivationReport derivation=preview.parameterDerivation();
+        label(c,"Surface topology: "+preview.surfaceTopologyAssumption()+" (chi="+derivation.eulerCharacteristic()+")");
+        label(c,"Derived N="+derivation.derivedVertexCount()+" E="+derivation.derivedEdgeCount()+" F="+derivation.derivedFaceCount());
+        label(c,derivation.explanation());
+        String signature=preview.primaryParameterMode()+":"+preview.parameterDerivation().authoritativeInputs()+":"+preview.faceComposition()+":"+preview.experimentProfile()+":"+preview.symmetryFilter();
+        if(!signature.equals(phase2PrimarySignature)){if(!phase2PrimarySignature.isEmpty())controller.phasedWorkflow().beginGenerationTransaction();phase2PrimarySignature=signature;phase2SelectedConfiguration=null;phase2LatestResult=null;phase2StoredResult=null;}
         phase2MaximumConfigurations = dynamicInteger(c, "Maximum configurations", phase2MaximumConfigurations, 1, 100_000);
         phase2TimeLimitSeconds = dynamicInteger(c, "Enumeration time limit (seconds)", phase2TimeLimitSeconds, 1, 86_400);
-        primaryButton(c, "Generate Configurations", true, "", () -> {
+        primaryButton(c, "Generate Configurations", generationEnabled(derivation), derivation.explanation(), () -> {
             try {
                 phase2SelectedConfiguration = null;
                 phase2LatestResult = null;
                 phase2StoredResult = null;
-                ConfigurationRequest request = new ConfigurationRequest(phase2NodeCount,
-                        phase2ExactDegree, phase2Dimension, phase2SymmetryFilter,
-                        phase2MaximumConfigurations, java.time.Duration.ofSeconds(phase2TimeLimitSeconds),
-                        null, Path.of("lattice/geometry-discovery/configuration-sets"), phase2ExperimentProfile)
-                        .withFaceComposition(phase2FaceCompositionMode==FaceCompositionMode.UNIFORM_FACE_SIZE
-                                ?FaceComposition.uniform(phase2CommonFaceEdgeCount):FaceComposition.discover());
+                ConfigurationRequest request=phase2Request(Path.of("lattice/geometry-discovery/configuration-sets"));
                 controller.phasedWorkflow().generateConfigurations(request);
             } catch (Exception exception) { nuklearModel.showErrorDialog("Configuration generation", exception.getMessage()); }
         });
@@ -270,6 +295,25 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 phase2Stage = Phase.GEOMETRY_TEST;
             });
         }
+    }
+
+    private ConfigurationRequest phase2Request(Path outputDirectory){
+        FaceComposition constraint=phase2FaceCompositionMode==FaceCompositionMode.UNIFORM_FACE_SIZE
+                ?FaceComposition.uniform(phase2CommonFaceEdgeCount):FaceComposition.discover();
+        ConfigurationRequest request=switch(phase2PrimaryParameterMode){
+            case NODE_COUNT->new ConfigurationRequest(phase2NodeCount,phase2ExactDegree,phase2Dimension,
+                    phase2SymmetryFilter,phase2MaximumConfigurations,java.time.Duration.ofSeconds(phase2TimeLimitSeconds),
+                    null,outputDirectory,phase2ExperimentProfile);
+            case FACE_COUNT->new ConfigurationRequest(0,phase2ExactDegree,phase2Dimension,phase2SymmetryFilter,
+                    phase2MaximumConfigurations,java.time.Duration.ofSeconds(phase2TimeLimitSeconds),null,
+                    outputDirectory,phase2ExperimentProfile,10_000,null,PrimaryParameterMode.FACE_COUNT,
+                    null,(long)phase2FaceCount,null,SurfaceTopologyAssumption.SPHERE_LIKE,null);
+            case FACE_COMPOSITION->new ConfigurationRequest(0,phase2ExactDegree,phase2Dimension,phase2SymmetryFilter,
+                    phase2MaximumConfigurations,java.time.Duration.ofSeconds(phase2TimeLimitSeconds),null,
+                    outputDirectory,phase2ExperimentProfile,10_000,null,PrimaryParameterMode.FACE_COMPOSITION,
+                    null,null,new ExactFaceCounts(phase2ExactFaceCounts),SurfaceTopologyAssumption.SPHERE_LIKE,null);
+        };
+        return request.withFaceComposition(constraint);
     }
 
     private void phase2GeometryTest(NkContext c) {
@@ -351,7 +395,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                                             phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance),
                                     phase2BenchmarkPreset,new ThreeDConstraintStrengths(phase2FacePlanarityStrength,phase2FaceAngleStrength,phase2DihedralStrength,phase2FacePlaneRadiusStrength),
                                     phase2FaceCompositionMode==FaceCompositionMode.UNIFORM_FACE_SIZE
-                                            ?FaceComposition.uniform(phase2CommonFaceEdgeCount):FaceComposition.discover()));
+                                            ?FaceComposition.uniform(phase2CommonFaceEdgeCount):FaceComposition.discover())
+                                    .withParameterDerivation(controller.phasedWorkflow().generation().orElseThrow().request()));
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry Test", exception.getMessage()); }
         });

@@ -30,7 +30,7 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
     private final WorkspaceController controller =
             GeometryDiscoveryWorkspaceManager.getInstance();
     private int phase2DetailsTab;
-    private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification", "Face Composition", "Eligibility",
+    private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification", "Parameter Derivation", "Face Composition", "Eligibility",
             "Realization", "Faces and Boundary", "2D Regularity", "3D Regularity", "Measurement", "Diagnostics"};
 
     public GeometryDiscoveryMetricsFrame(NuklearModel model) {
@@ -89,18 +89,37 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
                 case 0 -> phase2Summary(c, generation, configuration, result);
                 case 1 -> phase2Topology(c, configuration);
                 case 2 -> phase2Classification(c, generation, configuration);
-                case 3 -> phase2FaceComposition(c,generation,configuration);
-                case 4 -> phase2Eligibility(c,result);
-                case 5 -> phase2Realization(c, result);
-                case 6 -> phase2FacesBoundary(c, result);
-                case 7 -> phase2Regularity2d(c,result);
-                case 8 -> phase2Regularity3d(c,result);
-                case 9 -> phase2Measurement(c, result);
-                case 10 -> phase2Diagnostics(c, generation, configuration, result);
+                case 3 -> phase2ParameterDerivation(c,generation);
+                case 4 -> phase2FaceComposition(c,generation,configuration);
+                case 5 -> phase2Eligibility(c,result);
+                case 6 -> phase2Realization(c, result);
+                case 7 -> phase2FacesBoundary(c, result);
+                case 8 -> phase2Regularity2d(c,result);
+                case 9 -> phase2Regularity3d(c,result);
+                case 10 -> phase2Measurement(c, result);
+                case 11 -> phase2Diagnostics(c, generation, configuration, result);
                 default -> { }
             }
             Nuklear.nk_group_end(c);
         }
+    }
+
+    private void phase2ParameterDerivation(NkContext c,GenerationResult generation){
+        ParameterDerivationReport d=generation.request().parameterDerivation();
+        label(c,"Primary parameter mode: "+d.primaryParameterMode());
+        label(c,"Surface topology assumption: "+d.surfaceTopologyAssumption()+" chi="+d.eulerCharacteristic());
+        label(c,"Authoritative inputs: "+d.authoritativeInputs());
+        label(c,"Derived V="+d.derivedVertexCount()+" E="+d.derivedEdgeCount()+" F="+d.derivedFaceCount());
+        d.formulas().forEach(formula->label(c,"Formula: "+formula));
+        d.divisibilityChecks().forEach(check->label(c,"Divisibility: "+check));
+        label(c,"Degree incidence: "+d.degreeIncidenceCalculation());
+        label(c,"Face incidence: "+d.faceIncidenceCalculation());
+        label(c,"Arithmetic feasibility: "+(d.arithmeticFeasible()?"PASS":"FAIL"));
+        label(c,"Selected generation strategy: "+d.selectedGenerationStrategy());
+        label(c,"Current generation capability: "+(d.generationStrategyAvailable()?"AVAILABLE":"UNAVAILABLE / LIMIT REACHED"));
+        label(c,"Graph enumeration completeness: "+generation.metrics().enumerationComplete());
+        label(c,"Generation status: "+generation.status().code());
+        label(c,"Exact reasons: "+d.reasons());
     }
 
     private void phase2FaceComposition(NkContext c,GenerationResult generation,

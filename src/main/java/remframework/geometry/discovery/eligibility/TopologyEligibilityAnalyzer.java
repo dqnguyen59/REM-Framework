@@ -3,6 +3,7 @@ package remframework.geometry.discovery.eligibility;
 import remframework.geometry.discovery.DiscoveryConnection;
 import remframework.geometry.discovery.GraphSymmetryClassification;
 import remframework.geometry.discovery.configuration.Configuration;
+import remframework.geometry.discovery.configuration.ConfigurationRequest;
 import remframework.geometry.discovery.experiment.ExperimentProfile;
 import remframework.geometry.discovery.experiment.*;
 import remframework.geometry.discovery.GeometryConfigurationStatusCode;
@@ -27,6 +28,16 @@ public final class TopologyEligibilityAnalyzer {
             FaceComposition composition) {
         return analyze(configuration.nodeCount(), configuration.exactDegree(), configuration.edges(),
                 configuration.canonicalGraphLabel(), profile, composition);
+    }
+
+    public TopologyEligibilityReport analyze(Configuration configuration,ConfigurationRequest request) {
+        TopologyEligibilityReport report=analyze(configuration,request.experimentProfile(),request.faceComposition());
+        return new TopologyEligibilityReport(report.profile(),report.status(),report.conclusion(),
+                report.conditions(),report.bridgeCount(),report.articulationVertexCount(),
+                report.vertexConnectivity(),report.edgeConnectivity(),report.cycleRank(),report.planar(),
+                report.automorphismGroupSize(),report.graphSymmetry(),report.vertexTransitive(),
+                report.topologicalFaces(),report.faceComposition(),request.primaryParameterMode(),
+                request.surfaceTopologyAssumption(),request.parameterDerivation());
     }
 
     /** Returns a coordinate-free sphere-like face set when one is combinatorially available. */
