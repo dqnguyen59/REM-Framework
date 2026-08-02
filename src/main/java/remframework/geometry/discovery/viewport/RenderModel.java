@@ -57,6 +57,8 @@ public record RenderModel(String configurationId,
 
     private static RenderModel of(Configuration configuration,
             List<Vector3d> scientificCoordinates, boolean preview, long revision) {
+        long started=System.nanoTime();
+        try {
         DisplayTransform transform =
                 DisplayTransform.calculate(scientificCoordinates, 4.0);
         List<DiscoveryNode> nodes = new ArrayList<>();
@@ -72,6 +74,7 @@ public record RenderModel(String configurationId,
         String faceKey=configuration.id()+":"+configuration.provenance().getOrDefault("combinatorialFaces","");List<DerivedFace> faces=FACE_CACHE.computeIfAbsent(faceKey,ignored->{FACE_COMPLEX_BUILDS.incrementAndGet();return new remframework.geometry.discovery.eligibility.TopologyEligibilityAnalyzer().deriveTopologicalFaces(configuration).stream().map(cycle->new DerivedFace("face-"+cycle,cycle,true,true,0)).toList();});
         return new RenderModel(configuration.id().toString(), model,
                 transform, preview, revision, labels,faces);
+        }finally{DevelopmentTimingDiagnostics.record("viewport.topology-preview-construction",System.nanoTime()-started);}
     }
     public static long faceComplexBuildCount(){return FACE_COMPLEX_BUILDS.get();}
 }

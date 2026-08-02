@@ -27,12 +27,11 @@ public final class TopologyEligibilityAnalyzer {
 
     public TopologyEligibilityReport analyze(Configuration configuration, ExperimentProfile profile,
             FaceComposition composition) {
-        TopologyEligibilityReport report=analyze(configuration.nodeCount(), configuration.exactDegree(), configuration.edges(),
-                configuration.canonicalGraphLabel(), profile, composition);
         String persisted=configuration.provenance().get("combinatorialFaces");
-        if(persisted==null||persisted.isBlank())return report;
-        List<List<Integer>> faces=CombinatorialFaceComplex.decode(configuration.nodeCount(),persisted).faces();
-        return replaceFaces(report,configuration,composition,faces);
+        List<List<Integer>> faces=persisted==null||persisted.isBlank()?null:
+                CombinatorialFaceComplex.decode(configuration.nodeCount(),persisted).faces();
+        return analyze(configuration.nodeCount(), configuration.exactDegree(), configuration.edges(),
+                configuration.canonicalGraphLabel(), profile, composition,faces);
     }
 
     private TopologyEligibilityReport replaceFaces(TopologyEligibilityReport report,Configuration configuration,
@@ -65,6 +64,12 @@ public final class TopologyEligibilityAnalyzer {
     public TopologyEligibilityReport analyze(int n, int expectedDegree,
             List<DiscoveryConnection> edges, String canonicalIdentity, ExperimentProfile profile,
             FaceComposition composition) {
+        return analyze(n,expectedDegree,edges,canonicalIdentity,profile,composition,null);
+    }
+
+    private TopologyEligibilityReport analyze(int n, int expectedDegree,
+            List<DiscoveryConnection> edges, String canonicalIdentity, ExperimentProfile profile,
+            FaceComposition composition,List<List<Integer>> persistedFaces) {
         List<ConditionResult> checks = new ArrayList<>();
         boolean noLoops = edges.stream().noneMatch(e -> e.firstNodeId() == e.secondNodeId());
         boolean noDuplicates = edges.stream().map(DiscoveryConnection::undirectedKey).distinct().count() == edges.size();
@@ -104,7 +109,9 @@ public final class TopologyEligibilityAnalyzer {
                 ?new AutomorphismAnalyzer.Result(2L*n,true)
                 :simple && n <= 12?new AutomorphismAnalyzer().analyze(n, edges)
                 :new AutomorphismAnalyzer.Result(0, false);
-        FaceSetSearch faceSearch = simple && connected ? sphericalFaceSearch(adjacency, edges.size())
+        FaceSetSearch faceSearch = simple && connected ? persistedFaces==null
+                ? sphericalFaceSearch(adjacency, edges.size())
+                : new FaceSetSearch(persistedFaces,1)
                 : new FaceSetSearch(List.of(), 0);
         List<List<Integer>> faces = faceSearch.faces();
         Boolean planar = simple && connected ? !faces.isEmpty() : false;

@@ -66,12 +66,14 @@ public final class PhasedWorkflow {
     private volatile Stage2InitializationState stage2InitializationState=Stage2InitializationState.NOT_STARTED;
     private volatile long stage2InitializationMillis;
     private volatile RenderModel publishedRenderModel;
+    private volatile List<ConfigurationTableRow> cachedTableRows;
     private volatile String stage1ThreadName="",stage2ThreadName="";
     public synchronized GenerationResult generateConfigurations(ConfigurationRequest request)throws IOException{
         beginGenerationTransaction();
         GenerationResult generated=generator.generate(request);
         generation=generated;
         registry.registerAll(generated.configurations());
+        cachedTableRows=buildTableRows();
         if(request.outputDirectory()!=null)new ConfigurationStore(request.outputDirectory()).save(generated);
         return generated;
     }
@@ -81,17 +83,18 @@ public final class PhasedWorkflow {
             GenerationExecution execution=new GenerationExecution(workerCount,()->token!=operationToken.get()||Thread.currentThread().isInterrupted(),progress->{if(token==operationToken.get())generationProgress.set(progress);});
             GenerationResult generated=generator.generate(request,execution);if(token!=operationToken.get())return;
             if(request.outputDirectory()!=null)new ConfigurationStore(request.outputDirectory()).save(generated);
-            synchronized(this){if(token!=operationToken.get())return;generation=generated;registry.registerAll(generated.configurations());renderRevision++;}
-        }catch(Exception failure){if(token==operationToken.get())asynchronousFailure=failure.getMessage();}finally{if(token==operationToken.get())generationRunning=false;}});
+            long publicationStarted=System.nanoTime();synchronized(this){if(token!=operationToken.get())return;generation=generated;registry.registerAll(generated.configurations());cachedTableRows=buildTableRows();renderRevision++;}DevelopmentTimingDiagnostics.record("stage1.completed-result-publication",System.nanoTime()-publicationStarted);
+        }catch(Exception failure){if(token==operationToken.get())asynchronousFailure=failure.getMessage();}finally{if(token==operationToken.get()){generationRunning=false;generationTask=null;}}});
     }
-    public void cancelGeneration(){operationToken.incrementAndGet();Future<?> task=generationTask;if(task!=null)task.cancel(true);generationRunning=false;GenerationProgress old=generationProgress.get();if(old!=null)generationProgress.set(new GenerationProgress(old.strategy(),old.workerCount(),0,old.elapsed(),old.statesExamined(),old.statesPerSecond(),old.statesPruned(),old.frontierSize(),old.completedCandidates(),old.duplicateCandidates(),old.retainedConfigurations(),old.pruningCounts(),old.limits(),false,true));}
+    public void cancelGeneration(){operationToken.incrementAndGet();Future<?> task=generationTask;generationTask=null;if(task!=null)task.cancel(true);generationRunning=false;GenerationProgress old=generationProgress.get();if(old!=null)generationProgress.set(new GenerationProgress(old.strategy(),old.workerCount(),0,old.elapsed(),old.statesExamined(),old.statesPerSecond(),old.statesPruned(),0,old.completedCandidates(),old.duplicateCandidates(),old.retainedConfigurations(),old.pruningCounts(),old.limits(),false,true));}
     public boolean generationRunning(){return generationRunning;}
+    public boolean generationTaskRetired(){return generationTask==null;}
     public GenerationProgress generationProgress(){return generationProgress.get();}
     public String asynchronousFailure(){return asynchronousFailure;}
     public synchronized void beginGenerationTransaction(){
         cancelGeneration();generationProgress.set(null);
         if(incrementalSession!=null)incrementalSession.stop();
-        generation=null;selected=null;incrementalSession=null;activeRequest=null;activeResult=null;publishedRenderModel=null;
+        generation=null;selected=null;incrementalSession=null;activeRequest=null;activeResult=null;publishedRenderModel=null;cachedTableRows=null;
         persistedResultPath=null;reopenedCoordinates=List.of();registry.clear();renderRevision++;
     }
     public synchronized void reopen(Path setDirectory)throws IOException{ConfigurationStore store=new ConfigurationStore(setDirectory.getParent());List<Configuration> values=store.reopen(setDirectory);registry.registerAll(values);selected=null;if(!values.isEmpty()){ConfigurationRequest request=store.reopenRequest(setDirectory);GeometryConfigurationDiagnostic diagnostic=GeometryConfigurationDiagnostic.info(GeometryConfigurationStage.COMPLETE,GeometryConfigurationStatusCode.ENUMERATION_COMPLETE,"Configuration set reopened","Previously generated topology records and their recomputed parameter derivation were loaded without repeating enumeration.");generation=new GenerationResult(setDirectory.getFileName().toString(),request,values,new Metrics(0,values.size(),0,(int)values.stream().filter(v->v.automorphismGroupSize()>1).count(),(int)values.stream().filter(v->v.automorphismGroupSize()==1).count(),0,true),GeometryConfigurationStatus.of(diagnostic));}}
@@ -99,7 +102,7 @@ public final class PhasedWorkflow {
     public synchronized Optional<ConfigurationId> selectedConfiguration(){return Optional.ofNullable(selected);}
     public synchronized Optional<Configuration> selectedConfigurationRecord(){return selected==null?Optional.empty():registry.find(selected);}
     public synchronized Optional<GenerationResult> generation(){return Optional.ofNullable(generation);}
-    public synchronized TestResult runSelectedGeometryTest(TestRequest request){if(selected==null||!selected.equals(request.configurationId()))throw new IllegalStateException("The user must explicitly select this configuration before geometry testing.");TestResult result=new TestSession(registry.find(selected).orElseThrow(),request).run();registry.attach(result);activeResult=result;activeRequest=request;renderRevision++;return result;}
+    public synchronized TestResult runSelectedGeometryTest(TestRequest request){if(selected==null||!selected.equals(request.configurationId()))throw new IllegalStateException("The user must explicitly select this configuration before geometry testing.");TestResult result=new TestSession(registry.find(selected).orElseThrow(),request).run();registry.attach(result);cachedTableRows=null;activeResult=result;activeRequest=request;renderRevision++;return result;}
     public void startSelectedGeometryTest(TestRequest request) {
         Configuration configuration;long token;
         synchronized(this){requireSelected(request);activeRequest=request;incrementalSession=null;activeResult=null;stage2InitializationState=Stage2InitializationState.INITIALIZING;token=operationToken.incrementAndGet();configuration=registry.find(selected).orElseThrow();renderRevision++;}
@@ -137,7 +140,8 @@ public final class PhasedWorkflow {
     public synchronized ExperimentConvergenceDiagnostics convergenceDiagnostics(){return incrementalSession==null?null:incrementalSession.convergenceDiagnostics();}
     public synchronized IncrementalSession incrementalSession() { return incrementalSession; }
     public RenderModel renderModel() {return publishedRenderModel;}
-    public synchronized List<ConfigurationTableRow> tableRows(){ExperimentProfile profile=generation==null?ExperimentProfile.CLOSED_3D_VOLUME:generation.request().experimentProfile();var composition=generation==null?remframework.geometry.discovery.experiment.FaceComposition.discover():generation.request().faceComposition();ReferenceTopologyRecognizer recognizer=new ReferenceTopologyRecognizer();return registry.configurations().stream().map(c->{List<TestResult> tests=registry.tests(c.id());TestResult last=tests.isEmpty()?null:tests.get(tests.size()-1);TopologyEligibilityReport eligibility=new TopologyEligibilityAnalyzer().analyze(c,profile,composition);return new ConfigurationTableRow(c.id(),c.nodeCount(),c.exactDegree(),c.edges().size(),c.graphSymmetry(),c.automorphismGroupSize(),eligibility.vertexTransitive(),profile,c.status().code(),eligibility.status(),c.status().code(),last!=null,last==null?GeometryConfigurationStatusCode.GEOMETRY_TEST_NOT_STARTED:last.status().code(),eligibility.conclusion(),recognizer.recognize(c).topology(),eligibility.faceComposition()==null?remframework.geometry.discovery.experiment.FaceCompositionMatch.UNDETERMINED:eligibility.faceComposition().match());}).toList();}
+    public List<ConfigurationTableRow> tableRows(){List<ConfigurationTableRow> rows=cachedTableRows;if(rows!=null)return rows;long waiting=System.nanoTime();synchronized(this){DevelopmentTimingDiagnostics.record("ui.workflow-lock-wait",System.nanoTime()-waiting);if(cachedTableRows==null)cachedTableRows=buildTableRows();return cachedTableRows;}}
+    private List<ConfigurationTableRow> buildTableRows(){long started=System.nanoTime();try{ExperimentProfile profile=generation==null?ExperimentProfile.CLOSED_3D_VOLUME:generation.request().experimentProfile();var composition=generation==null?remframework.geometry.discovery.experiment.FaceComposition.discover():generation.request().faceComposition();ReferenceTopologyRecognizer recognizer=new ReferenceTopologyRecognizer();return registry.configurations().stream().map(c->{List<TestResult> tests=registry.tests(c.id());TestResult last=tests.isEmpty()?null:tests.get(tests.size()-1);TopologyEligibilityReport eligibility=new TopologyEligibilityAnalyzer().analyze(c,profile,composition);return new ConfigurationTableRow(c.id(),c.nodeCount(),c.exactDegree(),c.edges().size(),c.graphSymmetry(),c.automorphismGroupSize(),eligibility.vertexTransitive(),profile,c.status().code(),eligibility.status(),c.status().code(),last!=null,last==null?GeometryConfigurationStatusCode.GEOMETRY_TEST_NOT_STARTED:last.status().code(),eligibility.conclusion(),recognizer.recognize(c).topology(),eligibility.faceComposition()==null?remframework.geometry.discovery.experiment.FaceCompositionMatch.UNDETERMINED:eligibility.faceComposition().match());}).toList();}finally{DevelopmentTimingDiagnostics.record("ui.configuration-table-build",System.nanoTime()-started);}}
     public synchronized List<TestResult> geometryTests(ConfigurationId id){return registry.tests(id);}
     public synchronized TestResult latestGeometryTest(ConfigurationId id){List<TestResult> values=registry.tests(id);return values.isEmpty()?null:values.get(values.size()-1);}
     public synchronized Path saveLatestGeometryTest(Path configurationSetDirectory, ConfigurationId id) throws IOException {
@@ -168,7 +172,7 @@ public final class PhasedWorkflow {
         return optimized;
     }
     private void requireSelected(TestRequest request) { if (selected == null || !selected.equals(request.configurationId())) throw new IllegalStateException("The user must explicitly select this configuration before geometry testing."); }
-    private void publishIncrementalResult() { renderRevision++; if (incrementalSession != null && incrementalSession.result() != null && activeResult == null) { activeResult = incrementalSession.result(); registry.attach(activeResult); if (generation != null && generation.request().outputDirectory() != null) { try { persistedResultPath = new TestResultStore().save(generation.request().outputDirectory(), activeResult); } catch (IOException ignored) { persistedResultPath = null; } } } }
+    private void publishIncrementalResult() { renderRevision++; if (incrementalSession != null && incrementalSession.result() != null && activeResult == null) { activeResult = incrementalSession.result(); registry.attach(activeResult);cachedTableRows=null; if (generation != null && generation.request().outputDirectory() != null) { try { persistedResultPath = new TestResultStore().save(generation.request().outputDirectory(), activeResult); } catch (IOException ignored) { persistedResultPath = null; } } } }
     public synchronized Optional<Path> persistedResultPath() { return Optional.ofNullable(persistedResultPath); }
     public synchronized void reopenStoredResult(StoredResult stored) {
         if (registry.find(stored.configurationId()).isEmpty())

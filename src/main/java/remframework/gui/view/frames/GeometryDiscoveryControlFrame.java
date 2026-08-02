@@ -16,6 +16,7 @@ import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import remframework.helpers.Constants;
+import remframework.helpers.PerformanceMonitor;
 import remframework.gui.model.AbstractDialogModel.ConfirmState;
 import remframework.gui.model.DialogFileModel;
 import remframework.gui.model.NuklearModel;
@@ -27,6 +28,7 @@ import java.util.Deque;
 import java.util.List;
 
 public final class GeometryDiscoveryControlFrame extends AbstractFrame {
+    private static final int WORKFLOW_WINDOW_OPTIONS=Nuklear.NK_WINDOW_TITLE|Nuklear.NK_WINDOW_BORDER;
     public static List<String> primaryAuthoritativeControls(PrimaryParameterMode mode){return switch(mode){case NODE_COUNT->List.of("Node count N","Exact degree K");case FACE_COUNT->List.of("Total face count F","Exact degree K");case FACE_COMPOSITION->List.of("Exact face counts F_m","Exact degree K");};}
     public static List<String> primaryDerivedReadOnlyFields(PrimaryParameterMode mode){return switch(mode){case NODE_COUNT->List.of("Expected edge count E","Expected face count F");case FACE_COUNT->List.of("Derived node count N","Derived edge count E");case FACE_COMPOSITION->List.of("Derived total faces F","Derived edge count E","Derived node count N");};}
     public static boolean generationEnabled(ParameterDerivationReport report){return report!=null&&report.arithmeticFeasible();}
@@ -41,6 +43,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             GeometryDiscoveryWorkspaceManager.getInstance();
     private DialogFileModel candidateDialog;
     private final Deque<Path> recentCandidates = new ArrayDeque<>();
+    private GenerationResult terminalPresentationResult;
+    private List<String> terminalPresentationLines=List.of();
     private String selectedExample = "Small Cubic";
     private String selectedProfile = "General Geometry";
     private String selectedSearchMethod = "Hill Climbing";
@@ -109,15 +113,17 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
 
     public GeometryDiscoveryControlFrame(NuklearModel model) {
         super(model);
-        windowOptions = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_BORDER
-                | Nuklear.NK_WINDOW_NO_SCROLLBAR;
+        windowOptions = WORKFLOW_WINDOW_OPTIONS;
     }
+
+    public static boolean workflowScrollingEnabled(){return (WORKFLOW_WINDOW_OPTIONS&Nuklear.NK_WINDOW_NO_SCROLLBAR)==0;}
 
     @Override public String getTitle() { return "Geometry Discovery Workflow"; }
     @Override public void render(long window, NkContext context) {
         super.render(window, context);
         GeometryDiscoveryWorkspaceLayout.Bounds bounds = workspaceLayout().workflow();
-        createFixedLayout(context, bounds.x(), bounds.y(), bounds.width(), bounds.height());
+        long started=System.nanoTime();createFixedLayout(context, bounds.x(), bounds.y(), bounds.width(), bounds.height());
+        DevelopmentTimingDiagnostics.record("ui.geometry-control-frame",System.nanoTime()-started);
     }
 
     private GeometryDiscoveryWorkspaceLayout workspaceLayout() {
@@ -247,8 +253,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             } catch (Exception exception) { nuklearModel.showErrorDialog("Configuration generation", exception.getMessage()); }
         });
         primaryButton(c,"Cancel Generation",generating,"No generation is active.",controller.phasedWorkflow()::cancelGeneration);
-        GenerationProgress live=controller.phasedWorkflow().generationProgress();
+        long progressStarted=System.nanoTime();GenerationProgress live=controller.phasedWorkflow().generationProgress();
         if(live!=null){heading(c,"Generation progress");phase2ProgressBar.put(0,live.running()?Math.floorMod(live.elapsed().toMillis()/100,100):live.cancelled()?0:100);Nuklear.nk_layout_row_dynamic(c,18,1);Nuklear.nk_progress(c,phase2ProgressBar,100,false);label(c,(live.running()?"GENERATING":"GENERATION FINISHED")+" - workers "+live.activeWorkers()+"/"+live.workerCount()+" - "+String.format("%.1f states/s",live.statesPerSecond()));label(c,"Elapsed="+live.elapsed()+" examined="+live.statesExamined()+" pruned="+live.statesPruned()+" frontier="+live.frontierSize());label(c,"Completed="+live.completedCandidates()+" duplicates="+live.duplicateCandidates()+" retained="+live.retainedConfigurations());label(c,"Limits: "+live.limits());}
+        DevelopmentTimingDiagnostics.record("ui.generation-progress-poll",System.nanoTime()-progressStarted);
         primaryButton(c, "Reopen Persisted Configuration Set", true, "", () -> {
             try {
                 var root = Path.of("lattice/geometry-discovery/configuration-sets");
@@ -260,19 +267,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         });
         GenerationResult generation = controller.phasedWorkflow().generation().orElse(null);
         if (generation == null) { label(c, "No configuration set generated."); return; }
-        Metrics metrics = generation.metrics();
         heading(c, "Generation status");
-        label(c, "Status: " + generation.status().code() + " - " + generation.status().summary());
-        label(c, "Completion: " + (metrics.enumerationComplete() ? "Complete" : "Incomplete"));
-        label(c, "Examined: " + metrics.configurationsExamined() + "    Retained: " + metrics.uniqueConfigurationsRetained()
-                + "    Isomorphic duplicates removed: " + metrics.isomorphicDuplicatesRemoved());
-        label(c, "Symmetric: " + metrics.symmetricCount() + "    Asymmetric: " + metrics.asymmetricCount()
-                + "    Elapsed: " + metrics.elapsedMilliseconds() + " ms");
-        GenerationDiagnostics strategy=generation.generationDiagnostics();
-        label(c,"Strategy: "+strategy.strategy()+" construction="+strategy.constructionMethod()+" completeness="+strategy.completeness());
-        label(c,"Partial states examined="+strategy.partialStatesExamined()+" pruned="+strategy.partialStatesPruned()+" completed="+strategy.completedCandidates()+" duplicates="+strategy.duplicateCandidates());
-        if(!strategy.pruningCounts().isEmpty())label(c,"Pruning counts: "+strategy.pruningCounts());
-        if (!generation.status().mayContinue()) label(c, "Diagnostic: " + generation.status().explanation());
+        terminalPresentation(generation).forEach(line->label(c,line));
         heading(c, "Retained configurations");
         // Keep the candidate list independently scrollable so detail text never pushes rows away.
         Nuklear.nk_layout_row_dynamic(c, 220, 1);
@@ -311,6 +307,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             });
         }
     }
+
+    private List<String> terminalPresentation(GenerationResult generation){if(terminalPresentationResult==generation)return terminalPresentationLines;Metrics metrics=generation.metrics();GenerationDiagnostics strategy=generation.generationDiagnostics();List<String> lines=new java.util.ArrayList<>();lines.add("Status: "+generation.status().code()+" - "+generation.status().summary());lines.add("Completion: "+(metrics.enumerationComplete()?"Complete":"Incomplete"));lines.add("Examined: "+metrics.configurationsExamined()+"    Retained: "+metrics.uniqueConfigurationsRetained()+"    Isomorphic duplicates removed: "+metrics.isomorphicDuplicatesRemoved());lines.add("Symmetric: "+metrics.symmetricCount()+"    Asymmetric: "+metrics.asymmetricCount()+"    Elapsed: "+metrics.elapsedMilliseconds()+" ms");lines.add("Strategy: "+strategy.strategy()+" construction="+strategy.constructionMethod()+" completeness="+strategy.completeness());lines.add("Partial states examined="+strategy.partialStatesExamined()+" pruned="+strategy.partialStatesPruned()+" completed="+strategy.completedCandidates()+" duplicates="+strategy.duplicateCandidates());if(!strategy.pruningCounts().isEmpty())lines.add("Pruning counts: "+strategy.pruningCounts());if(!generation.status().mayContinue())lines.add("Diagnostic: "+generation.status().explanation());terminalPresentationResult=generation;terminalPresentationLines=List.copyOf(lines);return terminalPresentationLines;}
 
     private ConfigurationRequest phase2Request(Path outputDirectory){
         FaceComposition constraint=phase2FaceCompositionMode==FaceCompositionMode.UNIFORM_FACE_SIZE
@@ -603,8 +601,17 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                     + " distance=" + d.cameraDistance());
             label(c, "Clip near=" + d.nearPlane() + " far=" + d.farPlane()
                     + " intersectsFrustum=" + d.geometryIntersectsFrustum());
+            var timing=DevelopmentTimingDiagnostics.snapshot();
+            label(c,String.format("UI frame %.2f ms; OpenGL %.2f ms; workflow panel %.2f ms; topology preview %.2f ms",
+                    PerformanceMonitor.getMeasurement(PerformanceMonitor.Measurement.gui2D),averageTiming(timing,"viewport.opengl-render"),
+                    averageTiming(timing,"ui.geometry-control-frame"),averageTiming(timing,"viewport.topology-preview-construction")));
+            GenerationProgress progress=controller.phasedWorkflow().generationProgress();
+            label(c,"Stage 1 workers="+(progress==null?0:progress.activeWorkers())
+                    +"; Stage 2 worker="+controller.phasedWorkflow().geometryExecutionState());
         }
     }
+
+    private static double averageTiming(java.util.Map<String,DevelopmentTimingDiagnostics.Timing> timing,String key){var value=timing.get(key);return value==null?0:value.averageMillis();}
 
     private String phase2SymmetryFilterLabel() {
         return switch (phase2SymmetryFilter) { case SYMMETRIC_ONLY -> "Symmetric only"; case ASYMMETRIC_ONLY -> "Asymmetric only"; case BOTH -> "Both"; };

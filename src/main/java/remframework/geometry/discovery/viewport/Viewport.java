@@ -58,7 +58,9 @@ public final class Viewport implements AutoCloseable {
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glDepthMask(true);
+        long retrievalStarted=System.nanoTime();
         RenderModel phased = controller.phasedWorkflow().renderModel();
+        DevelopmentTimingDiagnostics.record("viewport.render-model-retrieval",System.nanoTime()-retrievalStarted);
         GeometryDiscoveryModel model;
         GeometryDiscoverySettings settings;
         String configurationId;
@@ -68,10 +70,11 @@ public final class Viewport implements AutoCloseable {
             configurationId = phased.configurationId();
             IncrementalSession incremental = controller.phasedWorkflow().incrementalSession();
             boolean frameRequested = !configurationId.equals(lastConfigurationId)
-                    || phased.topologyPreview() != lastTopologyPreview
-                    || incremental != null && incremental.iteration() == 0;
+                    || phased.topologyPreview() != lastTopologyPreview;
             if (frameRequested) {
+                long fitStarted=System.nanoTime();
                 controller.viewState().fitToView(model);
+                DevelopmentTimingDiagnostics.record("viewport.camera-fit",System.nanoTime()-fitStarted);
             }
             lastConfigurationId = configurationId;
             lastTopologyPreview = phased.topologyPreview();

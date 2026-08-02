@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import remframework.gui.model.NuklearModel;
 import remframework.gui.view.frames.AbstractFrame;
 import remframework.gui.view.frames.GeometryDiscoveryNewFrame;
+import remframework.gui.view.frames.GeometryDiscoveryControlFrame;
 
 import java.util.List;
 import java.nio.file.Files;
@@ -22,6 +23,12 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GeometryDiscoveryLayoutTest {
+
+    @Test void completeWorkflowUsesOuterVerticalScrollingAtEveryViewportHeight(){
+        assertTrue(GeometryDiscoveryControlFrame.workflowScrollingEnabled());
+        for(int height:List.of(320,480,720,1080))
+            assertTrue(GeometryDiscoveryWorkspaceLayout.calculate(1280,height,30,30).workflow().height()>0);
+    }
 
     @Test void fixedRegionsRemainAttachedAcrossResizeAndExcludeViewport() {
         GeometryDiscoveryWorkspaceLayout first =

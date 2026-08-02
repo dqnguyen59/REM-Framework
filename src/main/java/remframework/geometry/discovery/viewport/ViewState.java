@@ -40,8 +40,10 @@ public final class ViewState {
     private boolean showNeighborDistanceLabels;
     private boolean showDerivedFaces=true,showAcceptedFaces=true,showRejectedFaces,showFaceNormals;
     private Integer selectedNodeId;
+    private long fitInvocationCount;
 
     public ViewFit fitToView(GeometryDiscoveryModel model) {
+        fitInvocationCount++;
         ViewFit fit = calculateFit(model);
         center.set(fit.center());
         distance = fit.cameraDistance();
@@ -83,6 +85,7 @@ public final class ViewState {
     public double yaw() { return yaw; }
     public double pitch() { return pitch; }
     public double distance() { return distance; }
+    public long fitInvocationCount(){return fitInvocationCount;}
     public boolean orthographic() { return orthographic; }
     public void setOrthographic(boolean value) { orthographic = value; }
     public Integer selectedNodeId() { return selectedNodeId; }

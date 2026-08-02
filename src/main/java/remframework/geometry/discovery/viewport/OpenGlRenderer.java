@@ -40,6 +40,11 @@ public final class OpenGlRenderer implements AutoCloseable {
     private final int vbo;
     private final int matrixLocation;
     private final int opacityLocation;
+    private GeometryDiscoveryModel cachedBoundingBoxModel;
+    private List<Float> cachedBoundingBox=List.of();
+    private RenderModel cachedFaceModel;
+    private List<Float> cachedFaceTriangles=List.of();
+    private List<Float> cachedFaceNormals=List.of();
 
     public OpenGlRenderer() {
         program = createProgram();
@@ -74,7 +79,7 @@ public final class OpenGlRenderer implements AutoCloseable {
         if (view.showAxes()) addAxes(lines, fit);
         addGrid(lines, fit);
         draw(lines, GL11.GL_LINES, 1.5f);
-        if(view.showBoundingBox()){List<Float> boundingBox=new ArrayList<>();addBoundingBox(boundingBox,model);draw(boundingBox,GL11.GL_LINES,1f);}
+        if(view.showBoundingBox()){long boxStarted=System.nanoTime();if(cachedBoundingBoxModel!=model){List<Float> boundingBox=new ArrayList<>();addBoundingBox(boundingBox,model);cachedBoundingBox=List.copyOf(boundingBox);cachedBoundingBoxModel=model;}draw(cachedBoundingBox,GL11.GL_LINES,1f);DevelopmentTimingDiagnostics.record("viewport.bounding-box-render",System.nanoTime()-boxStarted);}
         if (view.showConnections()) {
             List<Float> tooShort = new ArrayList<>();
             List<Float> satisfied = new ArrayList<>();
@@ -98,7 +103,7 @@ public final class OpenGlRenderer implements AutoCloseable {
         }
         GL11.glPointSize(11f);
         draw(points, GL11.GL_POINTS, 1f);
-        if (view.showNodeLabels()) drawCanonicalLabels(model, matrix, width, height);
+        if (view.showNodeLabels()){long labelStarted=System.nanoTime();drawCanonicalLabels(model, matrix, width, height);DevelopmentTimingDiagnostics.record("viewport.label-render",System.nanoTime()-labelStarted);}
         GL30.glBindVertexArray(0);
         GL20.glUseProgram(0);
     }
@@ -111,8 +116,10 @@ public final class OpenGlRenderer implements AutoCloseable {
     private void renderFaces(RenderModel renderModel,ViewState view,int width,int height){
         GeometryDiscoveryModel model=renderModel.model();Map<Integer,DiscoveryNode> byId=new HashMap<>();model.nodes().forEach(n->byId.put(n.id(),n));
         ViewFit fit=view.calculateFit(model);Matrix4f matrix=viewProjection(view,fit,width,height);GL20.glUseProgram(program);GL20.glUniformMatrix4fv(matrixLocation,false,matrix.get(new float[16]));GL30.glBindVertexArray(vao);
-        List<Float> triangles=new ArrayList<>(),normals=new ArrayList<>();for(DerivedFace face:renderModel.derivedFaces()){if(face.nodeIds().size()<3)continue;Vector3d origin=byId.get(face.nodeIds().get(0)).position();for(int i=1;i+1<face.nodeIds().size();i++){vertex(triangles,origin,.12f,.55f,.8f);vertex(triangles,byId.get(face.nodeIds().get(i)).position(),.12f,.55f,.8f);vertex(triangles,byId.get(face.nodeIds().get(i+1)).position(),.12f,.55f,.8f);}if(view.showFaceNormals()){Vector3d center=new Vector3d();face.nodeIds().forEach(id->center.add(byId.get(id).position()));center.div(face.nodeIds().size());Vector3d n=new Vector3d(byId.get(face.nodeIds().get(1)).position()).sub(origin).cross(new Vector3d(byId.get(face.nodeIds().get(2)).position()).sub(origin));if(n.lengthSquared()>1e-12)line(normals,center,new Vector3d(n.normalize(.35)).add(center),1,.45f,.9f);}}
-        GL11.glEnable(GL11.GL_BLEND);GL11.glBlendFunc(GL11.GL_SRC_ALPHA,GL11.GL_ONE_MINUS_SRC_ALPHA);GL20.glUniform1f(opacityLocation,.18f);GL11.glDepthMask(false);draw(triangles,GL11.GL_TRIANGLES,1);GL11.glDepthMask(true);GL11.glDisable(GL11.GL_BLEND);GL20.glUniform1f(opacityLocation,1f);draw(normals,GL11.GL_LINES,2);GL30.glBindVertexArray(0);GL20.glUseProgram(0);
+        long constructionStarted=System.nanoTime();if(cachedFaceModel!=renderModel){List<Float> triangles=new ArrayList<>(),normals=new ArrayList<>();for(DerivedFace face:renderModel.derivedFaces()){if(face.nodeIds().size()<3)continue;Vector3d origin=byId.get(face.nodeIds().get(0)).position();for(int i=1;i+1<face.nodeIds().size();i++){vertex(triangles,origin,.12f,.55f,.8f);vertex(triangles,byId.get(face.nodeIds().get(i)).position(),.12f,.55f,.8f);vertex(triangles,byId.get(face.nodeIds().get(i+1)).position(),.12f,.55f,.8f);}Vector3d center=new Vector3d();face.nodeIds().forEach(id->center.add(byId.get(id).position()));center.div(face.nodeIds().size());Vector3d n=new Vector3d(byId.get(face.nodeIds().get(1)).position()).sub(origin).cross(new Vector3d(byId.get(face.nodeIds().get(2)).position()).sub(origin));if(n.lengthSquared()>1e-12)line(normals,center,new Vector3d(n.normalize(.35)).add(center),1,.45f,.9f);}cachedFaceTriangles=List.copyOf(triangles);cachedFaceNormals=List.copyOf(normals);cachedFaceModel=renderModel;}DevelopmentTimingDiagnostics.record("viewport.face-triangulation",System.nanoTime()-constructionStarted);
+        long faceStarted=System.nanoTime();
+        GL11.glEnable(GL11.GL_BLEND);GL11.glBlendFunc(GL11.GL_SRC_ALPHA,GL11.GL_ONE_MINUS_SRC_ALPHA);GL20.glUniform1f(opacityLocation,.18f);GL11.glDepthMask(false);draw(cachedFaceTriangles,GL11.GL_TRIANGLES,1);GL11.glDepthMask(true);GL11.glDisable(GL11.GL_BLEND);GL20.glUniform1f(opacityLocation,1f);if(view.showFaceNormals())draw(cachedFaceNormals,GL11.GL_LINES,2);GL30.glBindVertexArray(0);GL20.glUseProgram(0);
+        DevelopmentTimingDiagnostics.record("viewport.translucent-face-render",System.nanoTime()-faceStarted);
     }
 
     public Matrix4f viewProjection(ViewState view, ViewFit fit,
