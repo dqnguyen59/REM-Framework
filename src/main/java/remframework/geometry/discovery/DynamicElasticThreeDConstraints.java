@@ -28,6 +28,7 @@ public final class DynamicElasticThreeDConstraints {
     }
 
     public ThreeDConstraintDiagnostics diagnostics(List<DynamicElasticNode> nodes){return diagnosticsCoordinates(nodes.stream().map(n->new Vector3d(n.position())).toList());}
+    public FaceObjectiveDiagnostics objectiveDiagnostics(List<DynamicElasticNode> nodes){List<Vector3d> p=nodes.stream().map(n->new Vector3d(n.position())).toList();double plan=planarityEnergy(p),angle=angleEnergy(p),dihedral=dihedralValues(p).variance,radius=radiusValues(p).variance/(scale*scale);double pc=modes.facePlanarity()==FacePlanarityMode.REQUIRE_PLANAR_FACES?strengths.facePlanarity()*plan:0,ac=modes.faceAngles()==FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE?strengths.faceAngles()*angle:0,dc=modes.dihedrals()==DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES?strengths.dihedrals()*dihedral:0,rc=modes.facePlaneRadii()==FacePlaneRadiusMode.REQUIRE_EQUAL_FACE_PLANE_RADII?strengths.facePlaneRadii()*radius:0;ThreeDConstraintDiagnostics d=diagnosticsCoordinates(p);return new FaceObjectiveDiagnostics(d.maximumFacePlanarityError(),Math.sqrt(plan)*scale,d.maximumFaceAngleDeviation(),Math.sqrt(angle),pc,ac,dc,rc,pc+ac+dc+rc);}
 
     private double energy(List<Vector3d> p){double value=0;
         if(modes.facePlanarity()==FacePlanarityMode.REQUIRE_PLANAR_FACES)value+=strengths.facePlanarity()*DevelopmentTimingDiagnostics.measure("stage2.face-planarity-objective",()->planarityEnergy(p));

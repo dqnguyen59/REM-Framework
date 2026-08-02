@@ -136,6 +136,10 @@ public final class IncrementalSession {
     public int iteration() { return publishedIteration; }
     public DynamicElasticMetrics metrics() { return publishedMetrics; }
     public ThreeDConstraintDiagnostics threeDConstraintDiagnostics(){return publishedThreeD;}
+    public ConstraintObjectiveDiagnostics objectiveDiagnostics(){return elastic.objectiveDiagnostics();}
+    public StagnationStatus stagnationStatus(){return elastic.stagnationStatus();}
+    public int realizationIndex(){return attempt+1;}
+    public long realizedSeed(){return request.randomSeed()+attempt;}
     public List<ActiveConstraintState> activeThreeDConstraints(){ThreeDConstraintDiagnostics d=threeDConstraintDiagnostics();ThreeDExperimentConditions m=request.threeDConditions();ThreeDConstraintStrengths s=request.threeDConstraintStrengths();return List.of(
             state("Face planarity",m.facePlanarity()!=FacePlanarityMode.MEASURE_ONLY,m.facePlanarity()==FacePlanarityMode.REQUIRE_PLANAR_FACES,d.maximumFacePlanarityError(),m.facePlanarityTolerance(),s.facePlanarity()),
             state("Face angles",m.faceAngles()!=FaceAngleConditionMode.NONE,m.faceAngles()==FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE,d.maximumFaceAngleDeviation(),m.absoluteRegularityTolerance(),s.faceAngles()),
@@ -196,6 +200,8 @@ public final class IncrementalSession {
                 ? GeometryEmbeddingDimension.THREE_D:request.dimension();
         initialCoordinates = initializeCoordinates(configuration.nodeCount(),
                 initializationDimension, request.targetEdgeLength(), seed);
+        int secondAnchor=configuration.adjacency().get(0).stream().mapToInt(Integer::intValue).min().orElse(1);
+        initialCoordinates.get(secondAnchor).set(request.targetEdgeLength(),0,0);
         if(request.experimentProfile()==ExperimentProfile.CLOSED_2D_AREA
                 &&request.angleConditionMode()==AngleConditionMode.REQUIRE_EQUAL_ANGLES
                 &&request.planarityMode()==PlanarityRealizationMode.STRICT_2D_COORDINATES)
@@ -203,7 +209,7 @@ public final class IncrementalSession {
         List<DynamicElasticNode> nodes = new ArrayList<>();
         for (int id = 0; id < initialCoordinates.size(); id++)
             nodes.add(new DynamicElasticNode(id, initialCoordinates.get(id),
-                    new Vector3d(), id < 2));
+                    new Vector3d(), id==0||id==secondAnchor));
         elastic = new DynamicElasticSession(graph, settings, nodes);
         if(request.experimentProfile()==ExperimentProfile.CLOSED_2D_AREA){
             boolean strict=request.planarityMode()==PlanarityRealizationMode.STRICT_2D_COORDINATES;

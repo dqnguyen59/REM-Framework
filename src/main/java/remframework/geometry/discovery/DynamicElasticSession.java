@@ -45,6 +45,10 @@ public final class DynamicElasticSession {
     private double cycleAngleStrength;
     private DynamicElasticThreeDConstraints threeDConstraints;
     private ThreeDExperimentConditions threeDModes;
+    private final int secondAnchorId;
+    private final StagnationDetector stagnationDetector=new StagnationDetector(200,1e-5);
+    private StagnationStatus stagnationStatus=StagnationStatus.progressing();
+    private ConstraintObjectiveDiagnostics objectiveDiagnostics;
 
     public DynamicElasticSession(FixedDegreeGraph graph, DynamicElasticSettings settings) {
         this(graph, settings, initialize(graph.nodeCount(), settings));
@@ -54,8 +58,13 @@ public final class DynamicElasticSession {
                                  List<DynamicElasticNode> initialNodes) {
         this.graph = graph;
         this.settings = settings;
+        secondAnchorId=graph.connections().stream().filter(edge->edge.firstNodeId()==0||edge.secondNodeId()==0)
+                .mapToInt(edge->edge.firstNodeId()==0?edge.secondNodeId():edge.firstNodeId()).min().orElse(1);
         validateInitialNodes(graph, initialNodes);
-        this.initialNodes = initialNodes.stream().map(DynamicElasticNode::copy).toList();
+        boolean legacyAnchors=initialNodes.stream().filter(DynamicElasticNode::fixed).map(DynamicElasticNode::id).toList().equals(List.of(0,1));
+        this.initialNodes = initialNodes.stream().map(node->legacyAnchors
+                ?new DynamicElasticNode(node.id(),node.position(),node.velocity(),node.id()==0||node.id()==secondAnchorId)
+                :node.copy()).toList();
         reset();
     }
 
@@ -93,6 +102,8 @@ public final class DynamicElasticSession {
             state = DynamicElasticState.MAX_ITERATIONS_REACHED;
         else if (elasticConditions)
             state = DynamicElasticState.NEAR_EQUILIBRIUM;
+        objectiveDiagnostics=calculateObjectiveDiagnostics(current);
+        stagnationStatus=stagnationDetector.add(objectiveDiagnostics.totalObjective(),current.maximumNodeSpeed(),state==DynamicElasticState.EQUILIBRIUM_REACHED);
         return true;
     }
 
@@ -110,7 +121,9 @@ public final class DynamicElasticSession {
         elasticStableIterations = 0;
         failureReason = "";
         state = DynamicElasticState.INITIALIZING;
+        stagnationDetector.reset();stagnationStatus=StagnationStatus.progressing();
         enforceAnchors();
+        objectiveDiagnostics=calculateObjectiveDiagnostics(calculateMetrics());
     }
 
     public Map<Integer, Vector3d> calculateForces() {
@@ -148,6 +161,10 @@ public final class DynamicElasticSession {
     }
 
     public ThreeDConstraintDiagnostics threeDConstraintDiagnostics(){return threeDConstraints==null?ThreeDConstraintDiagnostics.inactive():threeDConstraints.diagnostics(nodes);}
+    public ConstraintObjectiveDiagnostics objectiveDiagnostics(){return objectiveDiagnostics;}
+    public StagnationStatus stagnationStatus(){return stagnationStatus;}
+
+    private ConstraintObjectiveDiagnostics calculateObjectiveDiagnostics(DynamicElasticMetrics metrics){double max=0,sum=0;for(DynamicElasticEdgeMetric edge:metrics.edges()){double error=(edge.distance()-edge.targetDistance())/settings.targetDistance();max=Math.max(max,Math.abs(error));sum+=error*error;}double rms=metrics.edges().isEmpty()?0:Math.sqrt(sum/metrics.edges().size());double edgeContribution=.5*settings.springStrength()*(metrics.edges().isEmpty()?0:sum/metrics.edges().size());FaceObjectiveDiagnostics face=threeDConstraints==null?FaceObjectiveDiagnostics.inactive():threeDConstraints.objectiveDiagnostics(nodes);double kinetic=nodes.stream().filter(node->!node.fixed()).mapToDouble(node->node.velocity().lengthSquared()).sum()*.5;return new ConstraintObjectiveDiagnostics(max,rms,face.planarityMaximum(),face.planarityRms(),face.angleMaximum(),face.angleRms(),edgeContribution,face.planarityContribution(),face.angleContribution(),face.dihedralContribution(),face.facePlaneRadiusContribution(),edgeContribution+face.totalContribution(),metrics.maximumNodeSpeed(),kinetic);}
 
     private boolean threeDConstraintsPass(){ThreeDConstraintDiagnostics d=threeDConstraintDiagnostics();if(!d.finite())return false;
         boolean planar=threeDModes.facePlanarity()!=FacePlanarityMode.REQUIRE_PLANAR_FACES||d.maximumFacePlanarityError()<=threeDModes.facePlanarityTolerance();
@@ -235,7 +252,7 @@ public final class DynamicElasticSession {
 
     private void enforceAnchors() {
         DynamicElasticNode first = byId.get(0);
-        DynamicElasticNode second = byId.get(1);
+        DynamicElasticNode second = byId.get(secondAnchorId);
         if (first != null) { first.position().zero(); first.velocity().zero(); }
         if (second != null) {
             second.position().set(settings.targetDistance(), 0, 0);

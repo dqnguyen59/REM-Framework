@@ -45,6 +45,8 @@ class ReferenceTopologyBenchmarkTest {
         assertEquals(before,after);
     }
 
+    @Test void generatedTwentyVertexTopologyIsRecognizedOnlyByExactIsomorphism(){ConfigurationRequest request=ConfigurationRequest.byFaceCount(12,3,GeometryEmbeddingDimension.THREE_D,ExperimentProfile.CONVEX_POLYHEDRAL_VOLUME).withFaceComposition(FaceComposition.uniform(5));Configuration generated=new ConfigurationGenerator().generate(request,new GenerationExecution(GenerationWorkerCount.explicit(2),()->false,null)).configurations().getFirst();assertEquals("cfg-b10320c7778b",generated.id().toString());assertEquals(ReferenceTopology.DODECAHEDRON_GRAPH,recognizer.recognize(generated).topology());assertEquals(generated.id(),generated.id());}
+
     @Test void labelsUseCanonicalIndicesAndFollowMovingCoordinates() {
         Configuration cube=cube();
         List<Vector3d> first=java.util.stream.IntStream.range(0,8).mapToObj(i->new Vector3d(i,0,0)).toList();

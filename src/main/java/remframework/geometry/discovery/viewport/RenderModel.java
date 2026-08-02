@@ -62,8 +62,9 @@ public record RenderModel(String configurationId,
         DisplayTransform transform =
                 DisplayTransform.calculate(scientificCoordinates, 4.0);
         List<DiscoveryNode> nodes = new ArrayList<>();
+        int secondAnchor=configuration.adjacency().get(0).stream().mapToInt(Integer::intValue).min().orElse(1);
         for (int id = 0; id < configuration.nodeCount(); id++)
-            nodes.add(new DiscoveryNode(id, transform.display(scientificCoordinates.get(id)), id < 2));
+            nodes.add(new DiscoveryNode(id, transform.display(scientificCoordinates.get(id)), id==0||id==secondAnchor));
         GeometryDiscoveryModel model = new GeometryDiscoveryModel(
                 "Phase 2 " + (preview ? "Topology Preview" : "Geometry Realization"),
                 preview ? "Graph visualization only - not a geometric realization."

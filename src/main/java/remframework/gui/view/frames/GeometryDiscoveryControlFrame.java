@@ -450,27 +450,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             if (phase2StoredResult != null)
                 label(c, "Reopened stored result: " + phase2StoredResult.status() + " - " + phase2StoredResult.explanation());
             IncrementalSession incremental = controller.phasedWorkflow().incrementalSession();
-            if (incremental == null) label(c, "Geometry test has not started.");
-            else {
-                label(c, "Execution: " + incremental.executionState() + "    Realization: "
-                        + incremental.scientificState() + "    Iteration: " + incremental.iteration());
-                ScientificTimingSnapshot timing=incremental.timing();label(c,String.format("Requested updates/s: %d    Achieved: %.3f    Average iteration: %.1f ms",controller.phasedWorkflow().scientificUpdatesPerSecond(),timing.achievedUpdatesPerSecond(),timing.averageIterationMillis()));
-                if (incremental.convergenceIteration() >= 0)
-                    label(c, "Scientific milestone iteration: " + incremental.convergenceIteration());
-                label(c, String.format("Edge-length accuracy: %.6f    Maximum speed: %.6g",
-                        incremental.metrics().meanDistanceAccuracy(), incremental.metrics().maximumNodeSpeed()));
-                label(c, "Convergence: elasticEquilibrium=" + incremental.metrics().elasticEquilibrium()
-                        + " spatiallyValid=" + incremental.metrics().spatiallyValid()
-                        + " realizationStatus=" + incremental.state());
-                if (!incremental.stopReason().isBlank()) label(c, "Diagnostic: " + incremental.stopReason());
-                ExperimentConvergenceDiagnostics live=incremental.convergenceDiagnostics();
-                label(c,String.format("Maximum edge error: %.7g    Maximum plane deviation: %.7g",live.maximumConnectedEdgeError(),live.maximumPlaneDeviation()));
-                label(c,String.format("Angle variance: %.7g    Maximum angle deviation: %.7g",live.angleVariance(),live.maximumAngleDeviation()));
-                label(c,"Edge="+live.edgeConstraint()+" Planarity="+live.planarity()+" Angle="+live.angleCondition()+" Boundary="+live.simpleBoundary()+" Area="+live.areaQualification());
-            }
             heading(c, "Stage 2 - Realization");
             label(c, "Geometry-test state: " + StatusPresentation.realizationState(incremental));
-            label(c, "Equal-edge realization: " + StatusPresentation.equalEdgeConclusion(incremental, null));
+            label(c, "Live numerical status is shown in Current Status.");
             return;
         }
         phase2ResultSections(c, result);

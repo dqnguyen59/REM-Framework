@@ -24,8 +24,7 @@ public final class GeometryDiscoverySearchFrame extends AbstractFrame {
 
     public GeometryDiscoverySearchFrame(NuklearModel model) {
         super(model);
-        windowOptions = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_BORDER
-                | Nuklear.NK_WINDOW_NO_SCROLLBAR;
+        windowOptions = Nuklear.NK_WINDOW_TITLE | Nuklear.NK_WINDOW_BORDER;
     }
 
     @Override public String getTitle() { return "Current Status"; }
@@ -53,6 +52,7 @@ public final class GeometryDiscoverySearchFrame extends AbstractFrame {
                     controller.state().experimentLifecycle().name()));
         }
         label(c, "Scoring profile: " + display(controller.state().scoringProfile().name()));
+        stage2Status(c);
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 3);
         if (Nuklear.nk_button_label(c, "Current Candidate"))
             controller.state().setViewportSelection(
@@ -103,6 +103,8 @@ public final class GeometryDiscoverySearchFrame extends AbstractFrame {
                     metrics.totalEdgeLengthError()));
         }
     }
+
+    private void stage2Status(NkContext c){PhasedWorkflow workflow=controller.phasedWorkflow();IncrementalSession session=workflow.incrementalSession();if(session==null)return;heading(c,"Stage 2 Live Status");label(c,"Configuration: "+session.configuration().id());label(c,"Execution: "+session.executionState()+"    Scientific: "+session.scientificState());label(c,"Realization: "+session.realizationIndex()+" seed="+session.realizedSeed()+"    Iteration: "+session.iteration());ScientificTimingSnapshot timing=session.timing();label(c,String.format("Requested updates/s: %d    Achieved: %.3f    Average iteration: %.2f ms",workflow.scientificUpdatesPerSecond(),timing.achievedUpdatesPerSecond(),timing.averageIterationMillis()));label(c,"Convergence iteration: "+session.convergenceIteration()+"    Stable iterations: "+session.metrics().stableIterations()+" / "+session.metrics().requiredStableIterations());ConstraintObjectiveDiagnostics objective=session.objectiveDiagnostics();if(objective!=null){label(c,String.format("Edge max/RMS: %.6g / %.6g",objective.edgeMaximum(),objective.edgeRms()));label(c,String.format("Planarity max/RMS: %.6g / %.6g",objective.planarityMaximum(),objective.planarityRms()));label(c,String.format("Angle max/RMS: %.6g / %.6g",objective.angleMaximum(),objective.angleRms()));label(c,String.format("Normalized objective: %.6g    Maximum velocity: %.6g",objective.totalObjective(),objective.maximumVelocity()));}label(c,"Stagnation: "+session.stagnationStatus().classification()+" - "+session.stagnationStatus().reason());heading(c,"Active constraints");for(ActiveConstraintState state:session.activeThreeDConstraints())label(c,state.name()+": "+(state.activeRealizationTarget()?"REQUIRE":"MEASURE_ONLY")+" strength="+state.restoringStrength()+" error="+state.currentError()+" tolerance="+state.tolerance());if(!session.stopReason().isBlank())label(c,"Latest failure: "+session.stopReason());}
 
     private void heading(NkContext c, String text) {
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 3, 1);
