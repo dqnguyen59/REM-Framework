@@ -20,6 +20,10 @@ public final class ConfigurationGenerator {
     private final AutomorphismAnalyzer automorphisms = new AutomorphismAnalyzer();
 
     public GenerationResult generate(ConfigurationRequest request) {
+        return generate(request,GenerationExecution.defaults());
+    }
+
+    public GenerationResult generate(ConfigurationRequest request,GenerationExecution execution) {
         long started=System.nanoTime();
         if(request==null)return result(null,List.of(),0,0,started,false,validate(null));
         if(request!=null&&request.primaryParameterMode()==PrimaryParameterMode.NODE_COUNT) {
@@ -39,7 +43,7 @@ public final class ConfigurationGenerator {
         if(normalized.exactDegree()==2&&normalized.nodeCount()>=3)
             return directCycle(request,started);
         if(normalized.selectedStrategy()==GenerationStrategy.UNIFORM_SPHERICAL_FACE_GENERATION)
-            return uniformSpherical(request,normalized,started);
+            return uniformSpherical(request,normalized,started,execution);
         if(normalized.nodeCount()>MAX_EXHAUSTIVE_N) {
             var d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.GRAPH_GENERATION,
                     GeometryConfigurationStatusCode.ENUMERATION_LIMIT_REACHED,
@@ -87,8 +91,8 @@ public final class ConfigurationGenerator {
     }
 
     private GenerationResult uniformSpherical(ConfigurationRequest request,
-            NormalizedGraphRequest normalized,long started){
-        UniformSphericalFaceGenerator.Outcome generated=new UniformSphericalFaceGenerator().generate(request,normalized);
+            NormalizedGraphRequest normalized,long started,GenerationExecution execution){
+        UniformSphericalFaceGenerator.Outcome generated=new UniformSphericalFaceGenerator().generate(request,normalized,execution);
         GenerationDiagnostics diagnostics=generated.diagnostics();boolean complete=diagnostics.completeness()==GenerationCompleteness.COMPLETE_FOR_SELECTED_PARAMETER_CLASS;
         GeometryConfigurationStatusCode code=complete?GeometryConfigurationStatusCode.COMPLETE_FOR_SELECTED_PARAMETER_CLASS
                 :diagnostics.completeness()==GenerationCompleteness.INCOMPLETE_SEARCH_LIMIT_REACHED

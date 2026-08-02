@@ -24,12 +24,16 @@ import org.joml.Vector3d;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** Immutable render adapter for topology previews and incremental realizations. */
 public record RenderModel(String configurationId,
         GeometryDiscoveryModel model, DisplayTransform transform,
         boolean topologyPreview, long revision, List<CanonicalNodeLabel> nodeLabels,
         List<DerivedFace> derivedFaces) {
+    private static final ConcurrentHashMap<String,List<DerivedFace>> FACE_CACHE=new ConcurrentHashMap<>();
+    private static final AtomicLong FACE_COMPLEX_BUILDS=new AtomicLong();
     public RenderModel {
         nodeLabels = List.copyOf(nodeLabels);
         derivedFaces=List.copyOf(derivedFaces);
@@ -65,8 +69,9 @@ public record RenderModel(String configurationId,
                 nodes, configuration.edges());
         List<CanonicalNodeLabel> labels = nodes.stream().map(node ->
                 new CanonicalNodeLabel(node.id(), Integer.toString(node.id()), node.position())).toList();
-        List<DerivedFace> faces=new remframework.geometry.discovery.eligibility.TopologyEligibilityAnalyzer().deriveTopologicalFaces(configuration).stream().map(cycle->new DerivedFace("face-"+cycle,cycle,true,true,0)).toList();
+        String faceKey=configuration.id()+":"+configuration.provenance().getOrDefault("combinatorialFaces","");List<DerivedFace> faces=FACE_CACHE.computeIfAbsent(faceKey,ignored->{FACE_COMPLEX_BUILDS.incrementAndGet();return new remframework.geometry.discovery.eligibility.TopologyEligibilityAnalyzer().deriveTopologicalFaces(configuration).stream().map(cycle->new DerivedFace("face-"+cycle,cycle,true,true,0)).toList();});
         return new RenderModel(configuration.id().toString(), model,
                 transform, preview, revision, labels,faces);
     }
+    public static long faceComplexBuildCount(){return FACE_COMPLEX_BUILDS.get();}
 }

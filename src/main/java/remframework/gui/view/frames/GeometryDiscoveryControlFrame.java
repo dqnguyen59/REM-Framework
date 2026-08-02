@@ -13,6 +13,7 @@ import remframework.geometry.discovery.experiment.*;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import remframework.helpers.Constants;
 import remframework.gui.model.AbstractDialogModel.ConfirmState;
@@ -78,6 +79,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private GraphSymmetryFilter phase2SymmetryFilter = GraphSymmetryFilter.BOTH;
     private int phase2MaximumConfigurations = 1000;
     private int phase2TimeLimitSeconds = 30;
+    private boolean phase2AutomaticWorkers=true;
+    private int phase2GenerationWorkers=Math.max(1,Runtime.getRuntime().availableProcessors()-1);
+    private final PointerBuffer phase2ProgressBar=PointerBuffer.allocateDirect(1);
     private ConfigurationId phase2SelectedConfiguration;
     private TestResult phase2LatestResult;
     private StoredResult phase2StoredResult;
@@ -230,15 +234,21 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         if(!signature.equals(phase2PrimarySignature)){if(!phase2PrimarySignature.isEmpty())controller.phasedWorkflow().beginGenerationTransaction();phase2PrimarySignature=signature;phase2SelectedConfiguration=null;phase2LatestResult=null;phase2StoredResult=null;}
         phase2MaximumConfigurations = dynamicInteger(c, "Maximum configurations", phase2MaximumConfigurations, 1, 100_000);
         phase2TimeLimitSeconds = dynamicInteger(c, "Enumeration time limit (seconds)", phase2TimeLimitSeconds, 1, 86_400);
-        primaryButton(c, "Generate Configurations", generationEnabled(derivation), derivation.explanation(), () -> {
+        String workerMode=nk_label_combo_options(c,MemoryStack.stackGet(),"Generation workers",new String[]{"AUTO","Explicit"},phase2AutomaticWorkers?"AUTO":"Explicit",.45,.55);phase2AutomaticWorkers="AUTO".equals(workerMode);
+        if(!phase2AutomaticWorkers)phase2GenerationWorkers=dynamicInteger(c,"Worker count",phase2GenerationWorkers,1,Math.max(1,Runtime.getRuntime().availableProcessors()*2));
+        boolean generating=controller.phasedWorkflow().generationRunning();
+        primaryButton(c, "Generate Configurations", generationEnabled(derivation)&&!generating, derivation.explanation(), () -> {
             try {
                 phase2SelectedConfiguration = null;
                 phase2LatestResult = null;
                 phase2StoredResult = null;
                 ConfigurationRequest request=phase2Request(Path.of("lattice/geometry-discovery/configuration-sets"));
-                controller.phasedWorkflow().generateConfigurations(request);
+                controller.phasedWorkflow().generateConfigurationsAsync(request,phase2AutomaticWorkers?GenerationWorkerCount.auto():GenerationWorkerCount.explicit(phase2GenerationWorkers));
             } catch (Exception exception) { nuklearModel.showErrorDialog("Configuration generation", exception.getMessage()); }
         });
+        primaryButton(c,"Cancel Generation",generating,"No generation is active.",controller.phasedWorkflow()::cancelGeneration);
+        GenerationProgress live=controller.phasedWorkflow().generationProgress();
+        if(live!=null){heading(c,"Generation progress");phase2ProgressBar.put(0,live.running()?Math.floorMod(live.elapsed().toMillis()/100,100):live.cancelled()?0:100);Nuklear.nk_layout_row_dynamic(c,18,1);Nuklear.nk_progress(c,phase2ProgressBar,100,false);label(c,(live.running()?"GENERATING":"GENERATION FINISHED")+" - workers "+live.activeWorkers()+"/"+live.workerCount()+" - "+String.format("%.1f states/s",live.statesPerSecond()));label(c,"Elapsed="+live.elapsed()+" examined="+live.statesExamined()+" pruned="+live.statesPruned()+" frontier="+live.frontierSize());label(c,"Completed="+live.completedCandidates()+" duplicates="+live.duplicateCandidates()+" retained="+live.retainedConfigurations());label(c,"Limits: "+live.limits());}
         primaryButton(c, "Reopen Persisted Configuration Set", true, "", () -> {
             try {
                 var root = Path.of("lattice/geometry-discovery/configuration-sets");
@@ -378,6 +388,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         label(c, "Initialization and relaxation use existing scientific defaults; canonical angle constraints remain disabled.");
         TestResult result = phase2LatestResult != null ? phase2LatestResult
                 : controller.phasedWorkflow().latestGeometryTest(selected.id());
+        Stage2InitializationState initialization=controller.phasedWorkflow().stage2InitializationState();
+        label(c,initialization==Stage2InitializationState.INITIALIZING?"INITIALIZING STAGE 2 ...":"Stage 2 initialization: "+initialization+(initialization==Stage2InitializationState.READY?" ("+controller.phasedWorkflow().stage2InitializationMillis()+" ms)":""));
         SessionState sessionState = controller.phasedWorkflow().geometryTestSessionState();
         ExecutionState executionState = controller.phasedWorkflow().geometryExecutionState();
         primaryButton(c, "Start Geometry Test", executionState != ExecutionState.RUNNING,
@@ -416,7 +428,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 || executionState == ExecutionState.PAUSED,
                 "The selected session is not active.", controller.phasedWorkflow()::stopSelectedGeometryTest);
         primaryButton(c, "Reset Same Seed", true, "", () -> { controller.phasedWorkflow().resetSelectedGeometryTest(); phase2LatestResult = null; });
-        primaryButton(c, "Reset New Seed", controller.phasedWorkflow().incrementalSession()!=null, "Start a geometry test first.", () -> { controller.phasedWorkflow().resetSelectedGeometryTestNewSeed(); phase2Seed=controller.phasedWorkflow().incrementalSession().request().randomSeed();phase2LatestResult=null; });
+        primaryButton(c, "Reset New Seed", controller.phasedWorkflow().incrementalSession()!=null, "Start a geometry test first.", () -> { controller.phasedWorkflow().resetSelectedGeometryTestNewSeed();phase2Seed++;phase2LatestResult=null; });
         primaryButton(c, "Save Geometry-Test Result", result != null, "Run Geometry Test before saving a result.", () -> {
             try { controller.phasedWorkflow().saveLatestGeometryTest(Path.of("lattice/geometry-discovery/configuration-sets"), selected.id()); }
             catch (Exception exception) { nuklearModel.showErrorDialog("Geometry-test result", exception.getMessage()); }
@@ -444,6 +456,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             else {
                 label(c, "Execution: " + incremental.executionState() + "    Realization: "
                         + incremental.scientificState() + "    Iteration: " + incremental.iteration());
+                ScientificTimingSnapshot timing=incremental.timing();label(c,String.format("Requested updates/s: %d    Achieved: %.3f    Average iteration: %.1f ms",controller.phasedWorkflow().scientificUpdatesPerSecond(),timing.achievedUpdatesPerSecond(),timing.averageIterationMillis()));
                 if (incremental.convergenceIteration() >= 0)
                     label(c, "Scientific milestone iteration: " + incremental.convergenceIteration());
                 label(c, String.format("Edge-length accuracy: %.6f    Maximum speed: %.6g",

@@ -69,9 +69,9 @@ class Closed2dProfileWorkflowTest {
     }
 
     @Test void workflowStepUpdatesRenderRevisionAndPausePreservesState() throws Exception {
-        PhasedWorkflow workflow=new PhasedWorkflow();Configuration graph=workflow.generateConfigurations(generationRequest(4)).configurations().getFirst();workflow.selectForGeometryTest(graph.id());workflow.startSelectedGeometryTest(request(graph,PlanarityRealizationMode.STRICT_2D_COORDINATES,AngleConditionMode.MEASURE_ONLY));workflow.pauseSelectedGeometryTest();
+        PhasedWorkflow workflow=new PhasedWorkflow();Configuration graph=workflow.generateConfigurations(generationRequest(4)).configurations().getFirst();workflow.selectForGeometryTest(graph.id());workflow.startSelectedGeometryTest(request(graph,PlanarityRealizationMode.STRICT_2D_COORDINATES,AngleConditionMode.MEASURE_ONLY));await(()->workflow.incrementalSession()!=null);workflow.pauseSelectedGeometryTest();
         long revision=workflow.renderModel().revision();List<Vector3d> paused=workflow.incrementalSession().currentCoordinates();workflow.advanceGeometryTestFrame();Thread.sleep(30);assertEquals(paused,workflow.incrementalSession().currentCoordinates());
-        workflow.stepSelectedGeometryTest();assertEquals(1,workflow.incrementalSession().iteration());assertTrue(workflow.renderModel().revision()>revision);workflow.resumeSelectedGeometryTest();assertEquals(ExecutionState.RUNNING,workflow.geometryExecutionState());workflow.close();
+        workflow.stepSelectedGeometryTest();await(()->workflow.incrementalSession().iteration()==1);assertTrue(workflow.renderModel().revision()>revision);workflow.resumeSelectedGeometryTest();assertEquals(ExecutionState.RUNNING,workflow.geometryExecutionState());workflow.close();
     }
 
     private ConfigurationRequest generationRequest(int n){return new ConfigurationRequest(n,2,GeometryEmbeddingDimension.TWO_D,GraphSymmetryFilter.BOTH,10,Duration.ofSeconds(5),null,null,ExperimentProfile.CLOSED_2D_AREA);}
@@ -81,4 +81,5 @@ class Closed2dProfileWorkflowTest {
     private static Configuration cycle(int n){var d=GeometryConfigurationDiagnostic.info(GeometryConfigurationStage.GRAPH_GENERATION,GeometryConfigurationStatusCode.GENERATED,"generated","test");return new Configuration(new ConfigurationId("cfg-cycle-"+n),n,2,edges(n),null,"cycle-"+n,"cycle-"+n,2*n,GraphSymmetryClassification.HIGHLY_SYMMETRIC,true,0,"TEST",true,GeometryConfigurationStatus.of(d),List.of(d),Instant.EPOCH,Map.of());}
     private static List<DiscoveryConnection> edges(int n){java.util.ArrayList<DiscoveryConnection> e=new java.util.ArrayList<>();for(int i=0;i<n;i++)e.add(new DiscoveryConnection(i,(i+1)%n));return e;}
     private static List<Vector3d> regularPolygon(int n){return java.util.stream.IntStream.range(0,n).mapToObj(i->new Vector3d(Math.cos(2*Math.PI*i/n),Math.sin(2*Math.PI*i/n),0)).toList();}
+    private static void await(java.util.function.BooleanSupplier condition)throws Exception{long deadline=System.nanoTime()+Duration.ofSeconds(5).toNanos();while(!condition.getAsBoolean()&&System.nanoTime()<deadline)Thread.sleep(5);assertTrue(condition.getAsBoolean());}
 }

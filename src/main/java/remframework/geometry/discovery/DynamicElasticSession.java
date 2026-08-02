@@ -62,7 +62,7 @@ public final class DynamicElasticSession {
     public boolean step() {
         if (finished()) return false;
         state = DynamicElasticState.RELAXING;
-        Map<Integer, Vector3d> forces = calculateForces();
+        Map<Integer, Vector3d> forces = DevelopmentTimingDiagnostics.measure("stage2.edge-and-constraint-forces",this::calculateForces);
         clampForces(forces);
         integrate(forces);
         enforceProfilePlane();
@@ -74,7 +74,7 @@ public final class DynamicElasticSession {
             failureReason = "A non-finite position, velocity, or metric was produced.";
             return false;
         }
-        DynamicElasticMetrics current = calculateMetrics();
+        DynamicElasticMetrics current = DevelopmentTimingDiagnostics.measure("stage2.qualification",this::calculateMetrics);
         boolean elasticConditions = current.connectionsSatisfied()
                 == current.connectionCount()
                 && current.maximumNodeSpeed() <= settings.maximumEquilibriumSpeed();

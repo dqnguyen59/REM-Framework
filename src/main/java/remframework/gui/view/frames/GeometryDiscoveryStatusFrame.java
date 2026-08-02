@@ -38,7 +38,7 @@ public final class GeometryDiscoveryStatusFrame extends AbstractFrame {
         GeometryDiscoveryWorkflowResolution workflow = controller.workflow();
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit, 1);
         Nuklear.nk_style_set_font(c, nuklearModel.getDefaultFontBold());
-        Nuklear.nk_label(c, controller.workspace().dynamicElasticActive()
+        Nuklear.nk_label(c, phase2Status()!=null?phase2Status():controller.workspace().dynamicElasticActive()
                 ? dynamicElasticStatus() : statusLabel(workflow.state()),
                 Nuklear.NK_TEXT_CENTERED);
         Nuklear.nk_style_set_font(c, nuklearModel.getDefaultFont());
@@ -47,6 +47,7 @@ public final class GeometryDiscoveryStatusFrame extends AbstractFrame {
                 + "    Profile: " + profileLabel(controller.state().scoringProfile()),
                 Nuklear.NK_TEXT_CENTERED);
     }
+    private String phase2Status(){PhasedWorkflow phase=controller.phasedWorkflow();GenerationProgress progress=phase.generationProgress();if(phase.generationRunning()&&progress!=null)return String.format("GENERATING - workers %d/%d - %.1f states/s",progress.activeWorkers(),progress.workerCount(),progress.statesPerSecond());if(phase.stage2InitializationState()==Stage2InitializationState.INITIALIZING)return "INITIALIZING STAGE 2 ...";IncrementalSession session=phase.incrementalSession();if(session!=null&&session.executionState()==ExecutionState.RUNNING)return String.format("RELAXING - iteration %d - %.2f updates/s",session.iteration(),session.timing().achievedUpdatesPerSecond());return null;}
     private String dynamicElasticStatus() {
         return DynamicElasticStatusReporter.label(
                 controller.workspace().dynamicElasticMetrics());

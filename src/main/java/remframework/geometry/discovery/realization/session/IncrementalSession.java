@@ -43,11 +43,17 @@ public final class IncrementalSession {
     private DynamicElasticSession elastic;
     private List<Vector3d> initialCoordinates;
     private int attempt;
-    private ExecutionState executionState = ExecutionState.IDLE;
-    private ScientificState scientificState = ScientificState.INITIALIZED;
-    private TestResult finalResult;
-    private String stopReason = "";
-    private int convergenceIteration = -1;
+    private volatile ExecutionState executionState = ExecutionState.IDLE;
+    private volatile ScientificState scientificState = ScientificState.INITIALIZED;
+    private volatile TestResult finalResult;
+    private volatile String stopReason = "";
+    private volatile int convergenceIteration = -1;
+    private volatile List<Vector3d> publishedCoordinates=List.of();
+    private volatile DynamicElasticMetrics publishedMetrics;
+    private volatile ThreeDConstraintDiagnostics publishedThreeD=ThreeDConstraintDiagnostics.inactive();
+    private volatile int publishedIteration;
+    private volatile ScientificTimingSnapshot timing=ScientificTimingSnapshot.initial(0);
+    private long totalIterationNanos;
 
     public IncrementalSession(Configuration configuration,
             TestRequest request) {
@@ -57,7 +63,7 @@ public final class IncrementalSession {
         this.request = request;
         this.graph = new FixedDegreeGraph(configuration.nodeCount(), configuration.exactDegree(),
                 configuration.edges(), configuration.canonicalGraphLabel());
-        initializeAttempt();
+        long started=System.nanoTime();initializeAttempt();publishSnapshot();timing=ScientificTimingSnapshot.initial(System.nanoTime()-started);
     }
 
     public synchronized void initialize() {
@@ -68,8 +74,9 @@ public final class IncrementalSession {
         if (executionState == ExecutionState.STOPPED) return false;
         if (executionState == ExecutionState.IDLE) executionState = ExecutionState.RUNNING;
         if (scientificState == ScientificState.INITIALIZED) scientificState = request.dimension()==GeometryEmbeddingDimension.THREE_D?ScientificState.RELAXING_CONSTRAINTS:ScientificState.RELAXING;
-        elastic.step();
+        long started=System.nanoTime();elastic.step();totalIterationNanos+=System.nanoTime()-started;
         if (elastic.finished()) finishAttempt();
+        publishSnapshot();
         return true;
     }
 
@@ -97,11 +104,11 @@ public final class IncrementalSession {
                 &&scientificState!=ScientificState.SEARCH_LIMIT_REACHED) executionState = ExecutionState.RUNNING;
     }
 
-    public synchronized void pause() {
+    public void pause() {
         if (executionState == ExecutionState.RUNNING) executionState = ExecutionState.PAUSED;
     }
 
-    public synchronized void stop() {
+    public void stop() {
         if (executionState == ExecutionState.STOPPED) return;
         executionState = ExecutionState.STOPPED;
         stopReason = "Geometry realization stopped by the user.";
@@ -115,27 +122,28 @@ public final class IncrementalSession {
         initializeAttempt();
         executionState = ExecutionState.IDLE;
         scientificState = ScientificState.INITIALIZED;
+        totalIterationNanos=0;publishSnapshot();
     }
 
-    public synchronized List<Vector3d> currentCoordinates() {
-        return elastic.nodes().stream().map(node -> new Vector3d(node.position())).toList();
+    public List<Vector3d> currentCoordinates() {
+        return publishedCoordinates.stream().map(Vector3d::new).toList();
     }
 
     public synchronized List<Vector3d> initialCoordinates() {
         return initialCoordinates.stream().map(Vector3d::new).toList();
     }
 
-    public synchronized int iteration() { return elastic.iteration(); }
-    public synchronized DynamicElasticMetrics metrics() { return elastic.metrics(); }
-    public synchronized ThreeDConstraintDiagnostics threeDConstraintDiagnostics(){return elastic.threeDConstraintDiagnostics();}
-    public synchronized List<ActiveConstraintState> activeThreeDConstraints(){ThreeDConstraintDiagnostics d=threeDConstraintDiagnostics();ThreeDExperimentConditions m=request.threeDConditions();ThreeDConstraintStrengths s=request.threeDConstraintStrengths();return List.of(
+    public int iteration() { return publishedIteration; }
+    public DynamicElasticMetrics metrics() { return publishedMetrics; }
+    public ThreeDConstraintDiagnostics threeDConstraintDiagnostics(){return publishedThreeD;}
+    public List<ActiveConstraintState> activeThreeDConstraints(){ThreeDConstraintDiagnostics d=threeDConstraintDiagnostics();ThreeDExperimentConditions m=request.threeDConditions();ThreeDConstraintStrengths s=request.threeDConstraintStrengths();return List.of(
             state("Face planarity",m.facePlanarity()!=FacePlanarityMode.MEASURE_ONLY,m.facePlanarity()==FacePlanarityMode.REQUIRE_PLANAR_FACES,d.maximumFacePlanarityError(),m.facePlanarityTolerance(),s.facePlanarity()),
             state("Face angles",m.faceAngles()!=FaceAngleConditionMode.NONE,m.faceAngles()==FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE,d.maximumFaceAngleDeviation(),m.absoluteRegularityTolerance(),s.faceAngles()),
             state("Dihedrals",m.dihedrals()!=DihedralConditionMode.NONE,m.dihedrals()==DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES,d.maximumDihedralDeviation(),m.absoluteRegularityTolerance(),s.dihedrals()),
             state("Face-plane radii",m.facePlaneRadii()!=FacePlaneRadiusMode.NONE,m.facePlaneRadii()==FacePlaneRadiusMode.REQUIRE_EQUAL_FACE_PLANE_RADII,d.maximumFacePlaneRadiusDeviation(),m.absoluteRegularityTolerance(),s.facePlaneRadii()));}
     private static ActiveConstraintState state(String name,boolean enabled,boolean active,double error,double tolerance,double strength){return new ActiveConstraintState(name,enabled,active,error,tolerance,active?strength:0,error<=tolerance);}
     /** Compatibility view for callers that used the former combined state. */
-    public synchronized SessionState state() {
+    public SessionState state() {
         if (scientificState == ScientificState.CONVERGED) return SessionState.CONVERGED;
         if (scientificState == ScientificState.SEARCH_LIMIT_REACHED) return SessionState.EXHAUSTED;
         if (scientificState == ScientificState.FAILED) return SessionState.FAILED;
@@ -147,12 +155,13 @@ public final class IncrementalSession {
             case STOPPED -> SessionState.STOPPED;
         };
     }
-    public synchronized ExecutionState executionState() { return executionState; }
-    public synchronized ScientificState scientificState() { return scientificState; }
-    public synchronized int convergenceIteration() { return convergenceIteration; }
-    public synchronized TestResult result() { return finalResult; }
-    public synchronized String stopReason() { return stopReason; }
-    public synchronized ExperimentConvergenceDiagnostics convergenceDiagnostics() {
+    public ExecutionState executionState() { return executionState; }
+    public ScientificState scientificState() { return scientificState; }
+    public ScientificTimingSnapshot timing(){return timing;}
+    public int convergenceIteration() { return convergenceIteration; }
+    public TestResult result() { return finalResult; }
+    public String stopReason() { return stopReason; }
+    public ExperimentConvergenceDiagnostics convergenceDiagnostics() {
         List<Vector3d> coordinates=currentCoordinates();
         double maximumEdgeError=elastic.metrics().edges().stream().mapToDouble(edge->Math.abs(edge.distance()-edge.targetDistance())).max().orElse(0);
         if(request.dimension()==GeometryEmbeddingDimension.THREE_D){ThreeDConstraintDiagnostics d=threeDConstraintDiagnostics();boolean edge=maximumEdgeError<=request.edgeTolerance();boolean planar=request.threeDConditions().facePlanarity()!=FacePlanarityMode.REQUIRE_PLANAR_FACES||d.maximumFacePlanarityError()<=request.threeDConditions().facePlanarityTolerance();boolean angles=request.threeDConditions().faceAngles()!=FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE||d.maximumFaceAngleDeviation()<=request.threeDConditions().absoluteRegularityTolerance();return new ExperimentConvergenceDiagnostics(iteration(),maximumEdgeError,d.maximumFacePlanarityError(),d.maximumFacePlanarityError(),d.maximumFacePlanarityError(),request.threeDConditions().facePlanarityTolerance(),d.dihedralVariance(),d.maximumFaceAngleDeviation(),edge?"PASS":"FAIL",planar?"PASS":"FAIL",request.threeDConditions().faceAngles()==FaceAngleConditionMode.MEASURE_ONLY?"MEASURE_ONLY":angles?"PASS":"FAIL","TOPOLOGICAL_FACE_COMPLEX_AVAILABLE","PENDING_FINAL_BOUNDARY_QUALIFICATION",scientificState==ScientificState.CONVERGED);}
@@ -168,7 +177,7 @@ public final class IncrementalSession {
                 regularity.interiorAngles().variance(),regularity.maximumAngleTargetDeviation(),
                 regularity.equalEdges()?"PASS":"FAIL",regularity.planar()?"PASS":"FAIL",angle,
                 regularity.simpleBoundary()?"PASS":"FAIL",regularity.positiveArea()?"PASS":"FAIL",
-                elastic.metrics().elasticEquilibrium()&&regularity.valid());
+                publishedMetrics.elasticEquilibrium()&&regularity.valid());
     }
     public Configuration configuration() { return configuration; }
     public TestRequest request(){return request;}
@@ -209,18 +218,20 @@ public final class IncrementalSession {
         }
     }
 
+    private void publishSnapshot(){long started=System.nanoTime();publishedCoordinates=elastic.nodes().stream().map(node->new Vector3d(node.position())).toList();publishedMetrics=elastic.metrics();publishedThreeD=elastic.threeDConstraintDiagnostics();publishedIteration=elastic.iteration();long publication=System.nanoTime()-started;DevelopmentTimingDiagnostics.record("stage2.snapshot-publication",publication);long count=Math.max(0,publishedIteration);double average=count==0?0:totalIterationNanos/1_000_000d/count;timing=new ScientificTimingSnapshot(timing.initializationNanos(),count,average,average==0?0:1000d/average,publication);}
+
     private void finishAttempt() {
         if (finalResult != null) return;
         DynamicElasticResult elasticResult = elastic.result();
         if (elasticResult.resultStatus() == DynamicElasticResultStatus.STABLE_CANDIDATE_FOUND) {
-            finalResult = finalizeResult(configuration, request, elasticResult);
+            finalResult = DevelopmentTimingDiagnostics.measure("stage2.final-qualification",()->finalizeResult(configuration, request, elasticResult));
             scientificState = finalResult.status().code()==GeometryConfigurationStatusCode.VALID_CANDIDATE
                     ? ScientificState.CONVERGED : ScientificState.QUALIFICATION_FAILED;
             convergenceIteration = iteration();
             return;
         }
         if (elasticResult.resultStatus() == DynamicElasticResultStatus.NUMERICAL_FAILURE) {
-            finalResult = finalizeResult(configuration, request, elasticResult);
+            finalResult = DevelopmentTimingDiagnostics.measure("stage2.final-qualification",()->finalizeResult(configuration, request, elasticResult));
             scientificState = ScientificState.FAILED;
             convergenceIteration = iteration();
             return;
@@ -229,7 +240,7 @@ public final class IncrementalSession {
             initializeAttempt();
             scientificState = request.dimension()==GeometryEmbeddingDimension.THREE_D?ScientificState.RELAXING_CONSTRAINTS:ScientificState.RELAXING;
         } else {
-            finalResult = finalizeResult(configuration, request, elasticResult);
+            finalResult = DevelopmentTimingDiagnostics.measure("stage2.final-qualification",()->finalizeResult(configuration, request, elasticResult));
             scientificState = ScientificState.SEARCH_LIMIT_REACHED;
             convergenceIteration = iteration();
         }

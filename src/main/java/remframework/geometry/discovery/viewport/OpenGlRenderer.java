@@ -104,8 +104,8 @@ public final class OpenGlRenderer implements AutoCloseable {
     }
 
     public void render(RenderModel renderModel,GeometryDiscoverySettings settings,ViewState view,int width,int height){
-        render(renderModel.model(),settings,view,width,height);
-        if(view.showDerivedFaces())renderFaces(renderModel,view,width,height);
+        long started=System.nanoTime();try{render(renderModel.model(),settings,view,width,height);
+        if(view.showDerivedFaces())renderFaces(renderModel,view,width,height);}finally{DevelopmentTimingDiagnostics.record("viewport.opengl-render",System.nanoTime()-started);}
     }
 
     private void renderFaces(RenderModel renderModel,ViewState view,int width,int height){
