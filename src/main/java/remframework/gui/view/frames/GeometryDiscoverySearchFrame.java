@@ -104,7 +104,26 @@ public final class GeometryDiscoverySearchFrame extends AbstractFrame {
         }
     }
 
-    private void stage2Status(NkContext c){PhasedWorkflow workflow=controller.phasedWorkflow();IncrementalSession session=workflow.incrementalSession();if(session==null)return;heading(c,"Stage 2 Live Status");label(c,"Configuration: "+session.configuration().id());label(c,"Execution: "+session.executionState()+"    Scientific: "+session.scientificState());label(c,"Realization: "+session.realizationIndex()+" seed="+session.realizedSeed()+"    Iteration: "+session.iteration());ScientificTimingSnapshot timing=session.timing();label(c,String.format("Requested updates/s: %d    Achieved: %.3f    Average iteration: %.2f ms",workflow.scientificUpdatesPerSecond(),timing.achievedUpdatesPerSecond(),timing.averageIterationMillis()));label(c,"Convergence iteration: "+session.convergenceIteration()+"    Stable iterations: "+session.metrics().stableIterations()+" / "+session.metrics().requiredStableIterations());ConstraintObjectiveDiagnostics objective=session.objectiveDiagnostics();if(objective!=null){label(c,String.format("Edge max/RMS: %.6g / %.6g",objective.edgeMaximum(),objective.edgeRms()));label(c,String.format("Planarity max/RMS: %.6g / %.6g",objective.planarityMaximum(),objective.planarityRms()));label(c,String.format("Angle max/RMS: %.6g / %.6g",objective.angleMaximum(),objective.angleRms()));label(c,String.format("Normalized objective: %.6g    Maximum velocity: %.6g",objective.totalObjective(),objective.maximumVelocity()));}label(c,"Stagnation: "+session.stagnationStatus().classification()+" - "+session.stagnationStatus().reason());heading(c,"Active constraints");for(ActiveConstraintState state:session.activeThreeDConstraints())label(c,state.name()+": "+(state.activeRealizationTarget()?"REQUIRE":"MEASURE_ONLY")+" strength="+state.restoringStrength()+" error="+state.currentError()+" tolerance="+state.tolerance());if(!session.stopReason().isBlank())label(c,"Latest failure: "+session.stopReason());}
+    private void stage2Status(NkContext c){PhasedWorkflow workflow=controller.phasedWorkflow();IncrementalSession session=workflow.incrementalSession();if(session==null)return;heading(c,"Stage 2 Live Status");label(c,"Configuration: "+session.configuration().id());label(c,"Execution: "+session.executionState()+"    Scientific: "+session.scientificState());label(c,"Realization: "+session.realizationIndex()+" seed="+session.realizedSeed()+"    Iteration: "+session.iteration());ScientificTimingSnapshot timing=session.timing();label(c,String.format("Requested updates/s: %d    Achieved: %.3f    Average iteration: %.2f ms",workflow.scientificUpdatesPerSecond(),timing.achievedUpdatesPerSecond(),timing.averageIterationMillis()));label(c,"Convergence iteration: "+session.convergenceIteration()+"    Stable iterations: "+session.metrics().stableIterations()+" / "+session.metrics().requiredStableIterations());ConstraintObjectiveDiagnostics objective=session.objectiveDiagnostics();if(objective!=null)label(c,String.format("Normalized objective: %.6g    Maximum velocity: %.6g",objective.totalObjective(),objective.maximumVelocity()));label(c,"Stagnation: "+session.stagnationStatus().classification()+" - "+session.stagnationStatus().reason());
+        ConstraintPresentationSummary summary=session.constraintPresentation();heading(c,"Constraint status");
+        label(c,"Constraint | Mode | Raw error | Tolerance | Error ratio | Strength | Status");
+        tooltip(c,"Raw error is the measured deviation; zero is ideal. Tolerance is the largest accepted error. Error ratio is raw error divided by tolerance and is not clamped. Restoring strength changes solver influence, not acceptance.");
+        for(ConstraintPresentation row:summary.constraints()){label(c,constraintRow(row));tooltip(c,row.explanation());}
+        label(c,"Required constraints: "+summary.requiredPassed()+" / "+summary.requiredTotal()+" passed");
+        label(c,"Worst required continuous constraint: "+summary.weakestRequiredConstraint());
+        label(c,"Worst error ratio: "+formatRatio(summary.worstRequiredRatio()));
+        if(!summary.failedDiscreteConstraints().isEmpty())label(c,"Failed/undetermined discrete: "+String.join(", ",summary.failedDiscreteConstraints()));
+        label(c,"Overall live qualification: "+(summary.qualified()?"QUALIFIED":"NOT QUALIFIED / PENDING"));
+        if(!session.stopReason().isBlank())label(c,"Latest failure: "+session.stopReason());}
+
+    private static String constraintRow(ConstraintPresentation row){
+        String error=Double.isFinite(row.rawError())?String.format("%.6g %s",row.rawError(),row.errorUnits()):"unavailable";
+        String tolerance=row.errorRatio()==null?"not used":Double.isFinite(row.tolerance())?String.format("%.6g %s",row.tolerance(),row.toleranceUnits()):"invalid";
+        String ratio=row.errorRatio()==null?"unavailable":formatRatio(row.errorRatio().value());
+        String strength=row.restoringStrength()==null?"disabled":String.format("%.4g",row.restoringStrength());
+        return row.displayName()+" | "+row.mode()+" | "+error+" | "+tolerance+" | "+ratio+" | "+strength+" | "+row.status();
+    }
+    private static String formatRatio(double ratio){return Double.isNaN(ratio)?"unavailable":Double.isInfinite(ratio)?"+INFINITY":String.format("%.3f",ratio);}
 
     private void heading(NkContext c, String text) {
         Nuklear.nk_layout_row_dynamic(c, rowHeightEdit + 3, 1);

@@ -373,8 +373,35 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             phase2NormalAlignment=regularityMode(c,stack,"Normal-center alignment",phase2NormalAlignment);
             nk_label_combo_options(c,stack,"Center definition",new String[]{"Vertex centroid"},"Vertex centroid",.45,.55);phase2CenterDefinition=GeometryCenterDefinition.VERTEX_CENTROID;
         }
-        if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA){phase2FacePlanarityTolerance=dynamicProperty(c,"Face-planarity tolerance",phase2FacePlanarityTolerance,1e-12,1,.000001);phase2RegularityTolerance=dynamicProperty(c,"Absolute regularity tolerance",phase2RegularityTolerance,1e-12,1,.000001);phase2RelativeRegularityTolerance=dynamicProperty(c,"Relative regularity tolerance",phase2RelativeRegularityTolerance,1e-12,1,.000001);}
-        if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA){phase2FacePlanarityStrength=dynamicProperty(c,"Face-planarity restoring strength",phase2FacePlanarityStrength,0,10,.05);phase2FaceAngleStrength=dynamicProperty(c,"Face-angle restoring strength",phase2FaceAngleStrength,0,10,.05);phase2DihedralStrength=dynamicProperty(c,"Dihedral restoring strength",phase2DihedralStrength,0,10,.05);phase2FacePlaneRadiusStrength=dynamicProperty(c,"Face-plane-radius restoring strength",phase2FacePlaneRadiusStrength,0,10,.05);}
+        if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA){
+            heading(c,"Constraint acceptance and influence");
+            label(c,"Tolerance changes acceptance; restoring strength changes solver influence. Neither guarantees convergence.");
+            if(phase2FacePlanarity==FacePlanarityMode.REQUIRE_PLANAR_FACES){
+                phase2FacePlanarityTolerance=dynamicProperty(c,"Face planarity - tolerance (length)",phase2FacePlanarityTolerance,1e-12,1,.000001);
+                phase2FacePlanarityStrength=dynamicProperty(c,"Face planarity - restoring strength",phase2FacePlanarityStrength,0,10,.05);
+            }else label(c,"Face planarity: MEASURE_ONLY - tolerance and strength not used.");
+            boolean sharedRequired=phase2FaceAngles==FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE
+                    ||phase2Dihedrals==DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES
+                    ||phase2VertexRadii==RegularityMode.REQUIRE_WITHIN_TOLERANCE
+                    ||phase2FaceCentroidRadii==RegularityMode.REQUIRE_WITHIN_TOLERANCE
+                    ||phase2EdgeMidpointRadii==RegularityMode.REQUIRE_WITHIN_TOLERANCE
+                    ||phase2FacePlaneRadii==FacePlaneRadiusMode.REQUIRE_EQUAL_FACE_PLANE_RADII
+                    ||phase2NormalAlignment==RegularityMode.REQUIRE_WITHIN_TOLERANCE;
+            if(sharedRequired){
+                phase2RegularityTolerance=dynamicProperty(c,"Shared regularity tolerance (absolute)",phase2RegularityTolerance,1e-12,1,.000001);
+                label(c,"Applies to required face angles, dihedrals, radius equalities, and normal-center alignment.");
+            }else label(c,"Shared regularity tolerance: disabled (no dependent condition is required).");
+            if(phase2FacePlaneRadii==FacePlaneRadiusMode.REQUIRE_EQUAL_FACE_PLANE_RADII)
+                phase2RelativeRegularityTolerance=dynamicProperty(c,"Shared regularity tolerance (relative)",phase2RelativeRegularityTolerance,1e-12,1,.000001);
+            if(phase2FaceAngles==FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE)
+                phase2FaceAngleStrength=dynamicProperty(c,"Face angles - restoring strength",phase2FaceAngleStrength,0,10,.05);
+            if(phase2Dihedrals==DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES)
+                phase2DihedralStrength=dynamicProperty(c,"Dihedrals - restoring strength",phase2DihedralStrength,0,10,.05);
+            if(phase2FacePlaneRadii==FacePlaneRadiusMode.REQUIRE_EQUAL_FACE_PLANE_RADII)
+                phase2FacePlaneRadiusStrength=dynamicProperty(c,"Face-plane radii - restoring strength",phase2FacePlaneRadiusStrength,0,10,.05);
+            label(c,"MEASURE_ONLY properties contribute no corrective force and are not required for convergence.");
+            label(c,"Raw error / tolerance is shown live in Current Status; zero error is ideal.");
+        }
         if(phase2PlanarityMode==PlanarityRealizationMode.PLANE_CONSTRAINT)
             phase2PlaneStrength=dynamicProperty(c,"Plane-restoring strength",phase2PlaneStrength,0,100,.01);
         if(phase2AngleMode==AngleConditionMode.REQUIRE_EQUAL_ANGLES)

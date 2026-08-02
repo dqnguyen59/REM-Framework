@@ -51,6 +51,9 @@ public final class IncrementalSession {
     private volatile List<Vector3d> publishedCoordinates=List.of();
     private volatile DynamicElasticMetrics publishedMetrics;
     private volatile ThreeDConstraintDiagnostics publishedThreeD=ThreeDConstraintDiagnostics.inactive();
+    private volatile ConstraintObjectiveDiagnostics publishedObjectives;
+    private volatile double publishedMaximumEdgeError;
+    private volatile StagnationStatus publishedStagnation=StagnationStatus.progressing();
     private volatile int publishedIteration;
     private volatile ScientificTimingSnapshot timing=ScientificTimingSnapshot.initial(0);
     private long totalIterationNanos;
@@ -136,8 +139,10 @@ public final class IncrementalSession {
     public int iteration() { return publishedIteration; }
     public DynamicElasticMetrics metrics() { return publishedMetrics; }
     public ThreeDConstraintDiagnostics threeDConstraintDiagnostics(){return publishedThreeD;}
-    public ConstraintObjectiveDiagnostics objectiveDiagnostics(){return elastic.objectiveDiagnostics();}
-    public StagnationStatus stagnationStatus(){return elastic.stagnationStatus();}
+    public ConstraintObjectiveDiagnostics objectiveDiagnostics(){return publishedObjectives;}
+    public double maximumEdgeError(){return publishedMaximumEdgeError;}
+    public StagnationStatus stagnationStatus(){return publishedStagnation;}
+    public ConstraintPresentationSummary constraintPresentation(){return Stage2ConstraintPresentation.from(this);}
     public int realizationIndex(){return attempt+1;}
     public long realizedSeed(){return request.randomSeed()+attempt;}
     public List<ActiveConstraintState> activeThreeDConstraints(){ThreeDConstraintDiagnostics d=threeDConstraintDiagnostics();ThreeDExperimentConditions m=request.threeDConditions();ThreeDConstraintStrengths s=request.threeDConstraintStrengths();return List.of(
@@ -224,7 +229,7 @@ public final class IncrementalSession {
         }
     }
 
-    private void publishSnapshot(){long started=System.nanoTime();publishedCoordinates=elastic.nodes().stream().map(node->new Vector3d(node.position())).toList();publishedMetrics=elastic.metrics();publishedThreeD=elastic.threeDConstraintDiagnostics();publishedIteration=elastic.iteration();long publication=System.nanoTime()-started;DevelopmentTimingDiagnostics.record("stage2.snapshot-publication",publication);long count=Math.max(0,publishedIteration);double average=count==0?0:totalIterationNanos/1_000_000d/count;timing=new ScientificTimingSnapshot(timing.initializationNanos(),count,average,average==0?0:1000d/average,publication);}
+    private void publishSnapshot(){long started=System.nanoTime();publishedCoordinates=elastic.nodes().stream().map(node->new Vector3d(node.position())).toList();publishedMetrics=elastic.metrics();publishedMaximumEdgeError=publishedMetrics.edges().stream().mapToDouble(edge->Math.abs(edge.distance()-edge.targetDistance())).max().orElse(0);publishedThreeD=elastic.threeDConstraintDiagnostics();publishedObjectives=elastic.objectiveDiagnostics();publishedStagnation=elastic.stagnationStatus();publishedIteration=elastic.iteration();long publication=System.nanoTime()-started;DevelopmentTimingDiagnostics.record("stage2.snapshot-publication",publication);long count=Math.max(0,publishedIteration);double average=count==0?0:totalIterationNanos/1_000_000d/count;timing=new ScientificTimingSnapshot(timing.initializationNanos(),count,average,average==0?0:1000d/average,publication);}
 
     private void finishAttempt() {
         if (finalResult != null) return;
