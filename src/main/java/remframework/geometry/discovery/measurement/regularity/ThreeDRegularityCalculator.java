@@ -53,7 +53,11 @@ public final class ThreeDRegularityCalculator {
             Statistics angleStats=Statistics.of(interior);double target=(vertices.size()-2.0)*Math.PI/vertices.size();
             double maxAngleDeviation=interior.stream().mapToDouble(value->Math.abs(value-target)).max().orElse(Double.NaN);
             faces.add(new FaceMetrics(face.id(),vertices.size(),area,perimeter,angleStats,Statistics.of(turning),
-                    Statistics.of(lengths),target,maxAngleDeviation,List.of(faceCenter.x,faceCenter.y,faceCenter.z)));
+                    Statistics.of(lengths),target,maxAngleDeviation,List.of(faceCenter.x,faceCenter.y,faceCenter.z),
+                    FaceDerivationPipeline.canonicalCycle(face.nodeIds()),maximum,disposition,
+                    !degenerate&&maximum<=facePlanarityTolerance,
+                    degenerate?"Degenerate face plane.":maximum<=facePlanarityTolerance
+                            ?"Accepted topology-derived face.":"Face planarity tolerance exceeded."));
             areas.computeIfAbsent(vertices.size(),ignored->new ArrayList<>()).add(area);
             angleVariances.computeIfAbsent(vertices.size(),ignored->new ArrayList<>()).add(angleStats.variance());
         }

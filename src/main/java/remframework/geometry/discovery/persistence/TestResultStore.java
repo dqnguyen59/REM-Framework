@@ -36,6 +36,8 @@ public final class TestResultStore {
         Path file = directory.resolve(result.configurationId() + "-" + Instant.now().toEpochMilli() + ".toml");
         String text = "format_version = 3\nconfiguration_id = \"" + result.configurationId() + "\"\n"
                 + "experiment_profile = \"" + (result.experimentProfile() == null ? "LEGACY_UNSPECIFIED" : result.experimentProfile()) + "\"\n"
+                + "face_composition_mode = \"" + result.faceComposition().mode() + "\"\n"
+                + "common_face_edge_count = " + (result.faceComposition().commonFaceEdgeCount() == null ? 0 : result.faceComposition().commonFaceEdgeCount()) + "\n"
                 + "planarity_mode = \"" + (result.planarityMode() == null ? "LEGACY_UNSPECIFIED" : result.planarityMode()) + "\"\n"
                 + "angle_condition_mode = \"" + (result.angleConditionMode() == null ? "LEGACY_UNSPECIFIED" : result.angleConditionMode()) + "\"\n"
                 + "benchmark_preset = \"" + (result.benchmarkPreset() == null ? "NONE" : result.benchmarkPreset()) + "\"\n"

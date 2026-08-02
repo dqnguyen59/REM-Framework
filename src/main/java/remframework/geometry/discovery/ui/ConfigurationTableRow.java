@@ -12,6 +12,7 @@ import remframework.geometry.discovery.optimization.*;
 import remframework.geometry.discovery.experiment.ExperimentProfile;
 import remframework.geometry.discovery.eligibility.EligibilityStatus;
 import remframework.geometry.discovery.reference.ReferenceTopology;
+import remframework.geometry.discovery.experiment.FaceCompositionMatch;
 import remframework.geometry.discovery.*;
 import remframework.geometry.discovery.configuration.*;
 import remframework.geometry.discovery.realization.session.*;
@@ -28,7 +29,7 @@ public record ConfigurationTableRow(ConfigurationId configurationId,int nodeCoun
         GeometryConfigurationStatusCode topologyStatus, EligibilityStatus eligibilityStatus,
         GeometryConfigurationStatusCode status,boolean geometryTested,
         GeometryConfigurationStatusCode geometryTestStatus,String diagnosticSummary,
-        ReferenceTopology referenceTopology) {
+        ReferenceTopology referenceTopology, FaceCompositionMatch faceCompositionMatch) {
     public ConfigurationTableRow(ConfigurationId configurationId, int nodeCount,
             int exactDegree, int edgeCount, GraphSymmetryClassification symmetry,
             long automorphismCount, GeometryConfigurationStatusCode status,
@@ -36,7 +37,7 @@ public record ConfigurationTableRow(ConfigurationId configurationId,int nodeCoun
             String diagnosticSummary) {
         this(configurationId, nodeCount, exactDegree, edgeCount, symmetry, automorphismCount,
                 symmetry == GraphSymmetryClassification.HIGHLY_SYMMETRIC, null, status, null, status,
-                geometryTested, geometryTestStatus, diagnosticSummary, null);
+                geometryTested, geometryTestStatus, diagnosticSummary, null,FaceCompositionMatch.UNDETERMINED);
     }
     public ConfigurationTableRow(ConfigurationId configurationId, int nodeCount,
             int exactDegree, int edgeCount, GraphSymmetryClassification symmetry,
@@ -45,6 +46,18 @@ public record ConfigurationTableRow(ConfigurationId configurationId,int nodeCoun
             GeometryConfigurationStatusCode geometryTestStatus, String diagnosticSummary) {
         this(configurationId, nodeCount, exactDegree, edgeCount, symmetry, automorphismCount,
                 vertexTransitive, null, status, null, status, geometryTested,
-                geometryTestStatus, diagnosticSummary, null);
+                geometryTestStatus, diagnosticSummary, null,FaceCompositionMatch.UNDETERMINED);
+    }
+    public ConfigurationTableRow(ConfigurationId configurationId,int nodeCount,
+            int exactDegree,int edgeCount,GraphSymmetryClassification symmetry,long automorphismCount,
+            boolean vertexTransitive, ExperimentProfile experimentProfile,
+            GeometryConfigurationStatusCode topologyStatus, EligibilityStatus eligibilityStatus,
+            GeometryConfigurationStatusCode status,boolean geometryTested,
+            GeometryConfigurationStatusCode geometryTestStatus,String diagnosticSummary,
+            ReferenceTopology referenceTopology) {
+        this(configurationId,nodeCount,exactDegree,edgeCount,symmetry,automorphismCount,
+                vertexTransitive,experimentProfile,topologyStatus,eligibilityStatus,status,
+                geometryTested,geometryTestStatus,diagnosticSummary,referenceTopology,
+                FaceCompositionMatch.UNDETERMINED);
     }
 }

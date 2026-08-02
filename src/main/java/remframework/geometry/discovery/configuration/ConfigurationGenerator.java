@@ -7,6 +7,8 @@ import remframework.geometry.discovery.graph.symmetry.AutomorphismAnalyzer;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import remframework.geometry.discovery.experiment.FaceCompositionMode;
+import remframework.geometry.discovery.experiment.FaceCompositionArithmetic;
 
 /**
  * Deterministic exhaustive generation of connected simple regular graphs.
@@ -23,6 +25,17 @@ public final class ConfigurationGenerator {
         long started=System.nanoTime();
         GeometryConfigurationStatus invalid=validate(request);
         if(invalid!=null) return result(request,List.of(),0,0,started,false,invalid);
+        if(request.faceComposition().mode()==FaceCompositionMode.UNIFORM_FACE_SIZE) {
+            FaceCompositionArithmetic arithmetic=FaceCompositionArithmetic.evaluate(request.nodeCount(),
+                    request.exactDegree(),request.faceComposition().commonFaceEdgeCount(),
+                    request.experimentProfile());
+            if(!arithmetic.passed()) {
+                var d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.REQUEST_VALIDATION,
+                        GeometryConfigurationStatusCode.FACE_COMPOSITION_ARITHMETICALLY_IMPOSSIBLE,
+                        "Face composition arithmetically impossible", arithmetic.explanation());
+                return result(request,List.of(),0,0,started,false,GeometryConfigurationStatus.of(d));
+            }
+        }
         if(request.exactDegree()==2&&request.nodeCount()>=3)
             return directCycle(request,started);
         if(request.nodeCount()>MAX_EXHAUSTIVE_N) {
@@ -81,7 +94,7 @@ public final class ConfigurationGenerator {
         ConfigurationRequest effectiveRequest=new ConfigurationRequest(request.nodeCount(),request.exactDegree(),
                 request.intendedDimension(),request.symmetryFilter(),request.maximumConfigurations(),
                 request.enumerationTimeLimit(),"DIRECT_CYCLE_CONSTRUCTION",request.outputDirectory(),
-                request.experimentProfile(),request.maximumDirectCycleNodes());
+                request.experimentProfile(),request.maximumDirectCycleNodes(),request.faceComposition());
         List<DiscoveryConnection> edges=new ArrayList<>();
         for(int node=0;node<request.nodeCount()-1;node++)edges.add(new DiscoveryConnection(node,node+1));
         edges.add(new DiscoveryConnection(request.nodeCount()-1,0));
@@ -147,7 +160,7 @@ public final class ConfigurationGenerator {
         else if(r.maximumConfigurations()<1||r.enumerationTimeLimit()==null||r.enumerationTimeLimit().isZero()||r.enumerationTimeLimit().isNegative())d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.REQUEST_VALIDATION,GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Invalid resource limits","Maximum configurations and enumeration time must be positive and finite.");
         return d==null?null:GeometryConfigurationStatus.of(d);
     }
-    private GenerationResult result(ConfigurationRequest r,List<Configuration> c,long examined,long dup,long started,boolean complete,GeometryConfigurationStatus status){int sym=(int)c.stream().filter(x->x.automorphismGroupSize()>1).count();int asym=c.size()-sym;long elapsed=(System.nanoTime()-started)/1_000_000;String setId="set-"+shortHash(r==null?"invalid":r.nodeCount()+":"+r.exactDegree()+":"+r.intendedDimension()+":"+r.symmetryFilter());return new GenerationResult(setId,r,c,new Metrics(examined,c.size(),dup,sym,asym,elapsed,complete),status);}
+    private GenerationResult result(ConfigurationRequest r,List<Configuration> c,long examined,long dup,long started,boolean complete,GeometryConfigurationStatus status){int sym=(int)c.stream().filter(x->x.automorphismGroupSize()>1).count();int asym=c.size()-sym;long elapsed=(System.nanoTime()-started)/1_000_000;String setId="set-"+shortHash(r==null?"invalid":r.nodeCount()+":"+r.exactDegree()+":"+r.intendedDimension()+":"+r.symmetryFilter()+":"+r.faceComposition());return new GenerationResult(setId,r,c,new Metrics(examined,c.size(),dup,sym,asym,elapsed,complete),status);}
     private static String shortHash(String value){
         try {
             byte[] digest=java.security.MessageDigest.getInstance("SHA-256")

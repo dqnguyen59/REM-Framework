@@ -12,6 +12,8 @@ import remframework.geometry.discovery.optimization.*;
 import remframework.geometry.discovery.measurement.regularity.*;
 import remframework.geometry.discovery.reference.*;
 import remframework.geometry.discovery.experiment.BenchmarkPreset;
+import remframework.geometry.discovery.experiment.*;
+import remframework.geometry.discovery.eligibility.TopologyEligibilityAnalyzer;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
@@ -28,7 +30,7 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
     private final WorkspaceController controller =
             GeometryDiscoveryWorkspaceManager.getInstance();
     private int phase2DetailsTab;
-    private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification", "Eligibility",
+    private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification", "Face Composition", "Eligibility",
             "Realization", "Faces and Boundary", "2D Regularity", "3D Regularity", "Measurement", "Diagnostics"};
 
     public GeometryDiscoveryMetricsFrame(NuklearModel model) {
@@ -87,17 +89,41 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
                 case 0 -> phase2Summary(c, generation, configuration, result);
                 case 1 -> phase2Topology(c, configuration);
                 case 2 -> phase2Classification(c, generation, configuration);
-                case 3 -> phase2Eligibility(c,result);
-                case 4 -> phase2Realization(c, result);
-                case 5 -> phase2FacesBoundary(c, result);
-                case 6 -> phase2Regularity2d(c,result);
-                case 7 -> phase2Regularity3d(c,result);
-                case 8 -> phase2Measurement(c, result);
-                case 9 -> phase2Diagnostics(c, generation, configuration, result);
+                case 3 -> phase2FaceComposition(c,generation,configuration);
+                case 4 -> phase2Eligibility(c,result);
+                case 5 -> phase2Realization(c, result);
+                case 6 -> phase2FacesBoundary(c, result);
+                case 7 -> phase2Regularity2d(c,result);
+                case 8 -> phase2Regularity3d(c,result);
+                case 9 -> phase2Measurement(c, result);
+                case 10 -> phase2Diagnostics(c, generation, configuration, result);
                 default -> { }
             }
             Nuklear.nk_group_end(c);
         }
+    }
+
+    private void phase2FaceComposition(NkContext c,GenerationResult generation,
+            Configuration configuration) {
+        FaceComposition selected=generation.request().faceComposition();
+        label(c,"Selected mode: "+selected.mode());
+        label(c,"Common face size: "+(selected.commonFaceEdgeCount()==null?"Not imposed":selected.commonFaceEdgeCount()));
+        if(selected.mode()==FaceCompositionMode.UNIFORM_FACE_SIZE){
+            FaceCompositionArithmetic a=FaceCompositionArithmetic.evaluate(generation.request().nodeCount(),
+                    generation.request().exactDegree(),selected.commonFaceEdgeCount(),
+                    generation.request().experimentProfile());
+            label(c,a.explanation());label(c,"N="+a.nodeCount()+" K="+a.exactDegree()+" m="+a.commonFaceEdgeCount());
+            label(c,"Expected E="+a.expectedEdgeCount()+" F="+a.expectedFaceCount()
+                    +" mF="+a.expectedFaceEdgeIncidences()+" 2E="+a.requiredEdgeFaceIncidences());
+            label(c,"Matching topology: "+a.matchingTopology());
+        }
+        if(configuration==null){label(c,"Select a configuration for its topology-derived face result.");return;}
+        var report=new TopologyEligibilityAnalyzer().analyze(configuration,
+                generation.request().experimentProfile(),selected).faceComposition();
+        label(c,"Actual derived face count: "+report.actualFaceCount());
+        label(c,"Actual face-size distribution: "+report.faceEdgeCountDistribution());
+        label(c,"Match result: "+report.match());label(c,"ConfigurationStatus reasons: "+report.reasons());
+        for(List<Integer> face:report.faces())label(c,"Canonical face cycle: "+face);
     }
 
     private void phase2Summary(NkContext c, GenerationResult generation, Configuration configuration, TestResult result) {

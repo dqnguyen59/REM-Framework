@@ -35,14 +35,33 @@ public record TestResult(ConfigurationId configurationId,
         GeometryOptimizationResult optimization, OptimizationComparison optimizationComparison,
         GeometryConfigurationStatus status, BenchmarkPreset benchmarkPreset,
         ReferenceTopologyMatch referenceTopologyMatch,
-        ThreeDConstraintStrengths threeDConstraintStrengths,long requestedSeed) {
+        ThreeDConstraintStrengths threeDConstraintStrengths,long requestedSeed,
+        FaceComposition faceComposition) {
+    public TestResult(ConfigurationId configurationId,
+            ExperimentProfile experimentProfile, PlanarityRealizationMode planarityMode,
+            AngleConditionMode angleConditionMode, TopologyEligibilityReport eligibility,
+            GraphSymmetryClassification graphSymmetry,Realization realization,
+            FaceDerivationResult faceDerivation,ClosedBoundaryResult boundary,
+            GeometricSymmetryResult geometricSymmetry,AreaResult area,VolumeResult volume,
+            TwoDRegularityMetrics twoDRegularity, ThreeDRegularityMetrics threeDRegularity,
+            ThreeDConditionReport threeDConditionReport,
+            GeometryOptimizationResult optimization, OptimizationComparison optimizationComparison,
+            GeometryConfigurationStatus status, BenchmarkPreset benchmarkPreset,
+            ReferenceTopologyMatch referenceTopologyMatch,
+            ThreeDConstraintStrengths threeDConstraintStrengths,long requestedSeed) {
+        this(configurationId,experimentProfile,planarityMode,angleConditionMode,eligibility,
+                graphSymmetry,realization,faceDerivation,boundary,geometricSymmetry,area,volume,
+                twoDRegularity,threeDRegularity,threeDConditionReport,optimization,
+                optimizationComparison,status,benchmarkPreset,referenceTopologyMatch,
+                threeDConstraintStrengths,requestedSeed,FaceComposition.discover());
+    }
     public TestResult(ConfigurationId configurationId, GraphSymmetryClassification graphSymmetry,
             Realization realization, FaceDerivationResult faceDerivation, ClosedBoundaryResult boundary,
             GeometricSymmetryResult geometricSymmetry, AreaResult area, VolumeResult volume,
             GeometryOptimizationResult optimization, GeometryConfigurationStatus status) {
         this(configurationId, null, null, null, null, graphSymmetry, realization, faceDerivation, boundary,
                 geometricSymmetry, area, volume, null, null, null, optimization, null, status,
-                BenchmarkPreset.NONE, null,null,realization==null?0:realization.seed());
+                BenchmarkPreset.NONE, null,null,realization==null?0:realization.seed(),FaceComposition.discover());
     }
 
     public boolean benchmarkTopologyRequirementPassed() {

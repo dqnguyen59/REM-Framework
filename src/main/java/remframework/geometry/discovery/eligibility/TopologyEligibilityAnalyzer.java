@@ -4,6 +4,8 @@ import remframework.geometry.discovery.DiscoveryConnection;
 import remframework.geometry.discovery.GraphSymmetryClassification;
 import remframework.geometry.discovery.configuration.Configuration;
 import remframework.geometry.discovery.experiment.ExperimentProfile;
+import remframework.geometry.discovery.experiment.*;
+import remframework.geometry.discovery.GeometryConfigurationStatusCode;
 import remframework.geometry.discovery.graph.symmetry.AutomorphismAnalyzer;
 
 import java.util.ArrayDeque;
@@ -11,13 +13,20 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /** Coordinate-free Stage 1 classification for an immutable graph topology. */
 public final class TopologyEligibilityAnalyzer {
     public TopologyEligibilityReport analyze(Configuration configuration, ExperimentProfile profile) {
+        return analyze(configuration, profile, FaceComposition.discover());
+    }
+
+    public TopologyEligibilityReport analyze(Configuration configuration, ExperimentProfile profile,
+            FaceComposition composition) {
         return analyze(configuration.nodeCount(), configuration.exactDegree(), configuration.edges(),
-                configuration.canonicalGraphLabel(), profile);
+                configuration.canonicalGraphLabel(), profile, composition);
     }
 
     /** Returns a coordinate-free sphere-like face set when one is combinatorially available. */
@@ -28,6 +37,12 @@ public final class TopologyEligibilityAnalyzer {
 
     public TopologyEligibilityReport analyze(int n, int expectedDegree,
             List<DiscoveryConnection> edges, String canonicalIdentity, ExperimentProfile profile) {
+        return analyze(n,expectedDegree,edges,canonicalIdentity,profile,FaceComposition.discover());
+    }
+
+    public TopologyEligibilityReport analyze(int n, int expectedDegree,
+            List<DiscoveryConnection> edges, String canonicalIdentity, ExperimentProfile profile,
+            FaceComposition composition) {
         List<ConditionResult> checks = new ArrayList<>();
         boolean noLoops = edges.stream().noneMatch(e -> e.firstNodeId() == e.secondNodeId());
         boolean noDuplicates = edges.stream().map(DiscoveryConnection::undirectedKey).distinct().count() == edges.size();
@@ -67,7 +82,9 @@ public final class TopologyEligibilityAnalyzer {
                 ?new AutomorphismAnalyzer.Result(2L*n,true)
                 :simple && n <= 12?new AutomorphismAnalyzer().analyze(n, edges)
                 :new AutomorphismAnalyzer.Result(0, false);
-        List<List<Integer>> faces = simple && connected ? sphericalFaceSet(adjacency, edges.size()) : List.of();
+        FaceSetSearch faceSearch = simple && connected ? sphericalFaceSearch(adjacency, edges.size())
+                : new FaceSetSearch(List.of(), 0);
+        List<List<Integer>> faces = faceSearch.faces();
         Boolean planar = simple && connected ? !faces.isEmpty() : false;
 
         boolean eligible;
@@ -126,9 +143,55 @@ public final class TopologyEligibilityAnalyzer {
                 ? "All topology-only necessary conditions for " + profile
                     + " passed. Closed geometric boundary remains undetermined until Stage 2."
                 : "One or more topology-only necessary conditions for " + profile + " failed.";
+        FaceCompositionReport faceComposition=classifyFaceComposition(n,expectedDegree,edges,profile,
+                composition,faceSearch,connected);
+        if(composition.mode()==FaceCompositionMode.UNIFORM_FACE_SIZE) {
+            boolean compositionEligible=faceComposition.match()==FaceCompositionMatch.MATCH;
+            checks.add(result("UNIFORM_FACE_SIZE",compositionEligible,faceComposition.explanation()));
+            eligible &= compositionEligible;
+            status=eligible?EligibilityStatus.POLYHEDRAL_TOPOLOGY_CANDIDATE:EligibilityStatus.INELIGIBLE;
+            conclusion=eligible
+                    ?"The topology satisfies the topology-only requirements of the selected uniform-face experiment. A valid geometric realization has not yet been established."
+                    :faceComposition.explanation();
+        }
         return new TopologyEligibilityReport(profile, status, conclusion, checks, bridges,
                 articulations, vertexConnectivity, edgeConnectivity, cycleRank, planar,
-                symmetry.groupSize(), symmetry.classification(), symmetry.vertexTransitive(), faces);
+                symmetry.groupSize(), symmetry.classification(), symmetry.vertexTransitive(), faces,
+                faceComposition);
+    }
+
+    private static FaceCompositionReport classifyFaceComposition(int n,int k,
+            List<DiscoveryConnection> edges,ExperimentProfile profile,FaceComposition composition,
+            FaceSetSearch search,boolean connected) {
+        FaceCompositionArithmetic arithmetic=composition.mode()==FaceCompositionMode.UNIFORM_FACE_SIZE
+                ?FaceCompositionArithmetic.evaluate(n,k,composition.commonFaceEdgeCount(),profile):null;
+        Map<Integer,Integer> distribution=new TreeMap<>();
+        search.faces().forEach(face->distribution.merge(face.size(),1,Integer::sum));
+        List<GeometryConfigurationStatusCode> reasons=new ArrayList<>();
+        FaceCompositionMatch match=FaceCompositionMatch.UNDETERMINED;
+        if(search.solutionCount()==0) reasons.add(GeometryConfigurationStatusCode.NO_COMBINATORIAL_FACE_SET);
+        else if(search.solutionCount()>1) reasons.add(GeometryConfigurationStatusCode.AMBIGUOUS_COMBINATORIAL_FACE_SET);
+        else if(!connected) reasons.add(GeometryConfigurationStatusCode.OPEN_COMBINATORIAL_BOUNDARY);
+        else if(!edgeIncidenceTwo(search.faces(),edges)) reasons.add(GeometryConfigurationStatusCode.NON_MANIFOLD_COMBINATORIAL_BOUNDARY);
+        else if(search.faces().stream().anyMatch(face->face.size()<3||face.stream().distinct().count()!=face.size()))
+            reasons.add(GeometryConfigurationStatusCode.NO_COMBINATORIAL_FACE_SET);
+        else if(composition.mode()==FaceCompositionMode.UNIFORM_FACE_SIZE) {
+            boolean uniform=distribution.size()==1;
+            if(!uniform) reasons.add(GeometryConfigurationStatusCode.NON_UNIFORM_FACE_SIZE);
+            else if(distribution.keySet().iterator().next()!=composition.commonFaceEdgeCount())
+                reasons.add(GeometryConfigurationStatusCode.FACE_SIZE_MISMATCH);
+            else { reasons.add(GeometryConfigurationStatusCode.ELIGIBLE_FOR_GEOMETRY_TEST); match=FaceCompositionMatch.MATCH; }
+        }
+        if(composition.mode()==FaceCompositionMode.DISCOVER) match=search.solutionCount()==1
+                ?FaceCompositionMatch.MATCH:FaceCompositionMatch.UNDETERMINED;
+        else if(!reasons.contains(GeometryConfigurationStatusCode.ELIGIBLE_FOR_GEOMETRY_TEST)
+                &&search.solutionCount()==1) match=FaceCompositionMatch.NO_MATCH;
+        String explanation=match==FaceCompositionMatch.MATCH
+                ?"Face composition: MATCH. Stage 1 topology-only conditions passed; geometric realization remains undetermined."
+                :"Face composition: "+(match==FaceCompositionMatch.NO_MATCH?"NO MATCH":"UNDETERMINED")
+                +". Reasons: "+reasons;
+        return new FaceCompositionReport(composition,arithmetic,match,search.faces().size(),
+                distribution,search.faces(),reasons,explanation);
     }
 
     private static ConditionResult result(String name, boolean pass, String text) {
@@ -200,28 +263,35 @@ public final class TopologyEligibilityAnalyzer {
     }
 
     private static List<List<Integer>> sphericalFaceSet(List<Set<Integer>> a, int edgeCount) {
+        return sphericalFaceSearch(a,edgeCount).faces();
+    }
+    private record FaceSetSearch(List<List<Integer>> faces,int solutionCount) {}
+    private static FaceSetSearch sphericalFaceSearch(List<Set<Integer>> a, int edgeCount) {
         int required = 2 - a.size() + edgeCount;
-        if (required < 1 || edgeCount > 30) return List.of();
+        if (required < 1 || edgeCount > 30) return new FaceSetSearch(List.of(),0);
         List<List<Integer>> cycles = chordlessCycles(a);
         int[] use = new int[edgeCount];
         List<Long> edgeKeys = new ArrayList<>();
         for (int u = 0; u < a.size(); u++) for (int v : a.get(u)) if (u < v) edgeKeys.add(key(u, v));
-        List<List<Integer>> selected = new ArrayList<>();
-        return chooseFaces(cycles, 0, required, selected, use, edgeKeys) ? List.copyOf(selected) : List.of();
+        List<List<List<Integer>>> solutions=new ArrayList<>();
+        chooseFaces(cycles,0,required,new ArrayList<>(),use,edgeKeys,solutions);
+        return new FaceSetSearch(solutions.isEmpty()?List.of():solutions.getFirst(),solutions.size());
     }
-    private static boolean chooseFaces(List<List<Integer>> cycles, int at, int remaining,
-            List<List<Integer>> selected, int[] use, List<Long> keys) {
-        if (remaining == 0) return Arrays.stream(use).allMatch(v -> v == 2);
-        if (cycles.size() - at < remaining) return false;
+    private static void chooseFaces(List<List<Integer>> cycles, int at, int remaining,
+            List<List<Integer>> selected, int[] use, List<Long> keys,
+            List<List<List<Integer>>> solutions) {
+        if(solutions.size()>=2)return;
+        if (remaining == 0) {if(Arrays.stream(use).allMatch(v -> v == 2))
+            solutions.add(selected.stream().map(List::copyOf).toList());return;}
+        if (cycles.size() - at < remaining) return;
         for (int i = at; i < cycles.size(); i++) {
             List<Integer> c = cycles.get(i); List<Integer> positions = new ArrayList<>(); boolean valid = true;
             for (int j = 0; j < c.size(); j++) { int p = keys.indexOf(key(c.get(j), c.get((j + 1) % c.size())));
                 if (p < 0 || use[p] >= 2) { valid = false; break; } positions.add(p); }
             if (!valid) continue; positions.forEach(p -> use[p]++); selected.add(c);
-            if (chooseFaces(cycles, i + 1, remaining - 1, selected, use, keys)) return true;
+            chooseFaces(cycles, i + 1, remaining - 1, selected, use, keys,solutions);
             selected.remove(selected.size() - 1); positions.forEach(p -> use[p]--);
         }
-        return false;
     }
     private static List<List<Integer>> chordlessCycles(List<Set<Integer>> a) {
         List<List<Integer>> result = new ArrayList<>(); Set<String> seen = new HashSet<>();

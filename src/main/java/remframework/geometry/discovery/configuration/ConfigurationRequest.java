@@ -23,12 +23,13 @@ import remframework.geometry.discovery.optimization.*;
 import java.nio.file.Path;
 import java.time.Duration;
 import remframework.geometry.discovery.experiment.ExperimentProfile;
+import remframework.geometry.discovery.experiment.FaceComposition;
 
 public record ConfigurationRequest(int nodeCount, int exactDegree,
         GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
         int maximumConfigurations, Duration enumerationTimeLimit,
         String generationStrategy, Path outputDirectory, ExperimentProfile experimentProfile,
-        int maximumDirectCycleNodes) {
+        int maximumDirectCycleNodes, FaceComposition faceComposition) {
     public ConfigurationRequest {
         intendedDimension = intendedDimension == null ? GeometryEmbeddingDimension.THREE_D : intendedDimension;
         symmetryFilter = symmetryFilter == null ? GraphSymmetryFilter.BOTH : symmetryFilter;
@@ -39,24 +40,40 @@ public record ConfigurationRequest(int nodeCount, int exactDegree,
                     ? ExperimentProfile.CLOSED_2D_AREA : ExperimentProfile.CLOSED_3D_VOLUME)
                 : experimentProfile;
         maximumDirectCycleNodes=maximumDirectCycleNodes>0?maximumDirectCycleNodes:10_000;
+        faceComposition=faceComposition==null?FaceComposition.discover():faceComposition;
     }
     public ConfigurationRequest(int nodeCount, int exactDegree,
             GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
             int maximumConfigurations, Duration enumerationTimeLimit,
             String generationStrategy, Path outputDirectory) {
         this(nodeCount, exactDegree, intendedDimension, symmetryFilter, maximumConfigurations,
-                enumerationTimeLimit, generationStrategy, outputDirectory, null,10_000);
+                enumerationTimeLimit, generationStrategy, outputDirectory, null,10_000,null);
     }
     public ConfigurationRequest(int nodeCount, int exactDegree,
             GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
             int maximumConfigurations, Duration enumerationTimeLimit,
             String generationStrategy, Path outputDirectory, ExperimentProfile experimentProfile) {
         this(nodeCount,exactDegree,intendedDimension,symmetryFilter,maximumConfigurations,
-                enumerationTimeLimit,generationStrategy,outputDirectory,experimentProfile,10_000);
+                enumerationTimeLimit,generationStrategy,outputDirectory,experimentProfile,10_000,null);
+    }
+    public ConfigurationRequest(int nodeCount, int exactDegree,
+            GeometryEmbeddingDimension intendedDimension, GraphSymmetryFilter symmetryFilter,
+            int maximumConfigurations, Duration enumerationTimeLimit,
+            String generationStrategy, Path outputDirectory, ExperimentProfile experimentProfile,
+            int maximumDirectCycleNodes) {
+        this(nodeCount,exactDegree,intendedDimension,symmetryFilter,maximumConfigurations,
+                enumerationTimeLimit,generationStrategy,outputDirectory,experimentProfile,
+                maximumDirectCycleNodes,null);
     }
     public static ConfigurationRequest exhaustive(int n, int k,
             GeometryEmbeddingDimension dimension) {
         return new ConfigurationRequest(n, k, dimension, GraphSymmetryFilter.BOTH,
-                10_000, Duration.ofSeconds(30), "EXHAUSTIVE_BACKTRACKING", null, null,10_000);
+                10_000, Duration.ofSeconds(30), "EXHAUSTIVE_BACKTRACKING", null, null,10_000,null);
+    }
+
+    public ConfigurationRequest withFaceComposition(FaceComposition value) {
+        return new ConfigurationRequest(nodeCount, exactDegree, intendedDimension, symmetryFilter,
+                maximumConfigurations, enumerationTimeLimit, generationStrategy, outputDirectory,
+                experimentProfile, maximumDirectCycleNodes, value);
     }
 }

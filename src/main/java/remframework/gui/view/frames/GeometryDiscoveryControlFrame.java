@@ -66,6 +66,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private int phase2ExactDegree = 2;
     private GeometryEmbeddingDimension phase2Dimension = GeometryEmbeddingDimension.THREE_D;
     private ExperimentProfile phase2ExperimentProfile = ExperimentProfile.CLOSED_3D_VOLUME;
+    private FaceCompositionMode phase2FaceCompositionMode=FaceCompositionMode.DISCOVER;
+    private int phase2CommonFaceEdgeCount=3;
     private GraphSymmetryFilter phase2SymmetryFilter = GraphSymmetryFilter.BOTH;
     private int phase2MaximumConfigurations = 1000;
     private int phase2TimeLimitSeconds = 30;
@@ -176,6 +178,12 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             ExperimentProfile selectedExperiment = switch (experiment) { case "Closed 2D area" -> ExperimentProfile.CLOSED_2D_AREA; case "Convex polyhedral volume" -> ExperimentProfile.CONVEX_POLYHEDRAL_VOLUME; default -> ExperimentProfile.CLOSED_3D_VOLUME; };
             if(selectedExperiment!=phase2ExperimentProfile){phase2ExperimentProfile=selectedExperiment;phase2SelectedConfiguration=null;phase2LatestResult=null;phase2StoredResult=null;controller.phasedWorkflow().beginGenerationTransaction();}
             phase2Dimension = phase2ExperimentProfile.intendedDimension();
+            String composition=nk_label_combo_options(c,stack,"Face composition mode",
+                    new String[]{"DISCOVER","UNIFORM_FACE_SIZE"},phase2FaceCompositionMode.name(),.4,.6);
+            FaceCompositionMode selectedComposition=FaceCompositionMode.valueOf(composition);
+            if(selectedComposition!=phase2FaceCompositionMode){phase2FaceCompositionMode=selectedComposition;
+                phase2SelectedConfiguration=null;phase2LatestResult=null;phase2StoredResult=null;
+                controller.phasedWorkflow().beginGenerationTransaction();}
             String dimension = nk_label_combo_options(c, stack, "Intended dimension",
                     new String[]{"2D", "3D"}, phase2Dimension == GeometryEmbeddingDimension.TWO_D ? "2D" : "3D", .4, .6);
             phase2Dimension = phase2ExperimentProfile.intendedDimension();
@@ -187,6 +195,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 default -> GraphSymmetryFilter.BOTH;
             };
         }
+        if(phase2FaceCompositionMode==FaceCompositionMode.UNIFORM_FACE_SIZE)
+            phase2CommonFaceEdgeCount=dynamicInteger(c,"Common face size",phase2CommonFaceEdgeCount,3,Integer.MAX_VALUE);
         phase2MaximumConfigurations = dynamicInteger(c, "Maximum configurations", phase2MaximumConfigurations, 1, 100_000);
         phase2TimeLimitSeconds = dynamicInteger(c, "Enumeration time limit (seconds)", phase2TimeLimitSeconds, 1, 86_400);
         primaryButton(c, "Generate Configurations", true, "", () -> {
@@ -197,7 +207,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 ConfigurationRequest request = new ConfigurationRequest(phase2NodeCount,
                         phase2ExactDegree, phase2Dimension, phase2SymmetryFilter,
                         phase2MaximumConfigurations, java.time.Duration.ofSeconds(phase2TimeLimitSeconds),
-                        null, Path.of("lattice/geometry-discovery/configuration-sets"), phase2ExperimentProfile);
+                        null, Path.of("lattice/geometry-discovery/configuration-sets"), phase2ExperimentProfile)
+                        .withFaceComposition(phase2FaceCompositionMode==FaceCompositionMode.UNIFORM_FACE_SIZE
+                                ?FaceComposition.uniform(phase2CommonFaceEdgeCount):FaceComposition.discover());
                 controller.phasedWorkflow().generateConfigurations(request);
             } catch (Exception exception) { nuklearModel.showErrorDialog("Configuration generation", exception.getMessage()); }
         });
@@ -231,6 +243,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             String text = (selected ? "> " : "") + row.configurationId() + "  N=" + row.nodeCount() + " K=" + row.exactDegree()
                     + " edges=" + row.edgeCount() + " aut=" + row.automorphismCount() + " " + row.symmetry()
                     + " reference=" + row.referenceTopology()
+                    + " face composition=" + row.faceCompositionMatch()
                     + " profile=" + row.experimentProfile() + " topology=" + row.topologyStatus()
                     + " eligibility=" + row.eligibilityStatus() + " geometry=" + row.geometryTestStatus();
             if (Nuklear.nk_button_label(c, text)) {
@@ -336,7 +349,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                                             phase2VertexRadii,phase2FaceCentroidRadii,phase2EdgeMidpointRadii,
                                             phase2FacePlaneRadii,phase2NormalAlignment,phase2CenterDefinition,
                                             phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance),
-                                    phase2BenchmarkPreset,new ThreeDConstraintStrengths(phase2FacePlanarityStrength,phase2FaceAngleStrength,phase2DihedralStrength,phase2FacePlaneRadiusStrength)));
+                                    phase2BenchmarkPreset,new ThreeDConstraintStrengths(phase2FacePlanarityStrength,phase2FaceAngleStrength,phase2DihedralStrength,phase2FacePlaneRadiusStrength),
+                                    phase2FaceCompositionMode==FaceCompositionMode.UNIFORM_FACE_SIZE
+                                            ?FaceComposition.uniform(phase2CommonFaceEdgeCount):FaceComposition.discover()));
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry Test", exception.getMessage()); }
         });

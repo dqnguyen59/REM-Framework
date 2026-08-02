@@ -238,7 +238,7 @@ public final class IncrementalSession {
     static TestResult finalizeResult(Configuration configuration,
             TestRequest request, DynamicElasticResult result) {
         TopologyEligibilityReport eligibility = new TopologyEligibilityAnalyzer()
-                .analyze(configuration, request.experimentProfile());
+                .analyze(configuration, request.experimentProfile(),request.faceComposition());
         List<Vector3d> initial = result.initialNodes().stream()
                 .map(node -> new Vector3d(node.position())).toList();
         List<Vector3d> coordinates = result.finalNodes().stream()
@@ -273,7 +273,7 @@ public final class IncrementalSession {
                     configuration.graphSymmetry(), realization, null, null, null,
                     AreaResult.unavailable(status), VolumeResult.unavailable(status), null, null, null,
                     GeometryOptimizationResult.notAttempted(), null, status,
-                    request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed());
+                    request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed(),request.faceComposition());
         }
         FaceDerivationResult faces = new FaceDerivationPipeline().derive(configuration, realization);
         ClosedBoundaryResult boundary = new ClosedBoundaryValidator().validate(configuration,
@@ -301,7 +301,11 @@ public final class IncrementalSession {
             qualified = request.threeDConditions().facePlanarity()!=FacePlanarityMode.REQUIRE_PLANAR_FACES
                     ||threeD.facePlanes().stream().allMatch(FacePlaneDiagnostic::planar);
             threeDConditions=new ThreeDConditionEvaluator().evaluate(qualified,threeD,request.threeDConditions());
+            qualified=threeDConditions.constrainedExperimentPassed();
         }
+        if(request.faceComposition().mode()==FaceCompositionMode.UNIFORM_FACE_SIZE)
+            qualified &= eligibility.faceComposition()!=null
+                    &&eligibility.faceComposition().match()==FaceCompositionMatch.MATCH;
         GeometryConfigurationStatus status = qualified
                 ? GeometryConfigurationStatus.of(GeometryConfigurationDiagnostic.info(
                 GeometryConfigurationStage.COMPLETE, GeometryConfigurationStatusCode.VALID_CANDIDATE,
@@ -310,7 +314,7 @@ public final class IncrementalSession {
         return new TestResult(configuration.id(), request.experimentProfile(),request.planarityMode(),request.angleConditionMode(), eligibility,
                 configuration.graphSymmetry(), realization, faces, boundary, symmetry, area, volume,
                 twoD, threeD,threeDConditions, GeometryOptimizationResult.notAttempted(), null, status,
-                request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed());
+                request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed(),request.faceComposition());
     }
 
     static List<Vector3d> initializeCoordinates(int count, GeometryEmbeddingDimension dimension,
