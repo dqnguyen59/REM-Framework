@@ -34,14 +34,15 @@ public record TestResult(ConfigurationId configurationId,
         ThreeDConditionReport threeDConditionReport,
         GeometryOptimizationResult optimization, OptimizationComparison optimizationComparison,
         GeometryConfigurationStatus status, BenchmarkPreset benchmarkPreset,
-        ReferenceTopologyMatch referenceTopologyMatch) {
+        ReferenceTopologyMatch referenceTopologyMatch,
+        ThreeDConstraintStrengths threeDConstraintStrengths,long requestedSeed) {
     public TestResult(ConfigurationId configurationId, GraphSymmetryClassification graphSymmetry,
             Realization realization, FaceDerivationResult faceDerivation, ClosedBoundaryResult boundary,
             GeometricSymmetryResult geometricSymmetry, AreaResult area, VolumeResult volume,
             GeometryOptimizationResult optimization, GeometryConfigurationStatus status) {
         this(configurationId, null, null, null, null, graphSymmetry, realization, faceDerivation, boundary,
                 geometricSymmetry, area, volume, null, null, null, optimization, null, status,
-                BenchmarkPreset.NONE, null);
+                BenchmarkPreset.NONE, null,null,realization==null?0:realization.seed());
     }
 
     public boolean benchmarkTopologyRequirementPassed() {
@@ -53,7 +54,11 @@ public record TestResult(ConfigurationId configurationId,
     public boolean selectedBenchmarkPassed() {
         if (!benchmarkTopologyRequirementPassed()) return false;
         if (benchmarkPreset == null || benchmarkPreset == BenchmarkPreset.NONE) return true;
-        return status.code() == GeometryConfigurationStatusCode.VALID_CANDIDATE
+        boolean sixQuadrilateralFaces=faceDerivation!=null&&faceDerivation.unique()
+                &&faceDerivation.faces().size()==6&&faceDerivation.faces().stream().allMatch(face->face.nodeIds().size()==4);
+        return sixQuadrilateralFaces&&boundary!=null&&boundary.closed()&&boundary.manifold()&&!boundary.selfIntersecting()
+                &&volume.available()&&volume.absoluteVolume()>0
+                &&status.code() == GeometryConfigurationStatusCode.VALID_CANDIDATE
                 && threeDConditionReport != null && threeDConditionReport.constrainedExperimentPassed();
     }
 }

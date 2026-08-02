@@ -20,6 +20,12 @@ public final class TopologyEligibilityAnalyzer {
                 configuration.canonicalGraphLabel(), profile);
     }
 
+    /** Returns a coordinate-free sphere-like face set when one is combinatorially available. */
+    public List<List<Integer>> deriveTopologicalFaces(Configuration configuration) {
+        return sphericalFaceSet(adjacency(configuration.nodeCount(), configuration.edges()),
+                configuration.edges().size());
+    }
+
     public TopologyEligibilityReport analyze(int n, int expectedDegree,
             List<DiscoveryConnection> edges, String canonicalIdentity, ExperimentProfile profile) {
         List<ConditionResult> checks = new ArrayList<>();

@@ -88,6 +88,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private GeometryCenterDefinition phase2CenterDefinition=GeometryCenterDefinition.VERTEX_CENTROID;
     private BenchmarkPreset phase2BenchmarkPreset=BenchmarkPreset.NONE;
     private double phase2FacePlanarityTolerance=1e-7,phase2RegularityTolerance=1e-6,phase2RelativeRegularityTolerance=1e-6;
+    private double phase2FacePlanarityStrength=1,phase2FaceAngleStrength=.6,phase2DihedralStrength=.5,phase2FacePlaneRadiusStrength=.6;
     private boolean showVertices = true, showEdges = true, showLabels = true,
             showCandidateFaces = true, showBoundaryFaces = true, showRejectedFaces = false,
             showNormals = false, showSelfIntersections = true, showViewportDiagnostics = false,
@@ -291,7 +292,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                     new String[]{"None","Cube emergent benchmark","Cube constrained benchmark"},
                     switch(phase2BenchmarkPreset){case NONE->"None";case CUBE_EMERGENT_BENCHMARK->"Cube emergent benchmark";case CUBE_CONSTRAINED_BENCHMARK->"Cube constrained benchmark";},.45,.55);
             BenchmarkPreset selectedPreset=switch(benchmark){case "Cube emergent benchmark"->BenchmarkPreset.CUBE_EMERGENT_BENCHMARK;case "Cube constrained benchmark"->BenchmarkPreset.CUBE_CONSTRAINED_BENCHMARK;default->BenchmarkPreset.NONE;};
-            if(selectedPreset!=phase2BenchmarkPreset){phase2BenchmarkPreset=selectedPreset;ThreeDExperimentConditions preset=BenchmarkPresets.conditions(selectedPreset);phase2FacePlanarity=preset.facePlanarity();phase2FaceAngles=preset.faceAngles();phase2Dihedrals=preset.dihedrals();phase2VertexRadii=preset.vertexRadii();phase2FaceCentroidRadii=preset.faceCentroidRadii();phase2EdgeMidpointRadii=preset.edgeMidpointRadii();phase2FacePlaneRadii=preset.facePlaneRadii();phase2NormalAlignment=preset.normalCenterAlignment();}
+            if(selectedPreset!=phase2BenchmarkPreset){phase2BenchmarkPreset=selectedPreset;ThreeDExperimentConditions preset=BenchmarkPresets.conditions(selectedPreset);phase2FacePlanarity=preset.facePlanarity();phase2FaceAngles=preset.faceAngles();phase2Dihedrals=preset.dihedrals();phase2VertexRadii=preset.vertexRadii();phase2FaceCentroidRadii=preset.faceCentroidRadii();phase2EdgeMidpointRadii=preset.edgeMidpointRadii();phase2FacePlaneRadii=preset.facePlaneRadii();phase2NormalAlignment=preset.normalCenterAlignment();if(selectedPreset==BenchmarkPreset.CUBE_CONSTRAINED_BENCHMARK)phase2InitialRealizations=BenchmarkPresets.CONSTRAINED_INITIAL_REALIZATIONS;}
             phase2FacePlanarity="Measure only".equals(nk_label_combo_options(c,stack,"Face planarity condition",new String[]{"Require planar faces","Measure only"},phase2FacePlanarity==FacePlanarityMode.REQUIRE_PLANAR_FACES?"Require planar faces":"Measure only",.45,.55))?FacePlanarityMode.MEASURE_ONLY:FacePlanarityMode.REQUIRE_PLANAR_FACES;
             phase2FaceAngles=switch(nk_label_combo_options(c,stack,"Face-angle condition",new String[]{"None","Measure only","Require equal within each face"},modeLabel(phase2FaceAngles),.45,.55)){case "None"->FaceAngleConditionMode.NONE;case "Require equal within each face"->FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE;default->FaceAngleConditionMode.MEASURE_ONLY;};
             phase2Dihedrals=switch(nk_label_combo_options(c,stack,"Dihedral-angle condition",new String[]{"None","Measure only","Require equal dihedrals"},modeLabel(phase2Dihedrals),.45,.55)){case "None"->DihedralConditionMode.NONE;case "Require equal dihedrals"->DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES;default->DihedralConditionMode.MEASURE_ONLY;};
@@ -303,6 +304,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             nk_label_combo_options(c,stack,"Center definition",new String[]{"Vertex centroid"},"Vertex centroid",.45,.55);phase2CenterDefinition=GeometryCenterDefinition.VERTEX_CENTROID;
         }
         if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA){phase2FacePlanarityTolerance=dynamicProperty(c,"Face-planarity tolerance",phase2FacePlanarityTolerance,1e-12,1,.000001);phase2RegularityTolerance=dynamicProperty(c,"Absolute regularity tolerance",phase2RegularityTolerance,1e-12,1,.000001);phase2RelativeRegularityTolerance=dynamicProperty(c,"Relative regularity tolerance",phase2RelativeRegularityTolerance,1e-12,1,.000001);}
+        if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA){phase2FacePlanarityStrength=dynamicProperty(c,"Face-planarity restoring strength",phase2FacePlanarityStrength,0,10,.05);phase2FaceAngleStrength=dynamicProperty(c,"Face-angle restoring strength",phase2FaceAngleStrength,0,10,.05);phase2DihedralStrength=dynamicProperty(c,"Dihedral restoring strength",phase2DihedralStrength,0,10,.05);phase2FacePlaneRadiusStrength=dynamicProperty(c,"Face-plane-radius restoring strength",phase2FacePlaneRadiusStrength,0,10,.05);}
         if(phase2PlanarityMode==PlanarityRealizationMode.PLANE_CONSTRAINT)
             phase2PlaneStrength=dynamicProperty(c,"Plane-restoring strength",phase2PlaneStrength,0,100,.01);
         if(phase2AngleMode==AngleConditionMode.REQUIRE_EQUAL_ANGLES)
@@ -310,6 +312,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         controller.phasedWorkflow().setVisualizationIterationsPerFrame(
                 dynamicInteger(c, "Visualization iterations per frame",
                         controller.phasedWorkflow().visualizationIterationsPerFrame(), 1, 10000));
+        controller.phasedWorkflow().setScientificUpdatesPerSecond(dynamicInteger(c,"Scientific updates per second",controller.phasedWorkflow().scientificUpdatesPerSecond(),1,120));
         label(c, "Initialization and relaxation use existing scientific defaults; canonical angle constraints remain disabled.");
         TestResult result = phase2LatestResult != null ? phase2LatestResult
                 : controller.phasedWorkflow().latestGeometryTest(selected.id());
@@ -333,7 +336,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                                             phase2VertexRadii,phase2FaceCentroidRadii,phase2EdgeMidpointRadii,
                                             phase2FacePlaneRadii,phase2NormalAlignment,phase2CenterDefinition,
                                             phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance),
-                                    phase2BenchmarkPreset));
+                                    phase2BenchmarkPreset,new ThreeDConstraintStrengths(phase2FacePlanarityStrength,phase2FaceAngleStrength,phase2DihedralStrength,phase2FacePlaneRadiusStrength)));
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry Test", exception.getMessage()); }
         });
@@ -347,7 +350,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         primaryButton(c, "Stop", executionState == ExecutionState.RUNNING
                 || executionState == ExecutionState.PAUSED,
                 "The selected session is not active.", controller.phasedWorkflow()::stopSelectedGeometryTest);
-        primaryButton(c, "Reset", true, "", () -> { controller.phasedWorkflow().resetSelectedGeometryTest(); phase2LatestResult = null; });
+        primaryButton(c, "Reset Same Seed", true, "", () -> { controller.phasedWorkflow().resetSelectedGeometryTest(); phase2LatestResult = null; });
+        primaryButton(c, "Reset New Seed", controller.phasedWorkflow().incrementalSession()!=null, "Start a geometry test first.", () -> { controller.phasedWorkflow().resetSelectedGeometryTestNewSeed(); phase2Seed=controller.phasedWorkflow().incrementalSession().request().randomSeed();phase2LatestResult=null; });
         primaryButton(c, "Save Geometry-Test Result", result != null, "Run Geometry Test before saving a result.", () -> {
             try { controller.phasedWorkflow().saveLatestGeometryTest(Path.of("lattice/geometry-discovery/configuration-sets"), selected.id()); }
             catch (Exception exception) { nuklearModel.showErrorDialog("Geometry-test result", exception.getMessage()); }
@@ -502,6 +506,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         showBoundaryFaces = nk_check_label(c, "Accepted boundary faces", showBoundaryFaces, .65, .35);
         showRejectedFaces = nk_check_label(c, "Rejected faces", showRejectedFaces, .65, .35);
         showNormals = nk_check_label(c, "Normals", showNormals, .65, .35);
+        controller.viewState().setShowDerivedFaces(showCandidateFaces);
+        controller.viewState().setShowAcceptedFaces(showBoundaryFaces);
+        controller.viewState().setShowRejectedFaces(showRejectedFaces);
+        controller.viewState().setShowFaceNormals(showNormals);
         showSelfIntersections = nk_check_label(c, "Detected self-intersections", showSelfIntersections, .65, .35);
         showViewportDiagnostics = nk_check_label(c, "Viewport diagnostics", showViewportDiagnostics, .65, .35);
         showWorldAxes = nk_check_label(c, "World axes", showWorldAxes, .65, .35);

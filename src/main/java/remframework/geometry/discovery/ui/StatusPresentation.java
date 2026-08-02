@@ -13,6 +13,7 @@ public final class StatusPresentation {
         return switch (session.scientificState()) {
             case INITIALIZED -> "INITIALIZED";
             case RELAXING -> "RELAXING";
+            case RELAXING_CONSTRAINTS -> "RELAXING_CONSTRAINTS";
             case CONVERGED -> "REALIZED";
             case QUALIFICATION_FAILED -> "EDGE_REALIZATION_FOUND; EXPERIMENT_QUALIFICATION_FAILED";
             case SEARCH_LIMIT_REACHED -> "NO_REALIZATION_FOUND_WITHIN_SEARCH_LIMITS";

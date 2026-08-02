@@ -21,4 +21,4 @@ import remframework.geometry.discovery.graph.symmetry.*;
 import remframework.geometry.discovery.optimization.*;
 
 /** Scientific milestone of the Dynamic Elastic realization search. */
-public enum ScientificState { INITIALIZED, RELAXING, CONVERGED, QUALIFICATION_FAILED, SEARCH_LIMIT_REACHED, FAILED }
+public enum ScientificState { INITIALIZED, RELAXING, RELAXING_CONSTRAINTS, CONVERGED, QUALIFICATION_FAILED, SEARCH_LIMIT_REACHED, FAILED }

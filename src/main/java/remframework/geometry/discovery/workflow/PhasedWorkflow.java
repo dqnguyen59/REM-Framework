@@ -41,6 +41,8 @@ public final class PhasedWorkflow {
     private TestRequest activeRequest;
     private TestResult activeResult;
     private int visualizationIterationsPerFrame = 25;
+    private int scientificUpdatesPerSecond=10;
+    private long nextScientificUpdateNanos;
     private long renderRevision;
     private Path persistedResultPath;
     private List<Vector3d> reopenedCoordinates = List.of();
@@ -85,9 +87,11 @@ public final class PhasedWorkflow {
     public synchronized void stepSelectedGeometryTest() { if (incrementalSession != null) { SessionState prior = incrementalSession.state(); incrementalSession.step(); if (prior == SessionState.READY || prior == SessionState.PAUSED) incrementalSession.pause(); publishIncrementalResult(); } }
     public synchronized void stopSelectedGeometryTest() { if (incrementalSession != null) incrementalSession.stop(); }
     public synchronized void resetSelectedGeometryTest() { if (selected == null) throw new IllegalStateException("Select one configuration before resetting geometry."); if (incrementalSession != null) incrementalSession.reset(); registry.clearTests(selected); activeResult=null; reopenedCoordinates=List.of(); persistedResultPath=null; renderRevision++; }
+    public synchronized void resetSelectedGeometryTestNewSeed(){if(selected==null)throw new IllegalStateException("Select one configuration before resetting geometry.");if(activeRequest==null)throw new IllegalStateException("Start a geometry test before requesting a new seed.");activeRequest=activeRequest.withRandomSeed(activeRequest.randomSeed()+1);incrementalSession=new IncrementalSession(registry.find(selected).orElseThrow(),activeRequest);registry.clearTests(selected);activeResult=null;reopenedCoordinates=List.of();persistedResultPath=null;renderRevision++;}
     public synchronized void advanceGeometryTestFrame() {
         if (incrementalSession == null || incrementalSession.executionState() != ExecutionState.RUNNING
                 || !frameAdvanceScheduled.compareAndSet(false, true)) return;
+        long now=System.nanoTime();if(now<nextScientificUpdateNanos){frameAdvanceScheduled.set(false);return;}nextScientificUpdateNanos=now+1_000_000_000L/scientificUpdatesPerSecond;
         IncrementalSession session = incrementalSession;
         int iterations = visualizationIterationsPerFrame;
         incrementalWorker.submit(() -> {
@@ -102,6 +106,8 @@ public final class PhasedWorkflow {
     }
     public synchronized int visualizationIterationsPerFrame() { return visualizationIterationsPerFrame; }
     public synchronized void setVisualizationIterationsPerFrame(int value) { if (value < 1) throw new IllegalArgumentException("Visualization iterations per frame must be positive."); visualizationIterationsPerFrame = Math.min(value, 10000); }
+    public synchronized int scientificUpdatesPerSecond(){return scientificUpdatesPerSecond;}
+    public synchronized void setScientificUpdatesPerSecond(int value){scientificUpdatesPerSecond=Math.max(1,Math.min(120,value));}
     public synchronized SessionState geometryTestSessionState() { return incrementalSession == null ? SessionState.READY : incrementalSession.state(); }
     public synchronized ExecutionState geometryExecutionState() { return incrementalSession == null ? ExecutionState.IDLE : incrementalSession.executionState(); }
     public synchronized ScientificState geometryScientificState() { return incrementalSession == null ? ScientificState.INITIALIZED : incrementalSession.scientificState(); }
@@ -147,7 +153,7 @@ public final class PhasedWorkflow {
         TestResult optimized = new TestResult(current.configurationId(),current.experimentProfile(),current.planarityMode(),current.angleConditionMode(),current.eligibility(),current.graphSymmetry(),
                 current.realization(),current.faceDerivation(),current.boundary(),current.geometricSymmetry(),current.area(),current.volume(),
                 current.twoDRegularity(),current.threeDRegularity(),current.threeDConditionReport(),optimization,comparison,current.status(),
-                current.benchmarkPreset(),current.referenceTopologyMatch());
+                current.benchmarkPreset(),current.referenceTopologyMatch(),current.threeDConstraintStrengths(),current.requestedSeed());
         registry.attach(optimized);
         return optimized;
     }

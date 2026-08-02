@@ -12,6 +12,7 @@ import remframework.geometry.discovery.optimization.*;
 
 import org.joml.Vector3d;
 import java.util.*;
+import remframework.geometry.discovery.eligibility.TopologyEligibilityAnalyzer;
 
 public final class FaceDerivationPipeline {
     private static final double TOLERANCE=1e-7;
@@ -21,8 +22,9 @@ public final class FaceDerivationPipeline {
             List<Integer> boundary=cycleBoundary(graph);
             if(boundary!=null){String key=key(boundary);candidates.add(new DerivedFace("face-"+key,boundary,true,true,0));}
         } else {
-            boolean[][] adjacency=GraphIsomorphismAnalyzer.matrix(graph.nodeCount(),graph.edges());
-            for(int start=0;start<graph.nodeCount();start++) dfs(start,start,adjacency,new boolean[graph.nodeCount()],new ArrayList<>(),seen,candidates,realization.finalCoordinates());
+            List<List<Integer>> topologicalFaces=new TopologyEligibilityAnalyzer().deriveTopologicalFaces(graph);
+            for(List<Integer> cycle:topologicalFaces){double error=planarity(cycle,realization.finalCoordinates());
+                candidates.add(new DerivedFace("face-"+key(cycle),canonicalCycle(cycle),true,error<=TOLERANCE,error));}
         }
         List<DerivedFace> faces=candidates.stream().filter(DerivedFace::chordless).filter(DerivedFace::planar).toList();
         boolean unique=!faces.isEmpty();

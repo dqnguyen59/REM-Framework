@@ -39,6 +39,8 @@ public final class TestResultStore {
                 + "planarity_mode = \"" + (result.planarityMode() == null ? "LEGACY_UNSPECIFIED" : result.planarityMode()) + "\"\n"
                 + "angle_condition_mode = \"" + (result.angleConditionMode() == null ? "LEGACY_UNSPECIFIED" : result.angleConditionMode()) + "\"\n"
                 + "benchmark_preset = \"" + (result.benchmarkPreset() == null ? "NONE" : result.benchmarkPreset()) + "\"\n"
+                + "requested_seed = " + result.requestedSeed() + "\n"
+                + "realized_seed = " + (result.realization()==null?result.requestedSeed():result.realization().seed()) + "\n"
                 + "eligibility_status = \"" + (result.eligibility() == null ? "NOT_RECORDED" : result.eligibility().status()) + "\"\n"
                 + "eligibility_reason = \"" + escape(result.eligibility() == null ? "Legacy result" : result.eligibility().conclusion()) + "\"\n"
                 + "status = \"" + result.status().code() + "\"\n"
@@ -49,6 +51,7 @@ public final class TestResultStore {
                 + "area_available = " + result.area().available() + "\n"
                 + "volume_available = " + result.volume().available() + "\n"
                 + "saved_at = \"" + Instant.now() + "\"\n";
+        if(result.threeDConstraintStrengths()!=null)text+="face_planarity_restoring_strength = "+result.threeDConstraintStrengths().facePlanarity()+"\nface_angle_restoring_strength = "+result.threeDConstraintStrengths().faceAngles()+"\ndihedral_restoring_strength = "+result.threeDConstraintStrengths().dihedrals()+"\nface_plane_radius_restoring_strength = "+result.threeDConstraintStrengths().facePlaneRadii()+"\n";
         if (result.referenceTopologyMatch() != null) {
             var match = result.referenceTopologyMatch();
             text += "reference_topology = \"" + match.topology() + "\"\n"

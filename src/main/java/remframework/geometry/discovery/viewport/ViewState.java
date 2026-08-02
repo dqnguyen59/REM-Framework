@@ -38,6 +38,7 @@ public final class ViewState {
     private boolean highlightFixedNodes = true;
     private boolean edgeErrorColoring = true;
     private boolean showNeighborDistanceLabels;
+    private boolean showDerivedFaces=true,showAcceptedFaces=true,showRejectedFaces,showFaceNormals;
     private Integer selectedNodeId;
 
     public ViewFit fitToView(GeometryDiscoveryModel model) {
@@ -104,4 +105,8 @@ public final class ViewState {
     public void setShowNeighborDistanceLabels(boolean value) {
         showNeighborDistanceLabels = value;
     }
+    public boolean showDerivedFaces(){return showDerivedFaces;} public void setShowDerivedFaces(boolean v){showDerivedFaces=v;}
+    public boolean showAcceptedFaces(){return showAcceptedFaces;} public void setShowAcceptedFaces(boolean v){showAcceptedFaces=v;}
+    public boolean showRejectedFaces(){return showRejectedFaces;} public void setShowRejectedFaces(boolean v){showRejectedFaces=v;}
+    public boolean showFaceNormals(){return showFaceNormals;} public void setShowFaceNormals(boolean v){showFaceNormals=v;}
 }

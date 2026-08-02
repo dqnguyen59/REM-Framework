@@ -41,6 +41,7 @@ public final class WorkspaceController implements AutoCloseable {
     private final PhasedWorkflow phasedWorkflow =
             new PhasedWorkflow();
     private volatile RenderDiagnostics renderDiagnostics;
+    private int discoveryDetailsHeight=GeometryDiscoveryWorkspaceLayout.PREFERRED_BOTTOM_HEIGHT;
 
     public WorkspaceController() {
         preferences.load(state, viewState);
@@ -205,8 +206,10 @@ public final class WorkspaceController implements AutoCloseable {
     public GeometryDiscoveryWorkspaceLayout layout(int width, int height) {
         int top = nuklearModel == null ? 30 : nuklearModel.getMenuBarHeight() + 4;
         return GeometryDiscoveryWorkspaceLayout.calculate(
-                width, height, top, Constants.STATUS_BAR_HEIGHT);
+                width, height, top, Constants.STATUS_BAR_HEIGHT,discoveryDetailsHeight);
     }
+    public int discoveryDetailsHeight(){return discoveryDetailsHeight;}
+    public void setDiscoveryDetailsHeight(int value){discoveryDetailsHeight=Math.max(GeometryDiscoveryWorkspaceLayout.MINIMUM_BOTTOM_HEIGHT,value);}
 
     @Override public void close() {
         deactivateWorkspace();

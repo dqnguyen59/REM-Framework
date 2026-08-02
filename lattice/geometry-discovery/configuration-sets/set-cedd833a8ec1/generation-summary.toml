@@ -4,6 +4,6 @@ unique_retained = 2
 isomorphic_duplicates_removed = 68
 symmetric_count = 2
 asymmetric_count = 0
-elapsed_milliseconds = 0
+elapsed_milliseconds = 1
 enumeration_complete = true
 status = "ENUMERATION_COMPLETE"

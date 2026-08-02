@@ -39,10 +39,12 @@ public final class OpenGlRenderer implements AutoCloseable {
     private final int vao;
     private final int vbo;
     private final int matrixLocation;
+    private final int opacityLocation;
 
     public OpenGlRenderer() {
         program = createProgram();
         matrixLocation = GL20.glGetUniformLocation(program, "viewProjection");
+        opacityLocation=GL20.glGetUniformLocation(program,"opacity");
         vao = GL30.glGenVertexArrays();
         vbo = GL15.glGenBuffers();
         GL30.glBindVertexArray(vao);
@@ -64,6 +66,7 @@ public final class OpenGlRenderer implements AutoCloseable {
         ViewFit fit = view.calculateFit(model);
         Matrix4f matrix = viewProjection(view, fit, width, height);
         GL20.glUseProgram(program);
+        GL20.glUniform1f(opacityLocation,1f);
         GL20.glUniformMatrix4fv(matrixLocation, false, matrix.get(new float[16]));
         GL30.glBindVertexArray(vao);
 
@@ -98,6 +101,18 @@ public final class OpenGlRenderer implements AutoCloseable {
         if (view.showNodeLabels()) drawCanonicalLabels(model, matrix, width, height);
         GL30.glBindVertexArray(0);
         GL20.glUseProgram(0);
+    }
+
+    public void render(RenderModel renderModel,GeometryDiscoverySettings settings,ViewState view,int width,int height){
+        render(renderModel.model(),settings,view,width,height);
+        if(view.showDerivedFaces())renderFaces(renderModel,view,width,height);
+    }
+
+    private void renderFaces(RenderModel renderModel,ViewState view,int width,int height){
+        GeometryDiscoveryModel model=renderModel.model();Map<Integer,DiscoveryNode> byId=new HashMap<>();model.nodes().forEach(n->byId.put(n.id(),n));
+        ViewFit fit=view.calculateFit(model);Matrix4f matrix=viewProjection(view,fit,width,height);GL20.glUseProgram(program);GL20.glUniformMatrix4fv(matrixLocation,false,matrix.get(new float[16]));GL30.glBindVertexArray(vao);
+        List<Float> triangles=new ArrayList<>(),normals=new ArrayList<>();for(DerivedFace face:renderModel.derivedFaces()){if(face.nodeIds().size()<3)continue;Vector3d origin=byId.get(face.nodeIds().get(0)).position();for(int i=1;i+1<face.nodeIds().size();i++){vertex(triangles,origin,.12f,.55f,.8f);vertex(triangles,byId.get(face.nodeIds().get(i)).position(),.12f,.55f,.8f);vertex(triangles,byId.get(face.nodeIds().get(i+1)).position(),.12f,.55f,.8f);}if(view.showFaceNormals()){Vector3d center=new Vector3d();face.nodeIds().forEach(id->center.add(byId.get(id).position()));center.div(face.nodeIds().size());Vector3d n=new Vector3d(byId.get(face.nodeIds().get(1)).position()).sub(origin).cross(new Vector3d(byId.get(face.nodeIds().get(2)).position()).sub(origin));if(n.lengthSquared()>1e-12)line(normals,center,new Vector3d(n.normalize(.35)).add(center),1,.45f,.9f);}}
+        GL11.glEnable(GL11.GL_BLEND);GL11.glBlendFunc(GL11.GL_SRC_ALPHA,GL11.GL_ONE_MINUS_SRC_ALPHA);GL20.glUniform1f(opacityLocation,.18f);GL11.glDepthMask(false);draw(triangles,GL11.GL_TRIANGLES,1);GL11.glDepthMask(true);GL11.glDisable(GL11.GL_BLEND);GL20.glUniform1f(opacityLocation,1f);draw(normals,GL11.GL_LINES,2);GL30.glBindVertexArray(0);GL20.glUseProgram(0);
     }
 
     public Matrix4f viewProjection(ViewState view, ViewFit fit,
@@ -252,8 +267,9 @@ public final class OpenGlRenderer implements AutoCloseable {
         String fragment = """
                 #version 330 core
                 in vec3 vertexColor;
+                uniform float opacity;
                 out vec4 outputColor;
-                void main() { outputColor = vec4(vertexColor, 1.0); }
+                void main() { outputColor = vec4(vertexColor, opacity); }
                 """;
         int vertexShader = shader(GL20.GL_VERTEX_SHADER, vertex);
         int fragmentShader = shader(GL20.GL_FRAGMENT_SHADER, fragment);

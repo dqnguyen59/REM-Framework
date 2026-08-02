@@ -31,6 +31,8 @@ public final class Viewport implements AutoCloseable {
     private double lastY;
     private boolean orbiting;
     private boolean panning;
+    private boolean resizingDetails;
+    private int windowWidth=1,windowHeight=1;
     private String lastConfigurationId = "";
     private long lastRenderRevision = Long.MIN_VALUE;
     private boolean lastTopologyPreview;
@@ -44,6 +46,7 @@ public final class Viewport implements AutoCloseable {
     }
 
     public void render(int width, int height) {
+        windowWidth=width;windowHeight=height;
         GeometryDiscoveryWorkspaceSnapshot snapshot = controller.workspace().snapshot();
         GeometryDiscoveryWorkspaceLayout.Bounds bounds =
                 controller.layout(width, height).viewport();
@@ -79,14 +82,15 @@ public final class Viewport implements AutoCloseable {
             settings = geometry.settings();
             configurationId = "legacy:" + model.name();
         }
-        renderer.render(model, settings,
-                controller.viewState(), bounds.width(), bounds.height());
+        if(phased!=null)renderer.render(phased,settings,controller.viewState(),bounds.width(),bounds.height());
+        else renderer.render(model, settings,controller.viewState(), bounds.width(), bounds.height());
         diagnostics = diagnostics(configurationId, model, phased, bounds.width(), bounds.height());
         controller.setRenderDiagnostics(diagnostics);
         GL11.glDisable(GL11.GL_SCISSOR_TEST);
     }
 
     public void cursor(double x, double y) {
+        if(resizingDetails){controller.setDiscoveryDetailsHeight((int)Math.max(GeometryDiscoveryWorkspaceLayout.MINIMUM_BOTTOM_HEIGHT,controller.layout(windowWidth,windowHeight).details().bottom()-y));}
         if (orbiting) controller.viewState().orbit((x - lastX) * .3, (y - lastY) * .3);
         if (panning) controller.viewState().pan(-(x - lastX) * .01, (y - lastY) * .01, 0);
         lastX = x;
@@ -94,6 +98,9 @@ public final class Viewport implements AutoCloseable {
     }
 
     public void button(int button, int action, int width, int height) {
+        GeometryDiscoveryWorkspaceLayout.Bounds detail=controller.layout(width,height).details();
+        if(button==0&&action==1&&Math.abs(lastY-detail.y())<=6){resizingDetails=true;return;}
+        if(button==0&&action==0&&resizingDetails){resizingDetails=false;return;}
         if (button == 0) {
             orbiting = action == 1;
             if (action == 0) select(lastX, lastY, width, height);

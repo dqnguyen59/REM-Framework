@@ -2,6 +2,8 @@ package remframework.geometry.discovery.experiment;
 
 /** General-condition definitions for optional reference-topology benchmarks. */
 public final class BenchmarkPresets {
+    public static final int CONSTRAINED_INITIAL_REALIZATIONS=5;
+    public static final int CONSTRAINED_ITERATIONS_PER_REALIZATION=5_000;
     private BenchmarkPresets() { }
 
     public static ThreeDExperimentConditions conditions(BenchmarkPreset preset) {

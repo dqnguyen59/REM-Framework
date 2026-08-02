@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
+import remframework.geometry.discovery.experiment.*;
 
 /**
  * Incremental velocity-based relaxation for a fixed regular graph.
@@ -42,6 +43,8 @@ public final class DynamicElasticSession {
     private double cycleTargetAngleDegrees;
     private double cycleAngleToleranceDegrees;
     private double cycleAngleStrength;
+    private DynamicElasticThreeDConstraints threeDConstraints;
+    private ThreeDExperimentConditions threeDModes;
 
     public DynamicElasticSession(FixedDegreeGraph graph, DynamicElasticSettings settings) {
         this(graph, settings, initialize(graph.nodeCount(), settings));
@@ -81,7 +84,8 @@ public final class DynamicElasticSession {
                 && current.spatiallyValid();
         boolean planeConditions = !planeConstraint || maximumPlaneDeviation() <= planarityTolerance;
         boolean cycleAngleConditions = !cycleAngleConstraint || maximumCycleAngleErrorDegrees() <= cycleAngleToleranceDegrees;
-        stableIterations = elasticConditions && canonicalConditions && planeConditions && cycleAngleConditions
+        boolean threeDConditions=threeDConstraints==null||threeDConstraintsPass();
+        stableIterations = elasticConditions && canonicalConditions && planeConditions && cycleAngleConditions&&threeDConditions
                 ? stableIterations + 1 : 0;
         if (stableIterations >= settings.requiredStableIterations())
             state = DynamicElasticState.EQUILIBRIUM_REACHED;
@@ -134,7 +138,23 @@ public final class DynamicElasticSession {
         if (planeConstraint)
             nodes.stream().filter(node -> !node.fixed()).forEach(node ->
                     forces.get(node.id()).z -= planeRestoringStrength * node.position().z);
+        if(threeDConstraints!=null)threeDConstraints.addForces(nodes,forces);
         return forces;
+    }
+
+    public void configureThreeDimensionalProfile(List<List<Integer>> faces,
+            ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths){
+        threeDModes=modes;threeDConstraints=new DynamicElasticThreeDConstraints(faces,modes,strengths,settings.targetDistance());
+    }
+
+    public ThreeDConstraintDiagnostics threeDConstraintDiagnostics(){return threeDConstraints==null?ThreeDConstraintDiagnostics.inactive():threeDConstraints.diagnostics(nodes);}
+
+    private boolean threeDConstraintsPass(){ThreeDConstraintDiagnostics d=threeDConstraintDiagnostics();if(!d.finite())return false;
+        boolean planar=threeDModes.facePlanarity()!=FacePlanarityMode.REQUIRE_PLANAR_FACES||d.maximumFacePlanarityError()<=threeDModes.facePlanarityTolerance();
+        boolean angles=threeDModes.faceAngles()!=FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE||d.maximumFaceAngleDeviation()<=threeDModes.absoluteRegularityTolerance();
+        boolean dihedral=threeDModes.dihedrals()!=DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES||d.maximumDihedralDeviation()<=threeDModes.absoluteRegularityTolerance();
+        boolean radii=threeDModes.facePlaneRadii()!=FacePlaneRadiusMode.REQUIRE_EQUAL_FACE_PLANE_RADII||d.maximumFacePlaneRadiusDeviation()<=threeDModes.absoluteRegularityTolerance();
+        return planar&&angles&&dihedral&&radii;
     }
 
     public void configureTwoDimensionalProfile(boolean strict, boolean constrained,

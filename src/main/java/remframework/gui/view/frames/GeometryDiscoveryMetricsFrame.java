@@ -149,6 +149,7 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
             label(c,"Edge-length constraint: "+d.edgeConstraint()+"    Planarity: "+d.planarity());
             label(c,"Angle condition: "+d.angleCondition()+"    Simple boundary: "+d.simpleBoundary());
             label(c,"Area qualification: "+d.areaQualification()+"    Full experiment converged: "+d.fullExperimentConverged());
+            if(session.request().dimension()==GeometryEmbeddingDimension.THREE_D){label(c,"Active 3D constraint summary:");for(ActiveConstraintState state:session.activeThreeDConstraints())label(c,state.name()+": enabled="+state.enabled()+" mode="+(state.activeRealizationTarget()?"ACTIVE_REALIZATION_TARGET":"MEASUREMENT_ONLY")+" error="+state.currentError()+" tolerance="+state.tolerance()+" strength="+state.restoringStrength()+" "+(state.passed()?"PASS":"FAIL"));ThreeDConstraintDiagnostics live=session.threeDConstraintDiagnostics();label(c,"Maximum velocity="+session.metrics().maximumNodeSpeed()+" volume estimate="+live.enclosedVolumeEstimate()+" combinatorial manifold="+live.manifold());}
         }
         label(c, "Target edge length: configured Geometry Test request");
         label(c, "Equal-edge realization: " + StatusPresentation.equalEdgeConclusion(session, result));
@@ -191,7 +192,7 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
 
     private void phase2FacesBoundary(NkContext c, TestResult result) {
         if (result == null) { label(c, "Faces: Undetermined"); label(c, "Boundary: Undetermined"); return; }
-        label(c, "Derived faces: " + (result.faceDerivation() == null ? "Not run" : result.faceDerivation().faces()));
+        if(result.faceDerivation()==null)label(c,"Derived faces: Not run");else for(DerivedFace face:result.faceDerivation().candidateFaces()){boolean accepted=result.faceDerivation().faces().contains(face);label(c,face.id()+" cycle="+face.nodeIds()+" edgeCount="+face.nodeIds().size()+" status="+(accepted?"ACCEPTED":"REJECTED")+" reason="+(accepted?"simple topological cycle and geometric planarity passed":!face.chordless()?"cycle has a chord":"face planarity error "+face.planarityError()));}
         label(c, "Unique face set: " + (result.faceDerivation() == null ? "Undetermined" : result.faceDerivation().unique()));
         label(c, "Boundary: " + (result.boundary() == null ? "Undetermined" : result.boundary().status().code()));
         if (result.boundary() != null) label(c, "Closed=" + result.boundary().closed() + " manifold=" + result.boundary().manifold() + " self-intersecting=" + result.boundary().selfIntersecting());

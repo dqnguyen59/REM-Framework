@@ -29,7 +29,7 @@ public record TestRequest(ConfigurationId configurationId,
         double planarityTolerance, double degeneracyTolerance, double angleTolerance,
         PlanarityRealizationMode planarityMode, double planeRestoringStrength,
         double angleRestoringStrength, ThreeDExperimentConditions threeDConditions,
-        BenchmarkPreset benchmarkPreset) {
+        BenchmarkPreset benchmarkPreset, ThreeDConstraintStrengths threeDConstraintStrengths) {
     public TestRequest {
         if(configurationId==null||dimension==null)throw new IllegalArgumentException("A selected configuration and dimension are required.");
         if(!Double.isFinite(targetEdgeLength)||targetEdgeLength<=0||initialRealizations<1||searchLimit<1)throw new IllegalArgumentException("Geometry-test limits must be positive and finite.");
@@ -52,6 +52,7 @@ public record TestRequest(ConfigurationId configurationId,
         if(benchmarkPreset!=BenchmarkPreset.NONE&&experimentProfile==ExperimentProfile.CLOSED_2D_AREA)
             throw new IllegalArgumentException("Cube benchmarks require a 3D experiment profile.");
         threeDConditions=threeDConditions==null?BenchmarkPresets.conditions(benchmarkPreset):threeDConditions;
+        threeDConstraintStrengths=threeDConstraintStrengths==null?ThreeDConstraintStrengths.defaults():threeDConstraintStrengths;
     }
     public TestRequest(ConfigurationId configurationId, GeometryEmbeddingDimension dimension,
             double targetEdgeLength,long randomSeed,int initialRealizations,
@@ -68,7 +69,7 @@ public record TestRequest(ConfigurationId configurationId,
         this(configurationId,dimension,targetEdgeLength,randomSeed,initialRealizations,relaxationSettings,
                 symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,
                 optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,
-                angleTolerance,null,.08,.01,null,null);
+                angleTolerance,null,.08,.01,null,null,null);
     }
     public TestRequest(ConfigurationId configurationId, GeometryEmbeddingDimension dimension,
             double targetEdgeLength,long randomSeed,int initialRealizations,
@@ -80,15 +81,17 @@ public record TestRequest(ConfigurationId configurationId,
         this(configurationId,dimension,targetEdgeLength,randomSeed,initialRealizations,relaxationSettings,
                 symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,
                 optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,angleTolerance,
-                planarityMode,planeRestoringStrength,angleRestoringStrength,null,null);
+                planarityMode,planeRestoringStrength,angleRestoringStrength,null,null,null);
     }
 
     public TestRequest withBenchmark(BenchmarkPreset preset) {
+        int realizations=preset==BenchmarkPreset.CUBE_CONSTRAINED_BENCHMARK?Math.max(initialRealizations,BenchmarkPresets.CONSTRAINED_INITIAL_REALIZATIONS):initialRealizations;
         return new TestRequest(configurationId, dimension, targetEdgeLength, randomSeed,
-                initialRealizations, relaxationSettings, symmetryPolicy, searchLimit,
+                realizations, relaxationSettings, symmetryPolicy, searchLimit,
                 experimentProfile, angleConditionMode, regularityMode, optimizationObjective,
                 edgeTolerance, planarityTolerance, degeneracyTolerance, angleTolerance,
                 planarityMode, planeRestoringStrength, angleRestoringStrength,
-                BenchmarkPresets.conditions(preset), preset);
+                BenchmarkPresets.conditions(preset), preset, ThreeDConstraintStrengths.defaults());
     }
+    public TestRequest withRandomSeed(long seed){return new TestRequest(configurationId,dimension,targetEdgeLength,seed,initialRealizations,relaxationSettings,symmetryPolicy,searchLimit,experimentProfile,angleConditionMode,regularityMode,optimizationObjective,edgeTolerance,planarityTolerance,degeneracyTolerance,angleTolerance,planarityMode,planeRestoringStrength,angleRestoringStrength,threeDConditions,benchmarkPreset,threeDConstraintStrengths);}
 }

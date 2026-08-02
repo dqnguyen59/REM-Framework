@@ -28,6 +28,10 @@ public record GeometryDiscoveryWorkspaceLayout(
 
     public static GeometryDiscoveryWorkspaceLayout calculate(
             int width, int height, int topBarHeight, int statusBarHeight) {
+        return calculate(width,height,topBarHeight,statusBarHeight,PREFERRED_BOTTOM_HEIGHT);
+    }
+    public static GeometryDiscoveryWorkspaceLayout calculate(
+            int width,int height,int topBarHeight,int statusBarHeight,int desiredBottomHeight){
         int w = Math.max(1, width);
         int h = Math.max(1, height);
         int top = clamp(topBarHeight, 0, Math.max(0, h - 1));
@@ -47,7 +51,7 @@ public record GeometryDiscoveryWorkspaceLayout(
 
         int viewportMinimumHeight = Math.min(MINIMUM_VIEWPORT_HEIGHT,
                 Math.max(80, bodyHeight / 2));
-        int bottom = Math.min(PREFERRED_BOTTOM_HEIGHT,
+        int bottom = Math.min(Math.max(MINIMUM_BOTTOM_HEIGHT,desiredBottomHeight),
                 Math.max(0, bodyHeight - viewportMinimumHeight));
         if (bodyHeight >= MINIMUM_BOTTOM_HEIGHT + viewportMinimumHeight)
             bottom = Math.max(MINIMUM_BOTTOM_HEIGHT, bottom);
