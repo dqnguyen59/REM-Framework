@@ -40,9 +40,9 @@ class PrimaryParameterModeTest {
                 .withFaceComposition(FaceComposition.uniform(5));
         assertDerived(request,20,30,12);
         assertTrue(request.parameterDerivation().arithmeticFeasible());
-        assertFalse(request.parameterDerivation().generationStrategyAvailable());
-        assertEquals(GeometryConfigurationStatusCode.ENUMERATION_LIMIT_REACHED,
-                new ConfigurationGenerator().generate(request).status().code());
+        assertTrue(request.parameterDerivation().generationStrategyAvailable());
+        assertEquals(GenerationStrategy.UNIFORM_SPHERICAL_FACE_GENERATION,
+                request.normalizedGraphRequest().selectedStrategy());
     }
 
     @Test void exactMixedCompositionDerivesSixVertices() {

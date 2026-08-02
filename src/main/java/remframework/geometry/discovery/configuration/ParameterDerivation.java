@@ -90,11 +90,14 @@ public final class ParameterDerivation {
         } else if(mode==PrimaryParameterMode.FACE_COMPOSITION&&twiceE!=null) faceIncidence="sum(m*F_m) = 2E = "+twiceE+": PASS";
         reasons=deduplicate(reasons);boolean feasible=reasons.isEmpty();
         if(feasible)reasons.add(GeometryConfigurationStatusCode.ARITHMETICALLY_FEASIBLE);
-        boolean generation=feasible&&v!=null&&(degree==2?v<=10_000:v<=ConfigurationGenerator.MAX_EXHAUSTIVE_N);
+        boolean specialized=feasible&&v!=null&&f!=null&&surface==SurfaceTopologyAssumption.SPHERE_LIKE
+                &&faceConstraint.mode()==FaceCompositionMode.UNIFORM_FACE_SIZE&&degree==3;
+        boolean generation=feasible&&v!=null&&(degree==2?v<=10_000:v<=ConfigurationGenerator.MAX_EXHAUSTIVE_N||specialized);
         reasons.add(generation?GeometryConfigurationStatusCode.ELIGIBLE_FOR_GENERATION:feasible
                 ?GeometryConfigurationStatusCode.GENERATION_STRATEGY_UNAVAILABLE:reasons.getFirst());
         reasons=deduplicate(reasons);
-        String strategy=degree==2?"DIRECT_CYCLE_CONSTRUCTION":"EXHAUSTIVE_BACKTRACKING";
+        String strategy=degree==2?"DIRECT_CYCLE_CONSTRUCTION":v!=null&&v>ConfigurationGenerator.MAX_EXHAUSTIVE_N&&specialized
+                ?"UNIFORM_SPHERICAL_FACE_GENERATION":"EXHAUSTIVE_BACKTRACKING";
         String explanation=(feasible?"Arithmetic feasibility: PASS":"Arithmetic feasibility: FAIL")
                 +". Generation capability: "+(generation?"AVAILABLE":"UNAVAILABLE")+". Reasons: "+reasons;
         return new ParameterDerivationReport(mode,surface,inputs,v,e,f,surface.eulerCharacteristic(),

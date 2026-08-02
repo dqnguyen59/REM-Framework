@@ -38,6 +38,8 @@ public final class ConfigurationGenerator {
         if(invalid!=null) return result(request,List.of(),0,0,started,false,invalid);
         if(normalized.exactDegree()==2&&normalized.nodeCount()>=3)
             return directCycle(request,started);
+        if(normalized.selectedStrategy()==GenerationStrategy.UNIFORM_SPHERICAL_FACE_GENERATION)
+            return uniformSpherical(request,normalized,started);
         if(normalized.nodeCount()>MAX_EXHAUSTIVE_N) {
             var d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.GRAPH_GENERATION,
                     GeometryConfigurationStatusCode.ENUMERATION_LIMIT_REACHED,
@@ -82,6 +84,22 @@ public final class ConfigurationGenerator {
                 "Enumeration incomplete","The configured time or retained-configuration limit was reached.");
         return result(request,configurations,examined[0],duplicates[0],started,complete,
                 GeometryConfigurationStatus.of(d));
+    }
+
+    private GenerationResult uniformSpherical(ConfigurationRequest request,
+            NormalizedGraphRequest normalized,long started){
+        UniformSphericalFaceGenerator.Outcome generated=new UniformSphericalFaceGenerator().generate(request,normalized);
+        GenerationDiagnostics diagnostics=generated.diagnostics();boolean complete=diagnostics.completeness()==GenerationCompleteness.COMPLETE_FOR_SELECTED_PARAMETER_CLASS;
+        GeometryConfigurationStatusCode code=complete?GeometryConfigurationStatusCode.COMPLETE_FOR_SELECTED_PARAMETER_CLASS
+                :diagnostics.completeness()==GenerationCompleteness.INCOMPLETE_SEARCH_LIMIT_REACHED
+                ?GeometryConfigurationStatusCode.INCOMPLETE_SEARCH_LIMIT_REACHED:GeometryConfigurationStatusCode.GENERATION_FAILED;
+        GeometryConfigurationDiagnostic diagnostic=complete
+                ?GeometryConfigurationDiagnostic.info(GeometryConfigurationStage.COMPLETE,code,"Uniform spherical generation complete",diagnostics.explanation())
+                :GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.GRAPH_GENERATION,code,"Uniform spherical generation incomplete",diagnostics.explanation());
+        List<Configuration> configurations=generated.configurations();int symmetric=(int)configurations.stream().filter(c->c.automorphismGroupSize()>1).count();
+        Metrics metrics=new Metrics(diagnostics.partialStatesExamined(),configurations.size(),diagnostics.duplicateCandidates(),symmetric,configurations.size()-symmetric,generated.elapsedMilliseconds(),complete);
+        String setId="set-"+shortHash(normalized.nodeCount()+":"+normalized.exactDegree()+":"+request.intendedDimension()+":"+request.symmetryFilter()+":"+normalized.faceComposition());
+        return new GenerationResult(setId,request,configurations,metrics,GeometryConfigurationStatus.of(diagnostic),diagnostics);
     }
 
     private GenerationResult directCycle(ConfigurationRequest request,long started){

@@ -98,13 +98,33 @@ public record ConfigurationRequest(int nodeCount, int exactDegree,
                 authoritativeNodeCount,authoritativeFaceCount,exactFaceCounts,
                 surfaceTopologyAssumption,null);
     }
+    public ConfigurationRequest withGenerationStrategy(GenerationStrategy value){return new ConfigurationRequest(
+            nodeCount,exactDegree,intendedDimension,symmetryFilter,maximumConfigurations,
+            enumerationTimeLimit,value.name(),outputDirectory,experimentProfile,maximumDirectCycleNodes,
+            faceComposition,primaryParameterMode,authoritativeNodeCount,authoritativeFaceCount,
+            exactFaceCounts,surfaceTopologyAssumption,null);}
+    public ConfigurationRequest withEnumerationTimeLimit(Duration value){return new ConfigurationRequest(
+            nodeCount,exactDegree,intendedDimension,symmetryFilter,maximumConfigurations,value,
+            generationStrategy,outputDirectory,experimentProfile,maximumDirectCycleNodes,
+            faceComposition,primaryParameterMode,authoritativeNodeCount,authoritativeFaceCount,
+            exactFaceCounts,surfaceTopologyAssumption,null);}
 
     public NormalizedGraphRequest normalizedGraphRequest() {
         if(!parameterDerivation.arithmeticFeasible())
             throw new IllegalStateException("Cannot normalize an arithmetically invalid request.");
+        boolean explicitSpecialized=GenerationStrategy.UNIFORM_SPHERICAL_FACE_GENERATION.name().equals(generationStrategy);
+        boolean specializedEligible=surfaceTopologyAssumption==SurfaceTopologyAssumption.SPHERE_LIKE
+                &&faceComposition.mode()==remframework.geometry.discovery.experiment.FaceCompositionMode.UNIFORM_FACE_SIZE
+                &&parameterDerivation.derivedFaceCount()!=null&&exactDegree==3;
+        GenerationStrategy strategy=exactDegree==2?GenerationStrategy.DIRECT_CYCLE_CONSTRUCTION
+                :(specializedEligible&&(nodeCount>ConfigurationGenerator.MAX_EXHAUSTIVE_N||explicitSpecialized)
+                ?GenerationStrategy.UNIFORM_SPHERICAL_FACE_GENERATION:GenerationStrategy.EXHAUSTIVE_BACKTRACKING);
+        UniformSphericalSearchLimits limits=new UniformSphericalSearchLimits(maximumConfigurations,
+                Math.max(10_000L,(long)maximumConfigurations*100),
+                (int)Math.min(Integer.MAX_VALUE,Math.max(10_000L,(long)maximumConfigurations*10)),enumerationTimeLimit);
         return new NormalizedGraphRequest(nodeCount,exactDegree,
                 parameterDerivation.derivedEdgeCount(),parameterDerivation.derivedFaceCount(),
-                faceComposition,surfaceTopologyAssumption,primaryParameterMode,parameterDerivation);
+                faceComposition,surfaceTopologyAssumption,primaryParameterMode,parameterDerivation,strategy,limits);
     }
 
     public static ConfigurationRequest byFaceCount(long faceCount,int k,

@@ -224,6 +224,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         ParameterDerivationReport derivation=preview.parameterDerivation();
         label(c,"Surface topology: "+preview.surfaceTopologyAssumption()+" (chi="+derivation.eulerCharacteristic()+")");
         label(c,"Derived N="+derivation.derivedVertexCount()+" E="+derivation.derivedEdgeCount()+" F="+derivation.derivedFaceCount());
+        if(derivation.arithmeticFeasible())label(c,"Selected strategy: "+preview.normalizedGraphRequest().selectedStrategy());
         label(c,derivation.explanation());
         String signature=preview.primaryParameterMode()+":"+preview.parameterDerivation().authoritativeInputs()+":"+preview.faceComposition()+":"+preview.experimentProfile()+":"+preview.symmetryFilter();
         if(!signature.equals(phase2PrimarySignature)){if(!phase2PrimarySignature.isEmpty())controller.phasedWorkflow().beginGenerationTransaction();phase2PrimarySignature=signature;phase2SelectedConfiguration=null;phase2LatestResult=null;phase2StoredResult=null;}
@@ -257,6 +258,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 + "    Isomorphic duplicates removed: " + metrics.isomorphicDuplicatesRemoved());
         label(c, "Symmetric: " + metrics.symmetricCount() + "    Asymmetric: " + metrics.asymmetricCount()
                 + "    Elapsed: " + metrics.elapsedMilliseconds() + " ms");
+        GenerationDiagnostics strategy=generation.generationDiagnostics();
+        label(c,"Strategy: "+strategy.strategy()+" construction="+strategy.constructionMethod()+" completeness="+strategy.completeness());
+        label(c,"Partial states examined="+strategy.partialStatesExamined()+" pruned="+strategy.partialStatesPruned()+" completed="+strategy.completedCandidates()+" duplicates="+strategy.duplicateCandidates());
+        if(!strategy.pruningCounts().isEmpty())label(c,"Pruning counts: "+strategy.pruningCounts());
         if (!generation.status().mayContinue()) label(c, "Diagnostic: " + generation.status().explanation());
         heading(c, "Retained configurations");
         // Keep the candidate list independently scrollable so detail text never pushes rows away.

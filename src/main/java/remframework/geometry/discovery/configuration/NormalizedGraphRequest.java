@@ -7,4 +7,5 @@ public record NormalizedGraphRequest(int nodeCount,int exactDegree,long expected
         Long expectedFaceCount,FaceComposition faceComposition,
         SurfaceTopologyAssumption surfaceTopologyAssumption,
         PrimaryParameterMode originalPrimaryParameterMode,
-        ParameterDerivationReport derivationReport) { }
+        ParameterDerivationReport derivationReport,GenerationStrategy selectedStrategy,
+        UniformSphericalSearchLimits specializedSearchLimits) { }

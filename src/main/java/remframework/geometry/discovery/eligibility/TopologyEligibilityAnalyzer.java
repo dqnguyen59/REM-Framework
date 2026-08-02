@@ -4,6 +4,7 @@ import remframework.geometry.discovery.DiscoveryConnection;
 import remframework.geometry.discovery.GraphSymmetryClassification;
 import remframework.geometry.discovery.configuration.Configuration;
 import remframework.geometry.discovery.configuration.ConfigurationRequest;
+import remframework.geometry.discovery.configuration.CombinatorialFaceComplex;
 import remframework.geometry.discovery.experiment.ExperimentProfile;
 import remframework.geometry.discovery.experiment.*;
 import remframework.geometry.discovery.GeometryConfigurationStatusCode;
@@ -26,9 +27,16 @@ public final class TopologyEligibilityAnalyzer {
 
     public TopologyEligibilityReport analyze(Configuration configuration, ExperimentProfile profile,
             FaceComposition composition) {
-        return analyze(configuration.nodeCount(), configuration.exactDegree(), configuration.edges(),
+        TopologyEligibilityReport report=analyze(configuration.nodeCount(), configuration.exactDegree(), configuration.edges(),
                 configuration.canonicalGraphLabel(), profile, composition);
+        String persisted=configuration.provenance().get("combinatorialFaces");
+        if(persisted==null||persisted.isBlank())return report;
+        List<List<Integer>> faces=CombinatorialFaceComplex.decode(configuration.nodeCount(),persisted).faces();
+        return replaceFaces(report,configuration,composition,faces);
     }
+
+    private TopologyEligibilityReport replaceFaces(TopologyEligibilityReport report,Configuration configuration,
+            FaceComposition composition,List<List<Integer>> faces){FaceSetSearch search=new FaceSetSearch(faces,1);FaceCompositionReport faceReport=classifyFaceComposition(configuration.nodeCount(),configuration.exactDegree(),configuration.edges(),report.profile(),composition,search,true);return new TopologyEligibilityReport(report.profile(),faceReport.match()==FaceCompositionMatch.NO_MATCH?EligibilityStatus.INELIGIBLE:report.status(),faceReport.match()==FaceCompositionMatch.MATCH?"Persisted first-class combinatorial face complex passed topology-only classification.":faceReport.explanation(),report.conditions(),report.bridgeCount(),report.articulationVertexCount(),report.vertexConnectivity(),report.edgeConnectivity(),report.cycleRank(),true,report.automorphismGroupSize(),report.graphSymmetry(),report.vertexTransitive(),faces,faceReport,report.primaryParameterMode(),report.surfaceTopologyAssumption(),report.parameterDerivation());}
 
     public TopologyEligibilityReport analyze(Configuration configuration,ConfigurationRequest request) {
         TopologyEligibilityReport report=analyze(configuration,request.experimentProfile(),request.faceComposition());
@@ -42,6 +50,9 @@ public final class TopologyEligibilityAnalyzer {
 
     /** Returns a coordinate-free sphere-like face set when one is combinatorially available. */
     public List<List<Integer>> deriveTopologicalFaces(Configuration configuration) {
+        String persisted=configuration.provenance().get("combinatorialFaces");
+        if(persisted!=null&&!persisted.isBlank())return CombinatorialFaceComplex.decode(
+                configuration.nodeCount(),persisted).faces();
         return sphericalFaceSet(adjacency(configuration.nodeCount(), configuration.edges()),
                 configuration.edges().size());
     }

@@ -30,7 +30,7 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
     private final WorkspaceController controller =
             GeometryDiscoveryWorkspaceManager.getInstance();
     private int phase2DetailsTab;
-    private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification", "Parameter Derivation", "Face Composition", "Eligibility",
+    private static final String[] PHASE2_TABS = {"Summary", "Topology", "Classification", "Parameter Derivation", "Generation Strategy", "Face Composition", "Eligibility",
             "Realization", "Faces and Boundary", "2D Regularity", "3D Regularity", "Measurement", "Diagnostics"};
 
     public GeometryDiscoveryMetricsFrame(NuklearModel model) {
@@ -90,19 +90,22 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
                 case 1 -> phase2Topology(c, configuration);
                 case 2 -> phase2Classification(c, generation, configuration);
                 case 3 -> phase2ParameterDerivation(c,generation);
-                case 4 -> phase2FaceComposition(c,generation,configuration);
-                case 5 -> phase2Eligibility(c,result);
-                case 6 -> phase2Realization(c, result);
-                case 7 -> phase2FacesBoundary(c, result);
-                case 8 -> phase2Regularity2d(c,result);
-                case 9 -> phase2Regularity3d(c,result);
-                case 10 -> phase2Measurement(c, result);
-                case 11 -> phase2Diagnostics(c, generation, configuration, result);
+                case 4 -> phase2GenerationStrategy(c,generation);
+                case 5 -> phase2FaceComposition(c,generation,configuration);
+                case 6 -> phase2Eligibility(c,result);
+                case 7 -> phase2Realization(c, result);
+                case 8 -> phase2FacesBoundary(c, result);
+                case 9 -> phase2Regularity2d(c,result);
+                case 10 -> phase2Regularity3d(c,result);
+                case 11 -> phase2Measurement(c, result);
+                case 12 -> phase2Diagnostics(c, generation, configuration, result);
                 default -> { }
             }
             Nuklear.nk_group_end(c);
         }
     }
+
+    private void phase2GenerationStrategy(NkContext c,GenerationResult generation){GenerationDiagnostics g=generation.generationDiagnostics();label(c,"Strategy: "+g.strategy()+" version="+g.strategyVersion());label(c,"Construction method: "+g.constructionMethod());label(c,"Normalized parameters: "+generation.request().normalizedGraphRequest());label(c,"Completeness: "+g.completeness());label(c,"Search limits: "+g.searchLimits());label(c,"States examined="+g.partialStatesExamined()+" pruned="+g.partialStatesPruned());label(c,"Completed candidates="+g.completedCandidates()+" duplicate candidates="+g.duplicateCandidates()+" retained="+g.retainedConfigurations());label(c,"Pruning diagnostics: "+g.pruningCounts());label(c,g.explanation());}
 
     private void phase2ParameterDerivation(NkContext c,GenerationResult generation){
         ParameterDerivationReport d=generation.request().parameterDerivation();
