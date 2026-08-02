@@ -2,6 +2,7 @@ package remframework.geometry.discovery;
 
 import org.joml.Vector3d;
 import remframework.geometry.discovery.experiment.*;
+import remframework.geometry.discovery.realization.session.OrientationConvexityCalculator;
 import java.util.*;
 
 /** General normalized face-complex energies and bounded finite-difference gradients. */
@@ -12,11 +13,14 @@ public final class DynamicElasticThreeDConstraints {
     private final ThreeDConstraintStrengths strengths;
     private final double scale;
     private final Map<Long,List<Integer>> faceEdgeIncidence;
+    private final boolean outwardOrientation;
+    private final double orientationStrength;
 
     public DynamicElasticThreeDConstraints(List<List<Integer>> faces,
             ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,double targetEdgeLength){
-        this.faces=faces.stream().map(List::copyOf).toList();this.modes=modes;this.strengths=strengths;scale=targetEdgeLength;faceEdgeIncidence=buildIncidence(this.faces);
+        this(faces,modes,strengths,targetEdgeLength,false,0);
     }
+    public DynamicElasticThreeDConstraints(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,double targetEdgeLength,boolean outwardOrientation,double orientationStrength){List<List<Integer>> coherent=OrientationConvexityCalculator.coherentFaces(faces);this.faces=(coherent==null?faces:coherent).stream().map(List::copyOf).toList();this.modes=modes;this.strengths=strengths;scale=targetEdgeLength;faceEdgeIncidence=buildIncidence(this.faces);this.outwardOrientation=outwardOrientation;this.orientationStrength=orientationStrength;}
 
     public void addForces(List<DynamicElasticNode> nodes,Map<Integer,Vector3d> forces){
         if(faces.isEmpty())return;List<Vector3d> p=nodes.stream().map(n->new Vector3d(n.position())).toList();
@@ -35,8 +39,10 @@ public final class DynamicElasticThreeDConstraints {
         if(modes.faceAngles()==FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE)value+=strengths.faceAngles()*DevelopmentTimingDiagnostics.measure("stage2.face-angle-objective",()->angleEnergy(p));
         if(modes.dihedrals()==DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES)value+=strengths.dihedrals()*DevelopmentTimingDiagnostics.measure("stage2.dihedral-objective",()->dihedralValues(p).variance);
         if(modes.facePlaneRadii()==FacePlaneRadiusMode.REQUIRE_EQUAL_FACE_PLANE_RADII)value+=strengths.facePlaneRadii()*DevelopmentTimingDiagnostics.measure("stage2.face-plane-radius-objective",()->radiusValues(p).variance)/(scale*scale);
+        if(outwardOrientation)value+=orientationStrength*orientationEnergy(p);
         return value;
     }
+    private double orientationEnergy(List<Vector3d> p){Vector3d center=new Vector3d();p.forEach(center::add);center.div(p.size());List<Plane> planes=faces.stream().map(f->plane(f,p)).toList();double sign=planes.stream().mapToDouble(x->x.normal.dot(new Vector3d(x.point).sub(center))).sum()<0?-1:1;double sum=0;int count=0;for(Plane plane:planes){Vector3d radial=new Vector3d(plane.point).sub(center);if(radial.lengthSquared()<=EPS)continue;double alignment=sign*plane.normal.dot(radial.normalize());double error=Math.max(0,-alignment);sum+=error*error;count++;}return count==0?0:sum/count;}
     private double planarityEnergy(List<Vector3d> p){double sum=0;int count=0;for(List<Integer> f:faces){Plane plane=plane(f,p);for(int id:f){double d=Math.abs(new Vector3d(p.get(id)).sub(plane.point).dot(plane.normal))/scale;sum+=d*d;count++;}}return count==0?0:sum/count;}
     private double angleEnergy(List<Vector3d> p){double sum=0;int count=0;for(List<Integer> f:faces){double target=(f.size()-2.0)*Math.PI/f.size();for(int i=0;i<f.size();i++){Vector3d a=new Vector3d(p.get(f.get((i-1+f.size())%f.size()))).sub(p.get(f.get(i)));Vector3d b=new Vector3d(p.get(f.get((i+1)%f.size()))).sub(p.get(f.get(i)));if(a.lengthSquared()>EPS&&b.lengthSquared()>EPS){double angle=Math.acos(clamp(a.normalize().dot(b.normalize())));double d=angle-target;sum+=d*d;count++;}}}return count==0?0:sum/count;}
     private Values dihedralValues(List<Vector3d> p){List<Double> values=new ArrayList<>();for(var e:faceEdgeIncidence.entrySet())if(e.getValue().size()==2){Vector3d a=plane(faces.get(e.getValue().get(0)),p).normal,b=plane(faces.get(e.getValue().get(1)),p).normal;double raw=Math.acos(clamp(Math.abs(a.dot(b))));values.add(raw);}return values(values);}

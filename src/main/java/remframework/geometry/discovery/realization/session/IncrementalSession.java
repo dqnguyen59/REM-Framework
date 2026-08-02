@@ -23,7 +23,9 @@ import remframework.geometry.discovery.optimization.*;
 import org.joml.Vector3d;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.SplittableRandom;
 import remframework.geometry.discovery.eligibility.*;
 import remframework.geometry.discovery.measurement.regularity.*;
@@ -57,6 +59,13 @@ public final class IncrementalSession {
     private volatile int publishedIteration;
     private volatile ScientificTimingSnapshot timing=ScientificTimingSnapshot.initial(0);
     private long totalIterationNanos;
+    private List<List<Integer>> topologyFaces=List.of();
+    private int continuationStageIndex,continuationStageIteration,continuationStable;
+    private double continuationRampFactor;
+    private double continuationRampCeiling=1;
+    private final List<ContinuationStageOutcome> continuationHistory=new ArrayList<>();
+    private volatile ContinuationSnapshot continuationSnapshot=ContinuationSnapshot.simultaneous();
+    private volatile OrientationConvexityDiagnostics orientationConvexity=OrientationConvexityDiagnostics.undetermined("Stage 2 has not published coordinates.");
 
     public IncrementalSession(Configuration configuration,
             TestRequest request) {
@@ -78,7 +87,8 @@ public final class IncrementalSession {
         if (executionState == ExecutionState.IDLE) executionState = ExecutionState.RUNNING;
         if (scientificState == ScientificState.INITIALIZED) scientificState = request.dimension()==GeometryEmbeddingDimension.THREE_D?ScientificState.RELAXING_CONSTRAINTS:ScientificState.RELAXING;
         long started=System.nanoTime();elastic.step();totalIterationNanos+=System.nanoTime()-started;
-        if (elastic.finished()) finishAttempt();
+        if(request.continuation().strategy()==RealizationStrategy.SEQUENTIAL_CONTINUATION)advanceContinuation();
+        else if (elastic.finished()) finishAttempt();
         publishSnapshot();
         return true;
     }
@@ -143,6 +153,8 @@ public final class IncrementalSession {
     public double maximumEdgeError(){return publishedMaximumEdgeError;}
     public StagnationStatus stagnationStatus(){return publishedStagnation;}
     public ConstraintPresentationSummary constraintPresentation(){return Stage2ConstraintPresentation.from(this);}
+    public ContinuationSnapshot continuationSnapshot(){return continuationSnapshot;}
+    public OrientationConvexityDiagnostics orientationConvexityDiagnostics(){return orientationConvexity;}
     public int realizationIndex(){return attempt+1;}
     public long realizedSeed(){return request.randomSeed()+attempt;}
     public List<ActiveConstraintState> activeThreeDConstraints(){ThreeDConstraintDiagnostics d=threeDConstraintDiagnostics();ThreeDExperimentConditions m=request.threeDConditions();ThreeDConstraintStrengths s=request.threeDConstraintStrengths();return List.of(
@@ -198,7 +210,8 @@ public final class IncrementalSession {
                 .withMaximumIterations(Math.min(request.searchLimit(),
                         request.relaxationSettings().maximumIterations()))
                 .withCanonicalGeometry(DynamicElasticCanonicalGeometrySettings.disabled());
-        if(request.benchmarkPreset()==BenchmarkPreset.CUBE_CONSTRAINED_BENCHMARK)
+        if(request.benchmarkPreset()==BenchmarkPreset.CUBE_CONSTRAINED_BENCHMARK
+                &&request.continuation().strategy()==RealizationStrategy.SIMULTANEOUS)
             settings=settings.withMaximumIterations(Math.min(settings.maximumIterations(),BenchmarkPresets.CONSTRAINED_ITERATIONS_PER_REALIZATION));
         GeometryEmbeddingDimension initializationDimension=request.experimentProfile()==ExperimentProfile.CLOSED_2D_AREA
                 && request.planarityMode()!=PlanarityRealizationMode.STRICT_2D_COORDINATES
@@ -206,6 +219,7 @@ public final class IncrementalSession {
         initialCoordinates = initializeCoordinates(configuration.nodeCount(),
                 initializationDimension, request.targetEdgeLength(), seed);
         int secondAnchor=configuration.adjacency().get(0).stream().mapToInt(Integer::intValue).min().orElse(1);
+        initialCoordinates.get(0).set(0,0,0);
         initialCoordinates.get(secondAnchor).set(request.targetEdgeLength(),0,0);
         if(request.experimentProfile()==ExperimentProfile.CLOSED_2D_AREA
                 &&request.angleConditionMode()==AngleConditionMode.REQUIRE_EQUAL_ANGLES
@@ -224,10 +238,29 @@ public final class IncrementalSession {
                     request.planarityTolerance(),request.angleConditionMode()==AngleConditionMode.REQUIRE_EQUAL_ANGLES,
                     targetDegrees,Math.toDegrees(request.angleTolerance()),request.angleRestoringStrength());
         }else{
-            List<List<Integer>> topologyFaces=new TopologyEligibilityAnalyzer().deriveTopologicalFaces(configuration);
-            elastic.configureThreeDimensionalProfile(topologyFaces,request.threeDConditions(),request.threeDConstraintStrengths());
+            topologyFaces=new TopologyEligibilityAnalyzer().deriveTopologicalFaces(configuration);
+            continuationStageIndex=0;continuationStageIteration=0;continuationStable=0;continuationRampFactor=0;continuationRampCeiling=1;if(attempt==0)continuationHistory.clear();
+            configureContinuationStage();
         }
     }
+
+    private void configureContinuationStage(){
+        if(request.continuation().strategy()!=RealizationStrategy.SEQUENTIAL_CONTINUATION){elastic.configureThreeDimensionalProfile(topologyFaces,request.threeDConditions(),request.threeDConstraintStrengths());continuationSnapshot=ContinuationSnapshot.simultaneous();return;}
+        ContinuationStageDefinition stage=request.continuation().schedule().stages().get(continuationStageIndex);Set<ContinuationConstraint> active=new LinkedHashSet<>(stage.retained());active.addAll(stage.introduced());double factor=stage.rampIterations()==0?1:Math.min(1,stage.startingFactor()+continuationStageIteration*(stage.finalFactor()-stage.startingFactor())/stage.rampIterations());factor=Math.min(factor,continuationRampCeiling);continuationRampFactor=factor;
+        ThreeDExperimentConditions original=request.threeDConditions();ThreeDExperimentConditions modes=new ThreeDExperimentConditions(active.contains(ContinuationConstraint.FACE_PLANARITY)?original.facePlanarity():FacePlanarityMode.MEASURE_ONLY,active.contains(ContinuationConstraint.FACE_ANGLE_EQUALITY)?original.faceAngles():FaceAngleConditionMode.MEASURE_ONLY,active.contains(ContinuationConstraint.JOINT_QUALIFICATION)?original.dihedrals():DihedralConditionMode.MEASURE_ONLY,original.vertexRadii(),original.faceCentroidRadii(),original.edgeMidpointRadii(),active.contains(ContinuationConstraint.FACE_PLANE_RADII)||active.contains(ContinuationConstraint.JOINT_QUALIFICATION)?original.facePlaneRadii():FacePlaneRadiusMode.MEASURE_ONLY,original.normalCenterAlignment(),original.centerDefinition(),original.facePlanarityTolerance(),original.absoluteRegularityTolerance(),original.relativeRegularityTolerance());ThreeDConstraintStrengths full=request.threeDConstraintStrengths();ThreeDConstraintStrengths strengths=new ThreeDConstraintStrengths(full.facePlanarity()*(stage.introduced().contains(ContinuationConstraint.FACE_PLANARITY)?factor:1),full.faceAngles()*(stage.introduced().contains(ContinuationConstraint.FACE_ANGLE_EQUALITY)?factor:1),full.dihedrals()*(stage.introduced().contains(ContinuationConstraint.JOINT_QUALIFICATION)?factor:1),full.facePlaneRadii()*(stage.introduced().contains(ContinuationConstraint.FACE_PLANE_RADII)?factor:1));boolean orientation=active.contains(ContinuationConstraint.OUTWARD_ORIENTATION);double orientationFactor=stage.introduced().contains(ContinuationConstraint.OUTWARD_ORIENTATION)?factor:1;elastic.configureThreeDimensionalProfile(topologyFaces,modes,strengths,orientation,request.continuation().outwardOrientationStrength()*orientationFactor);
+        elastic.setSpatialConstraintsEnabled(active.contains(ContinuationConstraint.JOINT_QUALIFICATION));
+    }
+
+    private void advanceContinuation(){ContinuationSchedule schedule=request.continuation().schedule();ContinuationStageDefinition stage=schedule.stages().get(continuationStageIndex);continuationStageIteration++;configureContinuationStage();orientationConvexity=new OrientationConvexityCalculator().calculate(topologyFaces,elastic.nodes().stream().map(n->new Vector3d(n.position())).toList(),request.threeDConditions().facePlanarityTolerance());Set<ContinuationConstraint> active=new LinkedHashSet<>(stage.retained());active.addAll(stage.introduced());ThreeDConstraintDiagnostics d=elastic.threeDConstraintDiagnostics();double worst=maximumEdgeErrorNow()/request.edgeTolerance();String worstName="Connected edge equality";if(active.contains(ContinuationConstraint.OUTWARD_ORIENTATION)){double ratio=orientationConvexity.outwardError()==0?0:Double.POSITIVE_INFINITY;if(ratio>worst){worst=ratio;worstName="Outward orientation";}}if(active.contains(ContinuationConstraint.FACE_PLANARITY)){double ratio=d.maximumFacePlanarityError()/request.threeDConditions().facePlanarityTolerance();if(ratio>worst){worst=ratio;worstName="Face planarity";}}if(active.contains(ContinuationConstraint.FACE_ANGLE_EQUALITY)){double ratio=d.maximumFaceAngleDeviation()/request.threeDConditions().absoluteRegularityTolerance();if(ratio>worst){worst=ratio;worstName="Face-angle equality";}}if(active.contains(ContinuationConstraint.FACE_PLANE_RADII)){double ratio=d.maximumFacePlaneRadiusDeviation()/request.threeDConditions().absoluteRegularityTolerance();if(ratio>worst){worst=ratio;worstName="Face-plane radii";}}boolean discrete=!active.contains(ContinuationConstraint.OUTWARD_ORIENTATION)||orientationConvexity.orientation()==OrientationState.COHERENT_AND_OUTWARD||orientationConvexity.orientation()==OrientationState.COHERENT_BUT_INWARD;boolean satisfied=continuationRampFactor>=1&&worst<=1&&discrete&&elastic.metrics().maximumNodeSpeed()<=request.relaxationSettings().maximumEquilibriumSpeed();continuationStable=satisfied?continuationStable+1:0;ContinuationStageState state=continuationRampFactor<1?ContinuationStageState.RAMPING:ContinuationStageState.RELAXING;String failure="";
+        boolean retainedOrientationRegression=stage.retained().contains(ContinuationConstraint.OUTWARD_ORIENTATION)&&orientationConvexity.outwardError()>0;
+        if(retainedOrientationRegression)continuationRampCeiling=Math.max(.05,continuationRampCeiling*.5);else if(continuationRampCeiling<1)continuationRampCeiling=Math.min(1,continuationRampCeiling+.002);
+        if(continuationStable>=stage.stableIterations()){state=ContinuationStageState.SATISFIED;continuationHistory.add(new ContinuationStageOutcome(stage.id(),state,continuationStageIteration,continuationStable,continuationRampFactor,worstName,worst,"All retained and introduced transition conditions remained satisfied."));if(continuationStageIndex+1<schedule.stages().size()){continuationStageIndex++;continuationStageIteration=0;continuationStable=0;continuationRampCeiling=1;configureContinuationStage();elastic.continueRelaxation();}else{elastic.acceptContinuationEquilibrium();finishAttempt();}}
+        else if(elastic.stagnationStatus().classification()==StagnationClass.PLATEAUED){state=ContinuationStageState.PLATEAUED;failure="Stage "+stage.id()+" plateaued outside transition criteria; worst constraint "+worstName+" ratio="+worst;continuationHistory.add(new ContinuationStageOutcome(stage.id(),state,continuationStageIteration,continuationStable,continuationRampFactor,worstName,worst,failure));stopReason=failure;if(++attempt<request.initialRealizations())initializeAttempt();else{finalResult=finalizeResult(configuration,request,elastic.result()).withContinuation(continuationSnapshot);scientificState=ScientificState.SEARCH_LIMIT_REACHED;}}
+        else if(continuationStageIteration>=stage.maximumIterations()){state=ContinuationStageState.FAILED;failure="Stage "+stage.id()+" reached its iteration limit outside transition criteria; worst constraint "+worstName+" ratio="+worst;continuationHistory.add(new ContinuationStageOutcome(stage.id(),state,continuationStageIteration,continuationStable,continuationRampFactor,worstName,worst,failure));stopReason=failure;if(++attempt<request.initialRealizations())initializeAttempt();else{finalResult=finalizeResult(configuration,request,elastic.result()).withContinuation(continuationSnapshot);scientificState=ScientificState.SEARCH_LIMIT_REACHED;}}
+        else if(elastic.finished())elastic.continueRelaxation();
+        ContinuationStageDefinition current=schedule.stages().get(Math.min(continuationStageIndex,schedule.stages().size()-1));continuationSnapshot=new ContinuationSnapshot(RealizationStrategy.SEQUENTIAL_CONTINUATION,schedule.id(),schedule.version(),continuationStageIndex+1,schedule.stages().size(),current.id(),current.displayName(),state,continuationStageIteration,elastic.iteration(),continuationRampFactor,continuationStable,current.stableIterations(),worstName,worst,List.copyOf(active),List.copyOf(stage.retained()),List.copyOf(continuationHistory),failure);if(finalResult!=null)finalResult=finalResult.withContinuation(continuationSnapshot);
+    }
+    private double maximumEdgeErrorNow(){return elastic.metrics().edges().stream().mapToDouble(e->Math.abs(e.distance()-e.targetDistance())).max().orElse(0);}
 
     private void publishSnapshot(){long started=System.nanoTime();publishedCoordinates=elastic.nodes().stream().map(node->new Vector3d(node.position())).toList();publishedMetrics=elastic.metrics();publishedMaximumEdgeError=publishedMetrics.edges().stream().mapToDouble(edge->Math.abs(edge.distance()-edge.targetDistance())).max().orElse(0);publishedThreeD=elastic.threeDConstraintDiagnostics();publishedObjectives=elastic.objectiveDiagnostics();publishedStagnation=elastic.stagnationStatus();publishedIteration=elastic.iteration();long publication=System.nanoTime()-started;DevelopmentTimingDiagnostics.record("stage2.snapshot-publication",publication);long count=Math.max(0,publishedIteration);double average=count==0?0:totalIterationNanos/1_000_000d/count;timing=new ScientificTimingSnapshot(timing.initializationNanos(),count,average,average==0?0:1000d/average,publication);}
 
@@ -235,14 +268,14 @@ public final class IncrementalSession {
         if (finalResult != null) return;
         DynamicElasticResult elasticResult = elastic.result();
         if (elasticResult.resultStatus() == DynamicElasticResultStatus.STABLE_CANDIDATE_FOUND) {
-            finalResult = DevelopmentTimingDiagnostics.measure("stage2.final-qualification",()->finalizeResult(configuration, request, elasticResult));
+            finalResult = DevelopmentTimingDiagnostics.measure("stage2.final-qualification",()->finalizeResult(configuration, request, elasticResult)).withContinuation(continuationSnapshot);
             scientificState = finalResult.status().code()==GeometryConfigurationStatusCode.VALID_CANDIDATE
                     ? ScientificState.CONVERGED : ScientificState.QUALIFICATION_FAILED;
             convergenceIteration = iteration();
             return;
         }
         if (elasticResult.resultStatus() == DynamicElasticResultStatus.NUMERICAL_FAILURE) {
-            finalResult = DevelopmentTimingDiagnostics.measure("stage2.final-qualification",()->finalizeResult(configuration, request, elasticResult));
+            finalResult = DevelopmentTimingDiagnostics.measure("stage2.final-qualification",()->finalizeResult(configuration, request, elasticResult)).withContinuation(continuationSnapshot);
             scientificState = ScientificState.FAILED;
             convergenceIteration = iteration();
             return;
@@ -251,7 +284,7 @@ public final class IncrementalSession {
             initializeAttempt();
             scientificState = request.dimension()==GeometryEmbeddingDimension.THREE_D?ScientificState.RELAXING_CONSTRAINTS:ScientificState.RELAXING;
         } else {
-            finalResult = DevelopmentTimingDiagnostics.measure("stage2.final-qualification",()->finalizeResult(configuration, request, elasticResult));
+            finalResult = DevelopmentTimingDiagnostics.measure("stage2.final-qualification",()->finalizeResult(configuration, request, elasticResult)).withContinuation(continuationSnapshot);
             scientificState = ScientificState.SEARCH_LIMIT_REACHED;
             convergenceIteration = iteration();
         }
@@ -295,7 +328,7 @@ public final class IncrementalSession {
                     configuration.graphSymmetry(), realization, null, null, null,
                     AreaResult.unavailable(status), VolumeResult.unavailable(status), null, null, null,
                     GeometryOptimizationResult.notAttempted(), null, status,
-                    request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed(),request.faceComposition(),request.primaryParameterMode(),request.surfaceTopologyAssumption(),request.parameterDerivation());
+                    request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed(),request.faceComposition(),request.primaryParameterMode(),request.surfaceTopologyAssumption(),request.parameterDerivation(),null);
         }
         FaceDerivationResult faces = new FaceDerivationPipeline().derive(configuration, realization);
         ClosedBoundaryResult boundary = new ClosedBoundaryValidator().validate(configuration,
@@ -336,7 +369,7 @@ public final class IncrementalSession {
         return new TestResult(configuration.id(), request.experimentProfile(),request.planarityMode(),request.angleConditionMode(), eligibility,
                 configuration.graphSymmetry(), realization, faces, boundary, symmetry, area, volume,
                 twoD, threeD,threeDConditions, GeometryOptimizationResult.notAttempted(), null, status,
-                request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed(),request.faceComposition(),request.primaryParameterMode(),request.surfaceTopologyAssumption(),request.parameterDerivation());
+                request.benchmarkPreset(), new ReferenceTopologyRecognizer().recognize(configuration),request.threeDConstraintStrengths(),request.randomSeed(),request.faceComposition(),request.primaryParameterMode(),request.surfaceTopologyAssumption(),request.parameterDerivation(),null);
     }
 
     static List<Vector3d> initializeCoordinates(int count, GeometryEmbeddingDimension dimension,

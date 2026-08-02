@@ -48,6 +48,7 @@ public final class DynamicElasticSession {
     private final int secondAnchorId;
     private final StagnationDetector stagnationDetector=new StagnationDetector(200,1e-5);
     private StagnationStatus stagnationStatus=StagnationStatus.progressing();
+    private boolean spatialConstraintsEnabled=true;
     private ConstraintObjectiveDiagnostics objectiveDiagnostics;
 
     public DynamicElasticSession(FixedDegreeGraph graph, DynamicElasticSettings settings) {
@@ -141,7 +142,7 @@ public final class DynamicElasticSession {
             forces.get(first.id()).add(force);
             forces.get(second.id()).sub(force);
         }
-        new DynamicElasticSpatialConstraints().addForces(graph, nodes, forces,
+        if(spatialConstraintsEnabled)new DynamicElasticSpatialConstraints().addForces(graph, nodes, forces,
                 settings.spatial(), settings.randomSeed());
         new DynamicElasticAngleConstraints().addForces(graph, byId, forces,
                 settings.canonicalGeometry());
@@ -157,8 +158,12 @@ public final class DynamicElasticSession {
 
     public void configureThreeDimensionalProfile(List<List<Integer>> faces,
             ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths){
-        threeDModes=modes;threeDConstraints=new DynamicElasticThreeDConstraints(faces,modes,strengths,settings.targetDistance());
+        configureThreeDimensionalProfile(faces,modes,strengths,false,0);
     }
+    public void configureThreeDimensionalProfile(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,boolean outwardOrientation,double orientationStrength){threeDModes=modes;threeDConstraints=new DynamicElasticThreeDConstraints(faces,modes,strengths,settings.targetDistance(),outwardOrientation,orientationStrength);}
+    public void continueRelaxation(){if(state==DynamicElasticState.EQUILIBRIUM_REACHED){state=DynamicElasticState.NEAR_EQUILIBRIUM;stableIterations=0;stagnationDetector.reset();stagnationStatus=StagnationStatus.progressing();}}
+    public void setSpatialConstraintsEnabled(boolean enabled){spatialConstraintsEnabled=enabled;}
+    public void acceptContinuationEquilibrium(){state=DynamicElasticState.EQUILIBRIUM_REACHED;}
 
     public ThreeDConstraintDiagnostics threeDConstraintDiagnostics(){return threeDConstraints==null?ThreeDConstraintDiagnostics.inactive():threeDConstraints.diagnostics(nodes);}
     public ConstraintObjectiveDiagnostics objectiveDiagnostics(){return objectiveDiagnostics;}

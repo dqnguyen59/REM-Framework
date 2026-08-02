@@ -38,7 +38,8 @@ public record TestResult(ConfigurationId configurationId,
         ThreeDConstraintStrengths threeDConstraintStrengths,long requestedSeed,
         FaceComposition faceComposition,PrimaryParameterMode primaryParameterMode,
         SurfaceTopologyAssumption surfaceTopologyAssumption,
-        ParameterDerivationReport parameterDerivation) {
+        ParameterDerivationReport parameterDerivation,ContinuationSnapshot continuation) {
+    public TestResult { continuation=continuation==null?ContinuationSnapshot.simultaneous():continuation; }
     public TestResult(ConfigurationId configurationId,
             ExperimentProfile experimentProfile, PlanarityRealizationMode planarityMode,
             AngleConditionMode angleConditionMode, TopologyEligibilityReport eligibility,
@@ -56,7 +57,7 @@ public record TestResult(ConfigurationId configurationId,
                 twoDRegularity,threeDRegularity,threeDConditionReport,optimization,
                 optimizationComparison,status,benchmarkPreset,referenceTopologyMatch,
                 threeDConstraintStrengths,requestedSeed,FaceComposition.discover(),
-                PrimaryParameterMode.NODE_COUNT,SurfaceTopologyAssumption.SPHERE_LIKE,null);
+                PrimaryParameterMode.NODE_COUNT,SurfaceTopologyAssumption.SPHERE_LIKE,null,null);
     }
     public TestResult(ConfigurationId configurationId, GraphSymmetryClassification graphSymmetry,
             Realization realization, FaceDerivationResult faceDerivation, ClosedBoundaryResult boundary,
@@ -65,7 +66,7 @@ public record TestResult(ConfigurationId configurationId,
         this(configurationId, null, null, null, null, graphSymmetry, realization, faceDerivation, boundary,
                 geometricSymmetry, area, volume, null, null, null, optimization, null, status,
                 BenchmarkPreset.NONE, null,null,realization==null?0:realization.seed(),FaceComposition.discover(),
-                PrimaryParameterMode.NODE_COUNT,SurfaceTopologyAssumption.SPHERE_LIKE,null);
+                PrimaryParameterMode.NODE_COUNT,SurfaceTopologyAssumption.SPHERE_LIKE,null,null);
     }
 
     public boolean benchmarkTopologyRequirementPassed() {
@@ -84,4 +85,5 @@ public record TestResult(ConfigurationId configurationId,
                 &&status.code() == GeometryConfigurationStatusCode.VALID_CANDIDATE
                 && threeDConditionReport != null && threeDConditionReport.constrainedExperimentPassed();
     }
+    public TestResult withContinuation(ContinuationSnapshot value){return new TestResult(configurationId,experimentProfile,planarityMode,angleConditionMode,eligibility,graphSymmetry,realization,faceDerivation,boundary,geometricSymmetry,area,volume,twoDRegularity,threeDRegularity,threeDConditionReport,optimization,optimizationComparison,status,benchmarkPreset,referenceTopologyMatch,threeDConstraintStrengths,requestedSeed,faceComposition,primaryParameterMode,surfaceTopologyAssumption,parameterDerivation,value);}
 }

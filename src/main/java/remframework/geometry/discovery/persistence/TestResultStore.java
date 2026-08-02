@@ -48,6 +48,12 @@ public final class TestResultStore {
                 + "benchmark_preset = \"" + (result.benchmarkPreset() == null ? "NONE" : result.benchmarkPreset()) + "\"\n"
                 + "requested_seed = " + result.requestedSeed() + "\n"
                 + "realized_seed = " + (result.realization()==null?result.requestedSeed():result.realization().seed()) + "\n"
+                + "realization_strategy = \"" + result.continuation().strategy() + "\"\n"
+                + "continuation_schedule_id = \"" + result.continuation().scheduleId() + "\"\n"
+                + "continuation_schedule_version = " + result.continuation().scheduleVersion() + "\n"
+                + "continuation_stage = \"" + result.continuation().stageId() + "\"\n"
+                + "continuation_stage_state = \"" + result.continuation().state() + "\"\n"
+                + "continuation_ramp_factor = " + result.continuation().rampFactor() + "\n"
                 + "eligibility_status = \"" + (result.eligibility() == null ? "NOT_RECORDED" : result.eligibility().status()) + "\"\n"
                 + "eligibility_reason = \"" + escape(result.eligibility() == null ? "Legacy result" : result.eligibility().conclusion()) + "\"\n"
                 + "status = \"" + result.status().code() + "\"\n"
@@ -59,6 +65,7 @@ public final class TestResultStore {
                 + "volume_available = " + result.volume().available() + "\n"
                 + "saved_at = \"" + Instant.now() + "\"\n";
         if(result.threeDConstraintStrengths()!=null)text+="face_planarity_restoring_strength = "+result.threeDConstraintStrengths().facePlanarity()+"\nface_angle_restoring_strength = "+result.threeDConstraintStrengths().faceAngles()+"\ndihedral_restoring_strength = "+result.threeDConstraintStrengths().dihedrals()+"\nface_plane_radius_restoring_strength = "+result.threeDConstraintStrengths().facePlaneRadii()+"\n";
+        for(int i=0;i<result.continuation().history().size();i++){ContinuationStageOutcome outcome=result.continuation().history().get(i);text+="continuation_history_"+i+" = \""+escape(outcome.stageId()+"|"+outcome.state()+"|"+outcome.iterations()+"|"+outcome.worstConstraint()+"|"+outcome.worstRatio()+"|"+outcome.reason())+"\"\n";}
         if (result.referenceTopologyMatch() != null) {
             var match = result.referenceTopologyMatch();
             text += "reference_topology = \"" + match.topology() + "\"\n"
