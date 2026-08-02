@@ -1,0 +1,23 @@
+configuration_id = "cfg-b10320c7778b"
+node_count = 20
+exact_degree = 3
+canonical_graph_label = "20:1110000000000000000001100000000000000000110000000000000000110000000000000011000000000100001000000000000010000000100001000000000001000000000010000100001000000001001000100000010100101000001011"
+isomorphism_class_id = "b10320c7778b"
+automorphism_group_size = 120
+graph_symmetry = "HIGHLY_SYMMETRIC"
+connected = true
+generation_index = 1
+generation_method = "UNIFORM_SPHERICAL_FACE_GENERATION"
+enumeration_complete = false
+status = "ELIGIBLE_FOR_GEOMETRY_TEST"
+face_composition_mode = "UNIFORM_FACE_SIZE"
+common_face_edge_count = 5
+face_composition_match = "MATCH"
+actual_face_count = 12
+face_edge_count_distribution = "{5=12}"
+face_composition_reasons = "[ELIGIBLE_FOR_GEOMETRY_TEST]"
+combinatorial_faces = "5-6-19-14-10;11-12-16-17-18;2-7-8-9-13;0-1-19-6-3;15-16-12-13-9;4-11-18-1-0;0-3-7-2-4;3-6-5-8-7;10-15-9-8-5;13-12-11-4-2;10-14-17-16-15;1-18-17-14-19"
+construction_method = "DUAL_TRIANGULATED_SURFACE"
+strategy_version = "1"
+created_at = "2026-08-02T21:23:35.242301961Z"
+edges = [[1, 0], [0, 3], [4, 0], [1, 18], [19, 1], [4, 2], [7, 2], [2, 13], [3, 6], [7, 3], [11, 4], [6, 5], [8, 5], [5, 10], [19, 6], [8, 7], [9, 8], [13, 9], [15, 9], [10, 14], [15, 10], [12, 11], [11, 18], [13, 12], [16, 12], [17, 14], [14, 19], [16, 15], [17, 16], [18, 17]]

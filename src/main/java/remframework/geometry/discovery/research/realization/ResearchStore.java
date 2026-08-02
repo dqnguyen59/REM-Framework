@@ -1,0 +1,18 @@
+package remframework.geometry.discovery.research.realization;
+
+import java.nio.file.*;
+import java.util.*;
+
+/** Append-only, resumable machine-readable research artifacts. */
+public final class ResearchStore {
+    private static final String HEADER="strategy,configuration,seed,budget,iterations,qualified,numeric_failure,worst_ratio,self_intersections,convexity_violations,objective,edge_error,edge_tolerance,planarity_error,planarity_tolerance,angle_error,angle_tolerance,runtime_ms,stage,stage_history,stagnation,status";
+    private final Path root,attempts;
+    public ResearchStore(Path root){this.root=root;attempts=root.resolve("attempts.csv");}
+    public void writeManifest(ResearchSearchManifest m)throws Exception{Files.createDirectories(root);List<String> lines=new ArrayList<>();lines.add("search_method="+m.searchMethod());lines.add("master_seed="+m.masterSeed());lines.add("surface_assumption="+m.surfaceAssumption());lines.add("budgets="+m.stagedIterationBudgets());lines.add("development_seeds="+m.developmentSeeds());lines.add("held_out_seeds="+m.heldOutSeeds());lines.add("strategy_count="+m.strategies().size());lines.add("unavailable="+m.unavailableAlternatives());Files.write(root.resolve("search-manifest.properties"),lines);for(RealizationStrategySpecification s:m.strategies())Files.writeString(root.resolve("strategy-"+s.id()+".txt"),s.toString());}
+    public synchronized void append(ResearchAttemptResult a)throws Exception{Files.createDirectories(root);if(Files.notExists(attempts))Files.writeString(attempts,HEADER+System.lineSeparator());Files.writeString(attempts,csv(a),StandardOpenOption.APPEND);}
+    public List<ResearchAttemptResult> readAttempts()throws Exception{if(Files.notExists(attempts))return List.of();return Files.readAllLines(attempts).stream().skip(1).filter(x->!x.isBlank()).map(ResearchStore::parse).toList();}
+    public Set<String> completedKeys()throws Exception{Set<String> keys=new HashSet<>();readAttempts().forEach(a->keys.add(a.key()));return keys;}
+    public void writeRanking(List<String> ids)throws Exception{Files.write(root.resolve("strategy-ranking.txt"),ids);}
+    private static String csv(ResearchAttemptResult a){return String.join(",",a.strategyId(),a.configurationId(),Long.toString(a.seed()),Integer.toString(a.budget()),Integer.toString(a.iterations()),Boolean.toString(a.qualified()),Boolean.toString(a.numericFailure()),Double.toString(a.worstRequiredErrorRatio()),Integer.toString(a.selfIntersections()),Integer.toString(a.convexityViolations()),Double.toString(a.normalizedRequiredObjective()),Double.toString(a.edgeError()),Double.toString(a.edgeTolerance()),Double.toString(a.planarityError()),Double.toString(a.planarityTolerance()),Double.toString(a.angleError()),Double.toString(a.angleTolerance()),Long.toString(a.runtimeMillis()),a.stage(),a.stageHistory(),a.stagnation(),a.configurationStatus())+"\n";}
+    private static ResearchAttemptResult parse(String line){String[] v=line.split(",",-1);return new ResearchAttemptResult(v[0],v[1],Long.parseLong(v[2]),Integer.parseInt(v[3]),Integer.parseInt(v[4]),Boolean.parseBoolean(v[5]),Boolean.parseBoolean(v[6]),Double.parseDouble(v[7]),Integer.parseInt(v[8]),Integer.parseInt(v[9]),Double.parseDouble(v[10]),Double.parseDouble(v[11]),Double.parseDouble(v[12]),Double.parseDouble(v[13]),Double.parseDouble(v[14]),Double.parseDouble(v[15]),Double.parseDouble(v[16]),Long.parseLong(v[17]),v[18],v[19],v[20],v[21]);}
+}

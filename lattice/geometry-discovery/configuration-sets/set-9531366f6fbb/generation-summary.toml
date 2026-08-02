@@ -1,0 +1,26 @@
+set_id = "set-9531366f6fbb"
+primary_parameter_mode = "FACE_COUNT"
+surface_topology_assumption = "SPHERE_LIKE"
+derived_vertex_count = 20
+derived_edge_count = 30
+derived_face_count = 12
+arithmetic_feasible = true
+generation_strategy_available = true
+generation_strategy = "UNIFORM_SPHERICAL_FACE_GENERATION"
+strategy_version = "2"
+construction_method = "DUAL_TRIANGULATED_SURFACE"
+worker_count = 31
+completeness = "COMPLETE_FOR_SELECTED_PARAMETER_CLASS"
+partial_states_examined = 7595
+partial_states_pruned = 220256
+completed_candidates = 1
+duplicate_candidates = 141102
+pruning_counts = "{CANONICAL_PARTIAL_DUPLICATE=141102, NON_FLIPPABLE_EDGE=79154}"
+configurations_examined = 7595
+unique_retained = 1
+isomorphic_duplicates_removed = 141102
+symmetric_count = 1
+asymmetric_count = 0
+elapsed_milliseconds = 1580
+enumeration_complete = true
+status = "COMPLETE_FOR_SELECTED_PARAMETER_CLASS"
