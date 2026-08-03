@@ -116,9 +116,15 @@ public record ConfigurationRequest(int nodeCount, int exactDegree,
         boolean specializedEligible=surfaceTopologyAssumption==SurfaceTopologyAssumption.SPHERE_LIKE
                 &&faceComposition.mode()==remframework.geometry.discovery.experiment.FaceCompositionMode.UNIFORM_FACE_SIZE
                 &&parameterDerivation.derivedFaceCount()!=null&&exactDegree==3;
+        boolean dualEligible=surfaceTopologyAssumption==SurfaceTopologyAssumption.SPHERE_LIKE
+                &&faceComposition.mode()==remframework.geometry.discovery.experiment.FaceCompositionMode.UNIFORM_FACE_SIZE
+                &&parameterDerivation.derivedFaceCount()!=null
+                &&faceComposition.commonFaceEdgeCount()==3&&exactDegree!=3;
         GenerationStrategy strategy=exactDegree==2?GenerationStrategy.DIRECT_CYCLE_CONSTRUCTION
                 :(specializedEligible&&(nodeCount>ConfigurationGenerator.MAX_EXHAUSTIVE_N||explicitSpecialized)
-                ?GenerationStrategy.UNIFORM_SPHERICAL_FACE_GENERATION:GenerationStrategy.EXHAUSTIVE_BACKTRACKING);
+                ?GenerationStrategy.UNIFORM_SPHERICAL_FACE_GENERATION
+                :(dualEligible&&nodeCount>ConfigurationGenerator.MAX_EXHAUSTIVE_N
+                        ?GenerationStrategy.DUAL_DIRECTED_UNIFORM_SPHERICAL_GENERATION:GenerationStrategy.EXHAUSTIVE_BACKTRACKING));
         UniformSphericalSearchLimits limits=new UniformSphericalSearchLimits(maximumConfigurations,
                 Math.max(10_000L,(long)maximumConfigurations*100),
                 (int)Math.min(Integer.MAX_VALUE,Math.max(10_000L,(long)maximumConfigurations*10)),enumerationTimeLimit);

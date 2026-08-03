@@ -44,6 +44,8 @@ public final class ConfigurationGenerator {
             return directCycle(request,started);
         if(normalized.selectedStrategy()==GenerationStrategy.UNIFORM_SPHERICAL_FACE_GENERATION)
             return uniformSpherical(request,normalized,started,execution);
+        if(normalized.selectedStrategy()==GenerationStrategy.DUAL_DIRECTED_UNIFORM_SPHERICAL_GENERATION)
+            return dualDirectedUniformSpherical(request,normalized,started,execution);
         if(normalized.nodeCount()>MAX_EXHAUSTIVE_N) {
             var d=GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.GRAPH_GENERATION,
                     GeometryConfigurationStatusCode.ENUMERATION_LIMIT_REACHED,
@@ -104,6 +106,17 @@ public final class ConfigurationGenerator {
         Metrics metrics=new Metrics(diagnostics.partialStatesExamined(),configurations.size(),diagnostics.duplicateCandidates(),symmetric,configurations.size()-symmetric,generated.elapsedMilliseconds(),complete);
         String setId="set-"+shortHash(normalized.nodeCount()+":"+normalized.exactDegree()+":"+request.intendedDimension()+":"+request.symmetryFilter()+":"+normalized.faceComposition());
         return new GenerationResult(setId,request,configurations,metrics,GeometryConfigurationStatus.of(diagnostic),diagnostics);
+    }
+
+    private GenerationResult dualDirectedUniformSpherical(ConfigurationRequest request,NormalizedGraphRequest normalized,long started,GenerationExecution execution){
+        DualDirectedUniformSphericalGenerator.Outcome generated=new DualDirectedUniformSphericalGenerator().generate(request,normalized,execution);
+        GenerationDiagnostics diagnostics=generated.diagnostics();boolean complete=diagnostics.completeness()==GenerationCompleteness.COMPLETE_FOR_SELECTED_PARAMETER_CLASS;
+        GeometryConfigurationStatusCode code=generated.configurations().isEmpty()?GeometryConfigurationStatusCode.PRIMAL_VALIDATION_FAILED:complete?GeometryConfigurationStatusCode.ELIGIBLE_FOR_GENERATION_VIA_DUALITY:GeometryConfigurationStatusCode.DUAL_GENERATION_INCOMPLETE;
+        String explanation=diagnostics.explanation()+" Dual configurations="+generated.dualConfigurations()+", retained primal configurations="+generated.configurations().size()+", rejections="+generated.rejectionCounts();
+        GeometryConfigurationDiagnostic diagnostic=complete&& !generated.configurations().isEmpty()?GeometryConfigurationDiagnostic.info(GeometryConfigurationStage.COMPLETE,code,"Dual-directed spherical generation",explanation):GeometryConfigurationDiagnostic.stop(GeometryConfigurationStage.GRAPH_GENERATION,code,"Dual-directed spherical generation",explanation);
+        Metrics metrics=new Metrics(diagnostics.partialStatesExamined(),generated.configurations().size(),diagnostics.duplicateCandidates(),(int)generated.configurations().stream().filter(c->c.automorphismGroupSize()>1).count(),(int)generated.configurations().stream().filter(c->c.automorphismGroupSize()<=1).count(),generated.diagnostics().searchLimits()==null?0:0,complete);
+        String setId="set-"+shortHash(normalized.nodeCount()+":"+normalized.exactDegree()+":"+request.intendedDimension()+":"+request.symmetryFilter()+":"+normalized.faceComposition()+":dual");
+        return new GenerationResult(setId,request,generated.configurations(),metrics,GeometryConfigurationStatus.of(diagnostic),diagnostics);
     }
 
     private GenerationResult directCycle(ConfigurationRequest request,long started){

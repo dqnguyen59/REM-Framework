@@ -92,12 +92,16 @@ public final class ParameterDerivation {
         if(feasible)reasons.add(GeometryConfigurationStatusCode.ARITHMETICALLY_FEASIBLE);
         boolean specialized=feasible&&v!=null&&f!=null&&surface==SurfaceTopologyAssumption.SPHERE_LIKE
                 &&faceConstraint.mode()==FaceCompositionMode.UNIFORM_FACE_SIZE&&degree==3;
-        boolean generation=feasible&&v!=null&&(degree==2?v<=10_000:v<=ConfigurationGenerator.MAX_EXHAUSTIVE_N||specialized);
+        boolean dualSpecialized=feasible&&v!=null&&f!=null&&surface==SurfaceTopologyAssumption.SPHERE_LIKE
+                &&faceConstraint.mode()==FaceCompositionMode.UNIFORM_FACE_SIZE
+                &&faceConstraint.commonFaceEdgeCount()==3;
+        boolean generation=feasible&&v!=null&&(degree==2?v<=10_000:v<=ConfigurationGenerator.MAX_EXHAUSTIVE_N||specialized||dualSpecialized);
         reasons.add(generation?GeometryConfigurationStatusCode.ELIGIBLE_FOR_GENERATION:feasible
                 ?GeometryConfigurationStatusCode.GENERATION_STRATEGY_UNAVAILABLE:reasons.getFirst());
         reasons=deduplicate(reasons);
         String strategy=degree==2?"DIRECT_CYCLE_CONSTRUCTION":v!=null&&v>ConfigurationGenerator.MAX_EXHAUSTIVE_N&&specialized
-                ?"UNIFORM_SPHERICAL_FACE_GENERATION":"EXHAUSTIVE_BACKTRACKING";
+                ?"UNIFORM_SPHERICAL_FACE_GENERATION":v!=null&&v>ConfigurationGenerator.MAX_EXHAUSTIVE_N&&dualSpecialized
+                ?"DUAL_DIRECTED_UNIFORM_SPHERICAL_GENERATION":"EXHAUSTIVE_BACKTRACKING";
         String explanation=(feasible?"Arithmetic feasibility: PASS":"Arithmetic feasibility: FAIL")
                 +". Generation capability: "+(generation?"AVAILABLE":"UNAVAILABLE")+". Reasons: "+reasons;
         return new ParameterDerivationReport(mode,surface,inputs,v,e,f,surface.eulerCharacteristic(),

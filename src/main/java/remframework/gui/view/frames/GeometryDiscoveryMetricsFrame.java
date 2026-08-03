@@ -121,12 +121,14 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
         label(c,"Degree incidence: "+d.degreeIncidenceCalculation());
         label(c,"Face incidence: "+d.faceIncidenceCalculation());
         label(c,"Arithmetic feasibility: "+(d.arithmeticFeasible()?"PASS":"FAIL"));
-        label(c,"Selected generation strategy: "+d.selectedGenerationStrategy());
+        label(c,"Selected generation strategy: "+generationStrategyLabel(d.selectedGenerationStrategy()));
+        if("DUAL_DIRECTED_UNIFORM_SPHERICAL_GENERATION".equals(d.selectedGenerationStrategy())){label(c,"Dual construction: V*="+d.derivedFaceCount()+" E*="+d.derivedEdgeCount()+" F*="+d.derivedVertexCount()+" K*=3 m*="+d.authoritativeInputs().getOrDefault("K","?"));label(c,"Generation capability: Available through supported dual class");}
         label(c,"Current generation capability: "+(d.generationStrategyAvailable()?"AVAILABLE":"UNAVAILABLE / LIMIT REACHED"));
         label(c,"Graph enumeration completeness: "+generation.metrics().enumerationComplete());
         label(c,"Generation status: "+generation.status().code());
         label(c,"Exact reasons: "+d.reasons());
     }
+    private static String generationStrategyLabel(String value){return "DUAL_DIRECTED_UNIFORM_SPHERICAL_GENERATION".equals(value)?"Dual-directed uniform spherical generation":value;}
 
     private void phase2FaceComposition(NkContext c,GenerationResult generation,
             Configuration configuration) {
