@@ -1,0 +1,19 @@
+package remframework.geometry.discovery.realization.sequence;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.*;
+import remframework.geometry.discovery.realization.session.ContinuationRampMode;
+
+/** Versioned, human-readable persistence for reusable constraint sequences. */
+public final class ConstraintSequenceStore {
+    public Path save(Path file,ConstraintSequence sequence)throws IOException{
+        Properties p=new Properties();p.setProperty("format_version","1");p.setProperty("sequence_id",sequence.sequenceId());p.setProperty("sequence_version",Integer.toString(sequence.version()));p.setProperty("name",sequence.name());p.setProperty("mode",sequence.mode().name());p.setProperty("notes",sequence.notes());p.setProperty("stage_count",Integer.toString(sequence.stages().size()));
+        for(int i=0;i<sequence.stages().size();i++){String k="stage."+i+".";ConstraintSequenceStage s=sequence.stages().get(i);p.setProperty(k+"id",s.stageId());p.setProperty(k+"constraint",s.constraintId().name());p.setProperty(k+"name",s.displayName());p.setProperty(k+"enabled",Boolean.toString(s.enabled()));p.setProperty(k+"mode",s.mode().name());p.setProperty(k+"activation",s.activationBehavior().name());p.setProperty(k+"strength",Double.toString(s.finalRestoringStrength()));p.setProperty(k+"ramp_mode",s.rampMode().name());p.setProperty(k+"ramp_iterations",Integer.toString(s.rampIterations()));p.setProperty(k+"tolerance",Double.toString(s.transitionTolerance()));p.setProperty(k+"stable_iterations",Integer.toString(s.stableIterations()));p.setProperty(k+"maximum_iterations",Integer.toString(s.maximumIterations()));p.setProperty(k+"stagnation_policy",s.stagnationPolicy().name());p.setProperty(k+"severe_regression_threshold",Double.toString(s.severeRegressionThreshold()));p.setProperty(k+"rollback_policy",s.rollbackPolicy().name());p.setProperty(k+"notes",s.notes());}
+        Path parent=file.toAbsolutePath().getParent();if(parent!=null)Files.createDirectories(parent);try(Writer out=Files.newBufferedWriter(file,StandardCharsets.UTF_8)){p.store(out,"REM Framework Geometry Discovery constraint sequence");}return file;
+    }
+    public ConstraintSequence load(Path file)throws IOException{
+        Properties p=new Properties();try(Reader in=Files.newBufferedReader(file,StandardCharsets.UTF_8)){p.load(in);}if(!"1".equals(p.getProperty("format_version")))throw new IOException("Unsupported constraint-sequence format version.");int count=Integer.parseInt(p.getProperty("stage_count"));List<ConstraintSequenceStage> stages=new ArrayList<>();for(int i=0;i<count;i++){String k="stage."+i+".";stages.add(new ConstraintSequenceStage(p.getProperty(k+"id"),ConstraintId.valueOf(p.getProperty(k+"constraint")),p.getProperty(k+"name"),Boolean.parseBoolean(p.getProperty(k+"enabled")),ConstraintStageMode.valueOf(p.getProperty(k+"mode")),ConstraintActivationBehavior.valueOf(p.getProperty(k+"activation")),Double.parseDouble(p.getProperty(k+"strength")),ContinuationRampMode.valueOf(p.getProperty(k+"ramp_mode")),Integer.parseInt(p.getProperty(k+"ramp_iterations")),Double.parseDouble(p.getProperty(k+"tolerance")),Integer.parseInt(p.getProperty(k+"stable_iterations")),Integer.parseInt(p.getProperty(k+"maximum_iterations")),ConstraintStagnationPolicy.valueOf(p.getProperty(k+"stagnation_policy")),Double.parseDouble(p.getProperty(k+"severe_regression_threshold")),ConstraintRollbackPolicy.valueOf(p.getProperty(k+"rollback_policy")),p.getProperty(k+"notes","")));}ConstraintSequence sequence=new ConstraintSequence(p.getProperty("sequence_id"),Integer.parseInt(p.getProperty("sequence_version")),p.getProperty("name"),ConstraintSequenceMode.valueOf(p.getProperty("mode")),stages,p.getProperty("notes",""));new ConstraintSequenceValidator().requireExecutable(sequence);return sequence;
+    }
+}

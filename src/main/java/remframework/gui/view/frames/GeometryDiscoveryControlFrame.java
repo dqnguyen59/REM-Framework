@@ -10,6 +10,7 @@ import remframework.geometry.discovery.graph.canonical.*;
 import remframework.geometry.discovery.graph.symmetry.*;
 import remframework.geometry.discovery.optimization.*;
 import remframework.geometry.discovery.experiment.*;
+import remframework.geometry.discovery.realization.sequence.*;
 
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
@@ -99,6 +100,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private double phase2AnimationDuration=2,phase2GuidanceStrength=.08;
     private int phase2AnimationFps=60,phase2GuidanceIterations=240,phase2HandoverIterations=120;
     private int phase2ContinuationRampIterations=200,phase2ContinuationStageLimit=10_000;
+    private ConstraintSequenceMode phase2SequenceMode=ConstraintSequenceMode.BUILT_IN_SEQUENCE;
+    private ConstraintSequenceEditorModel phase2SequenceEditor=new ConstraintSequenceEditorModel(ConstraintSequencePresets.edgeFirst());
+    private int phase2SelectedSequenceStage;
     private PlanarityRealizationMode phase2PlanarityMode=PlanarityRealizationMode.STRICT_2D_COORDINATES;
     private AngleConditionMode phase2AngleMode=AngleConditionMode.REQUIRE_EQUAL_ANGLES;
     private double phase2PlaneStrength=.08,phase2AngleStrength=.01;
@@ -372,6 +376,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             if(phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING){String behavior=nk_label_combo_options(c,stack,"Spectral behavior",new String[]{"Instant","Animated Display","Guided Relaxation"},switch(phase2SpectralPresentation){case INSTANT->"Instant";case ANIMATED_DISPLAY->"Animated Display";case GUIDED_RELAXATION->"Guided Relaxation";},.45,.55);phase2SpectralPresentation=switch(behavior){case "Animated Display"->SpectralPresentationMode.ANIMATED_DISPLAY;case "Guided Relaxation"->SpectralPresentationMode.GUIDED_RELAXATION;default->SpectralPresentationMode.INSTANT;};}
             label(c,phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION?"Introduces required constraint classes one stage at a time. Previously satisfied constraints remain active.":"All required realization targets begin at their configured full strengths.");
             if(phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION){phase2ContinuationRampIterations=dynamicInteger(c,"Continuation ramp iterations",phase2ContinuationRampIterations,1,100_000);phase2ContinuationStageLimit=dynamicInteger(c,"Maximum iterations per stage",phase2ContinuationStageLimit,1,1_000_000);label(c,"Ramp gradually increases a new constraint's restoring influence; it does not change acceptance tolerance.");label(c,"Schedule: CLOSED_UNIFORM_FACE_SEQUENTIAL - edges, outward orientation, required face constraints, joint qualification.");}
+            if(phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION)sequenceEditor(c,stack);
             String benchmark=nk_label_combo_options(c,stack,"Benchmark preset",
                     new String[]{"None","Cube emergent benchmark","Cube constrained benchmark"},
                     switch(phase2BenchmarkPreset){case NONE->"None";case CUBE_EMERGENT_BENCHMARK->"Cube emergent benchmark";case CUBE_CONSTRAINED_BENCHMARK->"Cube constrained benchmark";},.45,.55);
@@ -456,7 +461,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                                             ?FaceComposition.uniform(phase2CommonFaceEdgeCount):FaceComposition.discover())
                                     .withParameterDerivation(controller.phasedWorkflow().generation().orElseThrow().request())
                                     .withContinuation((phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION
-                                            ?ContinuationSettings.sequential(new ThreeDExperimentConditions(phase2FacePlanarity,phase2FaceAngles,phase2Dihedrals,phase2VertexRadii,phase2FaceCentroidRadii,phase2EdgeMidpointRadii,phase2FacePlaneRadii,phase2NormalAlignment,phase2CenterDefinition,phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance),100,phase2ContinuationStageLimit,phase2ContinuationRampIterations)
+                                            ?phase2SequenceMode==ConstraintSequenceMode.CUSTOM_SEQUENCE?ContinuationSettings.custom(phase2SequenceEditor.sequence()):ContinuationSettings.sequential(new ThreeDExperimentConditions(phase2FacePlanarity,phase2FaceAngles,phase2Dihedrals,phase2VertexRadii,phase2FaceCentroidRadii,phase2EdgeMidpointRadii,phase2FacePlaneRadii,phase2NormalAlignment,phase2CenterDefinition,phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance),100,phase2ContinuationStageLimit,phase2ContinuationRampIterations)
                                             :ContinuationSettings.simultaneous()).withInitialization(phase2Initialization)
                                             .withSpectralInitialization(new SpectralInitializationSettings(phase2SpectralPresentation,phase2AnimationDuration,phase2AnimationFps,phase2GuidanceIterations,phase2HandoverIterations,phase2GuidanceStrength))));
                 }
@@ -510,6 +515,35 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         if (phase2StoredResult != null)
             label(c, "Reopened stored result: " + phase2StoredResult.status() + " - " + phase2StoredResult.explanation());
     }
+
+    private void sequenceEditor(NkContext c,MemoryStack stack){
+        String mode=nk_label_combo_options(c,stack,"Constraint sequence",new String[]{"Built-in sequence","Custom sequence"},phase2SequenceMode==ConstraintSequenceMode.CUSTOM_SEQUENCE?"Custom sequence":"Built-in sequence",.45,.55);
+        phase2SequenceMode="Custom sequence".equals(mode)?ConstraintSequenceMode.CUSTOM_SEQUENCE:ConstraintSequenceMode.BUILT_IN_SEQUENCE;
+        if(phase2SequenceMode!=ConstraintSequenceMode.CUSTOM_SEQUENCE)return;
+        phase2Initialization=TopologyInitialization.RANDOM_SPHERICAL;phase2SpectralPresentation=SpectralPresentationMode.INSTANT;phase2BenchmarkPreset=BenchmarkPreset.NONE;
+        heading(c,"Sequence Editor");label(c,"RANDOM_SPHERICAL; spectral coordinates OFF; benchmark reference OFF; topology-specific coordinates OFF.");
+        String preset=nk_label_combo_options(c,stack,"Starting hypothesis",new String[]{"EDGE_FIRST","ORIENTATION_FIRST","CONVEXITY_FIRST","FACE_FIRST"},phase2SequenceEditor.sequence().name(),.45,.55);
+        if(!preset.equals(phase2SequenceEditor.sequence().name()))phase2SequenceEditor=new ConstraintSequenceEditorModel(switch(preset){case "ORIENTATION_FIRST"->ConstraintSequencePresets.orientationFirst();case "CONVEXITY_FIRST"->ConstraintSequencePresets.convexityFirst();case "FACE_FIRST"->ConstraintSequencePresets.faceFirst();default->ConstraintSequencePresets.edgeFirst();});
+        List<ConstraintSequenceStage> stages=phase2SequenceEditor.sequence().stages();if(phase2SelectedSequenceStage>=stages.size())phase2SelectedSequenceStage=Math.max(0,stages.size()-1);
+        for(int i=0;i<stages.size();i++){ConstraintSequenceStage s=stages.get(i);String marker=i==phase2SelectedSequenceStage?"> ":"";if(Nuklear.nk_button_label(c,marker+(i+1)+". "+s.displayName()+" | "+s.mode()+" | "+s.activationBehavior()+" | "+s.rampMode()+"/"+s.rampIterations()+" | max "+s.maximumIterations()+" | tol "+s.transitionTolerance()))phase2SelectedSequenceStage=i;}
+        Nuklear.nk_layout_row_dynamic(c,rowHeightEdit,5);
+        if(Nuklear.nk_button_label(c,"Add Stage"))phase2SequenceEditor.add(ConstraintSequenceStage.required(ConstraintId.EDGE_LENGTH));
+        if(Nuklear.nk_button_label(c,"Remove Stage")&&stages.size()>1)phase2SequenceEditor.remove(phase2SelectedSequenceStage);
+        if(Nuklear.nk_button_label(c,"Move Up")){phase2SequenceEditor.moveUp(phase2SelectedSequenceStage);phase2SelectedSequenceStage=Math.max(0,phase2SelectedSequenceStage-1);}
+        if(Nuklear.nk_button_label(c,"Move Down")){phase2SequenceEditor.moveDown(phase2SelectedSequenceStage);phase2SelectedSequenceStage=Math.min(stages.size()-1,phase2SelectedSequenceStage+1);}
+        Nuklear.nk_layout_row_dynamic(c,rowHeightEdit,5);
+        if(Nuklear.nk_button_label(c,"Duplicate Stage"))phase2SequenceEditor.duplicate(phase2SelectedSequenceStage);
+        ConstraintSequenceStage selected=phase2SequenceEditor.sequence().stages().get(Math.max(0,Math.min(phase2SelectedSequenceStage,phase2SequenceEditor.sequence().stages().size()-1)));
+        if(Nuklear.nk_button_label(c,selected.enabled()?"Disable":"Enable"))phase2SequenceEditor.setEnabled(phase2SelectedSequenceStage,!selected.enabled());
+        if(Nuklear.nk_button_label(c,"Reset to Built-In")){phase2SequenceMode=ConstraintSequenceMode.BUILT_IN_SEQUENCE;phase2SequenceEditor=new ConstraintSequenceEditorModel(ConstraintSequencePresets.edgeFirst());}
+        if(Nuklear.nk_button_label(c,"Save Sequence"))try{new ConstraintSequenceStore().save(sequenceFile(),phase2SequenceEditor.sequence());}catch(Exception failure){nuklearModel.showErrorDialog("Constraint Sequence",failure.getMessage());}
+        if(Nuklear.nk_button_label(c,"Reopen Sequence"))try{phase2SequenceEditor=new ConstraintSequenceEditorModel(new ConstraintSequenceStore().load(sequenceFile()));}catch(Exception failure){nuklearModel.showErrorDialog("Constraint Sequence",failure.getMessage());}
+        for(ConstraintSequenceIssue issue:new ConstraintSequenceValidator().validate(phase2SequenceEditor.sequence()))label(c,issue.severity()+": "+issue.explanation());
+        label(c,"Selected details: ID="+selected.stageId()+", constraint="+selected.constraintId()+", enabled="+selected.enabled()+", mode="+selected.mode()+", activation="+selected.activationBehavior()+", strength="+selected.finalRestoringStrength()+", ramp="+selected.rampMode()+"/"+selected.rampIterations()+", tolerance="+selected.transitionTolerance()+", stable="+selected.stableIterations()+", maximum="+selected.maximumIterations()+", stagnation="+selected.stagnationPolicy()+", severe regression="+selected.severeRegressionThreshold()+", rollback="+selected.rollbackPolicy()+", notes="+selected.notes());
+        if(selected.activationBehavior()==ConstraintActivationBehavior.STAGE_ONLY)label(c,"EXPERIMENTAL: STAGE_ONLY does not retain earlier required constraints.");
+    }
+
+    private Path sequenceFile(){return Path.of("lattice/geometry-discovery/constraint-sequences",phase2SequenceEditor.sequence().sequenceId()+"-v"+phase2SequenceEditor.sequence().version()+".properties");}
 
     private void phase2ResultSections(NkContext c, TestResult result) {
         heading(c, "Eligibility");
