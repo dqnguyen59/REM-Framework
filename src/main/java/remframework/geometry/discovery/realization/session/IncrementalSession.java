@@ -80,6 +80,7 @@ public final class IncrementalSession {
     private List<List<Vector3d>> initializationTrails=List.of();
     private volatile GeometryConfigurationStatus initializationFailure;
     private final EnumSet<ManualConstraint> manualActiveForces=EnumSet.noneOf(ManualConstraint.class);
+    private volatile ConstraintStrengthFactors strengthFactors;
     private final EnumMap<ManualConstraint,Boolean> manualRequirements=new EnumMap<>(ManualConstraint.class);
     private final List<ManualAction> manualActions=new ArrayList<>();
     private final List<GeometrySnapshot> manualSnapshots=new ArrayList<>();
@@ -102,6 +103,7 @@ public final class IncrementalSession {
         this.request = request;
         this.graph = new FixedDegreeGraph(configuration.nodeCount(), configuration.exactDegree(),
                 configuration.edges(), configuration.canonicalGraphLabel());
+        this.strengthFactors = defaultStrengthFactors();
         long started=System.nanoTime();initializeAttempt();publishSnapshot();timing=ScientificTimingSnapshot.initial(System.nanoTime()-started);
     }
 
@@ -180,6 +182,29 @@ public final class IncrementalSession {
     public ManualExecutionState manualExecutionState(){return manualExecutionState;}
     public ManualVelocityPolicy manualVelocityPolicy(){return manualVelocityPolicy;}
     public Set<ManualConstraint> manualActiveForces(){return Set.copyOf(manualActiveForces);}
+    public ConstraintStrengthFactors constraintStrengthFactors(){return strengthFactors;}
+    public ConstraintStrengthFactor constraintStrengthFactor(ManualConstraint constraint){return strengthFactors.get(constraint);}
+    public synchronized void setManualStrengthFactor(ManualConstraint constraint,double factor){
+        requireManual(); ConstraintStrengthFactor before=strengthFactors.get(constraint);
+        ConstraintStrengthFactor.validateFactor(factor);
+        if(before==null||!before.correctiveForceImplemented())throw new IllegalArgumentException("Strength unavailable - measurement only.");
+        if(Math.abs(before.runtimeFactor()-factor)<=1e-15)return;
+        Map<ManualConstraint,Double> beforeErrors=rawErrors();Map<ManualConstraint,Double> beforeRatios=ratios();
+        strengthFactors=strengthFactors.withFactor(constraint,factor,manualActiveForces.contains(constraint));
+        reconfigureManualForces(); elastic.resetConstraintStability();
+        if(manualVelocityPolicy==ManualVelocityPolicy.RESET_VELOCITY_ON_FORCE_CHANGE)elastic.resetVelocities();
+        ConstraintStrengthFactor after=strengthFactors.get(constraint);
+        if(!manualReplay)manualActions.add(new ManualAction(++manualActionSequence,Instant.now(),iteration(),constraint,
+                manualActiveForces.contains(constraint),manualActiveForces.contains(constraint),manualActiveForces,
+                manualVelocityPolicy,realizedSeed(),manualSnapshotRevision,beforeErrors,beforeRatios,
+                before.runtimeFactor(),after.runtimeFactor(),before.baseStrength(),before.effectiveStrength(),after.effectiveStrength(),true));
+        if(manualRecording&&!manualReplay)recordManualEvent(ManualExperimentEvent.Type.FORCE_CHANGED,
+                constraint.displayName()+" strength factor "+before.runtimeFactor()+" -> "+after.runtimeFactor());
+        publishSnapshot();
+    }
+    public synchronized void resetManualStrengthFactor(ManualConstraint constraint){setManualStrengthFactor(constraint,1.0);}
+    public synchronized void resetAllManualStrengthFactors(){for(ManualConstraint c:ManualConstraint.values()){ConstraintStrengthFactor f=strengthFactors.get(c);if(f!=null&&f.correctiveForceImplemented()&&Math.abs(f.runtimeFactor()-1)>1e-15)setManualStrengthFactor(c,1.0);}}
+    public synchronized void setManualStrengthFactors(Map<ManualConstraint,Double> factors){if(factors==null)return;factors.forEach(this::setManualStrengthFactor);}
     public synchronized void setManualActiveForceSet(Set<ManualConstraint> forces){requireManual();Set<ManualConstraint> requested=forces==null?Set.of():Set.copyOf(forces);for(ManualConstraint c:ManualConstraint.values())if(manualActiveForces.contains(c)!=requested.contains(c))setManualRelaxation(c,requested.contains(c));}
     public List<ManualAction> manualActions(){return List.copyOf(manualActions);}
     public List<ManualExperimentEvent> manualEvents(){return List.copyOf(manualEvents);}
@@ -200,12 +225,16 @@ public final class IncrementalSession {
     public synchronized void setManualRelaxation(ManualConstraint constraint,boolean enabled){if(request.continuation().strategy()!=RealizationStrategy.MANUAL_RELAXATION)throw new IllegalStateException("Manual relaxation is not selected.");boolean old=manualActiveForces.contains(constraint);if(old==enabled)return;Map<ManualConstraint,Double> before=ratios();if(enabled)manualActiveForces.add(constraint);else manualActiveForces.remove(constraint);reconfigureManualForces();if(manualVelocityPolicy==ManualVelocityPolicy.RESET_VELOCITY_ON_FORCE_CHANGE)elastic.resetVelocities();if(manualActiveForces.isEmpty()){manualExecutionState=ManualExecutionState.MANUAL_IDLE;executionState=ExecutionState.PAUSED;}else{manualExecutionState=ManualExecutionState.MANUAL_RELAXING;executionState=ExecutionState.RUNNING;}if(!manualReplay)manualActions.add(new ManualAction(++manualActionSequence,Instant.now(),iteration(),constraint,old,enabled,manualActiveForces,manualVelocityPolicy,realizedSeed(),manualSnapshotRevision,before,ratios()));if(manualRecording&&!manualReplay)recordManualEvent(ManualExperimentEvent.Type.FORCE_CHANGED,constraint.displayName()+" "+(enabled?"ON":"OFF"));manualRegressions.clear();for(var e:before.entrySet())manualRegressions.put(e.getKey(),new ManualRegression(e.getKey(),e.getValue(),ratios().getOrDefault(e.getKey(),Double.NaN),ratios().getOrDefault(e.getKey(),Double.NaN)-e.getValue(),"TRANSITION"));publishSnapshot();}
     public synchronized void turnAllManualRelaxationOff(){for(ManualConstraint c:ManualConstraint.values())if(manualActiveForces.contains(c))setManualRelaxation(c,false);}
     public synchronized void turnAllManualRelaxationOn(){for(ManualConstraint c:ManualConstraint.values())setManualRelaxation(c,true);}
-    public synchronized GeometrySnapshot saveManualSnapshot(String label){GeometrySnapshot snapshot=new GeometrySnapshot(UUID.randomUUID().toString(),label,currentCoordinates(),elastic.nodes().stream().map(n->new Vector3d(n.velocity())).toList(),manualActiveForces,manualConstraintStates(),iteration(),realizedSeed(),request.threeDConditions().centerDefinition().name(),finalResult!=null&&finalResult.status().code()==GeometryConfigurationStatusCode.VALID_CANDIDATE,++manualSnapshotRevision);manualSnapshots.add(snapshot);if(manualRecording)recordManualEvent(ManualExperimentEvent.Type.SNAPSHOT_SAVED,snapshot.snapshotId());return snapshot;}
-    public synchronized void restoreManualSnapshot(String id,boolean restoreForces){GeometrySnapshot snapshot=manualSnapshots.stream().filter(s->s.snapshotId().equals(id)).findFirst().orElseThrow();elastic.replacePositions(snapshot.coordinates());elastic.replaceVelocities(snapshot.velocities());if(restoreForces){manualActiveForces.clear();manualActiveForces.addAll(snapshot.activeForceSet());reconfigureManualForces();}manualExecutionState=manualActiveForces.isEmpty()?ManualExecutionState.MANUAL_IDLE:ManualExecutionState.MANUAL_PAUSED;if(manualRecording)recordManualEvent(ManualExperimentEvent.Type.SNAPSHOT_RESTORED,id);publishSnapshot();}
+    public synchronized GeometrySnapshot saveManualSnapshot(String label){GeometrySnapshot snapshot=new GeometrySnapshot(UUID.randomUUID().toString(),label,currentCoordinates(),elastic.nodes().stream().map(n->new Vector3d(n.velocity())).toList(),manualActiveForces,manualConstraintStates(),iteration(),realizedSeed(),request.threeDConditions().centerDefinition().name(),finalResult!=null&&finalResult.status().code()==GeometryConfigurationStatusCode.VALID_CANDIDATE,++manualSnapshotRevision,strengthFactors.values());manualSnapshots.add(snapshot);if(manualRecording)recordManualEvent(ManualExperimentEvent.Type.SNAPSHOT_SAVED,snapshot.snapshotId());return snapshot;}
+    public synchronized void restoreManualSnapshot(String id,boolean restoreForces){restoreManualSnapshot(id,restoreForces,true);}
+    public synchronized void restoreManualSnapshot(String id,boolean restoreForces,boolean restoreFactors){GeometrySnapshot snapshot=manualSnapshots.stream().filter(s->s.snapshotId().equals(id)).findFirst().orElseThrow();elastic.replacePositions(snapshot.coordinates());elastic.replaceVelocities(snapshot.velocities());if(restoreFactors&&!snapshot.strengthFactors().isEmpty())strengthFactors=new ConstraintStrengthFactors(snapshot.strengthFactors(),strengthFactors.revision());if(restoreForces){manualActiveForces.clear();manualActiveForces.addAll(snapshot.activeForceSet());}strengthFactors=strengthFactors.withActiveSet(manualActiveForces);reconfigureManualForces();elastic.resetConstraintStability();manualExecutionState=manualActiveForces.isEmpty()?ManualExecutionState.MANUAL_IDLE:ManualExecutionState.MANUAL_PAUSED;if(manualRecording)recordManualEvent(ManualExperimentEvent.Type.SNAPSHOT_RESTORED,id);publishSnapshot();}
     public synchronized boolean evaluateManualFinalQualification(){if(request.continuation().strategy()!=RealizationStrategy.MANUAL_RELAXATION)throw new IllegalStateException("Manual qualification requires MANUAL_RELAXATION.");finalResult=finalizeResult(configuration,request,elastic.resultForQualification()).withContinuation(continuationSnapshot);scientificState=finalResult.status().code()==GeometryConfigurationStatusCode.VALID_CANDIDATE?ScientificState.CONVERGED:ScientificState.QUALIFICATION_FAILED;if(manualRecording)recordManualEvent(ManualExperimentEvent.Type.QUALIFICATION_EVALUATED,finalResult.status().code().name());return finalResult.status().code()==GeometryConfigurationStatusCode.VALID_CANDIDATE;}
     private void requireManual(){if(request.continuation().strategy()!=RealizationStrategy.MANUAL_RELAXATION)throw new IllegalStateException("Manual relaxation is not selected.");}
     private void recordManualEvent(ManualExperimentEvent.Type type,String detail){manualEvents.add(new ManualExperimentEvent(++manualEventSequence,Instant.now(),iteration(),type,detail,manualSnapshotRevision));}
     private Map<ManualConstraint,Double> ratios(){EnumMap<ManualConstraint,Double> values=new EnumMap<>(ManualConstraint.class);for(ManualConstraintState s:manualConstraintStates())values.put(s.constraint(),s.normalizedRatio());return values;}
+    private Map<ManualConstraint,Double> rawErrors(){EnumMap<ManualConstraint,Double> values=new EnumMap<>(ManualConstraint.class);for(ManualConstraintState s:manualConstraintStates())values.put(s.constraint(),s.rawError());return values;}
+    private ConstraintStrengthFactors defaultStrengthFactors(){EnumMap<ManualConstraint,Double> bases=new EnumMap<>(ManualConstraint.class);bases.put(ManualConstraint.EDGE_LENGTH,request.relaxationSettings().springStrength());bases.put(ManualConstraint.FACE_ORIENTATION,request.continuation().outwardOrientationStrength());bases.put(ManualConstraint.CONVEXITY,.6);bases.put(ManualConstraint.FACE_PLANARITY,request.threeDConstraintStrengths().facePlanarity());bases.put(ManualConstraint.FACE_ANGLE,request.threeDConstraintStrengths().faceAngles());bases.put(ManualConstraint.FACE_DISTANCE,request.threeDConstraintStrengths().facePlaneRadii());bases.put(ManualConstraint.DIHEDRAL_ANGLE,request.threeDConstraintStrengths().dihedrals());bases.put(ManualConstraint.SELF_INTERSECTION_AVOIDANCE,.6);return ConstraintStrengthFactors.defaults(bases,List.of(ManualConstraint.EDGE_LENGTH,ManualConstraint.FACE_ORIENTATION,ManualConstraint.CONVEXITY,ManualConstraint.FACE_PLANARITY,ManualConstraint.FACE_ANGLE,ManualConstraint.FACE_DISTANCE,ManualConstraint.DIHEDRAL_ANGLE,ManualConstraint.SELF_INTERSECTION_AVOIDANCE));}
+    private Map<String,Double> runtimeFactorMap(){return strengthFactors.values().entrySet().stream().filter(entry->entry.getValue().correctiveForceImplemented()).collect(java.util.stream.Collectors.toUnmodifiableMap(entry->entry.getKey().name(),entry->entry.getValue().runtimeFactor()));}
 
     public List<Vector3d> currentCoordinates() {
         return publishedCoordinates.stream().map(Vector3d::new).toList();
@@ -327,7 +356,7 @@ public final class IncrementalSession {
         }else{
             topologyFaces=new TopologyEligibilityAnalyzer().deriveTopologicalFaces(configuration);
             continuationStageIndex=0;continuationStageIteration=0;continuationStable=0;continuationRampFactor=0;continuationRampCeiling=1;if(attempt==0)continuationHistory.clear();
-            if(request.continuation().strategy()==RealizationStrategy.MANUAL_RELAXATION){manualActiveForces.clear();manualActions.clear();manualRegressions.clear();manualExecutionState=ManualExecutionState.MANUAL_IDLE;reconfigureManualForces();}else configureContinuationStage();
+            if(request.continuation().strategy()==RealizationStrategy.MANUAL_RELAXATION){manualActiveForces.clear();strengthFactors=strengthFactors.withActiveSet(manualActiveForces);manualActions.clear();manualRegressions.clear();manualExecutionState=ManualExecutionState.MANUAL_IDLE;reconfigureManualForces();}else configureContinuationStage();
         }
         initializationStep=0;initializationRevision++;
         initializationFailure=null;
@@ -367,11 +396,13 @@ public final class IncrementalSession {
 
     private void reconfigureManualForces(){
         if(request.continuation().strategy()!=RealizationStrategy.MANUAL_RELAXATION)return;
-        elastic.setSpringStrength(manualActiveForces.contains(ManualConstraint.EDGE_LENGTH)?request.relaxationSettings().springStrength():0);
+        double edgeBase=manualActiveForces.contains(ManualConstraint.EDGE_LENGTH)?request.relaxationSettings().springStrength():0;
+        elastic.setSpringStrengthWithFactor(edgeBase,strengthFactors.factor(ManualConstraint.EDGE_LENGTH));
         ThreeDExperimentConditions original=request.threeDConditions();
         ThreeDExperimentConditions modes=new ThreeDExperimentConditions(manualActiveForces.contains(ManualConstraint.FACE_PLANARITY)?FacePlanarityMode.REQUIRE_PLANAR_FACES:FacePlanarityMode.MEASURE_ONLY,manualActiveForces.contains(ManualConstraint.FACE_ANGLE)?FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE:FaceAngleConditionMode.MEASURE_ONLY,manualActiveForces.contains(ManualConstraint.DIHEDRAL_ANGLE)?DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES:DihedralConditionMode.MEASURE_ONLY,original.vertexRadii(),original.faceCentroidRadii(),original.edgeMidpointRadii(),manualActiveForces.contains(ManualConstraint.FACE_DISTANCE)?FacePlaneRadiusMode.REQUIRE_EQUAL_FACE_PLANE_RADII:FacePlaneRadiusMode.MEASURE_ONLY,original.normalCenterAlignment(),original.centerDefinition(),original.facePlanarityTolerance(),original.absoluteRegularityTolerance(),original.relativeRegularityTolerance());
-        elastic.configureThreeDimensionalProfile(topologyFaces,modes,request.threeDConstraintStrengths(),manualActiveForces.contains(ManualConstraint.FACE_ORIENTATION),request.continuation().outwardOrientationStrength(),manualActiveForces.contains(ManualConstraint.SELF_INTERSECTION_AVOIDANCE),.05,.6,manualActiveForces.contains(ManualConstraint.CONVEXITY),request.threeDConditions().facePlanarityTolerance(),.6);
+        elastic.configureThreeDimensionalProfile(topologyFaces,modes,request.threeDConstraintStrengths(),manualActiveForces.contains(ManualConstraint.FACE_ORIENTATION),request.continuation().outwardOrientationStrength(),manualActiveForces.contains(ManualConstraint.SELF_INTERSECTION_AVOIDANCE),.05,.6,manualActiveForces.contains(ManualConstraint.CONVEXITY),request.threeDConditions().facePlanarityTolerance(),.6,runtimeFactorMap());
         elastic.setSpatialConstraintsEnabled(false);
+        elastic.resetConstraintStability();
         elastic.refreshDiagnostics();
     }
     private ContinuationConstraint manualContinuationConstraint(ManualConstraint constraint){return switch(constraint){case EDGE_LENGTH->ContinuationConstraint.EDGE_EQUALITY;case FACE_ORIENTATION->ContinuationConstraint.OUTWARD_ORIENTATION;case FACE_PLANARITY->ContinuationConstraint.FACE_PLANARITY;case FACE_ANGLE->ContinuationConstraint.FACE_ANGLE_EQUALITY;case FACE_DISTANCE->ContinuationConstraint.FACE_PLANE_RADII;default->null;};}

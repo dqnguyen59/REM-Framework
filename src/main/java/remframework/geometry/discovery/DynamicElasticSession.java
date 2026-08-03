@@ -50,6 +50,7 @@ public final class DynamicElasticSession {
     private StagnationStatus stagnationStatus=StagnationStatus.progressing();
     private boolean spatialConstraintsEnabled=true;
     private ConstraintObjectiveDiagnostics objectiveDiagnostics;
+    private double runtimeSpringStrength;
 
     public DynamicElasticSession(FixedDegreeGraph graph, DynamicElasticSettings settings) {
         this(graph, settings, initialize(graph.nodeCount(), settings));
@@ -125,6 +126,7 @@ public final class DynamicElasticSession {
         stagnationDetector.reset();stagnationStatus=StagnationStatus.progressing();
         enforceAnchors();
         objectiveDiagnostics=calculateObjectiveDiagnostics(calculateMetrics());
+        runtimeSpringStrength=settings.springStrength();
     }
 
     public Map<Integer, Vector3d> calculateForces() {
@@ -138,7 +140,7 @@ public final class DynamicElasticSession {
             Vector3d direction = distance > EPSILON ? displacement.div(distance)
                     : deterministicDirection(edge.undirectedKey());
             double error = distance - settings.targetDistance();
-            Vector3d force = direction.mul(settings.springStrength() * error);
+            Vector3d force = direction.mul(runtimeSpringStrength * error);
             forces.get(first.id()).add(force);
             forces.get(second.id()).sub(force);
         }
@@ -162,11 +164,15 @@ public final class DynamicElasticSession {
     }
     public void configureThreeDimensionalProfile(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,boolean outwardOrientation,double orientationStrength){configureThreeDimensionalProfile(faces,modes,strengths,outwardOrientation,orientationStrength,false,.05,.6);}
     public void configureThreeDimensionalProfile(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,boolean outwardOrientation,double orientationStrength,boolean avoidance,double clearanceFactor,double avoidanceStrength){configureThreeDimensionalProfile(faces,modes,strengths,outwardOrientation,orientationStrength,avoidance,clearanceFactor,avoidanceStrength,false,0,0);}
-    public void configureThreeDimensionalProfile(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,boolean outwardOrientation,double orientationStrength,boolean avoidance,double clearanceFactor,double avoidanceStrength,boolean convexity,double convexityTolerance,double convexityStrength){threeDModes=modes;threeDConstraints=new DynamicElasticThreeDConstraints(faces,modes,strengths,settings.targetDistance(),outwardOrientation,orientationStrength,avoidance,clearanceFactor,avoidanceStrength,convexity,convexityTolerance,convexityStrength);}
+    public void configureThreeDimensionalProfile(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,boolean outwardOrientation,double orientationStrength,boolean avoidance,double clearanceFactor,double avoidanceStrength,boolean convexity,double convexityTolerance,double convexityStrength){configureThreeDimensionalProfile(faces,modes,strengths,outwardOrientation,orientationStrength,avoidance,clearanceFactor,avoidanceStrength,convexity,convexityTolerance,convexityStrength,Map.of());}
+    public void configureThreeDimensionalProfile(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,boolean outwardOrientation,double orientationStrength,boolean avoidance,double clearanceFactor,double avoidanceStrength,boolean convexity,double convexityTolerance,double convexityStrength,Map<String,Double> runtimeFactors){threeDModes=modes;threeDConstraints=new DynamicElasticThreeDConstraints(faces,modes,strengths,settings.targetDistance(),outwardOrientation,orientationStrength,avoidance,clearanceFactor,avoidanceStrength,convexity,convexityTolerance,convexityStrength,runtimeFactors);}
     public void continueRelaxation(){if(state==DynamicElasticState.EQUILIBRIUM_REACHED){state=DynamicElasticState.NEAR_EQUILIBRIUM;stableIterations=0;stagnationDetector.reset();stagnationStatus=StagnationStatus.progressing();}}
     public void setSpatialConstraintsEnabled(boolean enabled){spatialConstraintsEnabled=enabled;}
     /** Runtime manual-relaxation control; coordinates and velocities are intentionally preserved. */
-    public void setSpringStrength(double strength){settings=settings.withSpringStrength(Math.max(0,strength));}
+    public void setSpringStrength(double strength){double value=Math.max(0,strength);settings=settings.withSpringStrength(value);runtimeSpringStrength=value;}
+    /** Sets the accepted base spring strength and its experimental runtime multiplier separately. */
+    public void setSpringStrengthWithFactor(double baseStrength,double factor){if(!Double.isFinite(baseStrength)||baseStrength<0)throw new IllegalArgumentException("Base spring strength must be finite and non-negative.");if(!Double.isFinite(factor)||factor<0)throw new IllegalArgumentException("Runtime strength factor must be finite and non-negative.");settings=settings.withSpringStrength(baseStrength);runtimeSpringStrength=baseStrength*factor;}
+    public void resetConstraintStability(){stableIterations=0;elasticStableIterations=0;stagnationDetector.reset();stagnationStatus=StagnationStatus.progressing();if(state==DynamicElasticState.EQUILIBRIUM_REACHED)state=DynamicElasticState.NEAR_EQUILIBRIUM;}
     public void refreshDiagnostics(){objectiveDiagnostics=calculateObjectiveDiagnostics(calculateMetrics());}
     public void replaceVelocities(List<Vector3d> velocities){if(velocities.size()!=nodes.size())throw new IllegalArgumentException("Velocity count does not match nodes.");for(int i=0;i<nodes.size();i++)nodes.get(i).velocity().set(velocities.get(i));}
     public void resetVelocities(){nodes.forEach(node->node.velocity().zero());}
