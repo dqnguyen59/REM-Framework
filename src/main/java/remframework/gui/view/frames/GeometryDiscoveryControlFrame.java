@@ -553,20 +553,30 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         heading(c,"Manual Relaxation");label(c,"Experimental direct force control. Coordinates are preserved when force sets change; no continuation schedule is used.");label(c,"Initialization: RANDOM_SPHERICAL; spectral guidance OFF.");
         IncrementalSession session=controller.phasedWorkflow().incrementalSession();
         if(session==null){label(c,"Start Geometry Test to initialize with all corrective forces OFF.");return;}
-        label(c,"Execution: "+session.manualExecutionState()+"    Active relaxation forces: "+session.manualActiveForces().size());label(c,"Velocity policy: "+session.manualVelocityPolicy());
-        Nuklear.nk_layout_row_dynamic(c,rowHeightEdit,4);
-        if(Nuklear.nk_button_label(c,"All Relaxation Off"))session.turnAllManualRelaxationOff();
-        if(Nuklear.nk_button_label(c,"All Relaxation On"))session.turnAllManualRelaxationOn();
-        if(Nuklear.nk_button_label(c,"Reset Relaxation Toggles"))session.turnAllManualRelaxationOff();
-        if(Nuklear.nk_button_label(c,"Save Geometry Snapshot"))session.saveManualSnapshot("manual-"+session.manualSnapshots().size());
+        label(c,"Execution: "+manualExecutionLabel(session.manualExecutionState())+"    Active relaxation forces: "+session.manualActiveForces().size());label(c,"Velocity policy: "+manualVelocityLabel(session.manualVelocityPolicy()));
+        Nuklear.nk_layout_row_dynamic(c,rowHeightEdit,5);
+        if(Nuklear.nk_button_label(c,"Turn All Off"))session.turnAllManualRelaxationOff();
+        if(Nuklear.nk_button_label(c,"Turn All On"))session.turnAllManualRelaxationOn();
+        if(Nuklear.nk_button_label(c,"Reset Toggles"))session.turnAllManualRelaxationOff();
+        if(Nuklear.nk_button_label(c,"Save Force Set"))try{new ManualRelaxationStore().saveForceSet(manualForceSetFile(),session.manualActiveForces());}catch(Exception failure){nuklearModel.showErrorDialog("Manual force set",failure.getMessage());}
+        if(Nuklear.nk_button_label(c,"Load Force Set"))try{session.setManualActiveForceSet(new ManualRelaxationStore().loadForceSet(manualForceSetFile()));}catch(Exception failure){nuklearModel.showErrorDialog("Manual force set",failure.getMessage());}
         Nuklear.nk_layout_row_dynamic(c,rowHeightEdit,4);
         String policy=nk_label_combo_options(c,stack,"Velocity policy",new String[]{"Reset on force change","Preserve velocity"},session.manualVelocityPolicy()==ManualVelocityPolicy.PRESERVE_VELOCITY_ON_FORCE_CHANGE?"Preserve velocity":"Reset on force change",.45,.55);session.setManualVelocityPolicy("Preserve velocity".equals(policy)?ManualVelocityPolicy.PRESERVE_VELOCITY_ON_FORCE_CHANGE:ManualVelocityPolicy.RESET_VELOCITY_ON_FORCE_CHANGE);
-        if(Nuklear.nk_button_label(c,"Restore Latest Snapshot")&&!session.manualSnapshots().isEmpty())session.restoreManualSnapshot(session.manualSnapshots().getLast().snapshotId(),false);
-        if(Nuklear.nk_button_label(c,"Delete Latest Snapshot")&&!session.manualSnapshots().isEmpty())session.deleteManualSnapshot(session.manualSnapshots().getLast().snapshotId());
+        if(Nuklear.nk_button_label(c,"Save Snapshot"))session.saveManualSnapshot("manual-"+session.manualSnapshots().size());
+        if(Nuklear.nk_button_label(c,"Restore Snapshot")&&!session.manualSnapshots().isEmpty())session.restoreManualSnapshot(session.manualSnapshots().getLast().snapshotId(),false);
+        if(Nuklear.nk_button_label(c,"Delete Snapshot")&&!session.manualSnapshots().isEmpty())session.deleteManualSnapshot(session.manualSnapshots().getLast().snapshotId());
         if(Nuklear.nk_button_label(c,"Evaluate Final Qualification"))session.evaluateManualFinalQualification();
+        heading(c,"Experiment Recording");label(c,session.manualRecording()?"Recording ACTIVE":"Recording stopped");Nuklear.nk_layout_row_dynamic(c,rowHeightEdit,4);
+        if(Nuklear.nk_button_label(c,"Start Recording"))session.startManualRecording("manual-recording");
+        if(Nuklear.nk_button_label(c,"Stop Recording"))session.stopManualRecording("manual-recording");
+        if(Nuklear.nk_button_label(c,"Replay Recording")&&session.lastManualRecording()!=null)session.replayManualRecording(session.lastManualRecording());
+        if(Nuklear.nk_button_label(c,"Save as Candidate Strategy")&&session.lastManualRecording()!=null)session.saveAsCandidateStrategy("MANUAL_DISCOVERED_STRATEGY_CANDIDATE");
         heading(c,"Shape Construction");manualRows(c,session,List.of(ManualConstraint.EDGE_LENGTH,ManualConstraint.FACE_ORIENTATION,ManualConstraint.CONVEXITY,ManualConstraint.FACE_PLANARITY,ManualConstraint.FACE_ANGLE,ManualConstraint.FACE_DISTANCE,ManualConstraint.NORMAL_ALIGNMENT,ManualConstraint.FACE_AREA));heading(c,"Regularity");manualRows(c,session,List.of(ManualConstraint.DIHEDRAL_ANGLE,ManualConstraint.VERTEX_DISTANCE,ManualConstraint.FACE_CENTER_DISTANCE,ManualConstraint.EDGE_CENTER_DISTANCE));
     }
-    private void manualRows(NkContext c,IncrementalSession session,List<ManualConstraint> constraints){for(ManualConstraint constraint:constraints){ManualConstraintState state=session.manualConstraintStates().stream().filter(s->s.constraint()==constraint).findFirst().orElseThrow();Nuklear.nk_layout_row_begin(c,Nuklear.NK_DYNAMIC,rowHeightEdit+2,2);Nuklear.nk_layout_row_push(c,.72f);Nuklear.nk_label(c,constraint.displayName()+"  "+(state.relaxationActive()?"ACTIVE":"INACTIVE"),Nuklear.NK_TEXT_LEFT);Nuklear.nk_layout_row_push(c,.28f);if(Nuklear.nk_button_label(c,state.relaxationActive()?"OFF":"ON"))session.setManualRelaxation(constraint,!state.relaxationActive());Nuklear.nk_layout_row_end(c);label(c,String.format(java.util.Locale.ROOT,"Error %.7g   Tolerance %.7g   Ratio %.7g   %s",state.rawError(),state.tolerance(),state.normalizedRatio(),state.status()));}}
+    private void manualRows(NkContext c,IncrementalSession session,List<ManualConstraint> constraints){for(ManualConstraint constraint:constraints){ManualConstraintState state=session.manualConstraintStates().stream().filter(s->s.constraint()==constraint).findFirst().orElseThrow();Nuklear.nk_layout_row_begin(c,Nuklear.NK_DYNAMIC,rowHeightEdit+2,3);Nuklear.nk_layout_row_push(c,.58f);Nuklear.nk_label(c,constraint.displayName(),Nuklear.NK_TEXT_LEFT);Nuklear.nk_layout_row_push(c,.20f);if(Nuklear.nk_button_label(c,state.relaxationActive()?"ON":"OFF"))session.setManualRelaxation(constraint,!state.relaxationActive());Nuklear.nk_layout_row_push(c,.22f);if(Nuklear.nk_button_label(c,state.requiredForFinalQualification()?"REQ YES":"REQ NO"))session.setManualFinalRequirement(constraint,!state.requiredForFinalQualification());Nuklear.nk_layout_row_end(c);label(c,String.format(java.util.Locale.ROOT,"Error %.7g   Tolerance %.7g   Ratio %.7g   %s",state.rawError(),state.tolerance(),state.normalizedRatio(),state.status()));}}
+    private static String manualExecutionLabel(ManualExecutionState state){return switch(state){case MANUAL_IDLE->"Idle";case MANUAL_RELAXING->"Relaxing";case MANUAL_PAUSED->"Paused";};}
+    private static String manualVelocityLabel(ManualVelocityPolicy policy){return policy==ManualVelocityPolicy.PRESERVE_VELOCITY_ON_FORCE_CHANGE?"Preserve velocity":"Reset on force change";}
+    private Path manualForceSetFile(){return Path.of("lattice/geometry-discovery/manual-force-set.properties");}
 
     private void phase2ResultSections(NkContext c, TestResult result) {
         heading(c, "Eligibility");
