@@ -2,77 +2,72 @@ package remframework.geometry.discovery.realization.session;
 
 import java.util.ArrayList;
 import java.util.List;
-import remframework.geometry.discovery.ThreeDConstraintDiagnostics;
+import java.util.Map;
 import remframework.geometry.discovery.ClosedBoundaryResult;
 import remframework.geometry.discovery.VolumeResult;
 import remframework.geometry.discovery.experiment.*;
-import remframework.geometry.discovery.measurement.regularity.Statistics;
-import remframework.geometry.discovery.measurement.regularity.ThreeDRegularityMetrics;
 
-/** Builds immutable diagnostics exclusively from a published scientific snapshot. */
+/** Builds immutable presentation rows from one published Stage 2 measurement snapshot. */
 public final class Stage2ConstraintPresentation {
-    private Stage2ConstraintPresentation(){}
-    public static ConstraintPresentationSummary from(IncrementalSession session){
-        TestRequest r=session.request();ThreeDExperimentConditions c=r.threeDConditions();
-        ThreeDConstraintStrengths s=r.threeDConstraintStrengths();
-        ThreeDConstraintDiagnostics d=session.threeDConstraintDiagnostics();
-        TestResult result=session.result();
-        ThreeDRegularityMetrics finalMetrics=result==null?null:result.threeDRegularity();
-        List<ConstraintPresentation> rows=new ArrayList<>();
-        rows.add(continuous("edge-equality","Connected-edge equality",ConstraintPresentationMode.REQUIRED_ACTIVE_TARGET,
-                session.maximumEdgeError(),r.edgeTolerance(),"length","length",
-                r.relaxationSettings().springStrength(),"Maximum absolute deviation from target connected-edge length."));
-        rows.add(continuousMode("face-planarity","Face planarity",c.facePlanarity()==FacePlanarityMode.MEASURE_ONLY,
-                d.maximumFacePlanarityError(),c.facePlanarityTolerance(),"length","maximum vertex-to-face-plane deviation",s.facePlanarity()));
-        rows.add(continuousMode("face-angle-equality","Face-angle equality",c.faceAngles(),
-                d.maximumFaceAngleDeviation(),c.absoluteRegularityTolerance(),"radians","maximum absolute deviation from topology-derived target angle",s.faceAngles()));
-        rows.add(continuousMode("dihedral-equality","Dihedral-angle equality",c.dihedrals(),
-                d.maximumDihedralDeviation(),c.absoluteRegularityTolerance(),"radians","maximum absolute deviation from common interior dihedral angle",s.dihedrals()));
-        rows.add(postMode("vertex-radius-equality","Vertex-radius equality",c.vertexRadii(),deviation(finalMetrics==null?null:finalMetrics.vertexRadii()),c.absoluteRegularityTolerance(),"length","maximum absolute deviation from mean vertex radius"));
-        rows.add(postMode("face-centroid-radius-equality","Face-centroid-radius equality",c.faceCentroidRadii(),deviation(finalMetrics==null?null:finalMetrics.faceCenterRadii()),c.absoluteRegularityTolerance(),"length","maximum absolute deviation from mean face-centroid radius"));
-        rows.add(postMode("edge-midpoint-radius-equality","Edge-midpoint-radius equality",c.edgeMidpointRadii(),deviation(finalMetrics==null?null:finalMetrics.edgeMidpointRadii()),c.absoluteRegularityTolerance(),"length","maximum absolute deviation from mean edge-midpoint radius"));
-        rows.add(continuousMode("face-plane-radius-equality","Face-plane-radius equality",c.facePlaneRadii(),
-                d.maximumFacePlaneRadiusDeviation(),c.absoluteRegularityTolerance(),"length","maximum absolute deviation from mean face-plane radius",s.facePlaneRadii()));
-        rows.add(postMode("normal-center-alignment","Normal-center alignment",c.normalCenterAlignment(),finalMetrics==null?Double.NaN:finalMetrics.maximumNormalAlignmentDeviationFromOne(),c.absoluteRegularityTolerance(),"dimensionless","maximum |1 - normal/center alignment|"));
-        rows.add(measured("equal-face-area","Equal face area",finalMetrics==null?Double.NaN:faceAreaDeviation(finalMetrics),"area","maximum absolute deviation from the mean face area"));
-        ClosedBoundaryResult boundary=result==null?null:result.boundary();VolumeResult volume=result==null?null:result.volume();
-        rows.add(discrete("closed-manifold","Closed-manifold boundary",true,boundary==null?ConstraintPresentationStatus.UNDETERMINED:boundary.closed()&&boundary.manifold()&&boundary.connected()?ConstraintPresentationStatus.PASS:ConstraintPresentationStatus.FAIL,"Requires a connected, closed manifold geometric boundary."));
-        rows.add(discrete("coherent-orientation","Coherent orientation",true,boundary==null?ConstraintPresentationStatus.UNDETERMINED:boundary.orientable()?ConstraintPresentationStatus.PASS:ConstraintPresentationStatus.FAIL,"Requires coherent orientation of the final boundary."));
-        rows.add(discrete("self-intersection","Self-intersection",true,boundary==null?ConstraintPresentationStatus.UNDETERMINED:!boundary.selfIntersecting()?ConstraintPresentationStatus.PASS:ConstraintPresentationStatus.FAIL,"PASS means the final intersection count is zero."));
-        rows.add(discrete("positive-volume","Positive volume",true,volume==null||!volume.available()?ConstraintPresentationStatus.UNDETERMINED:volume.absoluteVolume()>r.degeneracyTolerance()?ConstraintPresentationStatus.PASS:ConstraintPresentationStatus.FAIL,"Measured absolute volume must exceed degeneracy threshold "+r.degeneracyTolerance()+"."));
+    private Stage2ConstraintPresentation() { }
+
+    public static ConstraintPresentationSummary from(IncrementalSession session) {
+        TestRequest r=session.request(); ThreeDExperimentConditions c=r.threeDConditions();
+        Map<String,ConstraintMeasurement> m=session.constraintMeasurements(); List<ConstraintPresentation> rows=new ArrayList<>();
+        rows.add(row("edge-equality",ConstraintPresentationMode.REQUIRED_ACTIVE_TARGET,true,true,m.get("edge-equality"),r.edgeTolerance(),"length","Maximum absolute deviation from target connected-edge length",r.relaxationSettings().springStrength()));
+        rows.add(row("outward-face-orientation",ConstraintPresentationMode.MEASURE_ONLY,true,false,m.get("outward-face-orientation"),null,"","Coherent orientation of the ordered face cycles",null));
+        rows.add(modeRow("face-planarity",c.facePlanarity(),m.get("face-planarity"),c.facePlanarityTolerance(),"length","Maximum vertex-to-face-plane deviation",r.threeDConstraintStrengths().facePlanarity()));
+        rows.add(modeRow("face-angle-equality",c.faceAngles(),m.get("face-angle-equality"),c.absoluteRegularityTolerance(),"radians","Maximum absolute deviation from the topology-derived target angle",r.threeDConstraintStrengths().faceAngles()));
+        rows.add(modeRow("dihedral-equality",c.dihedrals(),m.get("dihedral-equality"),c.absoluteRegularityTolerance(),"radians","Maximum absolute deviation from the mean interior dihedral angle",r.threeDConstraintStrengths().dihedrals()));
+        rows.add(regularityRow("vertex-radius-equality",c.vertexRadii(),m.get("vertex-radius-equality"),c.absoluteRegularityTolerance(),"length","Maximum absolute deviation from the mean vertex distance"));
+        rows.add(regularityRow("face-centroid-radius-equality",c.faceCentroidRadii(),m.get("face-centroid-radius-equality"),c.absoluteRegularityTolerance(),"length","Center-to-face-centroid distance; maximum deviation from its mean"));
+        rows.add(regularityRow("edge-midpoint-radius-equality",c.edgeMidpointRadii(),m.get("edge-midpoint-radius-equality"),c.absoluteRegularityTolerance(),"length","Center-to-edge-midpoint distance; maximum deviation from its mean"));
+        rows.add(modeRow("face-plane-radius-equality",c.facePlaneRadii(),m.get("face-plane-radius-equality"),c.absoluteRegularityTolerance(),"length","Center-to-face-plane distance",r.threeDConstraintStrengths().facePlaneRadii()));
+        rows.add(regularityRow("normal-center-alignment",c.normalCenterAlignment(),m.get("normal-center-alignment"),c.absoluteRegularityTolerance(),"dimensionless","Maximum absolute value of 1 minus normal/radial alignment"));
+        rows.add(row("equal-face-area",ConstraintPresentationMode.MEASURE_ONLY,true,false,m.get("equal-face-area"),null,"area","Maximum absolute deviation from the mean face area",null));
+        ClosedBoundaryResult boundary=session.result()==null?null:session.result().boundary(); VolumeResult volume=session.result()==null?null:session.result().volume();
+        rows.add(discrete("closed-manifold",true,boundary==null?ConstraintPresentationStatus.UNDETERMINED:boundary.closed()&&boundary.manifold()&&boundary.connected()?ConstraintPresentationStatus.PASS:ConstraintPresentationStatus.FAIL,"Requires a connected, closed manifold geometric boundary."));
+        rows.add(discrete("coherent-orientation",true,boundary==null?ConstraintPresentationStatus.UNDETERMINED:boundary.orientable()?ConstraintPresentationStatus.PASS:ConstraintPresentationStatus.FAIL,"Requires coherent orientation of the final boundary."));
+        rows.add(discrete("self-intersection",true,boundary==null?ConstraintPresentationStatus.UNDETERMINED:!boundary.selfIntersecting()?ConstraintPresentationStatus.PASS:ConstraintPresentationStatus.FAIL,"PASS means the final intersection count is zero."));
+        rows.add(discrete("positive-volume",true,volume==null||!volume.available()?ConstraintPresentationStatus.UNDETERMINED:volume.absoluteVolume()>r.degeneracyTolerance()?ConstraintPresentationStatus.PASS:ConstraintPresentationStatus.FAIL,"Measured absolute volume must exceed the degeneracy threshold."));
         return ConstraintPresentationSummary.of(rows);
     }
-    private static ConstraintPresentation continuousMode(String id,String name,Object mode,double error,double tolerance,String units,String metric,double strength){
-        String text=String.valueOf(mode);boolean none=text.equals("NONE");boolean measured=text.equals("MEASURE_ONLY");
-        if(none)return absent(id,name,metric);
-        if(measured)return measured(id,name,error,units,metric);
-        return continuous(id,name,ConstraintPresentationMode.REQUIRED_ACTIVE_TARGET,error,tolerance,units,units,strength,metric);
+
+    private static ConstraintPresentation modeRow(String id,Object mode,ConstraintMeasurement measurement,double tolerance,String unit,String formula,double strength) {
+        boolean none=String.valueOf(mode).equals("NONE"); boolean measured=String.valueOf(mode).equals("MEASURE_ONLY");
+        return row(id,none?ConstraintPresentationMode.NONE:measured?ConstraintPresentationMode.MEASURE_ONLY:ConstraintPresentationMode.REQUIRED_ACTIVE_TARGET,
+                !none,!none&&!measured,measurement,tolerance,unit,formula,measured?null:strength);
     }
-    private static ConstraintPresentation postMode(String id,String name,RegularityMode mode,double error,double tolerance,String units,String metric){
-        if(mode==RegularityMode.NONE)return absent(id,name,metric);
-        if(mode==RegularityMode.MEASURE_ONLY)return measured(id,name,error,units,metric);
-        return continuous(id,name,ConstraintPresentationMode.REQUIRED_POST_QUALIFICATION,error,tolerance,units,units,null,metric+"; this requirement has no corrective solver force.");
+    private static ConstraintPresentation regularityRow(String id,RegularityMode mode,ConstraintMeasurement measurement,double tolerance,String unit,String formula) {
+        boolean none=mode==RegularityMode.NONE, measured=mode==RegularityMode.MEASURE_ONLY;
+        return row(id,none?ConstraintPresentationMode.NONE:measured?ConstraintPresentationMode.MEASURE_ONLY:ConstraintPresentationMode.REQUIRED_POST_QUALIFICATION,
+                !none,!none&&!measured,measurement,tolerance,unit,formula,null);
     }
-    private static ConstraintPresentation continuous(String id,String name,ConstraintPresentationMode mode,double error,double tolerance,String errorUnits,String toleranceUnits,Double strength,String metric){
-        NormalizedErrorRatio ratio=NormalizedErrorRatio.evaluate(error,tolerance,false);
-        return new ConstraintPresentation(id,name,mode,true,true,mode==ConstraintPresentationMode.REQUIRED_ACTIVE_TARGET,error,errorUnits,metric,tolerance,toleranceUnits,ratio,strength,ratio.status(),metric+" "+ratio.explanation());
+    private static ConstraintPresentation row(String id,ConstraintPresentationMode mode,boolean applicable,boolean required,
+            ConstraintMeasurement source,Double tolerance,String unit,String formula,Double strength) {
+        ConstraintMeasurement measurement=source==null?ConstraintMeasurement.unavailable(id,MeasurementState.NUMERICALLY_INVALID,
+                "MISSING_MEASUREMENT","The immutable measurement snapshot did not contain this constraint.",unit,0,0,List.of(),0):source;
+        if(!applicable) measurement=ConstraintMeasurement.unavailable(id,MeasurementState.NOT_REQUESTED,"NOT_REQUESTED",
+                "This measurement is not requested by the active profile.",unit,0,0,List.of(),measurement.coordinateRevision());
+        if(tolerance!=null) measurement=measurement.withTolerance(tolerance);
+        double raw=measurement.rawValue()==null?Double.NaN:measurement.rawValue();double tol=measurement.tolerance()==null?Double.NaN:measurement.tolerance();
+        NormalizedErrorRatio ratio=measurement.rawValue()!=null&&tolerance!=null?NormalizedErrorRatio.evaluate(raw,tolerance,false):null;
+        ConstraintPresentationStatus status=status(measurement,ratio);
+        boolean continuous=measurement.rawValue()!=null&&ratio!=null;
+        return new ConstraintPresentation(id,id,mode,applicable,required,mode==ConstraintPresentationMode.REQUIRED_ACTIVE_TARGET,
+                raw,unit,formula,tol,unit,continuous?ratio:null,strength,status,measurement.reasonText(),measurement);
     }
-    private static ConstraintPresentation measured(String id,String name,double error,String units,String metric){
-        return new ConstraintPresentation(id,name,ConstraintPresentationMode.MEASURE_ONLY,true,false,false,error,units,metric,Double.NaN,"not used",null,null,ConstraintPresentationStatus.MEASURED,metric+"; measured only and contributes no corrective force.");
+    private static ConstraintPresentation discrete(String id,boolean required,ConstraintPresentationStatus status,String explanation) {
+        ConstraintMeasurement m=new ConstraintMeasurement(id,MeasurementState.MEASURED,null,null,null,"","DISCRETE",explanation,List.of(),1,0,0,status==ConstraintPresentationStatus.PASS?"PASS":"FAIL");
+        return new ConstraintPresentation(id,id,ConstraintPresentationMode.REQUIRED_POST_QUALIFICATION,true,required,false,Double.NaN,"",id,Double.NaN,"",null,null,status,explanation,m);
     }
-    private static ConstraintPresentation absent(String id,String name,String metric){
-        return new ConstraintPresentation(id,name,ConstraintPresentationMode.NONE,false,false,false,Double.NaN,"",metric,Double.NaN,"",null,null,ConstraintPresentationStatus.NOT_APPLICABLE,metric+"; mode NONE excludes it from solver and qualification.");
-    }
-    private static ConstraintPresentation discrete(String id,String name,boolean required,ConstraintPresentationStatus status,String explanation){
-        return new ConstraintPresentation(id,name,required?ConstraintPresentationMode.REQUIRED_POST_QUALIFICATION:ConstraintPresentationMode.MEASURE_ONLY,true,required,false,Double.NaN,"",name,Double.NaN,"",null,null,status,explanation);
-    }
-    private static double deviation(Statistics values){
-        if(values==null||values.values().isEmpty()||!Double.isFinite(values.mean()))return Double.NaN;
-        return values.values().stream().mapToDouble(value->Math.abs(value-values.mean())).max().orElse(Double.NaN);
-    }
-    private static double faceAreaDeviation(ThreeDRegularityMetrics metrics){
-        if(metrics.faces().isEmpty())return Double.NaN;
-        double mean=metrics.faces().stream().mapToDouble(face->face.area()).average().orElse(Double.NaN);
-        return metrics.faces().stream().mapToDouble(face->Math.abs(face.area()-mean)).max().orElse(Double.NaN);
+    private static ConstraintPresentationStatus status(ConstraintMeasurement m,NormalizedErrorRatio ratio) {
+        if(m.state()==MeasurementState.NOT_REQUESTED)return ConstraintPresentationStatus.NOT_APPLICABLE;
+        if(m.state()==MeasurementState.NUMERICALLY_INVALID||m.state()==MeasurementState.NUMERICALLY_INVALID_LEGACY_VALUE)return ConstraintPresentationStatus.NUMERICALLY_INVALID;
+        if(m.qualitativeState().equals("COHERENT_OUTWARD"))return ConstraintPresentationStatus.PASS;
+        if(m.qualitativeState().equals("COHERENT_INWARD")||m.qualitativeState().equals("INCOHERENT"))return ConstraintPresentationStatus.FAIL;
+        if(ratio!=null)return ratio.status();
+        if(m.state()==MeasurementState.MEASURED||m.state()==MeasurementState.PARTIAL_MEASUREMENT)return ConstraintPresentationStatus.MEASURED;
+        return ConstraintPresentationStatus.UNDETERMINED;
     }
 }

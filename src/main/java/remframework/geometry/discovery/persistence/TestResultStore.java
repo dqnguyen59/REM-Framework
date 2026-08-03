@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
 
 /** Small, human-readable result summary store kept separate from topology TOML. */
 public final class TestResultStore {
@@ -139,6 +140,21 @@ public final class TestResultStore {
             }
         }
         if(result.optimizationComparison()!=null)for(var entry:result.optimizationComparison().changes().entrySet())text+="optimization_change_"+entry.getKey()+" = ["+entry.getValue().baseline()+", "+entry.getValue().optimized()+", "+entry.getValue().absoluteChange()+", "+entry.getValue().relativeChange()+"]\n";
+        text += "constraint_measurement_count = " + result.constraintMeasurements().size() + "\n";
+        for (int i=0;i<result.constraintMeasurements().size();i++) {
+            ConstraintMeasurement m=result.constraintMeasurements().get(i);
+            text += "constraint_measurement_"+i+"_id = \""+escape(m.constraintId())+"\"\n"
+                    +"constraint_measurement_"+i+"_state = \""+m.state()+"\"\n"
+                    +"constraint_measurement_"+i+"_raw = "+(m.rawValue()==null?"null":m.rawValue())+"\n"
+                    +"constraint_measurement_"+i+"_tolerance = "+(m.tolerance()==null?"null":m.tolerance())+"\n"
+                    +"constraint_measurement_"+i+"_unit = \""+escape(m.unit())+"\"\n"
+                    +"constraint_measurement_"+i+"_reason_code = \""+escape(m.reasonCode())+"\"\n"
+                    +"constraint_measurement_"+i+"_reason = \""+escape(m.reasonText())+"\"\n"
+                    +"constraint_measurement_"+i+"_qualitative_state = \""+escape(m.qualitativeState())+"\"\n"
+                    +"constraint_measurement_"+i+"_samples = "+m.sampleCount()+"\n"
+                    +"constraint_measurement_"+i+"_invalid_samples = "+m.invalidSampleCount()+"\n"
+                    +"constraint_measurement_"+i+"_coordinate_revision = "+m.coordinateRevision()+"\n";
+        }
         Files.writeString(file, text, StandardCharsets.UTF_8);
         return file;
     }
@@ -156,12 +172,24 @@ public final class TestResultStore {
             coordinates.add(new org.joml.Vector3d(Double.parseDouble(parts[0].trim()),
                     Double.parseDouble(parts[1].trim()), Double.parseDouble(parts[2].trim())));
         }
+        java.util.List<ConstraintMeasurement> measurements=new java.util.ArrayList<>();
+        int measurementCount=Integer.parseInt(values.getOrDefault("constraint_measurement_count","0"));
+        for(int i=0;i<measurementCount;i++){
+            String id=unquote(values.get("constraint_measurement_"+i+"_id"));
+            MeasurementState state=MeasurementState.valueOf(unquote(values.get("constraint_measurement_"+i+"_state")));
+            String rawText=values.get("constraint_measurement_"+i+"_raw"),toleranceText=values.get("constraint_measurement_"+i+"_tolerance");
+            Double raw="null".equals(rawText)||rawText==null?null:Double.parseDouble(rawText),tol="null".equals(toleranceText)||toleranceText==null?null:Double.parseDouble(toleranceText);
+            measurements.add(new ConstraintMeasurement(id,state,raw,tol,null,unquote(values.get("constraint_measurement_"+i+"_unit")),
+                    unquote(values.get("constraint_measurement_"+i+"_reason_code")),unquote(values.get("constraint_measurement_"+i+"_reason")),List.of(),
+                    Integer.parseInt(values.getOrDefault("constraint_measurement_"+i+"_samples","0")),Integer.parseInt(values.getOrDefault("constraint_measurement_"+i+"_invalid_samples","0")),Long.parseLong(values.getOrDefault("constraint_measurement_"+i+"_coordinate_revision","0")),unquote(values.getOrDefault("constraint_measurement_"+i+"_qualitative_state","\"\""))));
+        }
+        if(measurementCount==0&&values.values().stream().anyMatch(v->v.equals("NaN")))measurements.add(ConstraintMeasurement.legacy("legacy-measurement",Double.NaN,null,"",0));
         return new StoredResult(new ConfigurationId(unquote(values.get("configuration_id"))),
                 GeometryConfigurationStatusCode.valueOf(unquote(values.get("status"))),
                 unquote(values.get("explanation")), Boolean.parseBoolean(values.get("realization_found")),
                 Boolean.parseBoolean(values.get("unique_faces")), Boolean.parseBoolean(values.get("closed_boundary")),
                 Boolean.parseBoolean(values.get("area_available")), Boolean.parseBoolean(values.get("volume_available")),
-                Instant.parse(unquote(values.get("saved_at"))), coordinates);
+                Instant.parse(unquote(values.get("saved_at"))), coordinates,measurements);
     }
 
     private String unquote(String value) { return value != null && value.startsWith("\"") ? value.substring(1, value.length() - 1) : value; }

@@ -29,9 +29,15 @@ public record StoredResult(ConfigurationId configurationId,
         GeometryConfigurationStatusCode status, String explanation,
         boolean realizationFound, boolean uniqueFaces, boolean closedBoundary,
         boolean areaAvailable, boolean volumeAvailable, Instant savedAt,
-        List<Vector3d> finalCoordinates) {
+        List<Vector3d> finalCoordinates,List<ConstraintMeasurement> constraintMeasurements) {
     public StoredResult {
         finalCoordinates = finalCoordinates == null ? List.of()
                 : finalCoordinates.stream().map(Vector3d::new).toList();
+        constraintMeasurements=constraintMeasurements==null?List.of():List.copyOf(constraintMeasurements);
+    }
+    public StoredResult(ConfigurationId configurationId,GeometryConfigurationStatusCode status,String explanation,
+            boolean realizationFound,boolean uniqueFaces,boolean closedBoundary,boolean areaAvailable,
+            boolean volumeAvailable,Instant savedAt,List<Vector3d> finalCoordinates){
+        this(configurationId,status,explanation,realizationFound,uniqueFaces,closedBoundary,areaAvailable,volumeAvailable,savedAt,finalCoordinates,List.of());
     }
 }
