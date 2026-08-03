@@ -21,6 +21,7 @@ package remframework.gui.view;
 import lombok.Getter;
 import lombok.Setter;
 import org.lwjgl.glfw.GLFW;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.nuklear.*;
 import org.lwjgl.opengl.*;
 import org.lwjgl.stb.*;
@@ -188,6 +189,13 @@ public class NuklearView {
             MemoryUtil.memFree(bitmap);
         }
 
+        // Font callbacks are invoked from inside native nk_convert.  Do not push a
+        // MemoryStack from that callback: nested native callbacks can retain the
+        // callback frame until conversion completes and exhaust the thread stack.
+        FloatBuffer glyphX = BufferUtils.createFloatBuffer(1);
+        FloatBuffer glyphY = BufferUtils.createFloatBuffer(1);
+        IntBuffer glyphAdvance = BufferUtils.createIntBuffer(1);
+        STBTTAlignedQuad glyphQuad = STBTTAlignedQuad.malloc();
         font
                 .width((handle, h, text, len) -> {
                     float text_width = 0;
@@ -222,26 +230,16 @@ public class NuklearView {
                 })
                 .height(fontSize)
                 .query((handle, font_height, glyph, codepoint, next_codepoint) -> {
-                    try (MemoryStack stack = MemoryStack.stackPush()) {
-                        FloatBuffer x = stack.floats(0.0f);
-                        FloatBuffer y = stack.floats(0.0f);
-
-                        STBTTAlignedQuad q       = STBTTAlignedQuad.malloc(stack);
-                        IntBuffer        advance = stack.mallocInt(1);
-
-                        STBTruetype.stbtt_GetPackedQuad(cdata, BITMAP_W, BITMAP_H, codepoint - 32, x, y, q,
-                                                        false);
-                        STBTruetype.stbtt_GetCodepointHMetrics(fontInfo, codepoint, advance, null);
-
+                        glyphX.put(0, 0.0f); glyphY.put(0, 0.0f);
+                        STBTruetype.stbtt_GetPackedQuad(cdata, BITMAP_W, BITMAP_H, codepoint - 32, glyphX, glyphY, glyphQuad, false);
+                        STBTruetype.stbtt_GetCodepointHMetrics(fontInfo, codepoint, glyphAdvance, null);
                         NkUserFontGlyph ufg = NkUserFontGlyph.create(glyph);
-
-                        ufg.width(q.x1() - q.x0());
-                        ufg.height(q.y1() - q.y0());
-                        ufg.offset().set(q.x0(), q.y0() + (fontSize + descent));
-                        ufg.xadvance(advance.get(0) * scale);
-                        ufg.uv(0).set(q.s0(), q.t0());
-                        ufg.uv(1).set(q.s1(), q.t1());
-                    }
+                        ufg.width(glyphQuad.x1() - glyphQuad.x0());
+                        ufg.height(glyphQuad.y1() - glyphQuad.y0());
+                        ufg.offset().set(glyphQuad.x0(), glyphQuad.y0() + (fontSize + descent));
+                        ufg.xadvance(glyphAdvance.get(0) * scale);
+                        ufg.uv(0).set(glyphQuad.s0(), glyphQuad.t0());
+                        ufg.uv(1).set(glyphQuad.s1(), glyphQuad.t1());
                 })
                 .texture(it -> it.id(fontTexID));
     }
