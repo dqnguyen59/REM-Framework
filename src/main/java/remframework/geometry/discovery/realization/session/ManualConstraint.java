@@ -9,7 +9,8 @@ public enum ManualConstraint {
     FACE_ANGLE("Face Angle", Set.of()), FACE_DISTANCE("Face Distance", Set.of()),
     NORMAL_ALIGNMENT("Normal Alignment", Set.of()), FACE_AREA("Face Area", Set.of()),
     DIHEDRAL_ANGLE("Dihedral Angle", Set.of()), VERTEX_DISTANCE("Vertex Distance", Set.of()),
-    FACE_CENTER_DISTANCE("Face-Center Distance", Set.of()), EDGE_CENTER_DISTANCE("Edge-Center Distance", Set.of());
+    FACE_CENTER_DISTANCE("Face-Center Distance", Set.of()), EDGE_CENTER_DISTANCE("Edge-Center Distance", Set.of()),
+    SELF_INTERSECTION_AVOIDANCE("Self-Intersection Avoidance", Set.of());
     private final String displayName;private final Set<String> groups;
     ManualConstraint(String displayName,Set<String> groups){this.displayName=displayName;this.groups=groups;}
     public String displayName(){return displayName;}
