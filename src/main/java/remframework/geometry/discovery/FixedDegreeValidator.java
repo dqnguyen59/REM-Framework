@@ -16,8 +16,8 @@ import java.util.List;
 public final class FixedDegreeValidator {
     public FixedDegreeValidation validate(int nodeCount, int degree) {
         List<String> errors = new ArrayList<>();
-        if (degree != 2 && degree != 3)
-            errors.add("Dynamic Elastic Discovery currently supports exact neighbor counts 2 and 3.");
+        if (degree < 2)
+            errors.add("Dynamic Elastic Discovery requires at least two neighbors per node.");
         if (nodeCount < degree + 1)
             errors.add("Node count must be at least K + 1.");
         if (degree >= nodeCount)
@@ -26,8 +26,8 @@ public final class FixedDegreeValidator {
             errors.add("N * K must be even for an undirected regular graph.");
         if (degree == 2 && nodeCount < 3)
             errors.add("K = 2 requires at least 3 nodes.");
-        if (degree == 3 && (nodeCount < 4 || (nodeCount & 1) != 0))
-            errors.add("K = 3 requires an even node count of at least 4.");
+        if (degree >= 3 && nodeCount < 4)
+            errors.add("K >= 3 requires at least 4 nodes.");
         return new FixedDegreeValidation(errors.isEmpty(), errors,
                 nearest(nodeCount, degree, -1), nearest(nodeCount, degree, 1));
     }
@@ -43,6 +43,6 @@ public final class FixedDegreeValidator {
         return null;
     }
     private boolean basicValid(int n, int k) {
-        return (k == 2 && n >= 3) || (k == 3 && n >= 4 && (n & 1) == 0);
+        return k >= 2 && n >= k + 1 && n >= (k >= 3 ? 4 : 3) && ((long)n * k) % 2 == 0;
     }
 }
