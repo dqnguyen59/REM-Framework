@@ -449,6 +449,13 @@ public final class DynamicElasticSession {
         stableIterations = 0;
         state = DynamicElasticState.RELAXING;
     }
+    /** Updates a node only while the session remains in its pre-iteration initialization phase. */
+    public void setInitializationNodeState(int id,Vector3d position){
+        if(iteration!=0||state!=DynamicElasticState.INITIALIZING)
+            throw new IllegalStateException("Initialization coordinates cannot change after Dynamic Elastic starts.");
+        DynamicElasticNode node=byId.get(id);if(node==null)throw new IllegalArgumentException("Unknown node ID "+id);
+        node.position().set(position);node.velocity().zero();
+    }
     public FixedDegreeGraph graph() { return graph; }
     public DynamicElasticSettings settings() { return settings; }
     public DynamicElasticState state() { return state; }

@@ -95,6 +95,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private int phase2SearchLimit = 100_000;
     private RealizationStrategy phase2RealizationStrategy=RealizationStrategy.SIMULTANEOUS;
     private TopologyInitialization phase2Initialization=TopologyInitialization.SPECTRAL_EMBEDDING;
+    private SpectralPresentationMode phase2SpectralPresentation=SpectralPresentationMode.INSTANT;
+    private double phase2AnimationDuration=2,phase2GuidanceStrength=.08;
+    private int phase2AnimationFps=60,phase2GuidanceIterations=240,phase2HandoverIterations=120;
     private int phase2ContinuationRampIterations=200,phase2ContinuationStageLimit=10_000;
     private PlanarityRealizationMode phase2PlanarityMode=PlanarityRealizationMode.STRICT_2D_COORDINATES;
     private AngleConditionMode phase2AngleMode=AngleConditionMode.REQUIRE_EQUAL_ANGLES;
@@ -366,6 +369,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             phase2RealizationStrategy="Sequential continuation".equals(nk_label_combo_options(c,stack,"Realization strategy",new String[]{"Simultaneous","Sequential continuation"},phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION?"Sequential continuation":"Simultaneous",.45,.55))?RealizationStrategy.SEQUENTIAL_CONTINUATION:RealizationStrategy.SIMULTANEOUS;
             phase2Initialization="Topology spectral embedding".equals(nk_label_combo_options(c,stack,"Initialization",new String[]{"Topology spectral embedding","Random spherical"},phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING?"Topology spectral embedding":"Random spherical",.45,.55))?TopologyInitialization.SPECTRAL_EMBEDDING:TopologyInitialization.RANDOM_SPHERICAL;
             label(c,phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING?"Uses only the immutable adjacency eigenspace and target edge length; no reference geometry is consulted.":"Uses the existing deterministic seeded random spherical initializer.");
+            if(phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING){String behavior=nk_label_combo_options(c,stack,"Spectral behavior",new String[]{"Instant","Animated Display","Guided Relaxation"},switch(phase2SpectralPresentation){case INSTANT->"Instant";case ANIMATED_DISPLAY->"Animated Display";case GUIDED_RELAXATION->"Guided Relaxation";},.45,.55);phase2SpectralPresentation=switch(behavior){case "Animated Display"->SpectralPresentationMode.ANIMATED_DISPLAY;case "Guided Relaxation"->SpectralPresentationMode.GUIDED_RELAXATION;default->SpectralPresentationMode.INSTANT;};}
             label(c,phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION?"Introduces required constraint classes one stage at a time. Previously satisfied constraints remain active.":"All required realization targets begin at their configured full strengths.");
             if(phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION){phase2ContinuationRampIterations=dynamicInteger(c,"Continuation ramp iterations",phase2ContinuationRampIterations,1,100_000);phase2ContinuationStageLimit=dynamicInteger(c,"Maximum iterations per stage",phase2ContinuationStageLimit,1,1_000_000);label(c,"Ramp gradually increases a new constraint's restoring influence; it does not change acceptance tolerance.");label(c,"Schedule: CLOSED_UNIFORM_FACE_SEQUENTIAL - edges, outward orientation, required face constraints, joint qualification.");}
             String benchmark=nk_label_combo_options(c,stack,"Benchmark preset",
@@ -383,6 +387,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             phase2NormalAlignment=regularityMode(c,stack,"Normal-center alignment",phase2NormalAlignment);
             nk_label_combo_options(c,stack,"Center definition",new String[]{"Vertex centroid"},"Vertex centroid",.45,.55);phase2CenterDefinition=GeometryCenterDefinition.VERTEX_CENTROID;
         }
+        if(phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING&&phase2SpectralPresentation==SpectralPresentationMode.ANIMATED_DISPLAY){phase2AnimationDuration=dynamicProperty(c,"Animation duration (seconds)",phase2AnimationDuration,.1,60,.1);phase2AnimationFps=dynamicInteger(c,"Animation frames per second",phase2AnimationFps,1,240);label(c,"DISPLAY ANIMATION: scientific solver remains stopped and iteration stays zero until the preview completes or is skipped.");}
+        if(phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING&&phase2SpectralPresentation==SpectralPresentationMode.GUIDED_RELAXATION){phase2GuidanceIterations=dynamicInteger(c,"Guidance iterations",phase2GuidanceIterations,1,100_000);phase2HandoverIterations=dynamicInteger(c,"Handover iterations",phase2HandoverIterations,1,100_000);phase2GuidanceStrength=dynamicProperty(c,"Spectral guidance strength",phase2GuidanceStrength,1e-6,1,.001);label(c,"SCIENTIFIC RELAXATION: temporary topology-spectral guidance decays to exactly zero before final qualification.");}
         if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA){
             heading(c,"Constraint acceptance and influence");
             label(c,"Tolerance changes acceptance; restoring strength changes solver influence. Neither guarantees convergence.");
@@ -451,7 +457,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                                     .withParameterDerivation(controller.phasedWorkflow().generation().orElseThrow().request())
                                     .withContinuation((phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION
                                             ?ContinuationSettings.sequential(new ThreeDExperimentConditions(phase2FacePlanarity,phase2FaceAngles,phase2Dihedrals,phase2VertexRadii,phase2FaceCentroidRadii,phase2EdgeMidpointRadii,phase2FacePlaneRadii,phase2NormalAlignment,phase2CenterDefinition,phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance),100,phase2ContinuationStageLimit,phase2ContinuationRampIterations)
-                                            :ContinuationSettings.simultaneous()).withInitialization(phase2Initialization)));
+                                            :ContinuationSettings.simultaneous()).withInitialization(phase2Initialization)
+                                            .withSpectralInitialization(new SpectralInitializationSettings(phase2SpectralPresentation,phase2AnimationDuration,phase2AnimationFps,phase2GuidanceIterations,phase2HandoverIterations,phase2GuidanceStrength))));
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry Test", exception.getMessage()); }
         });
@@ -467,6 +474,10 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                 "The selected session is not active.", controller.phasedWorkflow()::stopSelectedGeometryTest);
         primaryButton(c, "Reset Same Seed", true, "", () -> { controller.phasedWorkflow().resetSelectedGeometryTest(); phase2LatestResult = null; });
         primaryButton(c, "Reset New Seed", controller.phasedWorkflow().incrementalSession()!=null, "Start a geometry test first.", () -> { controller.phasedWorkflow().resetSelectedGeometryTestNewSeed();phase2Seed++;phase2LatestResult=null; });
+        IncrementalSession initializationSession=controller.phasedWorkflow().incrementalSession();
+        boolean displayAnimation=initializationSession!=null&&initializationSession.initializationSnapshot().phase()==InitializationPhase.DISPLAY_ANIMATION;
+        primaryButton(c,"Skip Animation",displayAnimation,"Display animation is not active.",controller.phasedWorkflow()::skipInitializationAnimation);
+        primaryButton(c,"Restart Animation",initializationSession!=null&&initializationSession.initializationSnapshot().mode()==SpectralPresentationMode.ANIMATED_DISPLAY,"Animated Display is not selected.",controller.phasedWorkflow()::restartInitializationAnimation);
         primaryButton(c, "Save Geometry-Test Result", result != null, "Run Geometry Test before saving a result.", () -> {
             try { controller.phasedWorkflow().saveLatestGeometryTest(Path.of("lattice/geometry-discovery/configuration-sets"), selected.id()); }
             catch (Exception exception) { nuklearModel.showErrorDialog("Geometry-test result", exception.getMessage()); }
@@ -617,6 +628,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         controller.viewState().setShowGeometryCenter(showCenter);controller.viewState().setShowCenterLabel(showCenterLabel);controller.viewState().setShowCenterToFaceLines(showCenterFaceLines);controller.viewState().setShowCenterToVertexLines(showCenterVertexLines);
         heading(c,"Viewport Selection");selectVertices=nk_check_label(c,"Select vertices",selectVertices,.65,.35);selectEdges=nk_check_label(c,"Select edges",selectEdges,.65,.35);selectFaces=nk_check_label(c,"Select faces",selectFaces,.65,.35);selectCenter=nk_check_label(c,"Select center",selectCenter,.65,.35);controller.viewState().setSelectionFilters(new SelectionFilters(selectVertices,selectEdges,selectFaces,selectCenter));
         showEdgeLengths=nk_check_label(c,"Show Edge Lengths",showEdgeLengths,.65,.35);controller.viewState().setShowEdgeLengths(showEdgeLengths);
+        try(MemoryStack stack=MemoryStack.stackPush()){String trail=nk_label_combo_options(c,stack,"Initialization trails",new String[]{"Off","Short","Full initialization path"},switch(controller.viewState().initializationTrailMode()){case OFF->"Off";case SHORT->"Short";case FULL->"Full initialization path";},.45,.55);controller.viewState().setInitializationTrailMode(switch(trail){case "Short"->InitializationTrailMode.SHORT;case "Full initialization path"->InitializationTrailMode.FULL;default->InitializationTrailMode.OFF;});}
         showSelfIntersections = nk_check_label(c, "Detected self-intersections", showSelfIntersections, .65, .35);
         showViewportDiagnostics = nk_check_label(c, "Viewport diagnostics", showViewportDiagnostics, .65, .35);
         showWorldAxes = nk_check_label(c, "World axes", showWorldAxes, .65, .35);

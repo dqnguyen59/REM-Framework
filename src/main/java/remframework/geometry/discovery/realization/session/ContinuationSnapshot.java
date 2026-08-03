@@ -7,8 +7,10 @@ public record ContinuationSnapshot(RealizationStrategy strategy,String scheduleI
         int stageIndex,int stageCount,String stageId,String stageName,ContinuationStageState state,
         int stageIteration,int totalIteration,double rampFactor,int stableIterations,int requiredStableIterations,
         String worstConstraint,double worstRatio,List<ContinuationConstraint> active,
-        List<ContinuationConstraint> retained,List<ContinuationStageOutcome> history,String failureReason) {
+        List<ContinuationConstraint> retained,List<ContinuationStageOutcome> history,String failureReason,
+        SpectralInitializationSettings spectralInitialization,InitializationSnapshot initializationState) {
     public ContinuationSnapshot { active=List.copyOf(active);retained=List.copyOf(retained);history=List.copyOf(history); }
     public static ContinuationSnapshot simultaneous(){return simultaneous(remframework.geometry.discovery.TopologyInitialization.RANDOM_SPHERICAL);}
-    public static ContinuationSnapshot simultaneous(remframework.geometry.discovery.TopologyInitialization initialization){return new ContinuationSnapshot(RealizationStrategy.SIMULTANEOUS,"NONE",0,initialization,0,0,"SIMULTANEOUS","Simultaneous",ContinuationStageState.RELAXING,0,0,1,0,0,"unavailable",Double.NaN,List.of(),List.of(),List.of(),"");}
+    public static ContinuationSnapshot simultaneous(remframework.geometry.discovery.TopologyInitialization initialization){return simultaneous(initialization,SpectralInitializationSettings.instant(),InitializationSnapshot.instant());}
+    public static ContinuationSnapshot simultaneous(remframework.geometry.discovery.TopologyInitialization initialization,SpectralInitializationSettings settings,InitializationSnapshot state){return new ContinuationSnapshot(RealizationStrategy.SIMULTANEOUS,"NONE",0,initialization,0,0,"SIMULTANEOUS","Simultaneous",ContinuationStageState.RELAXING,0,0,1,0,0,"unavailable",Double.NaN,List.of(),List.of(),List.of(),"",settings,state);}
 }

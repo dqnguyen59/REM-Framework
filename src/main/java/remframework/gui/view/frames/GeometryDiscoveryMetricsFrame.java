@@ -192,6 +192,10 @@ public final class GeometryDiscoveryMetricsFrame extends AbstractFrame {
         IncrementalSession session = controller.phasedWorkflow().incrementalSession();
         if (session == null && result == null) { label(c, "Equal-edge realization: Not tested"); return; }
         if (session != null) {
+            InitializationSnapshot initialization=session.initializationSnapshot();
+            heading(c,"Initialization Contribution");label(c,"Mode="+initialization.mode()+" phase="+initialization.phase()+" progress="+initialization.progress());
+            InitializationContribution contribution=session.initializationContribution();label(c,"Random Start -> Spectral Target: maximum="+contribution.randomToSpectral().maximum()+" mean="+contribution.randomToSpectral().mean()+" RMS="+contribution.randomToSpectral().rms());label(c,"Scientific Start -> Final/Current: maximum="+contribution.scientificStartToFinal().maximum()+" mean="+contribution.scientificStartToFinal().mean()+" RMS="+contribution.scientificStartToFinal().rms());
+            for(InitializationMeasurement measurement:contribution.snapshots())label(c,measurement.snapshot()+": edge="+measurement.edgeError()+" planarity="+measurement.facePlanarityError()+" angle="+measurement.faceAngleError()+" face distance="+measurement.faceDistanceError()+" convexity violations="+measurement.convexityViolations()+" self-intersections="+(measurement.selfIntersections()<0?"not evaluated":measurement.selfIntersections())+" qualification="+measurement.qualificationState());
             label(c, "Execution state: " + session.executionState());
             label(c, "Scientific state: " + session.scientificState());
             label(c, "Iteration: " + session.iteration() + "    Convergence iteration: " + session.convergenceIteration());

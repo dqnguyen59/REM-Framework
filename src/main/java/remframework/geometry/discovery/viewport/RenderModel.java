@@ -31,14 +31,17 @@ import java.util.concurrent.atomic.AtomicLong;
 public record RenderModel(String configurationId,
         GeometryDiscoveryModel model, DisplayTransform transform,
         boolean topologyPreview, long revision, List<CanonicalNodeLabel> nodeLabels,
-        List<DerivedFace> derivedFaces, List<Vector3d> scientificCoordinates) {
+        List<DerivedFace> derivedFaces, List<Vector3d> scientificCoordinates,
+        List<List<Vector3d>> initializationTrails) {
     private static final ConcurrentHashMap<String,List<DerivedFace>> FACE_CACHE=new ConcurrentHashMap<>();
     private static final AtomicLong FACE_COMPLEX_BUILDS=new AtomicLong();
     public RenderModel {
         nodeLabels = List.copyOf(nodeLabels);
         derivedFaces=List.copyOf(derivedFaces);
         scientificCoordinates=scientificCoordinates.stream().map(Vector3d::new).toList();
+        initializationTrails=initializationTrails.stream().map(path->path.stream().map(Vector3d::new).toList()).toList();
     }
+    public RenderModel(String configurationId,GeometryDiscoveryModel model,DisplayTransform transform,boolean topologyPreview,long revision,List<CanonicalNodeLabel> nodeLabels,List<DerivedFace> derivedFaces,List<Vector3d> scientificCoordinates){this(configurationId,model,transform,topologyPreview,revision,nodeLabels,derivedFaces,scientificCoordinates,List.of());}
     public static RenderModel topologyPreview(Configuration configuration,
             long revision) {
         List<Vector3d> coordinates = new ArrayList<>();
@@ -48,16 +51,17 @@ public record RenderModel(String configurationId,
             double z = count > 4 ? .35 * Math.sin(angle * 2) : 0;
             coordinates.add(new Vector3d(Math.cos(angle), Math.sin(angle), z));
         }
-        return of(configuration, coordinates, true, revision);
+        return of(configuration, coordinates, true, revision,List.of());
     }
 
     public static RenderModel realization(Configuration configuration,
             List<Vector3d> coordinates, long revision) {
-        return of(configuration, coordinates, false, revision);
+        return of(configuration, coordinates, false, revision,List.of());
     }
+    public static RenderModel realization(Configuration configuration,List<Vector3d> coordinates,long revision,List<List<Vector3d>> trails){return of(configuration,coordinates,false,revision,trails);}
 
     private static RenderModel of(Configuration configuration,
-            List<Vector3d> scientificCoordinates, boolean preview, long revision) {
+            List<Vector3d> scientificCoordinates, boolean preview, long revision,List<List<Vector3d>> trails) {
         long started=System.nanoTime();
         try {
         DisplayTransform transform =
@@ -75,7 +79,7 @@ public record RenderModel(String configurationId,
                 new CanonicalNodeLabel(node.id(), Integer.toString(node.id()), node.position())).toList();
         String faceKey=configuration.id()+":"+configuration.provenance().getOrDefault("combinatorialFaces","");List<DerivedFace> faces=FACE_CACHE.computeIfAbsent(faceKey,ignored->{FACE_COMPLEX_BUILDS.incrementAndGet();return new remframework.geometry.discovery.eligibility.TopologyEligibilityAnalyzer().deriveTopologicalFaces(configuration).stream().map(cycle->new DerivedFace("face-"+cycle,cycle,true,true,0)).toList();});
         return new RenderModel(configuration.id().toString(), model,
-                transform, preview, revision, labels,faces,scientificCoordinates);
+                transform, preview, revision, labels,faces,scientificCoordinates,trails);
         }finally{DevelopmentTimingDiagnostics.record("viewport.topology-preview-construction",System.nanoTime()-started);}
     }
     public static long faceComplexBuildCount(){return FACE_COMPLEX_BUILDS.get();}

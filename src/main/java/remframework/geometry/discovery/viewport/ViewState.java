@@ -48,6 +48,7 @@ public final class ViewState {
     private Integer selectedNodeId;
     private long fitInvocationCount;
     private int workflowPanelWidth=GeometryDiscoveryWorkspaceLayout.PREFERRED_LEFT_WIDTH;
+    private InitializationTrailMode initializationTrailMode=InitializationTrailMode.OFF;
 
     public ViewFit fitToView(GeometryDiscoveryModel model) {
         fitInvocationCount++;
@@ -131,6 +132,7 @@ public final class ViewState {
     public boolean showNormalAlignmentState(){return showNormalAlignmentState;} public void setShowNormalAlignmentState(boolean v){showNormalAlignmentState=v;}
     public double normalDisplayLength(){return normalDisplayLength;} public void setNormalDisplayLength(double v){normalDisplayLength=Math.max(.01,v);}
     public boolean showEdgeLengths(){return showEdgeLengths;} public void setShowEdgeLengths(boolean v){showEdgeLengths=v;}
+    public InitializationTrailMode initializationTrailMode(){return initializationTrailMode;} public void setInitializationTrailMode(InitializationTrailMode value){initializationTrailMode=value==null?InitializationTrailMode.OFF:value;}
     public boolean showSelectedEdgeLengthOnly(){return showSelectedEdgeLengthOnly;} public void setShowSelectedEdgeLengthOnly(boolean v){showSelectedEdgeLengthOnly=v;}
     public boolean showEdgeError(){return showEdgeError;} public void setShowEdgeError(boolean v){showEdgeError=v;}
     public boolean showEdgeTarget(){return showEdgeTarget;} public void setShowEdgeTarget(boolean v){showEdgeTarget=v;}

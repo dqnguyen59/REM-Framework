@@ -110,8 +110,10 @@ public final class OpenGlRenderer implements AutoCloseable {
 
     public void render(RenderModel renderModel,GeometryDiscoverySettings settings,ViewState view,int width,int height){
         long started=System.nanoTime();try{render(renderModel.model(),settings,view,width,height);
-        if(view.showDerivedFaces())renderFaces(renderModel,view,width,height);renderInspection(renderModel,view,width,height);}finally{DevelopmentTimingDiagnostics.record("viewport.opengl-render",System.nanoTime()-started);}
+        if(view.showDerivedFaces())renderFaces(renderModel,view,width,height);renderInitializationTrails(renderModel,view,width,height);renderInspection(renderModel,view,width,height);}finally{DevelopmentTimingDiagnostics.record("viewport.opengl-render",System.nanoTime()-started);}
     }
+
+    private void renderInitializationTrails(RenderModel model,ViewState view,int width,int height){if(view.initializationTrailMode()==InitializationTrailMode.OFF||model.initializationTrails().isEmpty())return;List<Float> lines=new ArrayList<>();for(List<Vector3d> path:model.initializationTrails()){int start=view.initializationTrailMode()==InitializationTrailMode.SHORT?Math.max(1,path.size()-12):1;for(int i=start;i<path.size();i++)line(lines,model.transform().display(path.get(i-1)),model.transform().display(path.get(i)),.75f,.35f,1f);}ViewFit fit=view.calculateFit(model.model());Matrix4f matrix=viewProjection(view,fit,width,height);GL20.glUseProgram(program);GL20.glUniform1f(opacityLocation,1f);GL20.glUniformMatrix4fv(matrixLocation,false,matrix.get(new float[16]));GL30.glBindVertexArray(vao);draw(lines,GL11.GL_LINES,1.5f);GL30.glBindVertexArray(0);GL20.glUseProgram(0);}
 
     private void renderFaces(RenderModel renderModel,ViewState view,int width,int height){
         GeometryDiscoveryModel model=renderModel.model();Map<Integer,DiscoveryNode> byId=new HashMap<>();model.nodes().forEach(n->byId.put(n.id(),n));
