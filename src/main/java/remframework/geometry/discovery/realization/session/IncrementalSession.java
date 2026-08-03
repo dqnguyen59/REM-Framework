@@ -32,6 +32,11 @@ import remframework.geometry.discovery.eligibility.*;
 import remframework.geometry.discovery.measurement.regularity.*;
 import remframework.geometry.discovery.reference.ReferenceTopologyRecognizer;
 import remframework.geometry.discovery.experiment.*;
+import java.time.Instant;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Bounded, render-friendly facade over the existing DynamicElasticSession.
@@ -72,6 +77,15 @@ public final class IncrementalSession {
     private int initializationRevision,initializationStep;
     private List<List<Vector3d>> initializationTrails=List.of();
     private volatile GeometryConfigurationStatus initializationFailure;
+    private final EnumSet<ManualConstraint> manualActiveForces=EnumSet.noneOf(ManualConstraint.class);
+    private final EnumMap<ManualConstraint,Boolean> manualRequirements=new EnumMap<>(ManualConstraint.class);
+    private final List<ManualAction> manualActions=new ArrayList<>();
+    private final List<GeometrySnapshot> manualSnapshots=new ArrayList<>();
+    private final EnumMap<ManualConstraint,ManualRegression> manualRegressions=new EnumMap<>(ManualConstraint.class);
+    private ManualVelocityPolicy manualVelocityPolicy=ManualVelocityPolicy.RESET_VELOCITY_ON_FORCE_CHANGE;
+    private ManualExecutionState manualExecutionState=ManualExecutionState.MANUAL_IDLE;
+    private int manualSnapshotRevision;
+    private long manualActionSequence;
 
     public IncrementalSession(Configuration configuration,
             TestRequest request) {
@@ -90,6 +104,10 @@ public final class IncrementalSession {
 
     public synchronized boolean step() {
         if (executionState == ExecutionState.STOPPED) return false;
+        if(request.continuation().strategy()==RealizationStrategy.MANUAL_RELAXATION){
+            if(manualExecutionState!=ManualExecutionState.MANUAL_RELAXING)return false;
+            executionState=ExecutionState.RUNNING;
+        }
         if (executionState == ExecutionState.IDLE) executionState = ExecutionState.RUNNING;
         try{if(advanceSpectralInitialization()){publishSnapshot();return true;}}catch(RuntimeException failure){failInitialization(failure);publishSnapshot();return false;}
         if (scientificState == ScientificState.INITIALIZED) scientificState = request.dimension()==GeometryEmbeddingDimension.THREE_D?ScientificState.RELAXING_CONSTRAINTS:ScientificState.RELAXING;
@@ -112,6 +130,7 @@ public final class IncrementalSession {
     }
 
     public synchronized void run() {
+        if(request.continuation().strategy()==RealizationStrategy.MANUAL_RELAXATION&&manualActiveForces.isEmpty()){manualExecutionState=ManualExecutionState.MANUAL_IDLE;executionState=ExecutionState.PAUSED;publishSnapshot();return;}
         resume();
         while (executionState == ExecutionState.RUNNING
                 && scientificState != ScientificState.CONVERGED
@@ -121,11 +140,16 @@ public final class IncrementalSession {
     }
 
     public synchronized void resume() {
+        if(request.continuation().strategy()==RealizationStrategy.MANUAL_RELAXATION){
+            if(manualActiveForces.isEmpty()){manualExecutionState=ManualExecutionState.MANUAL_IDLE;executionState=ExecutionState.PAUSED;return;}
+            manualExecutionState=ManualExecutionState.MANUAL_RELAXING;executionState=ExecutionState.RUNNING;return;
+        }
         if (scientificState != ScientificState.CONVERGED&&scientificState!=ScientificState.FAILED
                 &&scientificState!=ScientificState.SEARCH_LIMIT_REACHED) executionState = ExecutionState.RUNNING;
     }
 
     public void pause() {
+        if(request.continuation().strategy()==RealizationStrategy.MANUAL_RELAXATION){manualExecutionState=ManualExecutionState.MANUAL_PAUSED;executionState=ExecutionState.PAUSED;return;}
         if (executionState == ExecutionState.RUNNING) executionState = ExecutionState.PAUSED;
     }
 
@@ -145,6 +169,28 @@ public final class IncrementalSession {
         scientificState = ScientificState.INITIALIZED;
         totalIterationNanos=0;publishSnapshot();
     }
+
+    public ManualExecutionState manualExecutionState(){return manualExecutionState;}
+    public ManualVelocityPolicy manualVelocityPolicy(){return manualVelocityPolicy;}
+    public Set<ManualConstraint> manualActiveForces(){return Set.copyOf(manualActiveForces);}
+    public List<ManualAction> manualActions(){return List.copyOf(manualActions);}
+    public List<GeometrySnapshot> manualSnapshots(){return List.copyOf(manualSnapshots);}
+    public synchronized void deleteManualSnapshot(String id){manualSnapshots.removeIf(snapshot->snapshot.snapshotId().equals(id));}
+    public List<ManualRegression> manualRegressions(){return List.copyOf(manualRegressions.values());}
+    public List<ManualConstraintState> manualConstraintStates(){
+        ThreeDConstraintDiagnostics d=threeDConstraintDiagnostics();Map<ManualConstraint,Double> errors=new EnumMap<>(ManualConstraint.class);
+        errors.put(ManualConstraint.EDGE_LENGTH,maximumEdgeError());errors.put(ManualConstraint.FACE_PLANARITY,d.maximumFacePlanarityError());errors.put(ManualConstraint.FACE_ANGLE,d.maximumFaceAngleDeviation());errors.put(ManualConstraint.FACE_DISTANCE,d.maximumFacePlaneRadiusDeviation());errors.put(ManualConstraint.DIHEDRAL_ANGLE,d.maximumDihedralDeviation());
+        List<ManualConstraintState> result=new ArrayList<>();for(ManualConstraint c:ManualConstraint.values()){double raw=errors.getOrDefault(c,Double.NaN);double tolerance=switch(c){case EDGE_LENGTH->request.edgeTolerance();case FACE_PLANARITY->request.threeDConditions().facePlanarityTolerance();default->request.threeDConditions().absoluteRegularityTolerance();};boolean available=Double.isFinite(raw);double ratio=available?raw/tolerance:Double.NaN;boolean required=manualRequirements.getOrDefault(c,false);ManualConstraintState.ManualConstraintStatus status=!available?ManualConstraintState.ManualConstraintStatus.UNAVAILABLE:manualActiveForces.contains(c)?ManualConstraintState.ManualConstraintStatus.ACTIVE:ratio<=1?ManualConstraintState.ManualConstraintStatus.INACTIVE_PASS:ManualConstraintState.ManualConstraintStatus.INACTIVE_FAIL;Double strength=manualActiveForces.contains(c)?switch(c){case EDGE_LENGTH->request.relaxationSettings().springStrength();case FACE_PLANARITY->request.threeDConstraintStrengths().facePlanarity();case FACE_ANGLE->request.threeDConstraintStrengths().faceAngles();case FACE_DISTANCE->request.threeDConstraintStrengths().facePlaneRadii();default->null;}:null;result.add(new ManualConstraintState(c,manualActiveForces.contains(c),available,required,raw,tolerance,ratio,status,strength));}return List.copyOf(result);
+    }
+    public synchronized void setManualVelocityPolicy(ManualVelocityPolicy policy){manualVelocityPolicy=policy==null?ManualVelocityPolicy.RESET_VELOCITY_ON_FORCE_CHANGE:policy;}
+    public synchronized void setManualFinalRequirement(ManualConstraint constraint,boolean required){manualRequirements.put(constraint,required);}
+    public synchronized void setManualRelaxation(ManualConstraint constraint,boolean enabled){if(request.continuation().strategy()!=RealizationStrategy.MANUAL_RELAXATION)throw new IllegalStateException("Manual relaxation is not selected.");boolean old=manualActiveForces.contains(constraint);if(old==enabled)return;Map<ManualConstraint,Double> before=ratios();if(enabled)manualActiveForces.add(constraint);else manualActiveForces.remove(constraint);reconfigureManualForces();if(manualVelocityPolicy==ManualVelocityPolicy.RESET_VELOCITY_ON_FORCE_CHANGE)elastic.resetVelocities();if(manualActiveForces.isEmpty()){manualExecutionState=ManualExecutionState.MANUAL_IDLE;executionState=ExecutionState.PAUSED;}else{manualExecutionState=ManualExecutionState.MANUAL_RELAXING;executionState=ExecutionState.RUNNING;}manualActions.add(new ManualAction(++manualActionSequence,Instant.now(),iteration(),constraint,old,enabled,manualActiveForces,manualVelocityPolicy,realizedSeed(),manualSnapshotRevision,before,ratios()));manualRegressions.clear();for(var e:before.entrySet())manualRegressions.put(e.getKey(),new ManualRegression(e.getKey(),e.getValue(),ratios().getOrDefault(e.getKey(),Double.NaN),ratios().getOrDefault(e.getKey(),Double.NaN)-e.getValue(),"TRANSITION"));publishSnapshot();}
+    public synchronized void turnAllManualRelaxationOff(){for(ManualConstraint c:ManualConstraint.values())if(manualActiveForces.contains(c))setManualRelaxation(c,false);}
+    public synchronized void turnAllManualRelaxationOn(){for(ManualConstraint c:ManualConstraint.values())setManualRelaxation(c,true);}
+    public synchronized GeometrySnapshot saveManualSnapshot(String label){GeometrySnapshot snapshot=new GeometrySnapshot(UUID.randomUUID().toString(),label,currentCoordinates(),elastic.nodes().stream().map(n->new Vector3d(n.velocity())).toList(),manualActiveForces,manualConstraintStates(),iteration(),realizedSeed(),request.threeDConditions().centerDefinition().name(),finalResult!=null&&finalResult.status().code()==GeometryConfigurationStatusCode.VALID_CANDIDATE,++manualSnapshotRevision);manualSnapshots.add(snapshot);return snapshot;}
+    public synchronized void restoreManualSnapshot(String id,boolean restoreForces){GeometrySnapshot snapshot=manualSnapshots.stream().filter(s->s.snapshotId().equals(id)).findFirst().orElseThrow();elastic.replacePositions(snapshot.coordinates());elastic.replaceVelocities(snapshot.velocities());if(restoreForces){manualActiveForces.clear();manualActiveForces.addAll(snapshot.activeForceSet());reconfigureManualForces();}manualExecutionState=manualActiveForces.isEmpty()?ManualExecutionState.MANUAL_IDLE:ManualExecutionState.MANUAL_PAUSED;publishSnapshot();}
+    public synchronized boolean evaluateManualFinalQualification(){if(request.continuation().strategy()!=RealizationStrategy.MANUAL_RELAXATION)throw new IllegalStateException("Manual qualification requires MANUAL_RELAXATION.");finalResult=finalizeResult(configuration,request,elastic.resultForQualification()).withContinuation(continuationSnapshot);scientificState=finalResult.status().code()==GeometryConfigurationStatusCode.VALID_CANDIDATE?ScientificState.CONVERGED:ScientificState.QUALIFICATION_FAILED;return finalResult.status().code()==GeometryConfigurationStatusCode.VALID_CANDIDATE;}
+    private Map<ManualConstraint,Double> ratios(){EnumMap<ManualConstraint,Double> values=new EnumMap<>(ManualConstraint.class);for(ManualConstraintState s:manualConstraintStates())values.put(s.constraint(),s.normalizedRatio());return values;}
 
     public List<Vector3d> currentCoordinates() {
         return publishedCoordinates.stream().map(Vector3d::new).toList();
@@ -263,7 +309,7 @@ public final class IncrementalSession {
         }else{
             topologyFaces=new TopologyEligibilityAnalyzer().deriveTopologicalFaces(configuration);
             continuationStageIndex=0;continuationStageIteration=0;continuationStable=0;continuationRampFactor=0;continuationRampCeiling=1;if(attempt==0)continuationHistory.clear();
-            configureContinuationStage();
+            if(request.continuation().strategy()==RealizationStrategy.MANUAL_RELAXATION){manualActiveForces.clear();manualActions.clear();manualRegressions.clear();manualExecutionState=ManualExecutionState.MANUAL_IDLE;reconfigureManualForces();}else configureContinuationStage();
         }
         initializationStep=0;initializationRevision++;
         initializationFailure=null;
@@ -301,6 +347,16 @@ public final class IncrementalSession {
         elastic.setSpatialConstraintsEnabled(active.contains(ContinuationConstraint.JOINT_QUALIFICATION));
     }
 
+    private void reconfigureManualForces(){
+        if(request.continuation().strategy()!=RealizationStrategy.MANUAL_RELAXATION)return;
+        elastic.setSpringStrength(manualActiveForces.contains(ManualConstraint.EDGE_LENGTH)?request.relaxationSettings().springStrength():0);
+        ThreeDExperimentConditions original=request.threeDConditions();
+        ThreeDExperimentConditions modes=new ThreeDExperimentConditions(manualActiveForces.contains(ManualConstraint.FACE_PLANARITY)?original.facePlanarity():FacePlanarityMode.MEASURE_ONLY,manualActiveForces.contains(ManualConstraint.FACE_ANGLE)?original.faceAngles():FaceAngleConditionMode.MEASURE_ONLY,manualActiveForces.contains(ManualConstraint.DIHEDRAL_ANGLE)?original.dihedrals():DihedralConditionMode.MEASURE_ONLY,original.vertexRadii(),original.faceCentroidRadii(),original.edgeMidpointRadii(),manualActiveForces.contains(ManualConstraint.FACE_DISTANCE)?original.facePlaneRadii():FacePlaneRadiusMode.MEASURE_ONLY,original.normalCenterAlignment(),original.centerDefinition(),original.facePlanarityTolerance(),original.absoluteRegularityTolerance(),original.relativeRegularityTolerance());
+        elastic.configureThreeDimensionalProfile(topologyFaces,modes,request.threeDConstraintStrengths(),manualActiveForces.contains(ManualConstraint.FACE_ORIENTATION),request.continuation().outwardOrientationStrength());
+        elastic.setSpatialConstraintsEnabled(manualActiveForces.contains(ManualConstraint.CONVEXITY));
+    }
+    private ContinuationConstraint manualContinuationConstraint(ManualConstraint constraint){return switch(constraint){case EDGE_LENGTH->ContinuationConstraint.EDGE_EQUALITY;case FACE_ORIENTATION->ContinuationConstraint.OUTWARD_ORIENTATION;case FACE_PLANARITY->ContinuationConstraint.FACE_PLANARITY;case FACE_ANGLE->ContinuationConstraint.FACE_ANGLE_EQUALITY;case FACE_DISTANCE->ContinuationConstraint.FACE_PLANE_RADII;default->null;};}
+
     private void advanceContinuation(){ContinuationSchedule schedule=request.continuation().schedule();ContinuationStageDefinition stage=schedule.stages().get(continuationStageIndex);continuationStageIteration++;configureContinuationStage();orientationConvexity=new OrientationConvexityCalculator().calculate(topologyFaces,elastic.nodes().stream().map(n->new Vector3d(n.position())).toList(),request.threeDConditions().facePlanarityTolerance());Set<ContinuationConstraint> active=new LinkedHashSet<>(stage.retained());active.addAll(stage.introduced());ThreeDConstraintDiagnostics d=elastic.threeDConstraintDiagnostics();double worst=maximumEdgeErrorNow()/request.edgeTolerance();String worstName="Connected edge equality";if(active.contains(ContinuationConstraint.OUTWARD_ORIENTATION)){double ratio=orientationConvexity.outwardError()==0?0:Double.POSITIVE_INFINITY;if(ratio>worst){worst=ratio;worstName="Outward orientation";}}if(active.contains(ContinuationConstraint.FACE_PLANARITY)){double ratio=d.maximumFacePlanarityError()/request.threeDConditions().facePlanarityTolerance();if(ratio>worst){worst=ratio;worstName="Face planarity";}}if(active.contains(ContinuationConstraint.FACE_ANGLE_EQUALITY)){double ratio=d.maximumFaceAngleDeviation()/request.threeDConditions().absoluteRegularityTolerance();if(ratio>worst){worst=ratio;worstName="Face-angle equality";}}if(active.contains(ContinuationConstraint.FACE_PLANE_RADII)){double ratio=d.maximumFacePlaneRadiusDeviation()/request.threeDConditions().absoluteRegularityTolerance();if(ratio>worst){worst=ratio;worstName="Face-plane radii";}}boolean discrete=!active.contains(ContinuationConstraint.OUTWARD_ORIENTATION)||orientationConvexity.orientation()==OrientationState.COHERENT_AND_OUTWARD||orientationConvexity.orientation()==OrientationState.COHERENT_BUT_INWARD;boolean satisfied=continuationRampFactor>=1&&worst<=1&&discrete&&elastic.metrics().maximumNodeSpeed()<=request.relaxationSettings().maximumEquilibriumSpeed();continuationStable=satisfied?continuationStable+1:0;ContinuationStageState state=continuationRampFactor<1?ContinuationStageState.RAMPING:ContinuationStageState.RELAXING;String failure="";
         boolean retainedOrientationRegression=stage.retained().contains(ContinuationConstraint.OUTWARD_ORIENTATION)&&orientationConvexity.outwardError()>0;
         if(retainedOrientationRegression)continuationRampCeiling=Math.max(.05,continuationRampCeiling*.5);else if(continuationRampCeiling<1)continuationRampCeiling=Math.min(1,continuationRampCeiling+.002);
@@ -312,7 +368,7 @@ public final class IncrementalSession {
     }
     private double maximumEdgeErrorNow(){return elastic.metrics().edges().stream().mapToDouble(e->Math.abs(e.distance()-e.targetDistance())).max().orElse(0);}
 
-    private void publishSnapshot(){long started=System.nanoTime();if(!initializationSnapshot.displayPreview())publishedCoordinates=elastic.nodes().stream().map(node->new Vector3d(node.position())).toList();publishedMetrics=elastic.metrics();publishedMaximumEdgeError=publishedMetrics.edges().stream().mapToDouble(edge->Math.abs(edge.distance()-edge.targetDistance())).max().orElse(0);publishedThreeD=elastic.threeDConstraintDiagnostics();publishedObjectives=elastic.objectiveDiagnostics();publishedStagnation=elastic.stagnationStatus();publishedIteration=elastic.iteration();if(request.continuation().strategy()==RealizationStrategy.SIMULTANEOUS)continuationSnapshot=ContinuationSnapshot.simultaneous(request.continuation().initialization(),request.continuation().spectralInitialization(),initializationSnapshot);long publication=System.nanoTime()-started;DevelopmentTimingDiagnostics.record("stage2.snapshot-publication",publication);long count=Math.max(0,publishedIteration);double average=count==0?0:totalIterationNanos/1_000_000d/count;timing=new ScientificTimingSnapshot(timing.initializationNanos(),count,average,average==0?0:1000d/average,publication);}
+    private void publishSnapshot(){long started=System.nanoTime();if(!initializationSnapshot.displayPreview())publishedCoordinates=elastic.nodes().stream().map(node->new Vector3d(node.position())).toList();publishedMetrics=elastic.metrics();publishedMaximumEdgeError=publishedMetrics.edges().stream().mapToDouble(edge->Math.abs(edge.distance()-edge.targetDistance())).max().orElse(0);publishedThreeD=elastic.threeDConstraintDiagnostics();publishedObjectives=elastic.objectiveDiagnostics();publishedStagnation=elastic.stagnationStatus();publishedIteration=elastic.iteration();if(request.continuation().strategy()==RealizationStrategy.SIMULTANEOUS)continuationSnapshot=ContinuationSnapshot.simultaneous(request.continuation().initialization(),request.continuation().spectralInitialization(),initializationSnapshot);else if(request.continuation().strategy()==RealizationStrategy.MANUAL_RELAXATION)continuationSnapshot=ContinuationSnapshot.manual(request.continuation().initialization(),request.continuation().spectralInitialization(),initializationSnapshot,manualActiveForces.stream().map(this::manualContinuationConstraint).filter(java.util.Objects::nonNull).toList(),publishedIteration);long publication=System.nanoTime()-started;DevelopmentTimingDiagnostics.record("stage2.snapshot-publication",publication);long count=Math.max(0,publishedIteration);double average=count==0?0:totalIterationNanos/1_000_000d/count;timing=new ScientificTimingSnapshot(timing.initializationNanos(),count,average,average==0?0:1000d/average,publication);}
 
     private void finishAttempt() {
         if (finalResult != null) return;

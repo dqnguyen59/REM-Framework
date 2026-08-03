@@ -370,13 +370,15 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
             phase2AngleMode=switch(angle){case "None"->AngleConditionMode.NONE;case "Require equal angles"->AngleConditionMode.REQUIRE_EQUAL_ANGLES;default->AngleConditionMode.MEASURE_ONLY;};
         }
         if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA)try(MemoryStack stack=MemoryStack.stackPush()){
-            phase2RealizationStrategy="Sequential continuation".equals(nk_label_combo_options(c,stack,"Realization strategy",new String[]{"Simultaneous","Sequential continuation"},phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION?"Sequential continuation":"Simultaneous",.45,.55))?RealizationStrategy.SEQUENTIAL_CONTINUATION:RealizationStrategy.SIMULTANEOUS;
+            String strategyLabel=nk_label_combo_options(c,stack,"Realization strategy",new String[]{"Simultaneous","Sequential continuation","Manual relaxation"},phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION?"Sequential continuation":phase2RealizationStrategy==RealizationStrategy.MANUAL_RELAXATION?"Manual relaxation":"Simultaneous",.45,.55);
+            phase2RealizationStrategy=switch(strategyLabel){case "Sequential continuation"->RealizationStrategy.SEQUENTIAL_CONTINUATION;case "Manual relaxation"->RealizationStrategy.MANUAL_RELAXATION;default->RealizationStrategy.SIMULTANEOUS;};
             phase2Initialization="Topology spectral embedding".equals(nk_label_combo_options(c,stack,"Initialization",new String[]{"Topology spectral embedding","Random spherical"},phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING?"Topology spectral embedding":"Random spherical",.45,.55))?TopologyInitialization.SPECTRAL_EMBEDDING:TopologyInitialization.RANDOM_SPHERICAL;
             label(c,phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING?"Uses only the immutable adjacency eigenspace and target edge length; no reference geometry is consulted.":"Uses the existing deterministic seeded random spherical initializer.");
             if(phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING){String behavior=nk_label_combo_options(c,stack,"Spectral behavior",new String[]{"Instant","Animated Display","Guided Relaxation"},switch(phase2SpectralPresentation){case INSTANT->"Instant";case ANIMATED_DISPLAY->"Animated Display";case GUIDED_RELAXATION->"Guided Relaxation";},.45,.55);phase2SpectralPresentation=switch(behavior){case "Animated Display"->SpectralPresentationMode.ANIMATED_DISPLAY;case "Guided Relaxation"->SpectralPresentationMode.GUIDED_RELAXATION;default->SpectralPresentationMode.INSTANT;};}
             label(c,phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION?"Introduces required constraint classes one stage at a time. Previously satisfied constraints remain active.":"All required realization targets begin at their configured full strengths.");
             if(phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION){phase2ContinuationRampIterations=dynamicInteger(c,"Continuation ramp iterations",phase2ContinuationRampIterations,1,100_000);phase2ContinuationStageLimit=dynamicInteger(c,"Maximum iterations per stage",phase2ContinuationStageLimit,1,1_000_000);label(c,"Ramp gradually increases a new constraint's restoring influence; it does not change acceptance tolerance.");label(c,"Schedule: CLOSED_UNIFORM_FACE_SEQUENTIAL - edges, outward orientation, required face constraints, joint qualification.");}
             if(phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION)sequenceEditor(c,stack);
+            if(phase2RealizationStrategy==RealizationStrategy.MANUAL_RELAXATION)manualRelaxationEditor(c,stack);
             String benchmark=nk_label_combo_options(c,stack,"Benchmark preset",
                     new String[]{"None","Cube emergent benchmark","Cube constrained benchmark"},
                     switch(phase2BenchmarkPreset){case NONE->"None";case CUBE_EMERGENT_BENCHMARK->"Cube emergent benchmark";case CUBE_CONSTRAINED_BENCHMARK->"Cube constrained benchmark";},.45,.55);
@@ -462,6 +464,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                                     .withParameterDerivation(controller.phasedWorkflow().generation().orElseThrow().request())
                                     .withContinuation((phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION
                                             ?phase2SequenceMode==ConstraintSequenceMode.CUSTOM_SEQUENCE?ContinuationSettings.custom(phase2SequenceEditor.sequence()):ContinuationSettings.sequential(new ThreeDExperimentConditions(phase2FacePlanarity,phase2FaceAngles,phase2Dihedrals,phase2VertexRadii,phase2FaceCentroidRadii,phase2EdgeMidpointRadii,phase2FacePlaneRadii,phase2NormalAlignment,phase2CenterDefinition,phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance),100,phase2ContinuationStageLimit,phase2ContinuationRampIterations)
+                                            :phase2RealizationStrategy==RealizationStrategy.MANUAL_RELAXATION?ContinuationSettings.manual()
                                             :ContinuationSettings.simultaneous()).withInitialization(phase2Initialization)
                                             .withSpectralInitialization(new SpectralInitializationSettings(phase2SpectralPresentation,phase2AnimationDuration,phase2AnimationFps,phase2GuidanceIterations,phase2HandoverIterations,phase2GuidanceStrength))));
                 }
@@ -544,6 +547,26 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     }
 
     private Path sequenceFile(){return Path.of("lattice/geometry-discovery/constraint-sequences",phase2SequenceEditor.sequence().sequenceId()+"-v"+phase2SequenceEditor.sequence().version()+".properties");}
+
+    private void manualRelaxationEditor(NkContext c,MemoryStack stack){
+        phase2Initialization=TopologyInitialization.RANDOM_SPHERICAL;phase2SpectralPresentation=SpectralPresentationMode.INSTANT;
+        heading(c,"Manual Relaxation");label(c,"Experimental direct force control. Coordinates are preserved when force sets change; no continuation schedule is used.");label(c,"Initialization: RANDOM_SPHERICAL; spectral guidance OFF.");
+        IncrementalSession session=controller.phasedWorkflow().incrementalSession();
+        if(session==null){label(c,"Start Geometry Test to initialize with all corrective forces OFF.");return;}
+        label(c,"Execution: "+session.manualExecutionState()+"    Active relaxation forces: "+session.manualActiveForces().size());label(c,"Velocity policy: "+session.manualVelocityPolicy());
+        Nuklear.nk_layout_row_dynamic(c,rowHeightEdit,4);
+        if(Nuklear.nk_button_label(c,"All Relaxation Off"))session.turnAllManualRelaxationOff();
+        if(Nuklear.nk_button_label(c,"All Relaxation On"))session.turnAllManualRelaxationOn();
+        if(Nuklear.nk_button_label(c,"Reset Relaxation Toggles"))session.turnAllManualRelaxationOff();
+        if(Nuklear.nk_button_label(c,"Save Geometry Snapshot"))session.saveManualSnapshot("manual-"+session.manualSnapshots().size());
+        Nuklear.nk_layout_row_dynamic(c,rowHeightEdit,4);
+        String policy=nk_label_combo_options(c,stack,"Velocity policy",new String[]{"Reset on force change","Preserve velocity"},session.manualVelocityPolicy()==ManualVelocityPolicy.PRESERVE_VELOCITY_ON_FORCE_CHANGE?"Preserve velocity":"Reset on force change",.45,.55);session.setManualVelocityPolicy("Preserve velocity".equals(policy)?ManualVelocityPolicy.PRESERVE_VELOCITY_ON_FORCE_CHANGE:ManualVelocityPolicy.RESET_VELOCITY_ON_FORCE_CHANGE);
+        if(Nuklear.nk_button_label(c,"Restore Latest Snapshot")&&!session.manualSnapshots().isEmpty())session.restoreManualSnapshot(session.manualSnapshots().getLast().snapshotId(),false);
+        if(Nuklear.nk_button_label(c,"Delete Latest Snapshot")&&!session.manualSnapshots().isEmpty())session.deleteManualSnapshot(session.manualSnapshots().getLast().snapshotId());
+        if(Nuklear.nk_button_label(c,"Evaluate Final Qualification"))session.evaluateManualFinalQualification();
+        heading(c,"Shape Construction");manualRows(c,session,List.of(ManualConstraint.EDGE_LENGTH,ManualConstraint.FACE_ORIENTATION,ManualConstraint.CONVEXITY,ManualConstraint.FACE_PLANARITY,ManualConstraint.FACE_ANGLE,ManualConstraint.FACE_DISTANCE,ManualConstraint.NORMAL_ALIGNMENT,ManualConstraint.FACE_AREA));heading(c,"Regularity");manualRows(c,session,List.of(ManualConstraint.DIHEDRAL_ANGLE,ManualConstraint.VERTEX_DISTANCE,ManualConstraint.FACE_CENTER_DISTANCE,ManualConstraint.EDGE_CENTER_DISTANCE));
+    }
+    private void manualRows(NkContext c,IncrementalSession session,List<ManualConstraint> constraints){for(ManualConstraint constraint:constraints){ManualConstraintState state=session.manualConstraintStates().stream().filter(s->s.constraint()==constraint).findFirst().orElseThrow();Nuklear.nk_layout_row_begin(c,Nuklear.NK_DYNAMIC,rowHeightEdit+2,2);Nuklear.nk_layout_row_push(c,.72f);Nuklear.nk_label(c,constraint.displayName()+"  "+(state.relaxationActive()?"ACTIVE":"INACTIVE"),Nuklear.NK_TEXT_LEFT);Nuklear.nk_layout_row_push(c,.28f);if(Nuklear.nk_button_label(c,state.relaxationActive()?"OFF":"ON"))session.setManualRelaxation(constraint,!state.relaxationActive());Nuklear.nk_layout_row_end(c);label(c,String.format(java.util.Locale.ROOT,"Error %.7g   Tolerance %.7g   Ratio %.7g   %s",state.rawError(),state.tolerance(),state.normalizedRatio(),state.status()));}}
 
     private void phase2ResultSections(NkContext c, TestResult result) {
         heading(c, "Eligibility");

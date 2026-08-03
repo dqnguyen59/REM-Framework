@@ -1,0 +1,21 @@
+package remframework.geometry.discovery;
+
+import static org.junit.jupiter.api.Assertions.*;
+import java.util.*;
+import org.junit.jupiter.api.Test;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.experiment.*;
+import remframework.geometry.discovery.realization.session.*;
+
+class ManualRelaxationSessionTest {
+    @Test void manualStartsIdleWithZeroIterationsAndPreservesCoordinatesOnToggle(){
+        ConfigurationRequest generation=ConfigurationRequest.exhaustive(4,3,GeometryEmbeddingDimension.THREE_D);
+        Configuration configuration=new ConfigurationGenerator().generate(generation).configurations().getFirst();
+        TestRequest request=new TestRequest(configuration.id(),GeometryEmbeddingDimension.THREE_D,1,42,1,null,GeometrySymmetryPolicy.MEASURE_ONLY,100,ExperimentProfile.CONVEX_POLYHEDRAL_VOLUME,null,null,null,1e-3,1e-7,1e-9,1e-6,null,0,0,null,BenchmarkPreset.NONE,ThreeDConstraintStrengths.defaults()).withContinuation(ContinuationSettings.manual());
+        IncrementalSession session=new IncrementalSession(configuration,request);
+        assertEquals(RealizationStrategy.MANUAL_RELAXATION,session.continuationSnapshot().strategy());assertEquals(ManualExecutionState.MANUAL_IDLE,session.manualExecutionState());assertTrue(session.manualActiveForces().isEmpty());assertFalse(session.step());assertEquals(0,session.iteration());
+        List<org.joml.Vector3d> before=session.currentCoordinates();session.setManualRelaxation(ManualConstraint.FACE_PLANARITY,true);assertEquals(ManualExecutionState.MANUAL_RELAXING,session.manualExecutionState());assertEquals(before,session.currentCoordinates());assertEquals(1,session.manualActions().size());session.pause();session.setManualRelaxation(ManualConstraint.FACE_PLANARITY,false);assertEquals(ManualExecutionState.MANUAL_IDLE,session.manualExecutionState());assertEquals(before,session.currentCoordinates());
+    }
+    @Test void snapshotsAndVelocityPoliciesAreIndependentFromRequirements(){
+        ConfigurationRequest generation=ConfigurationRequest.exhaustive(4,3,GeometryEmbeddingDimension.THREE_D);Configuration configuration=new ConfigurationGenerator().generate(generation).configurations().getFirst();TestRequest request=new TestRequest(configuration.id(),GeometryEmbeddingDimension.THREE_D,1,7,1,null,GeometrySymmetryPolicy.MEASURE_ONLY,100).withContinuation(ContinuationSettings.manual());IncrementalSession session=new IncrementalSession(configuration,request);session.setManualFinalRequirement(ManualConstraint.EDGE_LENGTH,true);assertTrue(session.manualConstraintStates().stream().filter(s->s.constraint()==ManualConstraint.EDGE_LENGTH).findFirst().orElseThrow().requiredForFinalQualification());GeometrySnapshot snapshot=session.saveManualSnapshot("zero");session.setManualVelocityPolicy(ManualVelocityPolicy.PRESERVE_VELOCITY_ON_FORCE_CHANGE);session.setManualRelaxation(ManualConstraint.EDGE_LENGTH,true);session.restoreManualSnapshot(snapshot.snapshotId(),true);assertTrue(session.manualActiveForces().isEmpty());assertEquals(1,session.manualSnapshots().size());}
+}

@@ -24,6 +24,7 @@ public record ContinuationSettings(RealizationStrategy strategy,ContinuationSche
     public static ContinuationSettings simultaneous(){return new ContinuationSettings(RealizationStrategy.SIMULTANEOUS,null,0);}
     public static ContinuationSettings sequential(ThreeDExperimentConditions c,int stable,int maximum,int ramp){return new ContinuationSettings(RealizationStrategy.SEQUENTIAL_CONTINUATION,ContinuationSchedule.closedUniformFaceSequential(c,stable,maximum,ramp),1);}
     public static ContinuationSettings custom(ConstraintSequence sequence){return new ContinuationSettings(RealizationStrategy.SEQUENTIAL_CONTINUATION,CustomSequenceAdapter.toContinuation(sequence),1,TopologyInitialization.RANDOM_SPHERICAL,SpectralInitializationSettings.instant(),ConstraintSequenceMode.CUSTOM_SEQUENCE,sequence);}
+    public static ContinuationSettings manual(){return new ContinuationSettings(RealizationStrategy.MANUAL_RELAXATION,null,1,TopologyInitialization.RANDOM_SPHERICAL,SpectralInitializationSettings.instant(),ConstraintSequenceMode.BUILT_IN_SEQUENCE,null);}
     public ContinuationSettings withInitialization(TopologyInitialization value){return new ContinuationSettings(strategy,schedule,outwardOrientationStrength,value,spectralInitialization,sequenceMode,constraintSequence);}
     public ContinuationSettings withSpectralInitialization(SpectralInitializationSettings value){return new ContinuationSettings(strategy,schedule,outwardOrientationStrength,initialization,value,sequenceMode,constraintSequence);}
 }
