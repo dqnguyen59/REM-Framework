@@ -161,7 +161,8 @@ public final class DynamicElasticSession {
         configureThreeDimensionalProfile(faces,modes,strengths,false,0);
     }
     public void configureThreeDimensionalProfile(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,boolean outwardOrientation,double orientationStrength){configureThreeDimensionalProfile(faces,modes,strengths,outwardOrientation,orientationStrength,false,.05,.6);}
-    public void configureThreeDimensionalProfile(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,boolean outwardOrientation,double orientationStrength,boolean avoidance,double clearanceFactor,double avoidanceStrength){threeDModes=modes;threeDConstraints=new DynamicElasticThreeDConstraints(faces,modes,strengths,settings.targetDistance(),outwardOrientation,orientationStrength,avoidance,clearanceFactor,avoidanceStrength);}
+    public void configureThreeDimensionalProfile(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,boolean outwardOrientation,double orientationStrength,boolean avoidance,double clearanceFactor,double avoidanceStrength){configureThreeDimensionalProfile(faces,modes,strengths,outwardOrientation,orientationStrength,avoidance,clearanceFactor,avoidanceStrength,false,0,0);}
+    public void configureThreeDimensionalProfile(List<List<Integer>> faces,ThreeDExperimentConditions modes,ThreeDConstraintStrengths strengths,boolean outwardOrientation,double orientationStrength,boolean avoidance,double clearanceFactor,double avoidanceStrength,boolean convexity,double convexityTolerance,double convexityStrength){threeDModes=modes;threeDConstraints=new DynamicElasticThreeDConstraints(faces,modes,strengths,settings.targetDistance(),outwardOrientation,orientationStrength,avoidance,clearanceFactor,avoidanceStrength,convexity,convexityTolerance,convexityStrength);}
     public void continueRelaxation(){if(state==DynamicElasticState.EQUILIBRIUM_REACHED){state=DynamicElasticState.NEAR_EQUILIBRIUM;stableIterations=0;stagnationDetector.reset();stagnationStatus=StagnationStatus.progressing();}}
     public void setSpatialConstraintsEnabled(boolean enabled){spatialConstraintsEnabled=enabled;}
     /** Runtime manual-relaxation control; coordinates and velocities are intentionally preserved. */
@@ -174,6 +175,7 @@ public final class DynamicElasticSession {
 
     public ThreeDConstraintDiagnostics threeDConstraintDiagnostics(){return threeDConstraints==null?ThreeDConstraintDiagnostics.inactive():threeDConstraints.diagnostics(nodes);}
     public SelfIntersectionDiagnostics selfIntersectionDiagnostics(){return threeDConstraints==null?SelfIntersectionDiagnostics.inactive():threeDConstraints.selfIntersectionDiagnostics(nodes);}
+    public double convexityObjective(){return threeDConstraints==null?0:threeDConstraints.convexityObjective(nodes);}
     public ConstraintObjectiveDiagnostics objectiveDiagnostics(){return objectiveDiagnostics;}
     public StagnationStatus stagnationStatus(){return stagnationStatus;}
 
