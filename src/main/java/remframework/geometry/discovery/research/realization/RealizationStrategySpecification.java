@@ -37,7 +37,7 @@ public record RealizationStrategySpecification(String id,int strategyVersion,
     public record AdaptiveStepSettings(boolean enabled,double initialStep,double minimumStep,
             double maximumStep,double reductionFactor) { }
 
-    public boolean executableByCurrentSolver(){return initialization==Initialization.RANDOM_SPHERICAL
+    public boolean executableByCurrentSolver(){return (initialization==Initialization.RANDOM_SPHERICAL||initialization==Initialization.SPECTRAL_EMBEDDING)
             &&(activation==Activation.SIMULTANEOUS||activation==Activation.SEQUENTIAL_WITH_RAMP)
             &&integration==Integration.DYNAMIC_ELASTIC&&convexity!=Requirement.REQUIRED
             &&normalAlignment!=Requirement.REQUIRED&&!maximumVolumeFinishing;}

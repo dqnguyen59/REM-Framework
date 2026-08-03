@@ -49,6 +49,7 @@ public final class TestResultStore {
                 + "requested_seed = " + result.requestedSeed() + "\n"
                 + "realized_seed = " + (result.realization()==null?result.requestedSeed():result.realization().seed()) + "\n"
                 + "realization_strategy = \"" + result.continuation().strategy() + "\"\n"
+                + "realization_initialization = \"" + result.continuation().initialization() + "\"\n"
                 + "continuation_schedule_id = \"" + result.continuation().scheduleId() + "\"\n"
                 + "continuation_schedule_version = " + result.continuation().scheduleVersion() + "\n"
                 + "continuation_stage = \"" + result.continuation().stageId() + "\"\n"

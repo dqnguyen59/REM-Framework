@@ -52,5 +52,5 @@ class RealizationStrategyResearchTest {
         assertEquals(List.of(attempt),reopened.readAttempts());assertEquals(java.util.Set.of(attempt.key()),reopened.completedKeys());
     }
 
-    private static ResearchAttemptResult result(String strategy,boolean qualified,double ratio,int violations){return new ResearchAttemptResult(strategy,"cfg-test",42,500,100,qualified,false,ratio,0,violations,ratio,.1,.01,.2,.01,.3,.01,10,"stage","","PROGRESSING",qualified?"VALID_CANDIDATE":"NO_REALIZATION_FOUND_WITHIN_SEARCH_LIMITS");}
+    private static ResearchAttemptResult result(String strategy,boolean qualified,double ratio,int violations){return new ResearchAttemptResult(strategy,"cfg-test",42,500,100,qualified,false,ratio,0,violations,ratio,.1,.01,.2,.01,.3,.01,.01,.01,.01,1,10,"stage","","PROGRESSING",qualified?"VALID_CANDIDATE":"NO_REALIZATION_FOUND_WITHIN_SEARCH_LIMITS");}
 }

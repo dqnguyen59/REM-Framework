@@ -6,6 +6,8 @@ public record ResearchAttemptResult(String strategyId,String configurationId,lon
         double worstRequiredErrorRatio,int selfIntersections,int convexityViolations,
         double normalizedRequiredObjective,double edgeError,double edgeTolerance,
         double planarityError,double planarityTolerance,double angleError,double angleTolerance,
+        double dihedralCoefficientOfVariation,double vertexRadiusCoefficientOfVariation,
+        double facePlaneRadiusCoefficientOfVariation,double volume,
         long runtimeMillis,String stage,String stageHistory,String stagnation,
         String configurationStatus) {
     public String key(){return strategyId+"|"+configurationId+"|"+seed+"|"+budget;}

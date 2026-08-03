@@ -14,6 +14,10 @@ public final class GeneralStrategySearchSpace {
                 ContinuationConstraint.FACE_ANGLE_EQUALITY,ContinuationConstraint.FACE_PLANE_RADII,
                 ContinuationConstraint.JOINT_QUALIFICATION);
         List<RealizationStrategySpecification> strategies=List.of(
+                spec("spectral-simultaneous-v1",RealizationStrategySpecification.Initialization.SPECTRAL_EMBEDDING,RealizationStrategySpecification.Activation.SIMULTANEOUS,0,2_000,
+                        RealizationStrategySpecification.Requirement.MEASURE_ONLY,RealizationStrategySpecification.Requirement.MEASURE_ONLY,RealizationStrategySpecification.Integration.DYNAMIC_ELASTIC,order),
+                spec("spectral-sequential-v1",RealizationStrategySpecification.Initialization.SPECTRAL_EMBEDDING,RealizationStrategySpecification.Activation.SEQUENTIAL_WITH_RAMP,100,2_000,
+                        RealizationStrategySpecification.Requirement.MEASURE_ONLY,RealizationStrategySpecification.Requirement.MEASURE_ONLY,RealizationStrategySpecification.Integration.DYNAMIC_ELASTIC,order),
                 spec("simultaneous-v1",RealizationStrategySpecification.Activation.SIMULTANEOUS,0,2_000,
                         RealizationStrategySpecification.Requirement.MEASURE_ONLY,RealizationStrategySpecification.Requirement.MEASURE_ONLY,RealizationStrategySpecification.Integration.DYNAMIC_ELASTIC,order),
                 spec("sequential-ramp-100-v1",RealizationStrategySpecification.Activation.SEQUENTIAL_WITH_RAMP,100,2_000,
@@ -31,15 +35,19 @@ public final class GeneralStrategySearchSpace {
         return new ResearchSearchManifest("SUCCESSIVE_HALVING",masterSeed,
                 "SPHERE_LIKE: connected closed orientable surface, Euler characteristic 2, one intended interior region",
                 List.of(500,2_000,10_000),List.of(42L,43L,44L,45L,46L),List.of(142L,143L,144L),strategies,
-                List.of("SPECTRAL_EMBEDDING initializer","GRAPH_DISTANCE_SPHERICAL initializer",
+                List.of("GRAPH_DISTANCE_SPHERICAL initializer",
                         "required convexity force","required normal-alignment force","adaptive/backtracking integration",
                         "maximum-volume finishing phase","custom constraint-order execution"));
     }
     private static RealizationStrategySpecification spec(String id,RealizationStrategySpecification.Activation activation,
             int ramp,int maximum,RealizationStrategySpecification.Requirement convexity,
             RealizationStrategySpecification.Requirement normal,RealizationStrategySpecification.Integration integration,
+            List<ContinuationConstraint> order){return spec(id,RealizationStrategySpecification.Initialization.RANDOM_SPHERICAL,activation,ramp,maximum,convexity,normal,integration,order);}
+    private static RealizationStrategySpecification spec(String id,RealizationStrategySpecification.Initialization initialization,RealizationStrategySpecification.Activation activation,
+            int ramp,int maximum,RealizationStrategySpecification.Requirement convexity,
+            RealizationStrategySpecification.Requirement normal,RealizationStrategySpecification.Integration integration,
             List<ContinuationConstraint> order){return new RealizationStrategySpecification(id,1,
-            RealizationStrategySpecification.Initialization.RANDOM_SPHERICAL,activation,order,
+            initialization,activation,order,
             ramp==0?RealizationStrategySpecification.RampType.NONE:RealizationStrategySpecification.RampType.LINEAR_BY_ITERATION,
             ramp,Map.of("facePlanarity",1.0,"faceAngle",.6,"faceDistance",.6,"orientation",1.0),
             Map.of("required",1.0),20,maximum,integration,

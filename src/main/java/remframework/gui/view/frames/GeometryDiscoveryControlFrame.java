@@ -94,6 +94,7 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
     private int phase2InitialRealizations = 1;
     private int phase2SearchLimit = 100_000;
     private RealizationStrategy phase2RealizationStrategy=RealizationStrategy.SIMULTANEOUS;
+    private TopologyInitialization phase2Initialization=TopologyInitialization.SPECTRAL_EMBEDDING;
     private int phase2ContinuationRampIterations=200,phase2ContinuationStageLimit=10_000;
     private PlanarityRealizationMode phase2PlanarityMode=PlanarityRealizationMode.STRICT_2D_COORDINATES;
     private AngleConditionMode phase2AngleMode=AngleConditionMode.REQUIRE_EQUAL_ANGLES;
@@ -363,6 +364,8 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
         }
         if(phase2ExperimentProfile!=ExperimentProfile.CLOSED_2D_AREA)try(MemoryStack stack=MemoryStack.stackPush()){
             phase2RealizationStrategy="Sequential continuation".equals(nk_label_combo_options(c,stack,"Realization strategy",new String[]{"Simultaneous","Sequential continuation"},phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION?"Sequential continuation":"Simultaneous",.45,.55))?RealizationStrategy.SEQUENTIAL_CONTINUATION:RealizationStrategy.SIMULTANEOUS;
+            phase2Initialization="Topology spectral embedding".equals(nk_label_combo_options(c,stack,"Initialization",new String[]{"Topology spectral embedding","Random spherical"},phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING?"Topology spectral embedding":"Random spherical",.45,.55))?TopologyInitialization.SPECTRAL_EMBEDDING:TopologyInitialization.RANDOM_SPHERICAL;
+            label(c,phase2Initialization==TopologyInitialization.SPECTRAL_EMBEDDING?"Uses only the immutable adjacency eigenspace and target edge length; no reference geometry is consulted.":"Uses the existing deterministic seeded random spherical initializer.");
             label(c,phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION?"Introduces required constraint classes one stage at a time. Previously satisfied constraints remain active.":"All required realization targets begin at their configured full strengths.");
             if(phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION){phase2ContinuationRampIterations=dynamicInteger(c,"Continuation ramp iterations",phase2ContinuationRampIterations,1,100_000);phase2ContinuationStageLimit=dynamicInteger(c,"Maximum iterations per stage",phase2ContinuationStageLimit,1,1_000_000);label(c,"Ramp gradually increases a new constraint's restoring influence; it does not change acceptance tolerance.");label(c,"Schedule: CLOSED_UNIFORM_FACE_SEQUENTIAL - edges, outward orientation, required face constraints, joint qualification.");}
             String benchmark=nk_label_combo_options(c,stack,"Benchmark preset",
@@ -446,9 +449,9 @@ public final class GeometryDiscoveryControlFrame extends AbstractFrame {
                                     phase2FaceCompositionMode==FaceCompositionMode.UNIFORM_FACE_SIZE
                                             ?FaceComposition.uniform(phase2CommonFaceEdgeCount):FaceComposition.discover())
                                     .withParameterDerivation(controller.phasedWorkflow().generation().orElseThrow().request())
-                                    .withContinuation(phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION
+                                    .withContinuation((phase2RealizationStrategy==RealizationStrategy.SEQUENTIAL_CONTINUATION
                                             ?ContinuationSettings.sequential(new ThreeDExperimentConditions(phase2FacePlanarity,phase2FaceAngles,phase2Dihedrals,phase2VertexRadii,phase2FaceCentroidRadii,phase2EdgeMidpointRadii,phase2FacePlaneRadii,phase2NormalAlignment,phase2CenterDefinition,phase2FacePlanarityTolerance,phase2RegularityTolerance,phase2RelativeRegularityTolerance),100,phase2ContinuationStageLimit,phase2ContinuationRampIterations)
-                                            :ContinuationSettings.simultaneous()));
+                                            :ContinuationSettings.simultaneous()).withInitialization(phase2Initialization)));
                 }
             } catch (Exception exception) { nuklearModel.showErrorDialog("Geometry Test", exception.getMessage()); }
         });

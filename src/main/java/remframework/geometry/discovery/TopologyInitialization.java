@@ -10,4 +10,4 @@ import remframework.geometry.discovery.graph.canonical.*;
 import remframework.geometry.discovery.graph.symmetry.*;
 import remframework.geometry.discovery.optimization.*;
 
-public enum TopologyInitialization { EXISTING, RANDOM_SPHERICAL, CUBIC_GRID }
+public enum TopologyInitialization { EXISTING, RANDOM_SPHERICAL, CUBIC_GRID, SPECTRAL_EMBEDDING }

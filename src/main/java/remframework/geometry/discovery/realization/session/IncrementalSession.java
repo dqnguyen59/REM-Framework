@@ -21,6 +21,7 @@ import remframework.geometry.discovery.graph.symmetry.*;
 import remframework.geometry.discovery.optimization.*;
 
 import org.joml.Vector3d;
+import org.joml.Quaterniond;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -216,11 +217,12 @@ public final class IncrementalSession {
         GeometryEmbeddingDimension initializationDimension=request.experimentProfile()==ExperimentProfile.CLOSED_2D_AREA
                 && request.planarityMode()!=PlanarityRealizationMode.STRICT_2D_COORDINATES
                 ? GeometryEmbeddingDimension.THREE_D:request.dimension();
-        initialCoordinates = initializeCoordinates(configuration.nodeCount(),
-                initializationDimension, request.targetEdgeLength(), seed);
+        initialCoordinates = request.continuation().initialization()==TopologyInitialization.SPECTRAL_EMBEDDING
+                ?new SpectralTopologyInitializer().initialize(configuration,request.targetEdgeLength())
+                :initializeCoordinates(configuration.nodeCount(),initializationDimension,
+                request.targetEdgeLength(), seed);
         int secondAnchor=configuration.adjacency().get(0).stream().mapToInt(Integer::intValue).min().orElse(1);
-        initialCoordinates.get(0).set(0,0,0);
-        initialCoordinates.get(secondAnchor).set(request.targetEdgeLength(),0,0);
+        gaugeCoordinates(initialCoordinates,secondAnchor);
         if(request.experimentProfile()==ExperimentProfile.CLOSED_2D_AREA
                 &&request.angleConditionMode()==AngleConditionMode.REQUIRE_EQUAL_ANGLES
                 &&request.planarityMode()==PlanarityRealizationMode.STRICT_2D_COORDINATES)
@@ -245,7 +247,7 @@ public final class IncrementalSession {
     }
 
     private void configureContinuationStage(){
-        if(request.continuation().strategy()!=RealizationStrategy.SEQUENTIAL_CONTINUATION){elastic.configureThreeDimensionalProfile(topologyFaces,request.threeDConditions(),request.threeDConstraintStrengths());continuationSnapshot=ContinuationSnapshot.simultaneous();return;}
+        if(request.continuation().strategy()!=RealizationStrategy.SEQUENTIAL_CONTINUATION){elastic.configureThreeDimensionalProfile(topologyFaces,request.threeDConditions(),request.threeDConstraintStrengths());continuationSnapshot=ContinuationSnapshot.simultaneous(request.continuation().initialization());return;}
         ContinuationStageDefinition stage=request.continuation().schedule().stages().get(continuationStageIndex);Set<ContinuationConstraint> active=new LinkedHashSet<>(stage.retained());active.addAll(stage.introduced());double factor=stage.rampIterations()==0?1:Math.min(1,stage.startingFactor()+continuationStageIteration*(stage.finalFactor()-stage.startingFactor())/stage.rampIterations());factor=Math.min(factor,continuationRampCeiling);continuationRampFactor=factor;
         ThreeDExperimentConditions original=request.threeDConditions();ThreeDExperimentConditions modes=new ThreeDExperimentConditions(active.contains(ContinuationConstraint.FACE_PLANARITY)?original.facePlanarity():FacePlanarityMode.MEASURE_ONLY,active.contains(ContinuationConstraint.FACE_ANGLE_EQUALITY)?original.faceAngles():FaceAngleConditionMode.MEASURE_ONLY,active.contains(ContinuationConstraint.JOINT_QUALIFICATION)?original.dihedrals():DihedralConditionMode.MEASURE_ONLY,original.vertexRadii(),original.faceCentroidRadii(),original.edgeMidpointRadii(),active.contains(ContinuationConstraint.FACE_PLANE_RADII)||active.contains(ContinuationConstraint.JOINT_QUALIFICATION)?original.facePlaneRadii():FacePlaneRadiusMode.MEASURE_ONLY,original.normalCenterAlignment(),original.centerDefinition(),original.facePlanarityTolerance(),original.absoluteRegularityTolerance(),original.relativeRegularityTolerance());ThreeDConstraintStrengths full=request.threeDConstraintStrengths();ThreeDConstraintStrengths strengths=new ThreeDConstraintStrengths(full.facePlanarity()*(stage.introduced().contains(ContinuationConstraint.FACE_PLANARITY)?factor:1),full.faceAngles()*(stage.introduced().contains(ContinuationConstraint.FACE_ANGLE_EQUALITY)?factor:1),full.dihedrals()*(stage.introduced().contains(ContinuationConstraint.JOINT_QUALIFICATION)?factor:1),full.facePlaneRadii()*(stage.introduced().contains(ContinuationConstraint.FACE_PLANE_RADII)?factor:1));boolean orientation=active.contains(ContinuationConstraint.OUTWARD_ORIENTATION);double orientationFactor=stage.introduced().contains(ContinuationConstraint.OUTWARD_ORIENTATION)?factor:1;elastic.configureThreeDimensionalProfile(topologyFaces,modes,strengths,orientation,request.continuation().outwardOrientationStrength()*orientationFactor);
         elastic.setSpatialConstraintsEnabled(active.contains(ContinuationConstraint.JOINT_QUALIFICATION));
@@ -258,7 +260,7 @@ public final class IncrementalSession {
         else if(elastic.stagnationStatus().classification()==StagnationClass.PLATEAUED){state=ContinuationStageState.PLATEAUED;failure="Stage "+stage.id()+" plateaued outside transition criteria; worst constraint "+worstName+" ratio="+worst;continuationHistory.add(new ContinuationStageOutcome(stage.id(),state,continuationStageIteration,continuationStable,continuationRampFactor,worstName,worst,failure));stopReason=failure;if(++attempt<request.initialRealizations())initializeAttempt();else{finalResult=finalizeResult(configuration,request,elastic.result()).withContinuation(continuationSnapshot);scientificState=ScientificState.SEARCH_LIMIT_REACHED;}}
         else if(continuationStageIteration>=stage.maximumIterations()){state=ContinuationStageState.FAILED;failure="Stage "+stage.id()+" reached its iteration limit outside transition criteria; worst constraint "+worstName+" ratio="+worst;continuationHistory.add(new ContinuationStageOutcome(stage.id(),state,continuationStageIteration,continuationStable,continuationRampFactor,worstName,worst,failure));stopReason=failure;if(++attempt<request.initialRealizations())initializeAttempt();else{finalResult=finalizeResult(configuration,request,elastic.result()).withContinuation(continuationSnapshot);scientificState=ScientificState.SEARCH_LIMIT_REACHED;}}
         else if(elastic.finished())elastic.continueRelaxation();
-        ContinuationStageDefinition current=schedule.stages().get(Math.min(continuationStageIndex,schedule.stages().size()-1));continuationSnapshot=new ContinuationSnapshot(RealizationStrategy.SEQUENTIAL_CONTINUATION,schedule.id(),schedule.version(),continuationStageIndex+1,schedule.stages().size(),current.id(),current.displayName(),state,continuationStageIteration,elastic.iteration(),continuationRampFactor,continuationStable,current.stableIterations(),worstName,worst,List.copyOf(active),List.copyOf(stage.retained()),List.copyOf(continuationHistory),failure);if(finalResult!=null)finalResult=finalResult.withContinuation(continuationSnapshot);
+        ContinuationStageDefinition current=schedule.stages().get(Math.min(continuationStageIndex,schedule.stages().size()-1));continuationSnapshot=new ContinuationSnapshot(RealizationStrategy.SEQUENTIAL_CONTINUATION,schedule.id(),schedule.version(),request.continuation().initialization(),continuationStageIndex+1,schedule.stages().size(),current.id(),current.displayName(),state,continuationStageIteration,elastic.iteration(),continuationRampFactor,continuationStable,current.stableIterations(),worstName,worst,List.copyOf(active),List.copyOf(stage.retained()),List.copyOf(continuationHistory),failure);if(finalResult!=null)finalResult=finalResult.withContinuation(continuationSnapshot);
     }
     private double maximumEdgeErrorNow(){return elastic.metrics().edges().stream().mapToDouble(e->Math.abs(e.distance()-e.targetDistance())).max().orElse(0);}
 
@@ -392,6 +394,8 @@ public final class IncrementalSession {
         }
         return result;
     }
+
+    static void gaugeCoordinates(List<Vector3d> coordinates,int secondAnchor){Vector3d origin=new Vector3d(coordinates.get(0));coordinates.forEach(p->p.sub(origin));Vector3d direction=new Vector3d(coordinates.get(secondAnchor));if(direction.lengthSquared()<=1e-20)throw new IllegalArgumentException("Gauge anchor edge is degenerate.");Quaterniond rotation=new Quaterniond().rotationTo(direction.normalize(),new Vector3d(1,0,0));coordinates.forEach(rotation::transform);}
 
     private static List<Integer> orderedCycle(Configuration configuration){
         List<Integer> result=new ArrayList<>();int previous=-1,current=0;

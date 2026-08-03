@@ -14,8 +14,12 @@ public final class PostRunBenchmarkEvaluator {
         ReferenceTopologyMatch match=new ReferenceTopologyRecognizer().recognize(topology);
         var faces=new TopologyEligibilityAnalyzer().analyze(topology,
                 ExperimentProfile.CONVEX_POLYHEDRAL_VOLUME,FaceComposition.uniform(faceSize)).faceComposition();
+        double squared=completed.dihedralCoefficientOfVariation()*completed.dihedralCoefficientOfVariation()
+                +completed.vertexRadiusCoefficientOfVariation()*completed.vertexRadiusCoefficientOfVariation()
+                +completed.facePlaneRadiusCoefficientOfVariation()*completed.facePlaneRadiusCoefficientOfVariation();
+        double similarity=Double.isFinite(squared)?1/(1+Math.sqrt(squared)):Double.NaN;
         return new PostRunBenchmarkEvaluation(completed.configurationId(),match.topology().name(),
-                match.exactMatch(),faces.actualFaceCount(),faceSize,
+                match.exactMatch(),faces.actualFaceCount(),faceSize,similarity,
                 "Reference evaluation occurred after attempt "+completed.key()+" ended; it did not affect realization or ranking.");
     }
 }
