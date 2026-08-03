@@ -165,6 +165,7 @@ public final class DynamicElasticSession {
     public void setSpatialConstraintsEnabled(boolean enabled){spatialConstraintsEnabled=enabled;}
     /** Runtime manual-relaxation control; coordinates and velocities are intentionally preserved. */
     public void setSpringStrength(double strength){settings=settings.withSpringStrength(Math.max(0,strength));}
+    public void refreshDiagnostics(){objectiveDiagnostics=calculateObjectiveDiagnostics(calculateMetrics());}
     public void replaceVelocities(List<Vector3d> velocities){if(velocities.size()!=nodes.size())throw new IllegalArgumentException("Velocity count does not match nodes.");for(int i=0;i<nodes.size();i++)nodes.get(i).velocity().set(velocities.get(i));}
     public void resetVelocities(){nodes.forEach(node->node.velocity().zero());}
     public void replacePositions(List<Vector3d> positions){if(positions.size()!=nodes.size())throw new IllegalArgumentException("Position count does not match nodes.");for(int i=0;i<nodes.size();i++)nodes.get(i).position().set(positions.get(i));enforceAnchors();}
