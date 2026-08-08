@@ -155,6 +155,12 @@ public class Node extends Entity {
         this.neighbors[neighbor.ordinal()] = node;
     }
 
+    /** Returns one direct graph neighbor. */
+    public Node getNeighbor(Neighbor neighbor) {
+        return neighbors[neighbor.ordinal()];
+    }
+
+
     @Override
     public boolean isVisible() {
         return isVisible || (type == EntityType.WALL) && remModel.isWallVisible();

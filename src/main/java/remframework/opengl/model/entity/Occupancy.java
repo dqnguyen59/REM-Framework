@@ -25,6 +25,7 @@ import org.joml.Vector3d;
 import org.joml.Vector3i;
 import org.joml.Vector4f;
 import remframework.opengl.model.Lattice;
+import remframework.opengl.helpers.Neighbor;
 import remframework.helpers.AbstractSettings;
 import remframework.helpers.ISettings;
 
@@ -70,6 +71,12 @@ public class Occupancy extends AbstractSettings implements ISettings {
      * The lattice node currently occupied by this Identity.
      */
     private Node node;
+
+    /** Graph radius of this single Identity's aggregate occupied region. */
+    private int graphRadius;
+    private transient java.util.List<Node> occupiedNodesCache;
+    private transient java.util.Set<Node> occupiedNodeSetCache;
+    private transient OccupiedRegionDiagnostics occupiedRegionDiagnostics;
 
     /**
      * The node index lattice location.
@@ -161,6 +168,79 @@ public class Occupancy extends AbstractSettings implements ISettings {
         resetHistory();
     }
 
+    public int getGraphRadius() { return graphRadius; }
+
+    public void setGraphRadius(int graphRadius) {
+        if (graphRadius < 0) {
+            throw new IllegalArgumentException("graphRadius must be non-negative: " + graphRadius);
+        }
+        if (this.graphRadius != graphRadius) {
+            this.graphRadius = graphRadius;
+            invalidateOccupiedRegion();
+        }
+    }
+
+    /** Returns the cached breadth-first region in deterministic graph order. */
+    public java.util.List<Node> getOccupiedNodes() {
+        if (occupiedNodesCache == null) rebuildOccupiedRegion();
+        return occupiedNodesCache;
+    }
+
+    public OccupiedRegionDiagnostics getOccupiedRegionDiagnostics() {
+        if (occupiedNodesCache == null) rebuildOccupiedRegion();
+        return occupiedRegionDiagnostics;
+    }
+
+    public void invalidateOccupiedRegion() {
+        occupiedNodesCache = null;
+        occupiedNodeSetCache = null;
+        occupiedRegionDiagnostics = null;
+    }
+
+    /** Rebuilds membership using only direct-neighbor graph traversal. */
+    public void rebuildOccupiedRegion() {
+        if (node == null) {
+            occupiedNodesCache = java.util.List.of();
+            occupiedNodeSetCache = java.util.Set.of();
+            occupiedRegionDiagnostics = new OccupiedRegionDiagnostics(graphRadius, 0, 0, 0, null);
+            return;
+        }
+        java.util.ArrayDeque<Node> queue = new java.util.ArrayDeque<>();
+        java.util.Map<Node, Integer> distance = new java.util.LinkedHashMap<>();
+        queue.add(node);
+        distance.put(node, 0);
+        while (!queue.isEmpty()) {
+            Node current = queue.removeFirst();
+            int currentDistance = distance.get(current);
+            if (currentDistance >= graphRadius) continue;
+            for (Neighbor direction : Neighbor.values()) {
+                Node neighbor = current.getNeighbor(direction);
+                if (neighbor != null && !distance.containsKey(neighbor)) {
+                    distance.put(neighbor, currentDistance + 1);
+                    queue.addLast(neighbor);
+                }
+            }
+        }
+        occupiedNodesCache = java.util.List.copyOf(distance.keySet());
+        occupiedNodeSetCache = java.util.Set.copyOf(distance.keySet());
+        int boundaryNodes = 0;
+        int crossingEdges = 0;
+        for (Node occupied : occupiedNodesCache) {
+            boolean boundary = false;
+            for (Neighbor direction : Neighbor.values()) {
+                Node neighbor = occupied.getNeighbor(direction);
+                if (neighbor != null && !occupiedNodeSetCache.contains(neighbor)) {
+                    boundary = true;
+                    crossingEdges++;
+                }
+            }
+            if (boundary) boundaryNodes++;
+        }
+        occupiedRegionDiagnostics = new OccupiedRegionDiagnostics(graphRadius,
+                occupiedNodesCache.size(), boundaryNodes, crossingEdges,
+                node.getIndex());
+    }
+
     @Override
     public AbstractSettings clone() {
         return null;
@@ -180,6 +260,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
         int y = getInt(section + index, "nodeIndex.y", 0);
         int z = getInt(section + index, "nodeIndex.z", 0);
         nodeIndex = new Vector3i(x, y, z);
+        setGraphRadius(getInt(section + index, "graphRadius", 0));
 
         x = getInt(section + index, "initialTransportMomentum.x", 0);
         y = getInt(section + index, "initialTransportMomentum.y", 0);
@@ -197,6 +278,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
         put(section + index, "nodeIndex.x", nodeIndex.x);
         put(section + index, "nodeIndex.y", nodeIndex.y);
         put(section + index, "nodeIndex.z", nodeIndex.z);
+        put(section + index, "graphRadius", graphRadius);
         put(section + index, "initialTransportMomentum.x", initialTransportMomentum.x);
         put(section + index, "initialTransportMomentum.y", initialTransportMomentum.y);
         put(section + index, "initialTransportMomentum.z", initialTransportMomentum.z);
@@ -207,6 +289,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     public void setNode(Node node) {
+        if (this.node != node) invalidateOccupiedRegion();
         this.node = node;
         nodeIndex.set(node.getIndex());
     }
@@ -287,7 +370,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     public void updateOscillation() {
         Vector3d o = identity.generateExcitation();
         if (o != null) {
-            node.addForce(o);
+            for (Node occupied : getOccupiedNodes()) occupied.addForce(o);
         }
     }
 

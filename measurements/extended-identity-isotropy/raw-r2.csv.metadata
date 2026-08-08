@@ -1,0 +1,8 @@
+graphRadius=2
+occupiedNodeCount=25
+boundaryNodeCount=18
+boundaryCrossingEdgeCount=78
+centerNodeIndex=( 8.000E+1  8.000E+1  8.000E+1)
+perNodeAmplitude=( 0.000E+0  0.000E+0  2.000E+2)
+updates=180
+throughputUpdatesPerSecond=3.623666823108208

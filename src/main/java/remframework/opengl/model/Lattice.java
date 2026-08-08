@@ -297,6 +297,7 @@ public class Lattice {
                         if (node != null) orderedNodes.add(node);
         }
         setNodeArray(orderedNodes.toArray());
+        project.occupancies.forEach(remframework.opengl.model.entity.Occupancy::invalidateOccupiedRegion);
         setEntityArray(entities.toArray());
     }
 
