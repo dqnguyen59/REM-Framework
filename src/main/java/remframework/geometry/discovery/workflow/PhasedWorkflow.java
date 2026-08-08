@@ -1,38 +1,34 @@
 package remframework.geometry.discovery.workflow;
+
+import org.joml.Vector3d;
 import remframework.geometry.discovery.*;
 import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.eligibility.TopologyEligibilityAnalyzer;
+import remframework.geometry.discovery.eligibility.TopologyEligibilityReport;
+import remframework.geometry.discovery.experiment.ExperimentProfile;
+import remframework.geometry.discovery.measurement.regularity.*;
+import remframework.geometry.discovery.optimization.AreaOptimizer;
+import remframework.geometry.discovery.optimization.VolumeOptimizer;
+import remframework.geometry.discovery.persistence.ConfigurationStore;
+import remframework.geometry.discovery.persistence.TestResultStore;
 import remframework.geometry.discovery.realization.session.*;
-import remframework.geometry.discovery.viewport.*;
-import remframework.geometry.discovery.workflow.*;
-import remframework.geometry.discovery.persistence.*;
-import remframework.geometry.discovery.ui.*;
-import remframework.geometry.discovery.graph.canonical.*;
-import remframework.geometry.discovery.graph.symmetry.*;
-import remframework.geometry.discovery.optimization.*;
-import remframework.geometry.discovery.*;
-import remframework.geometry.discovery.configuration.*;
-import remframework.geometry.discovery.realization.session.*;
-import remframework.geometry.discovery.viewport.*;
-import remframework.geometry.discovery.workflow.*;
-import remframework.geometry.discovery.persistence.*;
-import remframework.geometry.discovery.ui.*;
-import remframework.geometry.discovery.graph.canonical.*;
-import remframework.geometry.discovery.graph.symmetry.*;
-import remframework.geometry.discovery.optimization.*;
+import remframework.geometry.discovery.reference.ReferenceTopologyRecognizer;
+import remframework.geometry.discovery.ui.ConfigurationTableRow;
+import remframework.geometry.discovery.viewport.RenderModel;
+
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.*;
-import org.joml.Vector3d;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import remframework.geometry.discovery.eligibility.*;
-import remframework.geometry.discovery.experiment.ExperimentProfile;
-import remframework.geometry.discovery.measurement.regularity.*;
-import remframework.geometry.discovery.reference.ReferenceTopologyRecognizer;
+
 /** UI-facing model for the two explicit research stages. Selection never starts geometry. */
 public final class PhasedWorkflow {
     public static final String TOPOLOGY_PREVIEW_LABEL="Graph visualization only - not a geometric realization.";
@@ -44,7 +40,7 @@ public final class PhasedWorkflow {
     private TestRequest activeRequest;
     private TestResult activeResult;
     private int visualizationIterationsPerFrame = 25;
-    private int scientificUpdatesPerSecond=10;
+    private int scientificUpdatesPerSecond=100;
     private long nextScientificUpdateNanos;
     private long renderRevision;
     private Path persistedResultPath;
@@ -131,7 +127,7 @@ public final class PhasedWorkflow {
     public synchronized int visualizationIterationsPerFrame() { return visualizationIterationsPerFrame; }
     public synchronized void setVisualizationIterationsPerFrame(int value) { if (value < 1) throw new IllegalArgumentException("Visualization iterations per frame must be positive."); visualizationIterationsPerFrame = Math.min(value, 10000); }
     public synchronized int scientificUpdatesPerSecond(){return scientificUpdatesPerSecond;}
-    public synchronized void setScientificUpdatesPerSecond(int value){scientificUpdatesPerSecond=Math.max(1,Math.min(120,value));}
+    public synchronized void setScientificUpdatesPerSecond(int value){scientificUpdatesPerSecond=Math.max(1,Math.min(500,value));}
     public synchronized SessionState geometryTestSessionState() { return incrementalSession == null ? SessionState.READY : incrementalSession.state(); }
     public synchronized ExecutionState geometryExecutionState() { return incrementalSession == null ? ExecutionState.IDLE : incrementalSession.executionState(); }
     public synchronized ScientificState geometryScientificState() { return incrementalSession == null ? ScientificState.INITIALIZED : incrementalSession.scientificState(); }
