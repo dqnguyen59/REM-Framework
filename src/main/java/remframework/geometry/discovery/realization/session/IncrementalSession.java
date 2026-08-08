@@ -74,6 +74,8 @@ public final class IncrementalSession {
     private final List<ContinuationStageOutcome> continuationHistory=new ArrayList<>();
     private volatile ContinuationSnapshot continuationSnapshot=ContinuationSnapshot.simultaneous();
     private volatile OrientationConvexityDiagnostics orientationConvexity=OrientationConvexityDiagnostics.undetermined("Stage 2 has not published coordinates.");
+    private volatile FaceHalfSpaceConvexityDiagnostics faceHalfSpaceConvexity=FaceHalfSpaceConvexityDiagnostics.unavailable(FaceHalfSpaceConvexityStatus.UNAVAILABLE_FACE_COMPLEX_INVALID,"Stage 2 has not published coordinates.",Double.NaN,1);
+    private ConvexityMode convexityMode=ConvexityMode.LEGACY_CONVEXITY;
     private List<Vector3d> randomStartCoordinates=List.of(),spectralTargetCoordinates=List.of(),scientificStartCoordinates=List.of();
     private volatile InitializationSnapshot initializationSnapshot=InitializationSnapshot.instant();
     private int initializationRevision,initializationStep;
@@ -256,6 +258,9 @@ public final class IncrementalSession {
     public ConstraintPresentationSummary constraintPresentation(){return Stage2ConstraintPresentation.from(this);}
     public ContinuationSnapshot continuationSnapshot(){return continuationSnapshot;}
     public OrientationConvexityDiagnostics orientationConvexityDiagnostics(){return orientationConvexity;}
+    public FaceHalfSpaceConvexityDiagnostics faceHalfSpaceConvexityDiagnostics(){return elastic==null?faceHalfSpaceConvexity:elastic.faceHalfSpaceConvexityDiagnostics();}
+    public ConvexityMode convexityMode(){return convexityMode;}
+    public synchronized void setConvexityMode(ConvexityMode mode){convexityMode=mode==null?ConvexityMode.LEGACY_CONVEXITY:mode;if(request.continuation().strategy()==RealizationStrategy.MANUAL_RELAXATION)reconfigureManualForces();publishSnapshot();}
     public InitializationSnapshot initializationSnapshot(){return initializationSnapshot;}
     public GeometryConfigurationStatus initializationFailure(){return initializationFailure;}
     public List<Vector3d> randomStartCoordinates(){return copy(randomStartCoordinates);}
@@ -400,7 +405,7 @@ public final class IncrementalSession {
         elastic.setSpringStrengthWithFactor(edgeBase,strengthFactors.factor(ManualConstraint.EDGE_LENGTH));
         ThreeDExperimentConditions original=request.threeDConditions();
         ThreeDExperimentConditions modes=new ThreeDExperimentConditions(manualActiveForces.contains(ManualConstraint.FACE_PLANARITY)?FacePlanarityMode.REQUIRE_PLANAR_FACES:FacePlanarityMode.MEASURE_ONLY,manualActiveForces.contains(ManualConstraint.FACE_ANGLE)?FaceAngleConditionMode.REQUIRE_EQUAL_ANGLES_WITHIN_EACH_FACE:FaceAngleConditionMode.MEASURE_ONLY,manualActiveForces.contains(ManualConstraint.DIHEDRAL_ANGLE)?DihedralConditionMode.REQUIRE_EQUAL_DIHEDRAL_ANGLES:DihedralConditionMode.MEASURE_ONLY,original.vertexRadii(),original.faceCentroidRadii(),original.edgeMidpointRadii(),manualActiveForces.contains(ManualConstraint.FACE_DISTANCE)?FacePlaneRadiusMode.REQUIRE_EQUAL_FACE_PLANE_RADII:FacePlaneRadiusMode.MEASURE_ONLY,original.normalCenterAlignment(),original.centerDefinition(),original.facePlanarityTolerance(),original.absoluteRegularityTolerance(),original.relativeRegularityTolerance());
-        elastic.configureThreeDimensionalProfile(topologyFaces,modes,request.threeDConstraintStrengths(),manualActiveForces.contains(ManualConstraint.FACE_ORIENTATION),request.continuation().outwardOrientationStrength(),manualActiveForces.contains(ManualConstraint.SELF_INTERSECTION_AVOIDANCE),.05,.6,manualActiveForces.contains(ManualConstraint.CONVEXITY),request.threeDConditions().facePlanarityTolerance(),.6,runtimeFactorMap());
+        elastic.configureThreeDimensionalProfile(topologyFaces,modes,request.threeDConstraintStrengths(),manualActiveForces.contains(ManualConstraint.FACE_ORIENTATION),request.continuation().outwardOrientationStrength(),manualActiveForces.contains(ManualConstraint.SELF_INTERSECTION_AVOIDANCE),.05,.6,manualActiveForces.contains(ManualConstraint.CONVEXITY),request.threeDConditions().facePlanarityTolerance(),.6,runtimeFactorMap(),convexityMode);
         elastic.setSpatialConstraintsEnabled(false);
         elastic.resetConstraintStability();
         elastic.refreshDiagnostics();
