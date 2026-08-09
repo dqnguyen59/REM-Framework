@@ -16,6 +16,7 @@ public final class CompactMeasurementBackend implements AutoCloseable {
     private final double[] velocityX, velocityY, velocityZ;
     private final double[] accelerationX, accelerationY, accelerationZ;
     private int sourceIndex = -1;
+    private int[] sourceIndices;
     private double sourceForceX, sourceForceY, sourceForceZ;
     private int parallelism = 1;
 
@@ -38,6 +39,8 @@ public final class CompactMeasurementBackend implements AutoCloseable {
     public int z(int i){return i/(nx*ny);}
     public void setParallelism(int value){parallelism=Math.max(1,value);}
     public void setSource(int x,int y,int z){sourceIndex=index(x,y,z);}
+    /** Applies the next source force coherently to every supplied occupied node. */
+    public void setSourceNodes(int[] indices){sourceIndices=indices.clone();for(int i:sourceIndices)if(i<0||i>=nodeCount)throw new IllegalArgumentException("Source node outside lattice: "+i);Arrays.sort(sourceIndices);}
     public void setSourceForce(double x,double y,double z){sourceForceX=x;sourceForceY=y;sourceForceZ=z;}
     public double positionX(int i){return positionX[i];} public double positionY(int i){return positionY[i];} public double positionZ(int i){return positionZ[i];}
     public double velocityX(int i){return velocityX[i];} public double velocityY(int i){return velocityY[i];} public double velocityZ(int i){return velocityZ[i];}
@@ -49,15 +52,21 @@ public final class CompactMeasurementBackend implements AutoCloseable {
         if(parallelism>1){
             Thread[] workers=new Thread[parallelism];
             int chunk=(nodeCount+parallelism-1)/parallelism;
-            for(int t=0;t<parallelism;t++){final int start=t*chunk,end=Math.min(nodeCount,start+chunk);workers[t]=Thread.startVirtualThread(()->{for(int i=start;i<end;i++)updateNode(i);});}
+            for(int t=0;t<parallelism;t++){final int start=t*chunk,end=Math.min(nodeCount,start+chunk);if(sourceIndices==null)workers[t]=Thread.startVirtualThread(()->{for(int i=start;i<end;i++)updateNode(i,false);});else workers[t]=Thread.startVirtualThread(()->updateRange(start,end));}
             for(Thread worker:workers)try{worker.join();}catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException("Compact update interrupted",e);}
-        } else for(int i=0;i<nodeCount;i++) updateNode(i);
+        } else if(sourceIndices==null) for(int i=0;i<nodeCount;i++) updateNode(i,false);
+        else updateRange(0,nodeCount);
         System.arraycopy(nextPositionX,0,positionX,0,nodeCount);
         System.arraycopy(nextPositionY,0,positionY,0,nodeCount);
         System.arraycopy(nextPositionZ,0,positionZ,0,nodeCount);
     }
 
-    private void updateNode(int i){
+    private void updateRange(int start,int end){
+        int cursor=0; while(cursor<sourceIndices.length&&sourceIndices[cursor]<start)cursor++;
+        for(int i=start;i<end;i++){boolean source=cursor<sourceIndices.length&&sourceIndices[cursor]==i;if(source)cursor++;updateNode(i,source);}
+    }
+
+    private void updateNode(int i, boolean source){
         int x=i%nx, y=(i/nx)%ny, z=i/(nx*ny);
         double ex=0,ey=0,ez=0;
         if(x+1<nx){int n=i+1;ex=(ex+positionX[n])-positionX[i];ey=(ey+positionY[n])-positionY[i];ez=(ez+positionZ[n])-positionZ[i];}
@@ -66,7 +75,8 @@ public final class CompactMeasurementBackend implements AutoCloseable {
         if(x>0){int n=i-1;ex=(ex+positionX[n])-positionX[i];ey=(ey+positionY[n])-positionY[i];ez=(ez+positionZ[n])-positionZ[i];}
         if(y>0){int n=i-nx;ex=(ex+positionX[n])-positionX[i];ey=(ey+positionY[n])-positionY[i];ez=(ez+positionZ[n])-positionZ[i];}
         if(z>0){int n=i-nx*ny;ex=(ex+positionX[n])-positionX[i];ey=(ey+positionY[n])-positionY[i];ez=(ez+positionZ[n])-positionZ[i];}
-        if(i==sourceIndex){ex+=sourceForceX;ey+=sourceForceY;ez+=sourceForceZ;sourceForceX=sourceForceY=sourceForceZ=0;}
+        if(source) { ex+=sourceForceX; ey+=sourceForceY; ez+=sourceForceZ; }
+        else if(i==sourceIndex){ex+=sourceForceX;ey+=sourceForceY;ez+=sourceForceZ;sourceForceX=sourceForceY=sourceForceZ=0;}
         double ax=ex*gamma, ay=ey*gamma, az=ez*gamma;
         double vx=velocityX[i]+ax*cws, vy=velocityY[i]+ay*cws, vz=velocityZ[i]+az*cws;
         velocityX[i]=vx; velocityY[i]=vy; velocityZ[i]=vz;
@@ -95,5 +105,5 @@ public final class CompactMeasurementBackend implements AutoCloseable {
     public static long estimatePersistentBytes(int n){return persistentBytesPerNode()*n;}
     public static long estimateTemporaryBytes(int n){return 3L*Double.BYTES*n;}
     public static long estimateNodeCount(int n){return (long)n*n*n;}
-    @Override public void close(){ Arrays.fill(positionX,0); Arrays.fill(positionY,0); Arrays.fill(positionZ,0); }
+    @Override public void close(){ Arrays.fill(positionX,0); Arrays.fill(positionY,0); Arrays.fill(positionZ,0); sourceIndices=null; }
 }
