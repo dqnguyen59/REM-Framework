@@ -74,6 +74,8 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     /** Graph radius of this single Identity's aggregate occupied region. */
     private int graphRadius;
+    /** Symmetric body-diagonal indentation used by the shape-search experiment. */
+    private double bodyDiagonalIndentation;
     private transient java.util.List<Node> occupiedNodesCache;
     private transient java.util.Set<Node> occupiedNodeSetCache;
     private transient OccupiedRegionDiagnostics occupiedRegionDiagnostics;
@@ -180,6 +182,18 @@ public class Occupancy extends AbstractSettings implements ISettings {
         }
     }
 
+    public double getBodyDiagonalIndentation() { return bodyDiagonalIndentation; }
+
+    public void setBodyDiagonalIndentation(double indentation) {
+        if (!Double.isFinite(indentation) || indentation < 0.0) {
+            throw new IllegalArgumentException("bodyDiagonalIndentation must be finite and non-negative: " + indentation);
+        }
+        if (Double.compare(bodyDiagonalIndentation, indentation) != 0) {
+            bodyDiagonalIndentation = indentation;
+            invalidateOccupiedRegion();
+        }
+    }
+
     /** Returns the cached breadth-first region in deterministic graph order. */
     public java.util.List<Node> getOccupiedNodes() {
         if (occupiedNodesCache == null) rebuildOccupiedRegion();
@@ -215,7 +229,8 @@ public class Occupancy extends AbstractSettings implements ISettings {
             if (currentDistance >= graphRadius) continue;
             for (Neighbor direction : Neighbor.values()) {
                 Node neighbor = current.getNeighbor(direction);
-                if (neighbor != null && !distance.containsKey(neighbor)) {
+                if (neighbor != null && !distance.containsKey(neighbor)
+                        && isInsideShape(neighbor.getIndex())) {
                     distance.put(neighbor, currentDistance + 1);
                     queue.addLast(neighbor);
                 }
@@ -239,6 +254,22 @@ public class Occupancy extends AbstractSettings implements ISettings {
         occupiedRegionDiagnostics = new OccupiedRegionDiagnostics(graphRadius,
                 occupiedNodesCache.size(), boundaryNodes, crossingEdges,
                 node.getIndex());
+    }
+
+    /**
+     * Keeps the graph-radius region unchanged at indentation zero. Positive
+     * indentation progressively removes nodes for which all three coordinate
+     * offsets are non-zero, with the strongest effect toward the eight body
+     * diagonals. Axis extent is therefore unchanged and the BFS remains the
+     * only source of connectivity.
+     */
+    private boolean isInsideShape(Vector3i index) {
+        int dx = Math.abs(index.x - nodeIndex.x);
+        int dy = Math.abs(index.y - nodeIndex.y);
+        int dz = Math.abs(index.z - nodeIndex.z);
+        double score = (double) dx + dy + dz
+                + bodyDiagonalIndentation * Math.min(dx, Math.min(dy, dz));
+        return score < graphRadius;
     }
 
     @Override
