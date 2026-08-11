@@ -53,6 +53,8 @@ public class Scene {
 
     private ArrayList<Vector3i> wallNodeIndexList = new ArrayList<>();
     private ArrayList<Node>     hiLightedNodes    = new ArrayList<>();
+    private ArrayList<Probe>    probes            = new ArrayList<>();
+    private Probe               selectedProbe;
     private Node                firstHiLightedNode;
 
     private DirectionalLight directionalLight;
@@ -75,6 +77,7 @@ public class Scene {
 
     public void build() {
         System.out.println("Scene.build()");
+        clearProbes();
         Entity baseEntity = lattice.build();
         // Draw xyz arrows on entity baseField.
         Vector3i dimension = new Vector3i();
@@ -162,6 +165,30 @@ public class Scene {
                                                   y * project.getDimensionX() + x];
         node.setHiLighted(false);
         hiLightedNodes.remove(node);
+    }
+
+    public void addProbe(Probe probe) {
+        probes.add(probe);
+    }
+
+    public void clearProbes() {
+        if (selectedProbe != null) selectedProbe.setSelected(false);
+        selectedProbe = null;
+        probes.clear();
+    }
+
+    public void selectProbe(Probe probe) {
+        if (selectedProbe != null) selectedProbe.setSelected(false);
+        selectedProbe = probe;
+        if (selectedProbe != null) selectedProbe.setSelected(true);
+    }
+
+    public Probe getProbeForNode(Node node) {
+        if (node == null) return null;
+        for (Probe probe : probes) {
+            if (probe.getNode() == node) return probe;
+        }
+        return null;
     }
 
     private Vector3i isWallNodeExists(Node node) {

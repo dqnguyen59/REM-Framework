@@ -4,7 +4,9 @@ import org.joml.Vector3d;
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import remframework.gui.model.NuklearModel;
+import remframework.opengl.model.Probe;
 import remframework.opengl.model.entity.Occupancy;
+import remframework.opengl.model.entity.Node;
 import remframework.settings.Project;
 
 import java.util.Locale;
@@ -32,6 +34,24 @@ public final class FrameIsotropy extends AbstractFrame {
 
     @Override
     protected void layout(NkContext ctx, int x, int y, int width, int height) {
+        Probe probe = project.scene.getSelectedProbe();
+        section(ctx, "Selected passive probe");
+        if (probe == null) {
+            scalar(ctx, "Probe", "None");
+        } else {
+            Node node = probe.getNode();
+            scalar(ctx, "Probe", probe.getId());
+            vector(ctx, "Node coordinate", probe.getNodeCoordinate());
+            vector(ctx, "Node position", node.getPosition());
+            vector(ctx, "Gradient Imbalance", node.getGradientImbalance());
+            vector(ctx, "Acceleration", node.getAcceleration());
+            vector(ctx, "Node Velocity", node.getVelocity());
+            naVector(ctx, "Transport Momentum");
+            naVector(ctx, "Pressure");
+            scalar(ctx, "Cycle state", "N/A (Occupancy only)");
+        }
+
+        section(ctx, "Receiver Occupancy reference");
         Occupancy receiver = project.occupancies.size() > 1 ? project.occupancies.get(1) : null;
         if (receiver == null) {
             Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
@@ -58,6 +78,19 @@ public final class FrameIsotropy extends AbstractFrame {
         scalar(ctx, "Samples in current cycle", Integer.toString(receiver.getCycleSampleCountForAudit()));
         scalar(ctx, "Samples in last completed cycle", Integer.toString(receiver.getSamplesPerCycleForAudit()));
         scalar(ctx, "Cycle completed", Boolean.toString(receiver.wasCycleCompletedThisUpdate()));
+    }
+
+    private static void section(NkContext ctx, String label) {
+        Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 1);
+        Nuklear.nk_label(ctx, label, Nuklear.NK_TEXT_LEFT);
+    }
+
+    private static void naVector(NkContext ctx, String label) {
+        Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 4);
+        Nuklear.nk_label(ctx, label, Nuklear.NK_TEXT_LEFT);
+        Nuklear.nk_label(ctx, "N/A", Nuklear.NK_TEXT_RIGHT);
+        Nuklear.nk_label(ctx, "N/A", Nuklear.NK_TEXT_RIGHT);
+        Nuklear.nk_label(ctx, "N/A", Nuklear.NK_TEXT_RIGHT);
     }
 
     private static void scalar(NkContext ctx, String label, String value) {

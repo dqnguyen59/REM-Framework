@@ -41,6 +41,7 @@ import remframework.measurement.detector.DetectorExperimentController;
 import remframework.measurement.detector.FeasibilityPilotTelemetry;
 import remframework.opengl.model.RemModel.TranslationMode;
 import remframework.opengl.model.RemModel.NodeSelectionMode;
+import remframework.opengl.model.Probe;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.EntityType;
 import remframework.opengl.model.entity.Node;
@@ -64,6 +65,7 @@ import remframework.geometry.discovery.workflow.WorkspaceController;
 import remframework.geometry.discovery.GeometryDiscoveryWorkspaceManager;
 
 import java.lang.Math;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Objects;
 
@@ -314,18 +316,24 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     @Override
     public boolean mouseButtonCallback(long handle, int button, int action, int mods) {
+        leftButtonPressed           = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_PRESS;
+        boolean leftButtonReleased = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_RELEASE;
+
+        Node node = scene.getNodeFromMousePos(remModel.getMousePos().x,
+                                              remModel.getMousePos().y);
+        Probe probe = scene.getProbeForNode(node);
+        if (probe != null && (leftButtonPressed || leftButtonReleased)) {
+            scene.selectProbe(probe);
+            return true;
+        }
+
         if (discoveryWorkspace.state().active()) {
             if (nuklearModel.getFocusedFrame() == null)
                 discoveryViewport.button(button, action, glWindow.getWidth(), glWindow.getHeight());
             return false;
         }
-        boolean leftButtonReleased;
         if (nuklearModel.getFocusedFrame() == null) {
-            leftButtonPressed  = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_PRESS;
-            leftButtonReleased = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_RELEASE;
             rightButtonPress   = button == GLFW.GLFW_MOUSE_BUTTON_2 && action == GLFW.GLFW_PRESS;
-
-            Node node = scene.getNodeFromMousePos(remModel.getMousePos().x, remModel.getMousePos().y);
 
             if (node != null) {
                 if (leftButtonPressed)
@@ -969,6 +977,31 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             }
             renderer.processEntity(entity);
         }
+
+        createIsotropyProbe();
+    }
+
+    private void createIsotropyProbe() {
+        if (!"detectGradient8.qfs".equals(Path.of(project.getCurrentFilename()).getFileName().toString())) {
+            return;
+        }
+
+        Vector3i receiverIndex = new Vector3i(130, 140, 0);
+        Node receiverNode = scene.getLattice().getNodeByIndex(receiverIndex);
+        if (receiverNode == null) return;
+
+        Entity marker = scene.getLattice().createEntity(
+                new Vector3d(receiverNode.getPosition()), new Vector3d(), receiverNode.getScale() * 2.0);
+        marker.setOverrideModelMaterial(true);
+        marker.getMaterial().setDiffuseColor(new Vector4f(0.2f, 0.8f, 1.0f, 1.0f));
+        marker.getMaterial().setAmbientColor(new Vector4f(0.2f, 0.8f, 1.0f, 1.0f));
+        marker.getMaterial().setShininess(0.0f);
+
+        Probe probe = new Probe("detectGradient8-receiver", receiverNode, marker,
+                                new Vector4f(0.2f, 0.8f, 1.0f, 1.0f));
+        scene.addProbe(probe);
+        probe.updateMarker();
+        renderer.processEntity(marker);
     }
 
     private void updateNodesArray() {
@@ -1144,6 +1177,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
         PerformanceMonitor.start(Measurement.sendToGPU);
         isRenderingReady = false;
+        for (Probe probe : scene.getProbes()) {
+            probe.updateMarker();
+        }
         if (project.terrain.isVisible())
             renderer.processTerrain(project.terrain);
         renderer.render(project.camera, scene);
