@@ -1,0 +1,4 @@
+directionId,update,sourceCycle,receiverCycleBefore,receiverCycleAfter,cycleCompleted,velocityZPrevious,velocityZCurrent,note
+R01_1_0_0,,34,0,0,false,,,NO_TRANSITION_RECORDED; receiver velocity was not persisted
+R08_1_1_0,,34,0,0,false,,,NO_TRANSITION_RECORDED; receiver velocity was not persisted
+R09_1_1_1,,34,0,0,false,,,NO_TRANSITION_RECORDED; receiver velocity was not persisted

@@ -1,0 +1,13 @@
+key,value
+status,MEASUREMENT_INCOMPLETE
+directionId,R01_1_0_0
+primitiveDirection,"(1,0,0)"
+sourceCenter,166;166;166
+sourceGraphRadius,96
+receiverRelative,120;0;0
+receiverGraphDistance,120
+minimumGraphDistanceToOccupiedSource,25
+sourceActive,true
+sourceAmplitude,200.0
+sourceIndices,1161471
+updates,600

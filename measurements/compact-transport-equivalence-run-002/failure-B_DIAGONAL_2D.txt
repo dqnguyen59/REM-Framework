@@ -1,0 +1,1 @@
+java.nio.file.FileAlreadyExistsException: /tmp/compact-transport-equivalence-B_DIAGONAL_2D.csv

@@ -1,0 +1,4 @@
+scenarioId,updates,maxRawGradientDifference,maxScaledGradientDifference,maxGradientImbalanceDifference,maxAccelerationDifference,maxMomentumDifference,maxPressureDifference,cycleCompletionMatch,status
+A_X_AXIS,0,NaN,NaN,NaN,NaN,NaN,false,BACKEND_FAILURE
+B_DIAGONAL_2D,0,NaN,NaN,NaN,NaN,NaN,false,BACKEND_FAILURE
+C_DIAGONAL_3D,0,NaN,NaN,NaN,NaN,NaN,false,BACKEND_FAILURE

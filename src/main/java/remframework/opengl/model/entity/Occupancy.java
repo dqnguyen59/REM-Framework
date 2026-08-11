@@ -102,6 +102,8 @@ public class Occupancy extends AbstractSettings implements ISettings {
      * This is recomputed every update and is not persistent.
      */
     private final Vector3d gradientImbalance = new Vector3d();
+    /** Last scaled gradient sample retained for measurement-path auditing. */
+    private final Vector3d lastMeasuredGradient = new Vector3d();
 
     private final Vector3d acceleration = new Vector3d();
 
@@ -135,6 +137,8 @@ public class Occupancy extends AbstractSettings implements ISettings {
     private boolean isPositiveZ = true;
 
     private boolean signIsPositiveZ = true;
+    /** Read-only instrumentation flag for the most recent cycle check. */
+    private boolean cycleCompletedThisUpdate;
     private boolean lastPositiveY   = true;
     private boolean lastPositiveZ   = true;
     private int     samplesPerCycle = GRADIENT_IMBALANCE_HISTORY_LENGTH;
@@ -355,6 +359,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     public void saveGradientToHistory(Vector3d gradient) {
+        lastMeasuredGradient.set(gradient);
         // Store the newest sample
         gradientImbalanceHistory[gradientHistoryIndex].set(gradient);
 
@@ -365,6 +370,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     public boolean isCycleCompleted() {
+        cycleCompletedThisUpdate = false;
         if (signIsPositiveZ && node.getVelocity().z < 0) {
             // Set to negative
             signIsPositiveZ = false;
@@ -378,10 +384,25 @@ public class Occupancy extends AbstractSettings implements ISettings {
             cycleSampleCount = 0;
             resetMaxGradient();
             resetHistory();
+            cycleCompletedThisUpdate = true;
             return true;
         }
         return false;
     }
+
+    /** Returns whether the most recent cycle check completed a receiver cycle. */
+    public boolean wasCycleCompletedThisUpdate() {
+        return cycleCompletedThisUpdate;
+    }
+
+    /** Read-only cycle-state access for compact-path equivalence auditing. */
+    public boolean isSignIsPositiveZ() { return signIsPositiveZ; }
+
+    /** Read-only history-counter access for compact-path equivalence auditing. */
+    public int getCycleSampleCountForAudit() { return cycleSampleCount; }
+
+    /** Read-only completed-cycle sample-size access for compact-path equivalence auditing. */
+    public int getSamplesPerCycleForAudit() { return samplesPerCycle; }
 
     public void resetMaxGradient() {
         maxPositiveGradient.zero();

@@ -1,0 +1,4 @@
+scenarioId,updates,maxReceiverVelocityDifference,cycleCompletionMatch,signStateMatch,cycleSampleCountMatch,samplesPerCycleMatch,status
+A_X_AXIS,198,6.869504964868156e-16,true,true,true,true,VALID
+B_DIAGONAL_2D,198,6.227657278756737e-16,true,true,true,true,VALID
+C_DIAGONAL_3D,198,8.36136715420821e-16,true,true,true,true,VALID

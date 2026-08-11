@@ -1,0 +1,4 @@
+directionId,directionX,directionY,directionZ,receiverCycleNumber,completionUpdate,previousCompletionUpdate,cycleDurationUpdates,samplesPerCycle,sourceCycleAtCompletion,note
+R01_1_0_0,1,0,0,0,,,,,,NO_RECEIVER_CYCLE_COMPLETED
+R08_1_1_0,1,1,0,0,,,,,,NO_RECEIVER_CYCLE_COMPLETED
+R09_1_1_1,1,1,1,0,,,,,,NO_RECEIVER_CYCLE_COMPLETED
