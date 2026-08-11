@@ -23,6 +23,7 @@ import lombok.Setter;
 import org.ini4j.Wini;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
+import remframework.measurement.detector.ExtendedIdentityShape;
 import org.joml.Vector4f;
 import remframework.opengl.model.Lattice;
 import remframework.opengl.helpers.Neighbor;
@@ -76,6 +77,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     private int graphRadius;
     /** Symmetric body-diagonal indentation used by the shape-search experiment. */
     private double bodyDiagonalIndentation;
+    private double twoAxisIndentation;
     private transient java.util.List<Node> occupiedNodesCache;
     private transient java.util.Set<Node> occupiedNodeSetCache;
     private transient OccupiedRegionDiagnostics occupiedRegionDiagnostics;
@@ -184,6 +186,18 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     public double getBodyDiagonalIndentation() { return bodyDiagonalIndentation; }
 
+    public double getTwoAxisIndentation() { return twoAxisIndentation; }
+
+    public void setTwoAxisIndentation(double indentation) {
+        if (!Double.isFinite(indentation) || indentation < 0.0) {
+            throw new IllegalArgumentException("twoAxisIndentation must be finite and non-negative: " + indentation);
+        }
+        if (Double.compare(twoAxisIndentation, indentation) != 0) {
+            twoAxisIndentation = indentation;
+            invalidateOccupiedRegion();
+        }
+    }
+
     public void setBodyDiagonalIndentation(double indentation) {
         if (!Double.isFinite(indentation) || indentation < 0.0) {
             throw new IllegalArgumentException("bodyDiagonalIndentation must be finite and non-negative: " + indentation);
@@ -267,9 +281,8 @@ public class Occupancy extends AbstractSettings implements ISettings {
         int dx = Math.abs(index.x - nodeIndex.x);
         int dy = Math.abs(index.y - nodeIndex.y);
         int dz = Math.abs(index.z - nodeIndex.z);
-        double score = (double) dx + dy + dz
-                + bodyDiagonalIndentation * Math.min(dx, Math.min(dy, dz));
-        return score < graphRadius;
+        return ExtendedIdentityShape.score(dx, dy, dz, twoAxisIndentation,
+                bodyDiagonalIndentation) < graphRadius;
     }
 
     @Override
