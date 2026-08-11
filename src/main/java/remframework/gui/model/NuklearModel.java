@@ -64,6 +64,7 @@ public class NuklearModel {
 		detector,
 		preferences,
 		transportSystem,
+		isotropy,
 		geometryDiscoveryControls,
 		geometryDiscoveryMetrics,
 		geometryDiscoveryNode,
@@ -194,6 +195,8 @@ public class NuklearModel {
 			return new FrameSettings(this);
 		case transportSystem:
 			return new FrameTransportSystem(this);
+		case isotropy:
+			return new FrameIsotropy(this);
 		case preferences:
 			return new FramePreferences(this);
 		case terrainSettings:

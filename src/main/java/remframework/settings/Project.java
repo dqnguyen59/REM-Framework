@@ -192,6 +192,13 @@ public class Project extends AbstractSettings implements ISettings {
             occupancies.add(occupancy);
         }
 
+        if (Path.of(currentFilename).getFileName().toString().equals("detectGradient8.qfs")) {
+            TransportSystem.getInstance().configureReceiverStatusLogging(
+                    Path.of("measurements", "detectGradient8-receiver-status.csv"));
+        } else {
+            TransportSystem.getInstance().closeReceiverStatusLogging();
+        }
+
         detectors = DetectorConfiguration.load(ini, dimension);
         DetectorExperimentController detectorController =
                 DetectorExperimentController.getInstance();

@@ -1,4 +1,5 @@
 package remframework.opengl.controller;
+
 import remframework.geometry.discovery.*;
 import remframework.geometry.discovery.configuration.*;
 import remframework.geometry.discovery.realization.session.*;
@@ -23,6 +24,11 @@ import remframework.opengl.model.entity.Occupancy;
 import remframework.settings.Project;
 import remframework.helpers.AbstractSettings;
 import remframework.helpers.ISettings;
+
+import java.io.BufferedWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 /**
  * REM-FIELD Transport System.
@@ -65,12 +71,12 @@ import remframework.helpers.ISettings;
 @Setter
 public class TransportSystem extends AbstractSettings implements ISettings {
 
-    private static TransportSystem instance;
-    private final  Project         project  = Project.getInstance();
-    private final  RemModel        remModel = project.getRemModel();
-    private final GravityMeasurementLogger gravityMeasurementLogger =
+    private static TransportSystem                     instance;
+    private final  Project                             project                   = Project.getInstance();
+    private final  RemModel                            remModel                  = project.getRemModel();
+    private final  GravityMeasurementLogger            gravityMeasurementLogger  =
             GravityMeasurementLogger.getInstance();
-    private final GravityPressureExperimentController gravityPressureController =
+    private final  GravityPressureExperimentController gravityPressureController =
             GravityPressureExperimentController.getInstance();
 
     private boolean logToConsole     = false;
@@ -89,7 +95,11 @@ public class TransportSystem extends AbstractSettings implements ISettings {
      */
     private double transferThreshold     = 0.0000003;
     private double lastGradientImbalance = Double.MAX_VALUE;
-    private int cyclesToMove = 10;
+    private int    cyclesToMove          = 10;
+
+    private BufferedWriter receiverStatusWriter;
+    private boolean        receiverStatusEnabled;
+    private long           receiverStatusUpdate;
 
     public static TransportSystem getInstance() {
         if (instance == null) {
@@ -179,6 +189,131 @@ public class TransportSystem extends AbstractSettings implements ISettings {
         } else {
             transferOccupancy(occupancy);
         }
+
+        if (receiverStatusEnabled && project.occupancies.size() > 1
+            && occupancy == project.occupancies.get(1)) {
+            writeReceiverStatus(occupancy);
+        }
+    }
+
+    /**
+     * Enables the detectGradient8 receiver status trace.
+     */
+    public synchronized void configureReceiverStatusLogging(Path outputFile) {
+        closeReceiverStatusLogging();
+        try {
+            Path parent = outputFile.toAbsolutePath().getParent();
+            if (parent != null) Files.createDirectories(parent);
+            receiverStatusWriter = Files.newBufferedWriter(outputFile,
+                                                           StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
+                                                           StandardOpenOption.WRITE);
+            receiverStatusWriter.write(receiverStatusHeader());
+            receiverStatusWriter.newLine();
+            receiverStatusEnabled = true;
+            receiverStatusUpdate  = 0;
+        }
+        catch (Exception exception) {
+            receiverStatusEnabled = false;
+            receiverStatusWriter  = null;
+            System.err.println("Receiver status CSV disabled: " + exception.getMessage());
+        }
+    }
+
+    public synchronized void closeReceiverStatusLogging() {
+        receiverStatusEnabled = false;
+        if (receiverStatusWriter != null) {
+            try {
+                receiverStatusWriter.close();
+            }
+            catch (Exception ignored) {
+                // Best effort during application shutdown.
+            }
+            receiverStatusWriter = null;
+        }
+    }
+
+    public boolean isReceiverStatusEnabled() {
+        return receiverStatusEnabled;
+    }
+
+    public String getReceiverStatus() {
+        if (!receiverStatusEnabled || project.occupancies.size() < 2) return "";
+        return formatReceiverStatus(project.occupancies.get(1));
+    }
+
+    private synchronized void writeReceiverStatus(Occupancy occupancy) {
+        if (!receiverStatusEnabled || receiverStatusWriter == null) return;
+        try {
+            receiverStatusUpdate++;
+            StringBuilder row = new StringBuilder();
+            append(row, receiverStatusUpdate);
+            append(row, occupancy.getIdentity() == null ? "" : occupancy.getIdentity().getName());
+            append(row, occupancy.getNodeIndex().x);
+            append(row, occupancy.getNodeIndex().y);
+            append(row, occupancy.getNodeIndex().z);
+            append(row, occupancy.getGradientImbalance());
+            append(row, occupancy.getLastMaxPositiveGradient());
+            append(row, occupancy.getLastMaxNegativeGradient());
+            append(row, occupancy.getAcceleration());
+            append(row, occupancy.getTransportMomentum());
+            append(row, occupancy.getPressure());
+            append(row, occupancy.getNode().getVelocity());
+            append(row, occupancy.getCycleSampleCountForAudit());
+            append(row, occupancy.getSamplesPerCycleForAudit());
+            append(row, occupancy.wasCycleCompletedThisUpdate());
+            receiverStatusWriter.write(row.toString());
+            receiverStatusWriter.newLine();
+            receiverStatusWriter.flush();
+        }
+        catch (Exception exception) {
+            closeReceiverStatusLogging();
+            System.err.println("Receiver status CSV stopped: " + exception.getMessage());
+        }
+    }
+
+    private static String receiverStatusHeader() {
+        return "update,identity,nodeX,nodeY,nodeZ,gradientImbalanceX,gradientImbalanceY,gradientImbalanceZ," +
+               "maxPositiveGradientX,maxPositiveGradientY,maxPositiveGradientZ," +
+               "maxNegativeGradientX,maxNegativeGradientY,maxNegativeGradientZ," +
+               "accelerationX,accelerationY,accelerationZ," +
+               "transportMomentumX,transportMomentumY,transportMomentumZ," +
+               "pressureX,pressureY,pressureZ,nodeVelocityX,nodeVelocityY,nodeVelocityZ," +
+               "cycleSampleCount,samplesPerCycle,cycleCompleted";
+    }
+
+    private static String formatReceiverStatus(Occupancy occupancy) {
+        return String.format("Receiver G=(% .6e,% .6e,% .6e) " +
+                             "cycleMax+=(% .6e,% .6e,% .6e) cycleMax-=(% .6e,% .6e,% .6e) " +
+                             "A=(% .6e,% .6e,% .6e) M=(% .6e,% .6e,% .6e) " +
+                             "P=(% .6e,% .6e,% .6e) Vnode=(% .6e,% .6e,% .6e) " +
+                             "samples=%d/%d complete=%s",
+                             occupancy.getGradientImbalance().x, occupancy.getGradientImbalance().y,
+                             occupancy.getGradientImbalance().z,
+                             occupancy.getLastMaxPositiveGradient().x, occupancy.getLastMaxPositiveGradient().y,
+                             occupancy.getLastMaxPositiveGradient().z,
+                             occupancy.getLastMaxNegativeGradient().x, occupancy.getLastMaxNegativeGradient().y,
+                             occupancy.getLastMaxNegativeGradient().z,
+                             occupancy.getAcceleration().x, occupancy.getAcceleration().y,
+                             occupancy.getAcceleration().z,
+                             occupancy.getTransportMomentum().x, occupancy.getTransportMomentum().y,
+                             occupancy.getTransportMomentum().z,
+                             occupancy.getPressure().x, occupancy.getPressure().y, occupancy.getPressure().z,
+                             occupancy.getNode() == null ? 0 : occupancy.getNode().getVelocity().x,
+                             occupancy.getNode() == null ? 0 : occupancy.getNode().getVelocity().y,
+                             occupancy.getNode() == null ? 0 : occupancy.getNode().getVelocity().z,
+                             occupancy.getCycleSampleCountForAudit(), occupancy.getSamplesPerCycleForAudit(),
+                             occupancy.wasCycleCompletedThisUpdate());
+    }
+
+    private static void append(StringBuilder row, Object value) {
+        if (row.length() > 0) row.append(',');
+        row.append(value);
+    }
+
+    private static void append(StringBuilder row, Vector3d value) {
+        append(row, value.x);
+        append(row, value.y);
+        append(row, value.z);
     }
 
     /**
@@ -326,8 +461,8 @@ public class TransportSystem extends AbstractSettings implements ISettings {
                 //System.out.println("absZ: " + absZ);
                 occupancy.incrementTransportCycleZ();
                 if (occupancy.getTransportCyclesZ() >= cyclesToMove) {
-                    directionA = pressure.z <= 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
-                    directionB = pressure.z > 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
+                    directionA  = pressure.z <= 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
+                    directionB  = pressure.z > 0 ? Constants.NEIGHBOR_BACK : Constants.NEIGHBOR_FRONT;
                     currentNode = moveNode(occupancy, currentNode, directionA, directionB);
                     if (currentNode != null)
                         occupancy.setTransportCyclesZ(0);

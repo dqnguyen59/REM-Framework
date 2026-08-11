@@ -147,11 +147,14 @@ public class NuklearView {
     private void initFont(NkUserFont font, ByteBuffer ttf, int fontSize) {
         int BITMAP_W = 1024;
         int BITMAP_H = 1024;
+        int firstCodePoint = 32;
+        int glyphCount = 95;
+        int fallbackGlyphIndex = '?'- firstCodePoint;
 
         int fontTexID = GL11C.glGenTextures();
 
 		STBTTFontinfo          fontInfo = STBTTFontinfo.create();
-		STBTTPackedchar.Buffer cdata    = STBTTPackedchar.create(95);
+		STBTTPackedchar.Buffer cdata    = STBTTPackedchar.create(glyphCount);
 
 		float scale;
 		float descent;
@@ -169,7 +172,7 @@ public class NuklearView {
             STBTTPackContext pc = STBTTPackContext.malloc(stack);
             STBTruetype.stbtt_PackBegin(pc, bitmap, BITMAP_W, BITMAP_H, 0, 1, MemoryUtil.NULL);
             STBTruetype.stbtt_PackSetOversampling(pc, 4, 4);
-            STBTruetype.stbtt_PackFontRange(pc, ttf, 0, fontSize, 32, cdata);
+            STBTruetype.stbtt_PackFontRange(pc, ttf, 0, fontSize, firstCodePoint, cdata);
             STBTruetype.stbtt_PackEnd(pc);
 
             // Convert R8 to RGBA8
@@ -231,7 +234,12 @@ public class NuklearView {
                 .height(fontSize)
                 .query((handle, font_height, glyph, codepoint, next_codepoint) -> {
                         glyphX.put(0, 0.0f); glyphY.put(0, 0.0f);
-                        STBTruetype.stbtt_GetPackedQuad(cdata, BITMAP_W, BITMAP_H, codepoint - 32, glyphX, glyphY, glyphQuad, false);
+                        int glyphIndex = codepoint - firstCodePoint;
+                        if (glyphIndex < 0 || glyphIndex >= glyphCount) {
+                            glyphIndex = fallbackGlyphIndex;
+                            codepoint = '?';
+                        }
+                        STBTruetype.stbtt_GetPackedQuad(cdata, BITMAP_W, BITMAP_H, glyphIndex, glyphX, glyphY, glyphQuad, false);
                         STBTruetype.stbtt_GetCodepointHMetrics(fontInfo, codepoint, glyphAdvance, null);
                         NkUserFontGlyph ufg = NkUserFontGlyph.create(glyph);
                         ufg.width(glyphQuad.x1() - glyphQuad.x0());

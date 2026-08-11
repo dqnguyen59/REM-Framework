@@ -1067,6 +1067,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         controller.close();
         pressureController.close();
         detectorController.close();
+        transportSystem.closeReceiverStatusLogging();
         FeasibilityPilotTelemetry.getInstance().close();
         discoveryWorkspace.close();
         if (discoveryViewport != null) discoveryViewport.close();
