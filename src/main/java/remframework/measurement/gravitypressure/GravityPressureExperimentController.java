@@ -45,6 +45,15 @@ public final class GravityPressureExperimentController {
         return output;
     }
 
+    /** Configures the existing receiver logger at an explicit diagnostic path. */
+    public Path configure(Path output, String experimentName, boolean sourceEnabled,
+                          String receiverConfiguration, Occupancy source,
+                          List<Occupancy> receivers) throws IOException {
+        logger.configure(output, experimentName, sourceEnabled,
+                receiverConfiguration, source, receivers);
+        return output;
+    }
+
     public void setEnabled(boolean enabled) {
         logger.setEnabled(enabled);
     }

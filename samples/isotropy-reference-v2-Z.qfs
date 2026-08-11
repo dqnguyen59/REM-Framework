@@ -24,7 +24,7 @@ amplitude.z = 200.0
 nodeIndex.x = 166
 nodeIndex.y = 166
 nodeIndex.z = 166
-graphRadius = 0
+graphRadius = 96
 
 [Detectors]
 Size = 0

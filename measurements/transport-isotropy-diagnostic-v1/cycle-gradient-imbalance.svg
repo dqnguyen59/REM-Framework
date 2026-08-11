@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="560"><rect width="100%" height="100%" fill="white"/><text x="80" y="28" font-size="18">Existing cycle gradient imbalance</text>
+<line x1="80" y1="55" x2="80" y2="490" stroke="black"/><line x1="80" y1="490" x2="1070" y2="490" stroke="black"/>
+<text x="8" y="70">signed value: 1</text><text x="8" y="490">-1</text></svg>
