@@ -18,6 +18,7 @@ public final class CompactMeasurementBackend implements AutoCloseable {
     private int sourceIndex = -1;
     private int[] sourceIndices;
     private double sourceForceX, sourceForceY, sourceForceZ;
+    private double lastAppliedSourceForceX, lastAppliedSourceForceY, lastAppliedSourceForceZ;
     private int parallelism = 1;
 
     public CompactMeasurementBackend(int nx, int ny, int nz,
@@ -47,8 +48,19 @@ public final class CompactMeasurementBackend implements AutoCloseable {
     public double accelerationX(int i){return accelerationX[i];} public double accelerationY(int i){return accelerationY[i];} public double accelerationZ(int i){return accelerationZ[i];}
     public double sourceForceX(){return sourceForceX;} public double sourceForceY(){return sourceForceY;} public double sourceForceZ(){return sourceForceZ;}
 
+    /**
+     * Returns the coherent source force applied to this occupied node by the
+     * most recent update, or zero for a node outside the configured source.
+     * This is a read-only diagnostic and does not alter the update equations.
+     */
+    public Vector3d lastAppliedSourceForce(int nodeIndex){
+        boolean source=sourceIndices==null?nodeIndex==sourceIndex:Arrays.binarySearch(sourceIndices,nodeIndex)>=0;
+        return source?new Vector3d(lastAppliedSourceForceX,lastAppliedSourceForceY,lastAppliedSourceForceZ):new Vector3d();
+    }
+
     /** Executes one causal v0.1 update and commits all buffered positions. */
     public void update(){
+        lastAppliedSourceForceX=sourceForceX;lastAppliedSourceForceY=sourceForceY;lastAppliedSourceForceZ=sourceForceZ;
         if(parallelism>1){
             Thread[] workers=new Thread[parallelism];
             int chunk=(nodeCount+parallelism-1)/parallelism;
