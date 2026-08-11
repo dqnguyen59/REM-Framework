@@ -1,0 +1,1 @@
+ConfigurationStatus = MEASUREMENT_INCOMPLETE

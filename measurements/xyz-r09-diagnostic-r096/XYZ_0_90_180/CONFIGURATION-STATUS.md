@@ -1,0 +1,1 @@
+ConfigurationStatus = VALID_DIAGNOSTIC
