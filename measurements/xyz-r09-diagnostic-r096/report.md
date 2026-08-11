@@ -1,12 +1,10 @@
-# R09=(1,1,1) XYZ oscillator diagnostic
+# Phase 5 Task 4 — Component-wise R09 normalization
 
-Control gate: persisted V2 R09 Z response = 0.06669444463224276 (Q=2.496871554772099).
+Post-processing only; raw Task 3 measurements were not changed. R09 = (1,1,1).
 
-| Configuration | Mean X | Mean Y | Mean Z | Status |
-|---|---:|---:|---:|---|
-| Z_ONLY | -0.034075668682109260 | -0.034075668682109260 | 0.066694444632242760 | VALID_DIAGNOSTIC |
-| XYZ_IN_PHASE | -0.044360117689687530 | -0.044360117689687530 | -0.044360117689687530 | VALID_DIAGNOSTIC |
-| XYZ_0_120_240 | 0.015024400316468409 | -0.062041306102079200 | -0.069041092718304100 | VALID_DIAGNOSTIC |
-| XYZ_0_90_180 | -0.011382642915248514 | -0.054480808795136140 | -0.090238899290790800 | VALID_DIAGNOSTIC |
+- Z_ONLY: R09 Qx=2.50000682566, Qy=2.50003426473, Qz=2.49687155477; errors=(1.50000682566, 1.50003426473, 1.49687155477)
+- XYZ_IN_PHASE: R09 Qx=2.50679110946, Qy=2.50171387466, Qz=2.50474423936; errors=(1.50679110946, 1.50171387466, 1.50474423936)
+- XYZ_0_120_240: R09 Qx=2.48016113454, Qy=2.49968212071, Qz=2.49785088345; errors=(1.48016113454, 1.49968212071, 1.49785088345)
+- XYZ_0_90_180: R09 Qx=2.52667932136, Qy=2.50035964949, Qz=2.4976883998; errors=(1.52667932136, 1.50035964949, 1.4976883998)
 
-This is a component-wise diagnostic only; no XYZ scalar Emax/MAD/StdDev or isotropy claim is defined.
+The Z-only gate reproduces Qz=2.4968715547720990 exactly. XYZ in-phase does not produce equal normalized Q components: max pairwise difference is 0.0050772347975. Its measured Emax/MAD/StdDev component metrics are likewise not equal. The 0/120/240 case reduces the X error relative to Z-only; the 0/90/180 case does not reduce any R09 component error. The smallest measured R09 component error is XYZ_0_120_240 on X. No combined XYZ isotropy metric or complete-isotropy claim is defined.
