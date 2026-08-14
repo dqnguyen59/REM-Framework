@@ -29,6 +29,7 @@ import remframework.gui.view.frames.*;
 import remframework.gui.view.frames.dialogs.FrameConfirmDialog;
 import remframework.gui.view.frames.dialogs.FrameOpenFileDialog;
 import remframework.gui.view.frames.dialogs.FrameSaveFileDialog;
+import remframework.gui.view.frames.dialogs.FrameAddProbes;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -65,6 +66,7 @@ public class NuklearModel {
 		preferences,
 		transportSystem,
 		isotropy,
+		addProbes,
 		geometryDiscoveryControls,
 		geometryDiscoveryMetrics,
 		geometryDiscoveryNode,
@@ -197,6 +199,8 @@ public class NuklearModel {
 			return new FrameTransportSystem(this);
 		case isotropy:
 			return new FrameIsotropy(this);
+		case addProbes:
+			return new FrameAddProbes(this);
 		case preferences:
 			return new FramePreferences(this);
 		case terrainSettings:

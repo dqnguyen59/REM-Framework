@@ -5,6 +5,7 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import remframework.gui.model.NuklearModel;
 import remframework.opengl.model.Probe;
+import remframework.opengl.model.ProbeDefinition;
 import remframework.opengl.model.entity.Occupancy;
 import remframework.opengl.model.entity.Node;
 import remframework.settings.Project;
@@ -34,6 +35,14 @@ public final class FrameIsotropy extends AbstractFrame {
 
     @Override
     protected void layout(NkContext ctx, int x, int y, int width, int height) {
+        Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 2);
+        boolean hasGeneratedProbes = project.getProbeDefinitions().stream()
+                .anyMatch(ProbeDefinition::isGenerated);
+        if (nk_button_label(ctx, hasGeneratedProbes ? "Edit Probes..." : "Add Probes...")) {
+            nuklearModel.showFrame(NuklearModel.Frame.addProbes);
+        }
+        Nuklear.nk_label(ctx, "Probe center is the lattice geometric center", Nuklear.NK_TEXT_LEFT);
+
         Probe probe = project.scene.getSelectedProbe();
         section(ctx, "Selected passive probe");
         if (probe == null) {
@@ -41,6 +50,15 @@ public final class FrameIsotropy extends AbstractFrame {
         } else {
             Node node = probe.getNode();
             scalar(ctx, "Probe", probe.getId());
+            ProbeDefinition.Placement placement = probe.getPlacement();
+            if (placement != null) {
+                scalar(ctx, "Ray / plane", placement.rayPlane());
+                scalar(ctx, "Requested radius", Integer.toString(placement.requestedRadius()));
+                scalar(ctx, "Realized radius", String.format(Locale.ROOT, "%.6f",
+                                                              placement.realizedRadius()));
+                scalar(ctx, "Graph distance (diagnostic)",
+                       Integer.toString(placement.graphDistance()));
+            }
             vector(ctx, "Node coordinate", probe.getNodeCoordinate());
             vector(ctx, "Node position", node.getPosition());
             vector(ctx, "Gradient Imbalance", node.getGradientImbalance());

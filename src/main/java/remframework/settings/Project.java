@@ -88,6 +88,7 @@ public class Project extends AbstractSettings implements ISettings {
     private final ArrayList<Light> lights = new ArrayList<>();
 
     public List<Occupancy> occupancies = new ArrayList<>();
+    private List<ProbeDefinition> probeDefinitions = new ArrayList<>();
     private List<Detector> detectors = List.of();
 
     public static Project getInstance() {
@@ -100,6 +101,16 @@ public class Project extends AbstractSettings implements ISettings {
 
     public Project() {
         super();
+    }
+
+    /** Atomically replaces session-generated probes while preserving non-generated receivers. */
+    public void replaceGeneratedProbeDefinitions(List<ProbeDefinition> generatedDefinitions) {
+        List<ProbeDefinition> replacement = new ArrayList<>();
+        for (ProbeDefinition definition : probeDefinitions) {
+            if (!definition.isGenerated()) replacement.add(definition);
+        }
+        replacement.addAll(generatedDefinitions);
+        probeDefinitions = replacement;
     }
 
     public Project(Project project) {
@@ -180,6 +191,8 @@ public class Project extends AbstractSettings implements ISettings {
 
         settings.loadFromFile(ini, "QFSSettings", 0);
         slitWall.loadFromFile(ini, "SlitWall", 0);
+
+        probeDefinitions.clear();
 
         int size = getInt("Oscillators", "Size", 0);
 

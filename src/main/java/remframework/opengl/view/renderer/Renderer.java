@@ -35,6 +35,7 @@ public class Renderer {
 	
 	private EntityRenderer nodeRenderer;
 	private TerrainRenderer terrainRenderer;
+	private final List<Entity> probeEntities = new ArrayList<>();
 	
 	private static boolean isCulling = false;
 	
@@ -77,6 +78,20 @@ public class Renderer {
 	public void cleanupNodes() {
 		System.out.println("Renderer.cleanupNodes()");
 		nodeRenderer.getEntities().clear();
+		probeEntities.clear();
+	}
+
+	/** Synchronizes passive probe markers without adding them to the lattice entity set. */
+	public void syncProbeEntities(List<Entity> entities) {
+		for (Entity entity : probeEntities) {
+			List<Entity> rendered = nodeRenderer.getEntities().get(entity.getModel());
+			if (rendered != null) rendered.remove(entity);
+		}
+		probeEntities.clear();
+		for (Entity entity : entities) {
+			processEntity(entity);
+			probeEntities.add(entity);
+		}
 	}
 
 	public static void enableCulling() {

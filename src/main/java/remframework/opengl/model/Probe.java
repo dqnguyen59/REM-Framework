@@ -17,13 +17,16 @@ public final class Probe {
     private final Node node;
     private final Entity marker;
     private final Vector4f displayColor;
+    private final ProbeDefinition.Placement placement;
     private boolean selected;
 
-    public Probe(String id, Node node, Entity marker, Vector4f displayColor) {
+    public Probe(String id, Node node, Entity marker, Vector4f displayColor,
+                 ProbeDefinition.Placement placement) {
         this.id = id;
         this.node = node;
         this.marker = marker;
         this.displayColor = new Vector4f(displayColor);
+        this.placement = placement;
     }
 
     /** Returns the live coordinate of the referenced node. */

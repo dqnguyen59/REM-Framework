@@ -324,6 +324,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         Probe probe = scene.getProbeForNode(node);
         if (probe != null && (leftButtonPressed || leftButtonReleased)) {
             scene.selectProbe(probe);
+            remModel.setCurrentMouseNode(node);
+            remModel.getCurrentMouseNodeIndex().set(node.getIndex());
             return true;
         }
 
@@ -982,26 +984,19 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void createIsotropyProbe() {
-        if (!"detectGradient8.qfs".equals(Path.of(project.getCurrentFilename()).getFileName().toString())) {
-            return;
+        scene.clearProbes();
+        String filename = project.getCurrentFilename();
+        boolean detectGradient8 = !filename.isEmpty()
+                && "detectGradient8.qfs".equals(Path.of(filename).getFileName().toString());
+        if (detectGradient8 && project.getProbeDefinitions().stream()
+                .noneMatch(definition -> "detectGradient8-receiver".equals(definition.getId()))) {
+            project.getProbeDefinitions().add(new ProbeDefinition(
+                    "detectGradient8-receiver", new Vector3i(130, 140, 0),
+                    new Vector4f(0.2f, 0.8f, 1.0f, 1.0f)));
         }
-
-        Vector3i receiverIndex = new Vector3i(130, 140, 0);
-        Node receiverNode = scene.getLattice().getNodeByIndex(receiverIndex);
-        if (receiverNode == null) return;
-
-        Entity marker = scene.getLattice().createEntity(
-                new Vector3d(receiverNode.getPosition()), new Vector3d(), receiverNode.getScale() * 2.0);
-        marker.setOverrideModelMaterial(true);
-        marker.getMaterial().setDiffuseColor(new Vector4f(0.2f, 0.8f, 1.0f, 1.0f));
-        marker.getMaterial().setAmbientColor(new Vector4f(0.2f, 0.8f, 1.0f, 1.0f));
-        marker.getMaterial().setShininess(0.0f);
-
-        Probe probe = new Probe("detectGradient8-receiver", receiverNode, marker,
-                                new Vector4f(0.2f, 0.8f, 1.0f, 1.0f));
-        scene.addProbe(probe);
-        probe.updateMarker();
-        renderer.processEntity(marker);
+        for (ProbeDefinition definition : project.getProbeDefinitions()) {
+            scene.createProbe(definition, false);
+        }
     }
 
     private void updateNodesArray() {
@@ -1180,6 +1175,10 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         for (Probe probe : scene.getProbes()) {
             probe.updateMarker();
         }
+        for (Probe probe : scene.getPreviewProbes()) {
+            probe.updateMarker();
+        }
+        renderer.syncProbeEntities(scene.getProbeRenderEntities());
         if (project.terrain.isVisible())
             renderer.processTerrain(project.terrain);
         renderer.render(project.camera, scene);

@@ -54,6 +54,8 @@ public class Scene {
     private ArrayList<Vector3i> wallNodeIndexList = new ArrayList<>();
     private ArrayList<Node>     hiLightedNodes    = new ArrayList<>();
     private ArrayList<Probe>    probes            = new ArrayList<>();
+    private ArrayList<Probe>    previewProbes     = new ArrayList<>();
+    private boolean             replacementProbePreviewActive;
     private Probe               selectedProbe;
     private Node                firstHiLightedNode;
 
@@ -78,6 +80,7 @@ public class Scene {
     public void build() {
         System.out.println("Scene.build()");
         clearProbes();
+        clearPreviewProbes();
         Entity baseEntity = lattice.build();
         // Draw xyz arrows on entity baseField.
         Vector3i dimension = new Vector3i();
@@ -171,16 +174,99 @@ public class Scene {
         probes.add(probe);
     }
 
+    /** Creates a renderer-only marker that references a live node without creating an occupancy. */
+    public Probe createProbe(ProbeDefinition definition, boolean preview) {
+        Probe probe = buildProbe(definition, preview);
+        if (probe == null) return null;
+        if (preview) previewProbes.add(probe);
+        else probes.add(probe);
+        return probe;
+    }
+
+    private Probe buildProbe(ProbeDefinition definition, boolean preview) {
+        Node node = lattice.getNodeByIndex(definition.getNodeIndex());
+        if (node == null) return null;
+        Entity marker = new Entity(lattice.getBaseEntity(), lattice.getModelSphere(),
+                                   new Vector3d(node.getPosition()), new Vector3d(),
+                                   node.getScale() * (preview ? 2.0 : 2.75), EntityType.ENTITY);
+        marker.setOverrideModelMaterial(true);
+        marker.getMaterial().setDiffuseColor(definition.getDisplayColor());
+        marker.getMaterial().setAmbientColor(definition.getDisplayColor());
+        marker.getMaterial().setShininess(0.0f);
+        Probe probe = new Probe(definition.getId(), node, marker, definition.getDisplayColor(),
+                                definition.getPlacement());
+        probe.updateMarker();
+        return probe;
+    }
+
+    /** Replaces transient preview markers while leaving committed probe definitions untouched. */
+    public void setPreviewDefinitions(List<ProbeDefinition> definitions) {
+        setPreviewDefinitions(definitions, false);
+    }
+
+    /** Shows replacement previews without rendering duplicate committed generated markers. */
+    public void setPreviewDefinitions(List<ProbeDefinition> definitions, boolean replacesGenerated) {
+        clearPreviewProbes();
+        replacementProbePreviewActive = replacesGenerated;
+        for (ProbeDefinition definition : definitions) createProbe(definition, true);
+    }
+
+    /** Removes transient preview markers without changing committed probes or project data. */
+    public void clearPreviewProbes() {
+        previewProbes.clear();
+        replacementProbePreviewActive = false;
+    }
+
+    public List<Entity> getProbeRenderEntities() {
+        List<Entity> entities = new ArrayList<>();
+        for (Probe probe : probes) {
+            if (!replacementProbePreviewActive
+                    || !probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) {
+                entities.add(probe.getMarker());
+            }
+        }
+        for (Probe probe : previewProbes) entities.add(probe.getMarker());
+        return entities;
+    }
+
+    /** Replaces previews with committed renderer-only markers for the supplied definitions. */
+    public void commitProbeDefinitions(List<ProbeDefinition> definitions) {
+        clearPreviewProbes();
+        for (ProbeDefinition definition : definitions) createProbe(definition, false);
+    }
+
+    /** Atomically replaces generated probe markers while preserving manually created receivers. */
+    public boolean replaceGeneratedProbeDefinitions(List<ProbeDefinition> definitions) {
+        List<Probe> replacements = new ArrayList<>();
+        for (ProbeDefinition definition : definitions) {
+            Probe replacement = buildProbe(definition, false);
+            if (replacement == null) return false;
+            replacements.add(replacement);
+        }
+        if (selectedProbe != null && selectedProbe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) {
+            selectedProbe.setSelected(false);
+            selectedProbe = null;
+        }
+        probes.removeIf(probe -> probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX));
+        probes.addAll(replacements);
+        clearPreviewProbes();
+        return true;
+    }
+
     public void clearProbes() {
         if (selectedProbe != null) selectedProbe.setSelected(false);
         selectedProbe = null;
         probes.clear();
     }
 
+    /** Makes the committed probe the live diagnostic selection and refreshes its marker immediately. */
     public void selectProbe(Probe probe) {
         if (selectedProbe != null) selectedProbe.setSelected(false);
         selectedProbe = probe;
-        if (selectedProbe != null) selectedProbe.setSelected(true);
+        if (selectedProbe != null) {
+            selectedProbe.setSelected(true);
+            selectedProbe.updateMarker();
+        }
     }
 
     public Probe getProbeForNode(Node node) {
