@@ -28,6 +28,7 @@ import remframework.geometry.discovery.optimization.*;
  */
 package remframework.gui.view.frames;
 
+import lombok.Getter;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.lwjgl.nuklear.*;
@@ -110,9 +111,10 @@ public abstract class AbstractFrame implements IFrame {
 
 	private Stack<int[]> stackTextColor = new Stack<>();
 
-	private final NkRect frameRect = NkRect.create();
-	private final NkRect resizeHandleRect = NkRect.create();
-	private final NkRect contentRect = NkRect.create();
+    private final NkRect frameRect        = NkRect.create();
+    @Getter
+    private final NkRect resizeHandleRect = NkRect.create();
+    private final NkRect contentRect      = NkRect.create();
 	private NkVec2 pos = NkVec2.create();
 
 	private boolean customResizeEnabled;
@@ -290,6 +292,7 @@ public abstract class AbstractFrame implements IFrame {
 			if (inputBlocked) Nuklear.nk_widget_disable_begin(ctx);
 			layout(ctx, (int)contentRect.x(), (int)contentRect.y(), width, height);
 			if (inputBlocked) Nuklear.nk_widget_disable_end(ctx);
+			drawOverlay(ctx);
 
 			tabKeyPressed = false;
 			focusChanged = false;
@@ -324,11 +327,7 @@ public abstract class AbstractFrame implements IFrame {
 		resizeHandleRect.h(scrollbarSize.y());
 	}
 
-	public NkRect getResizeHandleRect() {
-		return resizeHandleRect;
-	}
-
-	protected final void enableCustomResize(float minimumWidth, float minimumHeight, float gripSize) {
+    protected final void enableCustomResize(float minimumWidth, float minimumHeight, float gripSize) {
 		customResizeEnabled = true;
 		resizeMinimumWidth = minimumWidth;
 		resizeMinimumHeight = minimumHeight;
@@ -396,6 +395,10 @@ public abstract class AbstractFrame implements IFrame {
 	}
 
 	record ResizeBounds(float x, float y, float width, float height) {}
+
+	protected void drawOverlay(NkContext ctx) {
+		// Optional frame-owned visual overlays are drawn after content and before nk_end.
+	}
 
 	protected void createLayout(NkContext ctx, int x, int y, int width, int height) {
 		_createLayout(ctx, x, y, width, height, false, false);

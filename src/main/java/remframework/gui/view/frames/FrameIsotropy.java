@@ -2,9 +2,12 @@ package remframework.gui.view.frames;
 
 import org.joml.Vector3d;
 import org.lwjgl.nuklear.NkContext;
+import org.lwjgl.nuklear.NkCommandBuffer;
+import org.lwjgl.nuklear.NkRect;
 import org.lwjgl.nuklear.NkVec2;
 import org.lwjgl.nuklear.Nuklear;
 import remframework.gui.model.NuklearModel;
+import remframework.gui.model.Theme;
 import remframework.opengl.model.PassiveObserver;
 import remframework.opengl.model.Probe;
 import remframework.opengl.model.ProbeDefinition;
@@ -174,6 +177,19 @@ public final class FrameIsotropy extends AbstractFrame {
         scalar(ctx, "Samples in last completed cycle", Integer.toString(receiver.getSamplesPerCycleForAudit()));
         scalar(ctx, "Cycle completed", Boolean.toString(receiver.wasCycleCompletedThisUpdate()));
         Nuklear.nk_group_end(ctx);
+    }
+
+    @Override
+    protected void drawOverlay(NkContext ctx) {
+        NkRect grip = getResizeHandleRect();
+        float inset = 20.0f;
+        float left = grip.x() + 0;
+        float top = grip.y() + 0;
+        float right = grip.x() + grip.w() - inset;
+        float bottom = grip.y() + grip.h() - inset;
+        NkCommandBuffer canvas = Nuklear.nk_window_get_canvas(ctx);
+        // Visual indicator for the custom resize grip; it does not handle input.
+        Nuklear.nk_fill_triangle(canvas, right, top, right, bottom, left, bottom, Theme.white);
     }
 
     static String sourceSamplesLabel(int index) {
