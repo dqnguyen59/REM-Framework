@@ -65,7 +65,7 @@ public class Scene {
     private final Map<PassiveObserver, Entity> gradientArrowEntities = new IdentityHashMap<>();
     private ObjFileModel gradientArrowModel;
     private boolean showGradientArrows;
-    private double gradientArrowScale = 1.0;
+    private double gradientArrowScaleExponent = 51.0;
     private Node                firstHiLightedNode;
 
     private DirectionalLight directionalLight;
@@ -268,12 +268,16 @@ public class Scene {
         if (!showGradientArrows) hideGradientArrows();
     }
 
-    public double getGradientArrowScale() {
-        return gradientArrowScale;
+    public double getGradientArrowScaleExponent() {
+        return gradientArrowScaleExponent;
     }
 
-    public void setGradientArrowScale(double gradientArrowScale) {
-        this.gradientArrowScale = Math.max(0.0, gradientArrowScale);
+    public void setGradientArrowScaleExponent(double exponent) {
+        gradientArrowScaleExponent = Math.max(0.0, Math.min(120.0, exponent));
+    }
+
+    public double getGradientArrowScale() {
+        return Math.pow(10.0, gradientArrowScaleExponent / 10.0);
     }
 
     /** Updates cached renderer-only gradient arrows without recreating their entities. */
@@ -300,18 +304,20 @@ public class Scene {
                     && probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) continue;
             Entity arrow = gradientArrowEntities.computeIfAbsent(probe, this::createGradientArrow);
             Vector3d gradient = probe.getStableGradientImbalance();
-            Vector3d arrowVector = new Vector3d(gradient).mul(gradientArrowScale);
+            Vector3d arrowVector = new Vector3d(gradient).mul(getGradientArrowScale());
             double length = arrowVector.length();
             if (!Double.isFinite(length) || length <= 0.0) {
                 arrow.setVisible(false);
                 continue;
             }
             Vector3d anchor = probe.getMarker().getPosition();
+            Vector3d rotation = GradientArrowGeometry.rotationForDirection(arrowVector);
+            if (rotation == null) {
+                arrow.setVisible(false);
+                continue;
+            }
             arrow.setPosition(anchor);
-            arrow.setRotation(Math.toDegrees(Math.atan2(arrowVector.z,
-                                                         Math.hypot(arrowVector.x, arrowVector.y))),
-                              0.0,
-                              Math.toDegrees(-Math.atan2(arrowVector.x, arrowVector.y)));
+            arrow.setRotation(rotation);
             arrow.setScale(length);
             arrow.setCustomColor(new Vector4f(probe.getMarker().getMaterial().getAmbientColor()));
             arrow.setVisible(true);

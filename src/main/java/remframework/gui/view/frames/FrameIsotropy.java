@@ -67,8 +67,12 @@ public final class FrameIsotropy extends AbstractFrame {
         section(ctx, "Gradient visualization");
         project.scene.setShowGradientArrows(nk_check_label(ctx, "Show gradient imbalance arrows",
                                                             project.scene.isShowGradientArrows(), 0.7, 0.3));
-        scalar(ctx, "Gradient arrow scale", format(project.scene.getGradientArrowScale()));
-        project.scene.setGradientArrowScale(nk_slider(ctx, 0.0, project.scene.getGradientArrowScale(), 10.0, 0.01));
+        scalar(ctx, "Gradient arrow scale exponent",
+               Integer.toString((int) project.scene.getGradientArrowScaleExponent()));
+        project.scene.setGradientArrowScaleExponent(
+                Math.rint(nk_slider(ctx, 0.0, project.scene.getGradientArrowScaleExponent(), 120.0, 1)));
+        scalar(ctx, "Visual scale", "10^" + (int) project.scene.getGradientArrowScaleExponent()
+                + " = " + format(project.scene.getGradientArrowScale()));
 
         NkVec2 contentSize = NkVec2.create();
         Nuklear.nk_window_get_content_region_size(ctx, contentSize);
