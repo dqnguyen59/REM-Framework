@@ -348,6 +348,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         Node node = scene.getNodeFromMousePos(remModel.getMousePos().x,
                                               remModel.getMousePos().y);
         Probe probe = scene.getProbeForNode(node);
+        boolean ctrlLeftClick = button == GLFW.GLFW_MOUSE_BUTTON_1
+                && (mods & GLFW.GLFW_MOD_CONTROL) != 0;
+        if (ctrlLeftClick) {
+            if (leftButtonPressed) handleCtrlComparisonSelection(node, probe);
+            return true;
+        }
         if (probe != null && (leftButtonPressed || leftButtonReleased)) {
             scene.selectProbe(probe);
             remModel.setCurrentMouseNode(node);
@@ -408,6 +414,28 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             rightButtonPress   = false;
         }
         return false;
+    }
+
+    /** Handles Ctrl-click comparison assignment without changing normal probe selection. */
+    private void handleCtrlComparisonSelection(Node node, Probe rawProbe) {
+        PassiveObserver candidate = rawProbe;
+        if (candidate == null) {
+            candidate = scene.getInterpolatedProbeFromMousePos(
+                    remModel.getMousePos().x, remModel.getMousePos().y);
+        }
+        if (candidate != null) {
+            if (!candidate.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) {
+                remModel.setCustomStatus("Only generated probes can be compared.");
+            } else if (!scene.toggleComparisonProbe(candidate)) {
+                remModel.setCustomStatus("Comparison pair is full.");
+            }
+            return;
+        }
+        if (scene.getPreviewProbeForNode(node) != null
+                || scene.getPreviewInterpolatedProbeFromMousePos(
+                        remModel.getMousePos().x, remModel.getMousePos().y) != null) {
+            remModel.setCustomStatus("Preview probes cannot be compared.");
+        }
     }
 
     @Override
@@ -822,6 +850,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             } else {
                 waitAfterReset--;
             }
+            scene.updateProbeMeasurements(transportSystem);
             simulateDetection();
             scene.processRemFieldEngine(numThreads, segmentSize);
             scene.waitForAllTasksReady();

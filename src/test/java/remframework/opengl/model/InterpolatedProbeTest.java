@@ -88,7 +88,14 @@ class InterpolatedProbeTest {
         expectedSelected.w = 1.0f;
         assertEquals(expectedSelected, marker.getMaterial().getDiffuseColor());
 
+        probe.setComparisonSlot(0);
+        probe.updateMarker();
+        Vector4f expectedComparison = new Vector4f(0.0f, 1.0f, 0.0f, 1.0f).mul(2.0f);
+        expectedComparison.w = 1.0f;
+        assertEquals(expectedComparison, marker.getMaterial().getDiffuseColor());
+
         probe.setSelected(false);
+        probe.setComparisonSlot(-1);
         probe.setHovered(false);
         probe.updateMarker();
         Vector4f expectedNormal = new Vector4f(probeColour).mul(2.0f);

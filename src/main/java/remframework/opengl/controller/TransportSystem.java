@@ -166,6 +166,13 @@ public class TransportSystem extends AbstractSettings implements ISettings {
         // G = measureGradientImbalance * gradientGain
         storeMeasuredGradientImbalance(occupancy);
 
+        // Probe Occupancies use the same stable measurement path but have no
+        // permitted physics side effects.
+        if (!occupancy.getOccupant().canExcite() && !occupancy.getOccupant().canTransfer()) {
+            occupancy.isCycleCompleted();
+            return;
+        }
+
         // C is the inverseFactor
         // a(G)=sign(G) * 1 / (C + G²) - 1 / C
         updateAcceleration(occupancy);
@@ -321,10 +328,14 @@ public class TransportSystem extends AbstractSettings implements ISettings {
      */
     private void storeMeasuredGradientImbalance(Occupancy occupancy) {
         Vector3d measuredGradient = occupancy.getNode().measureGradientImbalance();
-        gravityMeasurementLogger.captureRawGradient(occupancy, measuredGradient);
-        gravityPressureController.captureRawGradient(occupancy, measuredGradient);
+        if (occupancy.getIdentity() != null) {
+            gravityMeasurementLogger.captureRawGradient(occupancy, measuredGradient);
+            gravityPressureController.captureRawGradient(occupancy, measuredGradient);
+        }
         measuredGradient.mul(gradientGain);
-        gravityPressureController.captureScaledGradient(occupancy, measuredGradient);
+        if (occupancy.getIdentity() != null) {
+            gravityPressureController.captureScaledGradient(occupancy, measuredGradient);
+        }
         occupancy.saveGradientToHistory(measuredGradient);
     }
 

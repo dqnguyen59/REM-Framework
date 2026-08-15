@@ -25,6 +25,7 @@ import remframework.helpers.Constants;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.EntityType;
 import remframework.opengl.model.entity.Node;
+import remframework.opengl.controller.TransportSystem;
 import remframework.opengl.model.lights.DirectionalLight;
 import remframework.opengl.helpers.OBJFormatLoader;
 import remframework.settings.AppSettings;
@@ -58,6 +59,7 @@ public class Scene {
     private boolean             replacementProbePreviewActive;
     private PassiveObserver     selectedProbe;
     private PassiveObserver     hoveredProbe;
+    private final ProbeComparison comparison = new ProbeComparison();
     private Node                firstHiLightedNode;
 
     private DirectionalLight directionalLight;
@@ -175,7 +177,17 @@ public class Scene {
         probes.add(probe);
     }
 
-    /** Creates a renderer-only passive observer without creating an identity or occupancy. */
+    /** Reconstructs committed probe measurements through TransportSystem after lattice creation. */
+    public void updateProbeMeasurements(TransportSystem transportSystem) {
+        for (PassiveObserver probe : probes) {
+            if (probe instanceof Probe rawProbe) rawProbe.updateMeasurements(transportSystem);
+            else if (probe instanceof InterpolatedProbe interpolatedProbe) {
+                interpolatedProbe.updateMeasurements(transportSystem);
+            }
+        }
+    }
+
+    /** Reconstructs a renderer-only passive observer without adding a project Identity Occupancy. */
     public PassiveObserver createProbe(ProbeDefinition definition, boolean preview) {
         PassiveObserver probe = buildProbe(definition, preview);
         if (probe == null) return null;
@@ -275,6 +287,7 @@ public class Scene {
             hoveredProbe.setHovered(false);
             hoveredProbe = null;
         }
+        clearComparison();
         probes.removeIf(probe -> probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX));
         probes.addAll(replacements);
         clearPreviewProbes();
@@ -287,14 +300,21 @@ public class Scene {
         if (hoveredProbe != null) hoveredProbe.setHovered(false);
         selectedProbe = null;
         hoveredProbe = null;
+        clearComparison();
     }
 
     /** Removes all probe markers and restores the ordinary lattice render state. */
     public void clearProbes() {
         clearProbeInteractionState();
+        for (PassiveObserver probe : probes) resetProbeMeasurements(probe);
+        for (PassiveObserver probe : previewProbes) resetProbeMeasurements(probe);
         probes.clear();
         previewProbes.clear();
         replacementProbePreviewActive = false;
+    }
+
+    private static void resetProbeMeasurements(PassiveObserver probe) {
+        for (var occupancy : probe.getOccupancies()) occupancy.resetMeasurementState();
     }
 
     /** Makes the committed probe the live diagnostic selection and refreshes its marker immediately. */
@@ -321,6 +341,35 @@ public class Scene {
         }
     }
 
+    /** Assigns or removes an eligible generated probe from comparison A or B. */
+    public boolean toggleComparisonProbe(PassiveObserver probe) {
+        if (probe == null || !probes.contains(probe)
+                || !probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) return false;
+        if (!comparison.toggle(probe)) return false;
+        applyComparisonSlots();
+        return true;
+    }
+
+    /** Clears both live comparison slots and restores their normal marker colours. */
+    public void clearComparison() {
+        comparison.clear();
+        applyComparisonSlots();
+    }
+
+    public ProbeComparison getComparison() {
+        return comparison;
+    }
+
+    private void applyComparisonSlots() {
+        for (PassiveObserver probe : probes) probe.setComparisonSlot(-1);
+        PassiveObserver a = comparison.get(ProbeComparison.Slot.A);
+        PassiveObserver b = comparison.get(ProbeComparison.Slot.B);
+        if (a != null) a.setComparisonSlot(0);
+        if (b != null) b.setComparisonSlot(1);
+        if (a != null) a.updateMarker();
+        if (b != null && b != a) b.updateMarker();
+    }
+
     public Probe getProbeForNode(Node node) {
         if (node == null) return null;
         for (PassiveObserver observer : probes) {
@@ -329,8 +378,25 @@ public class Scene {
         return null;
     }
 
+    public PassiveObserver getPreviewProbeForNode(Node node) {
+        if (node == null) return null;
+        for (PassiveObserver observer : previewProbes) {
+            if (observer instanceof Probe probe && probe.getNode() == node) return probe;
+        }
+        return null;
+    }
+
     /** Returns the nearest interpolated marker after the unchanged node-picking path misses. */
     public InterpolatedProbe getInterpolatedProbeFromMousePos(double xPos, double yPos) {
+        return getInterpolatedProbeFromMousePos(xPos, yPos, probes);
+    }
+
+    public InterpolatedProbe getPreviewInterpolatedProbeFromMousePos(double xPos, double yPos) {
+        return getInterpolatedProbeFromMousePos(xPos, yPos, previewProbes);
+    }
+
+    private InterpolatedProbe getInterpolatedProbeFromMousePos(
+            double xPos, double yPos, List<PassiveObserver> candidates) {
         Matrix4f projectionMatrix = project.camera.getProjectionMatrix();
         Matrix4f viewMatrix = project.camera.getViewMatrix();
         Vector3f cameraPos = project.camera.getPosition();
@@ -347,7 +413,7 @@ public class Scene {
         float nearestDistance = Float.POSITIVE_INFINITY;
         Vector4f markerPosition = new Vector4f();
         Vector2f intersection = new Vector2f();
-        for (PassiveObserver observer : probes) {
+        for (PassiveObserver observer : candidates) {
             if (!(observer instanceof InterpolatedProbe interpolatedProbe)) continue;
             Entity marker = observer.getMarker();
             marker.getTransformMatrix4f().transform(0, 0, 0, 1, markerPosition);

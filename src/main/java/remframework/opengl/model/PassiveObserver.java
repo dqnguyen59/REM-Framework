@@ -2,6 +2,9 @@ package remframework.opengl.model;
 
 import org.joml.Vector3d;
 import remframework.opengl.model.entity.Entity;
+import remframework.opengl.model.entity.Occupancy;
+
+import java.util.List;
 
 /** Shared render and read-only observation contract for passive probes. */
 public interface PassiveObserver {
@@ -45,9 +48,19 @@ public interface PassiveObserver {
 
     Observation getObservation();
 
+    /** Returns the source Occupancies used by this passive measurement. */
+    default List<Occupancy> getOccupancies() { return List.of(); }
+
+    /** Returns the stable completed-cycle gradient exposed by this passive measurement. */
+    default Vector3d getStableGradientImbalance() {
+        return getObservation().gradientImbalance();
+    }
+
     void setSelected(boolean selected);
 
     void setHovered(boolean hovered);
+
+    void setComparisonSlot(int slot);
 
     void updateMarker();
 }

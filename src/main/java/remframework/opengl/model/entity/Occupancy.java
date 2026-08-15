@@ -31,7 +31,7 @@ import remframework.helpers.AbstractSettings;
 import remframework.helpers.ISettings;
 
 /**
- * Represents the relationship between an Identity and a Node.
+ * Represents the relationship between an Occupant and a Node.
  * <br>
  * <br>
  * An Identity does not directly have a position in REM-FIELD.
@@ -41,7 +41,7 @@ import remframework.helpers.ISettings;
  * The Occupancy object is also the location where transport state is stored.
  * This is important because pressure belongs to the relationship:
  * <br>
- *     Identity <-> Node
+ *     Occupant <-> Node
  * <br>
  * <br>
  * and not to the Identity itself or the Node itself.
@@ -67,6 +67,9 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     /** Identity currently occupying this node. */
     private Identity identity;
+
+    /** Runtime occupant; Identity remains separately persisted for .qfs compatibility. */
+    private transient Occupant occupant;
 
     /**
      * The lattice node currently occupied by this Identity.
@@ -169,11 +172,39 @@ public class Occupancy extends AbstractSettings implements ISettings {
      */
     public Occupancy(Identity identity, Node node) {
         this.identity = identity;
+        this.occupant = identity;
+        if (identity != null) identity.setOccupancy(this);
         this.node = node;
         if (node != null) {
             nodeIndex.set(node.getIndex());
         }
         resetHistory();
+    }
+
+    /** Creates a general Occupant–Node relation without changing Identity serialization. */
+    public Occupancy(Occupant occupant, Node node) {
+        this.occupant = occupant;
+        this.identity = occupant instanceof Identity identityValue ? identityValue : null;
+        if (identity != null) identity.setOccupancy(this);
+        this.node = node;
+        if (node != null) nodeIndex.set(node.getIndex());
+        resetHistory();
+    }
+
+    /** Returns the runtime occupant, falling back to the persisted Identity after loading. */
+    public Occupant getOccupant() {
+        return occupant != null ? occupant : identity;
+    }
+
+    /** Assigns a runtime occupant without altering the legacy Identity field. */
+    public void setOccupant(Occupant occupant) {
+        this.occupant = occupant;
+        if (occupant instanceof Identity identityValue) this.identity = identityValue;
+    }
+
+    /** Compatibility accessor retained for existing Identity callers and project files. */
+    public Identity getIdentity() {
+        return identity;
     }
 
     public int getGraphRadius() { return graphRadius; }
@@ -317,6 +348,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
         identity = new Identity("");
         identity.loadFromFile(ini, section, index);
+        identity.setOccupancy(this);
     }
 
     @Override
@@ -333,7 +365,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     public boolean isOccupied() {
-        return identity != null && nodeIndex != null;// && node != null;
+        return getOccupant() != null && nodeIndex != null;// && node != null;
     }
 
     public void setNode(Node node) {
@@ -345,6 +377,10 @@ public class Occupancy extends AbstractSettings implements ISettings {
     @Override
     public void reset() {
         System.out.println("Occupancy.reset()");
+        if (identity == null) {
+            resetMeasurementState();
+            return;
+        }
         identity.reset();
         pressure.zero();
         resetMaxGradient();
@@ -356,6 +392,28 @@ public class Occupancy extends AbstractSettings implements ISettings {
         entity.getMaterial().setShininess(0.0f);
 
         identity.setEntity(entity);
+    }
+
+    /** Clears measurement-only state for a Probe Occupancy without creating an Identity entity. */
+    public void resetMeasurementState() {
+        gradientImbalance.zero();
+        lastMeasuredGradient.zero();
+        acceleration.zero();
+        pressure.zero();
+        transportMomentum.zero();
+        resetMaxGradient();
+        resetHistory();
+        gradientHistoryIndex = 0;
+        cycleSampleCount = 0;
+        samplesPerCycle = GRADIENT_IMBALANCE_HISTORY_LENGTH;
+        signIsPositiveZ = true;
+        cycleCompletedThisUpdate = false;
+        transportCyclesX = 0;
+        transportCyclesY = 0;
+        transportCyclesZ = 0;
+        addAccX = 0.0;
+        addAccY = 0.0;
+        addAccZ = 0.0;
     }
 
     public void saveGradientToHistory(Vector3d gradient) {
