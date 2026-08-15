@@ -36,6 +36,7 @@ public class Renderer {
 	private EntityRenderer nodeRenderer;
 	private TerrainRenderer terrainRenderer;
 	private final List<Entity> probeEntities = new ArrayList<>();
+	private final List<Entity> gradientArrowEntities = new ArrayList<>();
 	
 	private static boolean isCulling = false;
 	
@@ -79,6 +80,20 @@ public class Renderer {
 		System.out.println("Renderer.cleanupNodes()");
 		nodeRenderer.getEntities().clear();
 		probeEntities.clear();
+		gradientArrowEntities.clear();
+	}
+
+	/** Synchronizes cached passive-probe arrows without adding them to the lattice entity set. */
+	public void syncGradientArrowEntities(List<Entity> entities) {
+		for (Entity entity : gradientArrowEntities) {
+			List<Entity> rendered = nodeRenderer.getEntities().get(entity.getModel());
+			if (rendered != null) rendered.remove(entity);
+		}
+		gradientArrowEntities.clear();
+		for (Entity entity : entities) {
+			processEntity(entity);
+			gradientArrowEntities.add(entity);
+		}
 	}
 
 	/** Synchronizes passive probe markers without adding them to the lattice entity set. */

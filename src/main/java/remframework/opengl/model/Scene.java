@@ -35,7 +35,9 @@ import remframework.settings.SlitWallSettings;
 
 import java.lang.Math;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -60,6 +62,10 @@ public class Scene {
     private PassiveObserver     selectedProbe;
     private PassiveObserver     hoveredProbe;
     private final ProbeComparison comparison = new ProbeComparison();
+    private final Map<PassiveObserver, Entity> gradientArrowEntities = new IdentityHashMap<>();
+    private ObjFileModel gradientArrowModel;
+    private boolean showGradientArrows;
+    private double gradientArrowScale = 1.0;
     private Node                firstHiLightedNode;
 
     private DirectionalLight directionalLight;
@@ -253,6 +259,85 @@ public class Scene {
         replacementProbePreviewActive = false;
     }
 
+    public boolean isShowGradientArrows() {
+        return showGradientArrows;
+    }
+
+    public void setShowGradientArrows(boolean showGradientArrows) {
+        this.showGradientArrows = showGradientArrows;
+        if (!showGradientArrows) hideGradientArrows();
+    }
+
+    public double getGradientArrowScale() {
+        return gradientArrowScale;
+    }
+
+    public void setGradientArrowScale(double gradientArrowScale) {
+        this.gradientArrowScale = Math.max(0.0, gradientArrowScale);
+    }
+
+    /** Updates cached renderer-only gradient arrows without recreating their entities. */
+    public List<Entity> getGradientArrowRenderEntities() {
+        if (!showGradientArrows || probes.isEmpty()) {
+            hideGradientArrows();
+            return List.of();
+        }
+        if (gradientArrowModel == null) {
+            gradientArrowModel = new OBJFormatLoader().loadOBJModel(Constants.MODEL_ARROW);
+        }
+
+        gradientArrowEntities.keySet().removeIf(probe -> {
+            if (probes.contains(probe)
+                    && (!replacementProbePreviewActive
+                        || !probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX))) return false;
+            gradientArrowEntities.get(probe).setVisible(false);
+            return true;
+        });
+
+        List<Entity> visible = new ArrayList<>();
+        for (PassiveObserver probe : probes) {
+            if (replacementProbePreviewActive
+                    && probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) continue;
+            Entity arrow = gradientArrowEntities.computeIfAbsent(probe, this::createGradientArrow);
+            Vector3d gradient = probe.getStableGradientImbalance();
+            Vector3d arrowVector = new Vector3d(gradient).mul(gradientArrowScale);
+            double length = arrowVector.length();
+            if (!Double.isFinite(length) || length <= 0.0) {
+                arrow.setVisible(false);
+                continue;
+            }
+            Vector3d anchor = probe.getMarker().getPosition();
+            arrow.setPosition(anchor);
+            arrow.setRotation(Math.toDegrees(Math.atan2(arrowVector.z,
+                                                         Math.hypot(arrowVector.x, arrowVector.y))),
+                              0.0,
+                              Math.toDegrees(-Math.atan2(arrowVector.x, arrowVector.y)));
+            arrow.setScale(length);
+            arrow.setCustomColor(new Vector4f(probe.getMarker().getMaterial().getAmbientColor()));
+            arrow.setVisible(true);
+            arrow.updateMatrix();
+            visible.add(arrow);
+        }
+        return visible;
+    }
+
+    /** Hides and forgets cached arrows when committed probe or lattice render state is rebuilt. */
+    public void hideGradientArrows() {
+        for (Entity arrow : gradientArrowEntities.values()) arrow.setVisible(false);
+        gradientArrowEntities.clear();
+    }
+
+    private Entity createGradientArrow(PassiveObserver probe) {
+        Entity arrow = new Entity(lattice.getBaseEntity(), gradientArrowModel,
+                                  probe.getMarker().getPosition(), new Vector3d(), 0.0,
+                                  EntityType.ENTITY);
+        arrow.setOverrideModelMaterial(true);
+        arrow.getMaterial().setDiffuseColor(new Vector4f(1, 1, 1, 1));
+        arrow.getMaterial().setAmbientColor(new Vector4f(1, 1, 1, 1));
+        arrow.getMaterial().setShininess(0.0f);
+        return arrow;
+    }
+
     public List<Entity> getProbeRenderEntities() {
         List<Entity> entities = new ArrayList<>();
         for (PassiveObserver probe : probes) {
@@ -273,6 +358,7 @@ public class Scene {
 
     /** Atomically replaces generated probe markers while preserving manually created receivers. */
     public boolean replaceGeneratedProbeDefinitions(List<ProbeDefinition> definitions) {
+        hideGradientArrows();
         List<PassiveObserver> replacements = new ArrayList<>();
         for (ProbeDefinition definition : definitions) {
             PassiveObserver replacement = buildProbe(definition, false);
@@ -305,6 +391,7 @@ public class Scene {
 
     /** Removes all probe markers and restores the ordinary lattice render state. */
     public void clearProbes() {
+        hideGradientArrows();
         clearProbeInteractionState();
         for (PassiveObserver probe : probes) resetProbeMeasurements(probe);
         for (PassiveObserver probe : previewProbes) resetProbeMeasurements(probe);

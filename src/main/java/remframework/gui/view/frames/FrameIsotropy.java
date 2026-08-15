@@ -64,6 +64,12 @@ public final class FrameIsotropy extends AbstractFrame {
         }
         Nuklear.nk_label(ctx, "Probe center is the lattice geometric center", Nuklear.NK_TEXT_LEFT);
 
+        section(ctx, "Gradient visualization");
+        project.scene.setShowGradientArrows(nk_check_label(ctx, "Show gradient imbalance arrows",
+                                                            project.scene.isShowGradientArrows(), 0.7, 0.3));
+        scalar(ctx, "Gradient arrow scale", format(project.scene.getGradientArrowScale()));
+        project.scene.setGradientArrowScale(nk_slider(ctx, 0.0, project.scene.getGradientArrowScale(), 10.0, 0.01));
+
         NkVec2 contentSize = NkVec2.create();
         Nuklear.nk_window_get_content_region_size(ctx, contentSize);
         int detailsHeight = Math.max(rowHeight, Math.round(contentSize.y()) - rowHeight);
@@ -116,12 +122,14 @@ public final class FrameIsotropy extends AbstractFrame {
                 vector(ctx, "Node coordinate", rawProbe.getNodeCoordinate());
                 vector(ctx, "Node position", node.getPosition());
                 vector(ctx, "Stable gradient imbalance", probe.getStableGradientImbalance());
+                scalar(ctx, "Gradient strength |g|", format(probe.getStableGradientImbalance().length()));
                 vector(ctx, "Acceleration", node.getAcceleration());
                 vector(ctx, "Node Velocity", node.getVelocity());
             } else {
                 scalar(ctx, "Measurement", "Interpolated estimate — not a node measurement");
                 vector(ctx, "Interpolated live position", observation.position());
                 vector(ctx, "Weighted stable gradient imbalance", probe.getStableGradientImbalance());
+                scalar(ctx, "Gradient strength |g|", format(probe.getStableGradientImbalance().length()));
                 vector(ctx, "Interpolated acceleration", observation.acceleration());
                 vector(ctx, "Interpolated velocity", observation.velocity());
             }
@@ -204,6 +212,7 @@ public final class FrameIsotropy extends AbstractFrame {
         scalar(ctx, label + " requested radius", Integer.toString(measurement.requestedRadius()));
         vector(ctx, label + " requested direction", measurement.requestedDirection());
         vector(ctx, label + " g", measurement.gradient());
+        scalar(ctx, label + " |g|", format(measurement.gradient().length()));
         scalar(ctx, label + " g_parallel", format(measurement.radial()));
         scalar(ctx, label + " g_perp", format(measurement.sideways()));
     }

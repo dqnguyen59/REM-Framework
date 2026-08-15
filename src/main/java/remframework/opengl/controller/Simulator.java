@@ -1256,6 +1256,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             probe.updateMarker();
         }
         renderer.syncProbeEntities(scene.getProbeRenderEntities());
+        renderer.syncGradientArrowEntities(scene.getGradientArrowRenderEntities());
         if (project.terrain.isVisible())
             renderer.processTerrain(project.terrain);
         renderer.render(project.camera, scene);
