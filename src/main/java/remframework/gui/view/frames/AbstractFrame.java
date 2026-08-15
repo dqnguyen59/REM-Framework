@@ -111,8 +111,21 @@ public abstract class AbstractFrame implements IFrame {
 	private Stack<int[]> stackTextColor = new Stack<>();
 
 	private final NkRect frameRect = NkRect.create();
+	private final NkRect resizeHandleRect = NkRect.create();
 	private final NkRect contentRect = NkRect.create();
 	private NkVec2 pos = NkVec2.create();
+
+	private boolean customResizeEnabled;
+	private boolean customResizeCaptured;
+	private double initialResizeCursorX;
+	private double initialResizeCursorY;
+	private float initialResizeFrameX;
+	private float initialResizeFrameY;
+	private float initialResizeFrameWidth;
+	private float initialResizeFrameHeight;
+	private float resizeMinimumWidth;
+	private float resizeMinimumHeight;
+	private float resizeGripSize;
 
 	public AbstractFrame(NuklearModel nuklearModel) {
 		this.nuklearModel = nuklearModel;
@@ -225,6 +238,7 @@ public abstract class AbstractFrame implements IFrame {
 			frameRect.h(h);
 
 			Nuklear.nk_window_get_content_region(ctx, contentRect);
+			updateResizeHandleRect(ctx);
 
 			contentRect.x(contentRect.x() - 6);
 			contentRect.w(contentRect.w() + 14);
@@ -288,6 +302,100 @@ public abstract class AbstractFrame implements IFrame {
 		lastWidth = width;
 		lastHeight = height;
 	}
+
+	private void updateResizeHandleRect(NkContext ctx) {
+		if (customResizeEnabled) {
+			resizeHandleRect.x(frameRect.x() + frameRect.w() - resizeGripSize);
+			resizeHandleRect.y(frameRect.y() + frameRect.h() - resizeGripSize);
+			resizeHandleRect.w(resizeGripSize);
+			resizeHandleRect.h(resizeGripSize);
+			return;
+		}
+		if ((windowOptions & Nuklear.NK_WINDOW_SCALABLE) == 0) {
+			resizeHandleRect.x(0).y(0).w(0).h(0);
+			return;
+		}
+		NkVec2 padding = ctx.style().window().padding();
+		NkVec2 scrollbarSize = ctx.style().window().scrollbar_size();
+		// This is Nuklear's NK_WINDOW_SCALABLE bottom-right scaler in logical UI coordinates.
+		resizeHandleRect.x(contentRect.x() + contentRect.w() + padding.x() - scrollbarSize.x());
+		resizeHandleRect.y(contentRect.y() + contentRect.h());
+		resizeHandleRect.w(scrollbarSize.x());
+		resizeHandleRect.h(scrollbarSize.y());
+	}
+
+	public NkRect getResizeHandleRect() {
+		return resizeHandleRect;
+	}
+
+	protected final void enableCustomResize(float minimumWidth, float minimumHeight, float gripSize) {
+		customResizeEnabled = true;
+		resizeMinimumWidth = minimumWidth;
+		resizeMinimumHeight = minimumHeight;
+		resizeGripSize = gripSize;
+	}
+
+	public final boolean isCustomResizeCaptured() {
+		return customResizeCaptured;
+	}
+
+	/** Starts custom resize capture only when the cursor is in this frame's rendered grip. */
+	public final boolean beginCustomResize(double cursorX, double cursorY) {
+		if (!customResizeEnabled || customResizeCaptured || !isInsideResizeHandle(cursorX, cursorY)) {
+			return false;
+		}
+		customResizeCaptured = true;
+		initialResizeCursorX = cursorX;
+		initialResizeCursorY = cursorY;
+		initialResizeFrameX = frameRect.x();
+		initialResizeFrameY = frameRect.y();
+		initialResizeFrameWidth = frameRect.w();
+		initialResizeFrameHeight = frameRect.h();
+		return true;
+	}
+
+	/** Applies the cursor delta to the captured frame without consulting the old grip or frame bounds. */
+	public final boolean updateCustomResize(double cursorX, double cursorY) {
+		if (!customResizeCaptured) return false;
+		ResizeBounds bounds = boundsFromResizeDelta(initialResizeFrameX, initialResizeFrameY,
+				initialResizeFrameWidth, initialResizeFrameHeight,
+				cursorX - initialResizeCursorX, cursorY - initialResizeCursorY,
+				resizeMinimumWidth, resizeMinimumHeight,
+				getWindowWidth(), getWindowHeight());
+		frameRect.x(bounds.x()).y(bounds.y()).w(bounds.width()).h(bounds.height());
+		windowRect.x(bounds.x()).y(bounds.y()).w(bounds.width()).h(bounds.height());
+		NkRect savedRect = appSettings.getFrameRectMap().get(getTitle());
+		if (savedRect == null) {
+			savedRect = NkRect.create();
+			appSettings.getFrameRectMap().put(getTitle(), savedRect);
+		}
+		savedRect.x(bounds.x()).y(bounds.y()).w(bounds.width()).h(bounds.height());
+		return true;
+	}
+
+	/** Ends custom resize capture on the matching left-button release, wherever the cursor is. */
+	public final boolean endCustomResize() {
+		if (!customResizeCaptured) return false;
+		customResizeCaptured = false;
+		return true;
+	}
+
+	private boolean isInsideResizeHandle(double cursorX, double cursorY) {
+		return cursorX >= resizeHandleRect.x() && cursorX <= resizeHandleRect.x() + resizeHandleRect.w()
+				&& cursorY >= resizeHandleRect.y() && cursorY <= resizeHandleRect.y() + resizeHandleRect.h();
+	}
+
+	static ResizeBounds boundsFromResizeDelta(float initialX, float initialY,
+			float initialWidth, float initialHeight, double deltaX, double deltaY,
+			float minimumWidth, float minimumHeight, float viewportWidth, float viewportHeight) {
+		float maximumWidth = Math.max(minimumWidth, viewportWidth - initialX);
+		float maximumHeight = Math.max(minimumHeight, viewportHeight - initialY);
+		float width = (float)Math.max(minimumWidth, Math.min(maximumWidth, initialWidth + deltaX));
+		float height = (float)Math.max(minimumHeight, Math.min(maximumHeight, initialHeight + deltaY));
+		return new ResizeBounds(initialX, initialY, width, height);
+	}
+
+	record ResizeBounds(float x, float y, float width, float height) {}
 
 	protected void createLayout(NkContext ctx, int x, int y, int width, int height) {
 		_createLayout(ctx, x, y, width, height, false, false);

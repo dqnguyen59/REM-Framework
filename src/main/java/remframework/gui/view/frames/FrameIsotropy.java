@@ -19,11 +19,16 @@ import java.util.Locale;
 /** Read-only live view of the detectGradient8 receiver state. */
 public final class FrameIsotropy extends AbstractFrame {
 
+    private static final int DEFAULT_WIDTH = 720;
+    private static final int DEFAULT_HEIGHT = 720;
+    private static final int MIN_WIDTH = 520;
+    private static final int MIN_HEIGHT = 420;
+
     private final Project project = Project.getInstance();
 
     public FrameIsotropy(NuklearModel model) {
         super(model);
-        windowOptions |= Nuklear.NK_WINDOW_SCALABLE;
+        enableCustomResize(MIN_WIDTH, MIN_HEIGHT, 12);
     }
 
     @Override
@@ -34,7 +39,18 @@ public final class FrameIsotropy extends AbstractFrame {
     @Override
     public void render(long windowHandle, NkContext ctx) {
         super.render(windowHandle, ctx);
-        createLayout(ctx, 40, nuklearModel.getMenuBarHeight() + 50, 720, 720);
+        var savedRect = appSettings.getFrameRectMap().get(getTitle());
+        int width = savedRect == null
+                ? DEFAULT_WIDTH
+                : Math.max(MIN_WIDTH, Math.round(savedRect.w()));
+        int height = savedRect == null
+                ? DEFAULT_HEIGHT
+                : Math.max(MIN_HEIGHT, Math.round(savedRect.h()));
+        if (savedRect != null) {
+            savedRect.w(width);
+            savedRect.h(height);
+        }
+        createLayout(ctx, 40, nuklearModel.getMenuBarHeight() + 50, width, height);
     }
 
     @Override

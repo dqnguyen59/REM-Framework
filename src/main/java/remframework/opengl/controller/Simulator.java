@@ -308,6 +308,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     /** Defers expensive ray picking to one pass per rendered frame using the latest cursor position. */
     private void processDeferredHoverPick() {
+        if (nuklearController.isLeftMouseCaptureActive()) return;
         Vector3f cameraPosition = project.camera.getPosition();
         Vector3f cameraRotation = project.camera.getRotation();
         boolean cameraChanged = !cameraPosition.equals(lastHoverPickCameraPosition)
