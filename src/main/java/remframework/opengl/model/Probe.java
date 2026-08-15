@@ -6,6 +6,7 @@ import org.joml.Vector3i;
 import org.joml.Vector4f;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.Node;
+import remframework.settings.Project;
 
 /** A passive visual and observational reference to a lattice node. */
 @Getter
@@ -21,6 +22,7 @@ public final class Probe implements PassiveObserver {
     private final Vector4f displayColor;
     private final ProbeDefinition.Placement placement;
     private boolean selected;
+    private boolean hovered;
 
     public Probe(String id, Node node, Entity marker, Vector4f displayColor,
                  ProbeDefinition.Placement placement) {
@@ -60,10 +62,17 @@ public final class Probe implements PassiveObserver {
         this.selected = selected;
     }
 
+    @Override
+    public void setHovered(boolean hovered) {
+        this.hovered = hovered;
+    }
+
     /** Synchronizes only the render marker from the referenced node. */
     public void updateMarker() {
         marker.setPosition(getNodePosition());
-        marker.setCustomColor(selected ? SELECTED_COLOR : displayColor);
+        marker.setCustomColor(selected ? SELECTED_COLOR
+                                       : hovered ? new Vector4f(Project.getInstance().settings.selectedColor)
+                                                 : displayColor);
         marker.updateMatrix();
     }
 }

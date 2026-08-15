@@ -47,5 +47,7 @@ public interface PassiveObserver {
 
     void setSelected(boolean selected);
 
+    void setHovered(boolean hovered);
+
     void updateMarker();
 }

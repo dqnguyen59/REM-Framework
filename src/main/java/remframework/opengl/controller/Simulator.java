@@ -91,6 +91,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private       Node     selectedNode;
     private final Vector2d lastMousePos = new Vector2d();
+    private final Vector2d lastHoverPickMousePos = new Vector2d(Double.NaN, Double.NaN);
+    private final Vector3f lastHoverPickCameraPosition = new Vector3f(Float.NaN);
+    private final Vector3f lastHoverPickCameraRotation = new Vector3f(Float.NaN);
+    private final Matrix4f lastHoverPickProjection = new Matrix4f();
+    private boolean hoverPickPending;
 
     private              boolean         leftButtonPressed             = false;
     private              boolean         rightButtonPress              = false;
@@ -274,21 +279,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         }
         remModel.getMousePos().x = xPos;
         remModel.getMousePos().y = yPos;
-
-        Node node = scene.getNodeFromMousePos(xPos, yPos);
-        if (node != null) {
-            if (selectedNode != null) selectedNode.setSelected(false);
-            selectedNode = node;
-            selectedNode.setSelected(true);
-            remModel.getCurrentMouseNodeIndex().set(selectedNode.getIndex());
-            remModel.setCurrentMouseNode(selectedNode);
-
-            if (isDrawing)
-                mouseDrawWall(node);
-
-            if (leftButtonPressed)
-                checkAndErase(node);
-        }
+        hoverPickPending = true;
 
         float deltaX = 0;
         float deltaY = 0;
@@ -313,6 +304,40 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         lastMousePos.y = yPos;
 
         return false;
+    }
+
+    /** Defers expensive ray picking to one pass per rendered frame using the latest cursor position. */
+    private void processDeferredHoverPick() {
+        Vector3f cameraPosition = project.camera.getPosition();
+        Vector3f cameraRotation = project.camera.getRotation();
+        boolean cameraChanged = !cameraPosition.equals(lastHoverPickCameraPosition)
+                || !cameraRotation.equals(lastHoverPickCameraRotation)
+                || !project.camera.getProjectionMatrix().equals(lastHoverPickProjection);
+        Vector2d mousePosition = remModel.getMousePos();
+        if (!hoverPickPending && !cameraChanged
+                && mousePosition.equals(lastHoverPickMousePos)) return;
+
+        Node node = scene.getNodeFromMousePos(mousePosition.x, mousePosition.y);
+        if (node != selectedNode) {
+            if (selectedNode != null) selectedNode.setSelected(false);
+            selectedNode = node;
+            if (selectedNode != null) {
+                selectedNode.setSelected(true);
+                remModel.getCurrentMouseNodeIndex().set(selectedNode.getIndex());
+                remModel.setCurrentMouseNode(selectedNode);
+            }
+        }
+
+        PassiveObserver hoveredProbe = scene.getProbeForNode(node);
+        if (hoveredProbe == null) {
+            hoveredProbe = scene.getInterpolatedProbeFromMousePos(mousePosition.x, mousePosition.y);
+        }
+        scene.setHoveredProbe(hoveredProbe);
+        lastHoverPickMousePos.set(mousePosition);
+        lastHoverPickCameraPosition.set(cameraPosition);
+        lastHoverPickCameraRotation.set(cameraRotation);
+        lastHoverPickProjection.set(project.camera.getProjectionMatrix());
+        hoverPickPending = false;
     }
 
     @Override
@@ -1193,6 +1218,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
         PerformanceMonitor.start(Measurement.sendToGPU);
         isRenderingReady = false;
+        processDeferredHoverPick();
         for (PassiveObserver probe : scene.getProbes()) {
             probe.updateMarker();
         }

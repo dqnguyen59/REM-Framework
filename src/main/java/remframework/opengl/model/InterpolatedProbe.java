@@ -5,6 +5,7 @@ import org.joml.Vector3d;
 import org.joml.Vector4f;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.Node;
+import remframework.settings.Project;
 
 import java.util.List;
 
@@ -21,6 +22,7 @@ public final class InterpolatedProbe implements PassiveObserver {
     private final ProbeDefinition.Placement placement;
     private final List<Node> sourceNodes;
     private boolean selected;
+    private boolean hovered;
 
     public InterpolatedProbe(ProbeDefinition definition, List<Node> sourceNodes, Entity marker) {
         if (definition.getDetectorType() == ProbeDetectorType.RAW_NODE) {
@@ -56,12 +58,19 @@ public final class InterpolatedProbe implements PassiveObserver {
         this.selected = selected;
     }
 
+    @Override
+    public void setHovered(boolean hovered) {
+        this.hovered = hovered;
+    }
+
     /** Places the marker at the weighted live physical position of this interpolated estimate. */
     @Override
     public void updateMarker() {
         Vector3d position = getObservation().position();
         marker.setPosition(position);
-        marker.setCustomColor(selected ? SELECTED_COLOR : displayColor);
+        marker.setCustomColor(selected ? SELECTED_COLOR
+                                       : hovered ? new Vector4f(Project.getInstance().settings.selectedColor)
+                                                 : displayColor);
         marker.updateMatrix();
     }
 }

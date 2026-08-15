@@ -57,6 +57,7 @@ public class Scene {
     private ArrayList<PassiveObserver> previewProbes = new ArrayList<>();
     private boolean             replacementProbePreviewActive;
     private PassiveObserver     selectedProbe;
+    private PassiveObserver     hoveredProbe;
     private Node                firstHiLightedNode;
 
     private DirectionalLight directionalLight;
@@ -215,8 +216,9 @@ public class Scene {
                                    new Vector3d(position), new Vector3d(),
                                    sourceScale * (preview ? 2.0 : 2.75), EntityType.ENTITY);
         marker.setOverrideModelMaterial(true);
-        marker.getMaterial().setDiffuseColor(definition.getDisplayColor());
-        marker.getMaterial().setAmbientColor(definition.getDisplayColor());
+        // Material colours are mutated by Entity.setColor; never retain the definition's vector.
+        marker.getMaterial().setDiffuseColor(new Vector4f(definition.getDisplayColor()));
+        marker.getMaterial().setAmbientColor(new Vector4f(definition.getDisplayColor()));
         marker.getMaterial().setShininess(0.0f);
         return marker;
     }
@@ -269,16 +271,30 @@ public class Scene {
             selectedProbe.setSelected(false);
             selectedProbe = null;
         }
+        if (hoveredProbe != null && hoveredProbe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) {
+            hoveredProbe.setHovered(false);
+            hoveredProbe = null;
+        }
         probes.removeIf(probe -> probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX));
         probes.addAll(replacements);
         clearPreviewProbes();
         return true;
     }
 
-    public void clearProbes() {
+    /** Clears committed and transient probe interaction state before rebuilding the lattice. */
+    public void clearProbeInteractionState() {
         if (selectedProbe != null) selectedProbe.setSelected(false);
+        if (hoveredProbe != null) hoveredProbe.setHovered(false);
         selectedProbe = null;
+        hoveredProbe = null;
+    }
+
+    /** Removes all probe markers and restores the ordinary lattice render state. */
+    public void clearProbes() {
+        clearProbeInteractionState();
         probes.clear();
+        previewProbes.clear();
+        replacementProbePreviewActive = false;
     }
 
     /** Makes the committed probe the live diagnostic selection and refreshes its marker immediately. */
@@ -288,6 +304,20 @@ public class Scene {
         if (selectedProbe != null) {
             selectedProbe.setSelected(true);
             selectedProbe.updateMarker();
+        }
+    }
+
+    /** Changes hover state only; probe observations and their source nodes remain untouched. */
+    public void setHoveredProbe(PassiveObserver probe) {
+        if (hoveredProbe == probe) return;
+        if (hoveredProbe != null) {
+            hoveredProbe.setHovered(false);
+            hoveredProbe.updateMarker();
+        }
+        hoveredProbe = probe;
+        if (hoveredProbe != null) {
+            hoveredProbe.setHovered(true);
+            hoveredProbe.updateMarker();
         }
     }
 
