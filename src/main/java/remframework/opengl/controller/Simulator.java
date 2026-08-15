@@ -67,6 +67,7 @@ import remframework.geometry.discovery.GeometryDiscoveryWorkspaceManager;
 import java.lang.Math;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class Simulator extends Engine implements IMouseAndKeyboardEvents {
@@ -327,6 +328,14 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             remModel.setCurrentMouseNode(node);
             remModel.getCurrentMouseNodeIndex().set(node.getIndex());
             return true;
+        }
+        if (leftButtonPressed || leftButtonReleased) {
+            InterpolatedProbe interpolatedProbe = scene.getInterpolatedProbeFromMousePos(
+                    remModel.getMousePos().x, remModel.getMousePos().y);
+            if (interpolatedProbe != null) {
+                scene.selectProbe(interpolatedProbe);
+                return true;
+            }
         }
 
         if (discoveryWorkspace.state().active()) {
@@ -985,6 +994,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private void createIsotropyProbe() {
         scene.clearProbes();
+        Object[] nodeArray = scene.getLattice().getNodeArray();
+        if (nodeArray == null || nodeArray.length == 0) return;
         String filename = project.getCurrentFilename();
         boolean detectGradient8 = !filename.isEmpty()
                 && "detectGradient8.qfs".equals(Path.of(filename).getFileName().toString());
@@ -993,6 +1004,16 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             project.getProbeDefinitions().add(new ProbeDefinition(
                     "detectGradient8-receiver", new Vector3i(130, 140, 0),
                     new Vector4f(0.2f, 0.8f, 1.0f, 1.0f)));
+        }
+        List<ProbeDefinition> generated = project.getProbeDefinitions().stream()
+                .filter(ProbeDefinition::isGenerated).toList();
+        Vector3i centerIndex = new Vector3i(project.getDimensionX() / 2,
+                                            project.getDimensionY() / 2,
+                                            project.getDimensionZ() / 2);
+        Node center = scene.getLattice().getNodeByIndex(centerIndex);
+        if (!ProbePlacement.generatedDefinitionsCompatible(center, generated,
+                project.getDimensionZ() > 1, ProbePlacement.DEFAULT_TOLERANCES)) {
+            project.replaceGeneratedProbeDefinitions(List.of());
         }
         for (ProbeDefinition definition : project.getProbeDefinitions()) {
             scene.createProbe(definition, false);
@@ -1172,10 +1193,10 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
         PerformanceMonitor.start(Measurement.sendToGPU);
         isRenderingReady = false;
-        for (Probe probe : scene.getProbes()) {
+        for (PassiveObserver probe : scene.getProbes()) {
             probe.updateMarker();
         }
-        for (Probe probe : scene.getPreviewProbes()) {
+        for (PassiveObserver probe : scene.getPreviewProbes()) {
             probe.updateMarker();
         }
         renderer.syncProbeEntities(scene.getProbeRenderEntities());

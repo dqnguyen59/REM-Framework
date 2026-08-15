@@ -4,8 +4,10 @@ import org.joml.Vector3d;
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import remframework.gui.model.NuklearModel;
+import remframework.opengl.model.PassiveObserver;
 import remframework.opengl.model.Probe;
 import remframework.opengl.model.ProbeDefinition;
+import remframework.opengl.model.ProbeDetectorType;
 import remframework.opengl.model.entity.Occupancy;
 import remframework.opengl.model.entity.Node;
 import remframework.settings.Project;
@@ -43,27 +45,59 @@ public final class FrameIsotropy extends AbstractFrame {
         }
         Nuklear.nk_label(ctx, "Probe center is the lattice geometric center", Nuklear.NK_TEXT_LEFT);
 
-        Probe probe = project.scene.getSelectedProbe();
+        PassiveObserver probe = project.scene.getSelectedProbe();
         section(ctx, "Selected passive probe");
         if (probe == null) {
             scalar(ctx, "Probe", "None");
         } else {
-            Node node = probe.getNode();
             scalar(ctx, "Probe", probe.getId());
-            ProbeDefinition.Placement placement = probe.getPlacement();
+            scalar(ctx, "Detector type", probe.getDetectorType().name());
+            ProbeDefinition.Placement placement = probe.getDefinition().getPlacement();
             if (placement != null) {
-                scalar(ctx, "Ray / plane", placement.rayPlane());
-                scalar(ctx, "Requested radius", Integer.toString(placement.requestedRadius()));
-                scalar(ctx, "Realized radius", String.format(Locale.ROOT, "%.6f",
-                                                              placement.realizedRadius()));
-                scalar(ctx, "Graph distance (diagnostic)",
-                       Integer.toString(placement.graphDistance()));
+                scalar(ctx, "Represented targets", placement.targets().stream()
+                        .map(target -> "Shell " + (target.shell() + 1) + " " + target.rayPlane())
+                        .reduce((left, right) -> left + ", " + right).orElse(""));
+                scalar(ctx, "Requested radii", placement.targets().stream()
+                        .map(target -> Integer.toString(target.requestedRadius()))
+                        .reduce((left, right) -> left + ", " + right).orElse(""));
+                if (probe.getDetectorType() == ProbeDetectorType.RAW_NODE) {
+                    ProbeDefinition.Target firstTarget = placement.targets().getFirst();
+                    scalar(ctx, "Realized radius", String.format(Locale.ROOT, "%.6f",
+                                                                  firstTarget.realizedRadius()));
+                    scalar(ctx, "Graph distance (diagnostic)",
+                           Integer.toString(firstTarget.graphDistance()));
+                } else {
+                    ProbeDefinition.Target target = placement.targets().getFirst();
+                    vector(ctx, "Exact requested coordinate", target.requestedCoordinate());
+                    vector(ctx, "Requested direction", target.requestedDirection());
+                    for (int sourceIndex = 0;
+                         sourceIndex < probe.getDefinition().getInterpolationSources().size();
+                         sourceIndex++) {
+                        ProbeDefinition.InterpolationSource source = probe.getDefinition()
+                                .getInterpolationSources().get(sourceIndex);
+                        scalar(ctx, "Interpolation source " + (sourceIndex + 1),
+                               String.format(Locale.ROOT, "(%d, %d, %d), weight %.9f",
+                                       source.nodeIndex().x, source.nodeIndex().y,
+                                       source.nodeIndex().z, source.weight()));
+                    }
+                }
             }
-            vector(ctx, "Node coordinate", probe.getNodeCoordinate());
-            vector(ctx, "Node position", node.getPosition());
-            vector(ctx, "Gradient Imbalance", node.getGradientImbalance());
-            vector(ctx, "Acceleration", node.getAcceleration());
-            vector(ctx, "Node Velocity", node.getVelocity());
+            PassiveObserver.Observation observation = probe.getObservation();
+            if (probe instanceof Probe rawProbe) {
+                Node node = rawProbe.getNode();
+                scalar(ctx, "Measurement", "Raw node measurement");
+                vector(ctx, "Node coordinate", rawProbe.getNodeCoordinate());
+                vector(ctx, "Node position", node.getPosition());
+                vector(ctx, "Gradient Imbalance", node.getGradientImbalance());
+                vector(ctx, "Acceleration", node.getAcceleration());
+                vector(ctx, "Node Velocity", node.getVelocity());
+            } else {
+                scalar(ctx, "Measurement", "Interpolated estimate — not a node measurement");
+                vector(ctx, "Interpolated live position", observation.position());
+                vector(ctx, "Interpolated gradient imbalance", observation.gradientImbalance());
+                vector(ctx, "Interpolated acceleration", observation.acceleration());
+                vector(ctx, "Interpolated velocity", observation.velocity());
+            }
             naVector(ctx, "Transport Momentum");
             naVector(ctx, "Pressure");
             scalar(ctx, "Cycle state", "N/A (Occupancy only)");

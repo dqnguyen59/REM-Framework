@@ -1,5 +1,6 @@
 package remframework.gui.view.frames.dialogs;
 
+import org.joml.Vector3d;
 import org.joml.Vector3i;
 import org.joml.Vector4f;
 import org.lwjgl.nuklear.NkContext;
@@ -7,8 +8,10 @@ import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import remframework.gui.model.NuklearModel;
 import remframework.gui.view.frames.AbstractFrame;
+import remframework.opengl.model.PassiveObserver;
 import remframework.opengl.model.Probe;
 import remframework.opengl.model.ProbeDefinition;
+import remframework.opengl.model.ProbeDetectorType;
 import remframework.opengl.model.ProbePlacement;
 import remframework.opengl.model.Scene;
 import remframework.opengl.model.entity.Node;
@@ -25,16 +28,17 @@ public final class FrameAddProbes extends AbstractFrame {
     private static int retainedFirstShellRadius = 10;
     private static int retainedShellDistance = 5;
     private static int retainedNumberOfShells = 2;
-    private static int retained2DProbesPerShell = 4;
+    private static int retained2DProbesPerShell = 5;
     private static int retained3DProbesPerPlanePerShell = 5;
     private static int retainedRegion;
+    private static boolean retainedInterpolatedBinding;
     private static Vector4f retainedDisplayColor = new Vector4f(0.2f, 0.8f, 1.0f, 1.0f);
 
     private final Project project = Project.getInstance();
     private final Scene scene = project.scene;
-    private final Node center;
-    private final boolean threeDimensional;
-    private final Vector3i centerIndex;
+    private Node center;
+    private boolean threeDimensional;
+    private Vector3i centerIndex;
     private final boolean editing;
     private final List<ProbeDefinition> existingGeneratedDefinitions;
 
@@ -43,6 +47,7 @@ public final class FrameAddProbes extends AbstractFrame {
     private int numberOfShells = retainedNumberOfShells;
     private int probesPerPlane;
     private int region = retainedRegion;
+    private boolean interpolatedBinding = retainedInterpolatedBinding;
     private Vector4f displayColor = new Vector4f(retainedDisplayColor);
 
     private final StringBuffer firstShellRadiusBuffer = new StringBuffer();
@@ -53,6 +58,7 @@ public final class FrameAddProbes extends AbstractFrame {
     private List<ProbeDefinition> previewDefinitions = List.of();
     private List<ProbePlacement.ProbeReport> probeReports = List.of();
     private String previewStatus = "Preview not generated.";
+    private String activeProbeSpace = "";
     private boolean previewValid;
     private boolean replacementPreviewActive;
 
@@ -64,16 +70,25 @@ public final class FrameAddProbes extends AbstractFrame {
         threeDimensional = project.getDimensionZ() > 1;
         probesPerPlane = threeDimensional ? retained3DProbesPerPlanePerShell
                                           : retained2DProbesPerShell;
+        activeProbeSpace = calculateActiveProbeSpace();
         editing = project.getProbeDefinitions().stream().anyMatch(ProbeDefinition::isGenerated);
         existingGeneratedDefinitions = project.getProbeDefinitions().stream()
                 .filter(ProbeDefinition::isGenerated).map(definition -> definition.withId(definition.getId()))
                 .toList();
         if (editing) {
+            interpolatedBinding = existingGeneratedDefinitions.getFirst().getDetectorType()
+                    != ProbeDetectorType.RAW_NODE;
             previewDefinitions = existingGeneratedDefinitions;
             probeReports = ProbePlacement.describe(center, existingGeneratedDefinitions);
-            previewStatus = "Existing generated probes: " + existingGeneratedDefinitions.size();
-            previewValid = probeReports.size() == existingGeneratedDefinitions.size()
-                    && probeReports.stream().noneMatch(ProbePlacement.ProbeReport::collision);
+            int representedTargetCount = existingGeneratedDefinitions.stream()
+                    .filter(definition -> definition.getPlacement() != null)
+                    .mapToInt(definition -> definition.getPlacement().targets().size()).sum();
+            previewStatus = "Existing: requested targets " + representedTargetCount
+                    + " | unavailable targets 0 | merged collisions "
+                    + (representedTargetCount - existingGeneratedDefinitions.size())
+                    + " | unique passive probes " + existingGeneratedDefinitions.size() + ".";
+            previewValid = !existingGeneratedDefinitions.isEmpty()
+                    && probeReports.size() == representedTargetCount;
             if (!previewValid) previewStatus = "Existing generated probes contain an invalid node reference.";
         }
     }
@@ -92,6 +107,7 @@ public final class FrameAddProbes extends AbstractFrame {
     @Override
     protected void layout(NkContext ctx, int x, int y, int width, int height) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
+            boolean latticeContextChanged = refreshLatticeContext();
             Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
             if (center == null) {
                 Nuklear.nk_label(ctx, "Lattice center is unavailable for this project.",
@@ -110,6 +126,7 @@ public final class FrameAddProbes extends AbstractFrame {
             int previousNumberOfShells = numberOfShells;
             int previousProbesPerPlane = probesPerPlane;
             int previousRegion = region;
+            boolean previousInterpolatedBinding = interpolatedBinding;
             Vector4f previousColor = new Vector4f(displayColor);
 
             firstShellRadius = nk_label_edit(ctx, stack, "First Shell Radius:",
@@ -119,8 +136,12 @@ public final class FrameAddProbes extends AbstractFrame {
             numberOfShells = nk_label_edit(ctx, stack, "Number Of Shells:",
                     numberOfShellsBuffer, numberOfShells, 0.55, 0.45);
             probesPerPlane = nk_label_edit(ctx, stack, threeDimensional
-                    ? "Probes Per Plane Per Shell (odd):" : "Probes Per Shell:",
+                    ? "Probes Per Plane Per Shell (odd):" : "Probes Per Shell (odd):",
                     probesPerPlaneBuffer, probesPerPlane, 0.55, 0.45);
+            String[] bindingModes = {"Raw aligned lattice nodes", "Exact-position interpolated"};
+            String selectedBinding = nk_label_Options(ctx, "Binding:", bindingModes,
+                    interpolatedBinding ? bindingModes[1] : bindingModes[0], 0.25, 0.75, 2);
+            interpolatedBinding = bindingModes[1].equals(selectedBinding);
             String[] regions = regionLabels();
             String selectedRegion = nk_label_Options(ctx, "Region:", regions,
                     regions[Math.max(0, Math.min(region, regions.length - 1))], 0.25, 0.75,
@@ -134,12 +155,19 @@ public final class FrameAddProbes extends AbstractFrame {
                     || previousNumberOfShells != numberOfShells
                     || previousProbesPerPlane != probesPerPlane
                     || previousRegion != region
+                    || previousInterpolatedBinding != interpolatedBinding
                     || !previousColor.equals(displayColor);
-            if (changed || previewDefinitions.isEmpty()) regeneratePreview();
+            String calculatedActiveSpace = calculateActiveProbeSpace();
+            boolean effectiveSpaceChanged = !calculatedActiveSpace.equals(activeProbeSpace);
+            if (latticeContextChanged) removeStaleGeneratedProbes(effectiveSpaceChanged);
+            if (changed || latticeContextChanged || effectiveSpaceChanged || previewDefinitions.isEmpty()) {
+                regeneratePreview();
+            }
             retainSettings();
 
             Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
             Nuklear.nk_label(ctx, previewStatus, Nuklear.NK_TEXT_LEFT);
+            Nuklear.nk_label(ctx, activeProbeSpace, Nuklear.NK_TEXT_LEFT);
             Nuklear.nk_layout_row_dynamic(ctx, 260, 1);
             if (Nuklear.nk_group_begin(ctx, "Probe placement diagnostics", 0)) {
                 renderProbeTable(ctx);
@@ -165,13 +193,15 @@ public final class FrameAddProbes extends AbstractFrame {
 
     private void regeneratePreview() {
         Set<Node> blocked = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (Probe probe : scene.getProbes()) {
-            if (!editing || !probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) {
+        for (PassiveObserver observer : scene.getProbes()) {
+            if (observer instanceof Probe probe
+                    && (!editing || !probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX))) {
                 blocked.add(probe.getNode());
             }
         }
         for (ProbeDefinition definition : project.getProbeDefinitions()) {
             if (editing && definition.isGenerated()) continue;
+            if (definition.getDetectorType() != ProbeDetectorType.RAW_NODE) continue;
             Node node = scene.getLattice().getNodeByIndex(definition.getNodeIndex());
             if (node != null) blocked.add(node);
         }
@@ -179,9 +209,11 @@ public final class FrameAddProbes extends AbstractFrame {
         ProbePlacement.Result result = ProbePlacement.place(
                 center, firstShellRadius, shellDistance, numberOfShells, probesPerPlane,
                 region, threeDimensional, previewColor(displayColor),
-                blocked, "preview");
+                blocked, "preview", selectedDetectorType());
         previewDefinitions = result.definitions();
         previewStatus = result.status();
+        activeProbeSpace = result.activeProbeSpace().isEmpty()
+                ? calculateActiveProbeSpace() : result.activeProbeSpace();
         previewValid = result.valid() && !previewDefinitions.isEmpty();
         probeReports = result.probeReports();
         replacementPreviewActive = previewValid;
@@ -204,18 +236,60 @@ public final class FrameAddProbes extends AbstractFrame {
         close();
     }
 
-    /** Renders requested and realized geometry for every independently snapped passive probe. */
+    /** Renders immutable requested geometry and either raw snapping or interpolation diagnostics. */
     private void renderProbeTable(NkContext ctx) {
         Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
-        Nuklear.nk_label(ctx, "Shell | Ray / Plane | Requested radius | Realized radius | Graph distance (diagnostic) | Coordinate",
+        Nuklear.nk_label(ctx, "Shell | Ray / Plane | Detector | Requested radius | Exact requested coordinate | Requested direction | Realized radius | Angular deviation from ideal ray | Realized direction | Angular deviation from first-shell direction | Graph distance (diagnostic) | Selected coordinate / sources",
                 Nuklear.NK_TEXT_LEFT);
         for (ProbePlacement.ProbeReport report : probeReports) {
             Vector3i coordinate = report.coordinate();
+            String coordinateText = coordinate == null ? "-"
+                    : String.format("(%d,%d,%d)", coordinate.x, coordinate.y, coordinate.z);
+            String realizedText = Double.isFinite(report.realizedRadius())
+                    ? String.format(java.util.Locale.ROOT, "%.6f", report.realizedRadius())
+                    : "N/A";
+            String angularText = Double.isFinite(report.angularDeviationDegrees())
+                    ? String.format(java.util.Locale.ROOT, "%.3f°", report.angularDeviationDegrees())
+                    : "N/A";
+            Vector3i realizedDirection = report.realizedDirection();
+            String realizedDirectionText = realizedDirection == null ? "-"
+                    : String.format("(%d,%d,%d)", realizedDirection.x,
+                                    realizedDirection.y, realizedDirection.z);
+            String alignmentText = Double.isFinite(report.angularDeviationFromFirstShellDegrees())
+                    ? String.format(java.util.Locale.ROOT, "%.3f°",
+                                    report.angularDeviationFromFirstShellDegrees())
+                    : "N/A";
+            String graphDistanceText = report.graphDistance() >= 0
+                    ? Integer.toString(report.graphDistance()) : "N/A";
+            Vector3d requestedCoordinate = report.requestedCoordinate();
+            String requestedCoordinateText = String.format(java.util.Locale.ROOT,
+                    "(%.6f,%.6f,%.6f)", requestedCoordinate.x,
+                    requestedCoordinate.y, requestedCoordinate.z);
+            Vector3d requestedDirection = report.requestedDirection();
+            String requestedDirectionText = String.format(java.util.Locale.ROOT,
+                    "(%.6f,%.6f,%.6f)", requestedDirection.x,
+                    requestedDirection.y, requestedDirection.z);
+            String bindingText = report.detectorType() == ProbeDetectorType.RAW_NODE
+                    ? coordinateText : report.interpolationSources().stream()
+                    .map(source -> String.format(java.util.Locale.ROOT, "(%d,%d,%d) w=%.6f",
+                            source.nodeIndex().x, source.nodeIndex().y, source.nodeIndex().z,
+                            source.weight()))
+                    .reduce((left, right) -> left + "; " + right).orElse("-");
+            String resultText;
+            if (!report.available()) {
+                resultText = " UNAVAILABLE: " + report.unavailableReason();
+            } else if (report.merged()) {
+                resultText = " MERGED: " + String.join(", ", report.representedTargets());
+            } else {
+                resultText = "";
+            }
             Nuklear.nk_label(ctx, String.format(java.util.Locale.ROOT,
-                    "%d | %s | %d | %.6f | %d | (%d,%d,%d)%s", report.shell() + 1,
-                    report.rayPlane(), report.requestedRadius(), report.realizedRadius(),
-                    report.graphDistance(), coordinate.x, coordinate.y, coordinate.z,
-                    report.collision() ? " COLLISION" : ""),
+                    "%d | %s | %s | %d | %s | %s | %s | %s | %s | %s | %s | %s%s",
+                    report.shell() + 1, report.rayPlane(), report.detectorType(),
+                    report.requestedRadius(), requestedCoordinateText, requestedDirectionText,
+                    realizedText,
+                    angularText, realizedDirectionText, alignmentText,
+                    graphDistanceText, bindingText, resultText),
                     Nuklear.NK_TEXT_LEFT);
         }
     }
@@ -235,7 +309,15 @@ public final class FrameAddProbes extends AbstractFrame {
         if (threeDimensional) retained3DProbesPerPlanePerShell = probesPerPlane;
         else retained2DProbesPerShell = probesPerPlane;
         retainedRegion = region;
+        retainedInterpolatedBinding = interpolatedBinding;
         retainedDisplayColor = new Vector4f(displayColor);
+    }
+
+    private ProbeDetectorType selectedDetectorType() {
+        if (!interpolatedBinding) return ProbeDetectorType.RAW_NODE;
+        return calculateActiveProbeSpace().contains("XYZ octant")
+                ? ProbeDetectorType.INTERPOLATED_3D
+                : ProbeDetectorType.INTERPOLATED_2D;
     }
 
     /** Returns the deterministic geometric center, independent of the mouse-selected node. */
@@ -243,6 +325,45 @@ public final class FrameAddProbes extends AbstractFrame {
         return new Vector3i(project.getDimensionX() / 2,
                             project.getDimensionY() / 2,
                             project.getDimensionZ() / 2);
+    }
+
+    private String calculateActiveProbeSpace() {
+        long largestRadius = firstShellRadius
+                + (long) Math.max(0, numberOfShells - 1) * shellDistance;
+        if (largestRadius < 1 || largestRadius > Integer.MAX_VALUE) return "";
+        return ProbePlacement.activeProbeSpace(center, (int) largestRadius, region,
+                threeDimensional, ProbePlacement.DEFAULT_TOLERANCES);
+    }
+
+    private boolean refreshLatticeContext() {
+        Vector3i currentCenterIndex = geometricCenterIndex();
+        Node currentCenter = scene.getLattice().getNodeByIndex(currentCenterIndex);
+        boolean currentThreeDimensional = project.getDimensionZ() > 1;
+        boolean changed = currentCenter != center || !currentCenterIndex.equals(centerIndex)
+                || currentThreeDimensional != threeDimensional;
+        if (changed) {
+            centerIndex = currentCenterIndex;
+            center = currentCenter;
+            threeDimensional = currentThreeDimensional;
+        }
+        return changed;
+    }
+
+    private void removeStaleGeneratedProbes(boolean effectiveSpaceChanged) {
+        List<ProbeDefinition> generated = project.getProbeDefinitions().stream()
+                .filter(ProbeDefinition::isGenerated).toList();
+        if (generated.isEmpty()) return;
+        List<ProbePlacement.ProbeReport> reports = ProbePlacement.describe(center, generated);
+        int targetCount = generated.stream().filter(definition -> definition.getPlacement() != null)
+                .mapToInt(definition -> definition.getPlacement().targets().size()).sum();
+        boolean staleGeometry = reports.size() != targetCount || reports.stream().anyMatch(report ->
+                Math.abs(report.realizedRadius() - report.requestedRadius())
+                        > ProbePlacement.DEFAULT_TOLERANCES.maximumRadialError());
+        if (effectiveSpaceChanged || staleGeometry) {
+            scene.replaceGeneratedProbeDefinitions(List.of());
+            project.replaceGeneratedProbeDefinitions(List.of());
+            previewDefinitions = List.of();
+        }
     }
 
     private static Vector4f previewColor(Vector4f color) {

@@ -53,10 +53,10 @@ public class Scene {
 
     private ArrayList<Vector3i> wallNodeIndexList = new ArrayList<>();
     private ArrayList<Node>     hiLightedNodes    = new ArrayList<>();
-    private ArrayList<Probe>    probes            = new ArrayList<>();
-    private ArrayList<Probe>    previewProbes     = new ArrayList<>();
+    private ArrayList<PassiveObserver> probes        = new ArrayList<>();
+    private ArrayList<PassiveObserver> previewProbes = new ArrayList<>();
     private boolean             replacementProbePreviewActive;
-    private Probe               selectedProbe;
+    private PassiveObserver     selectedProbe;
     private Node                firstHiLightedNode;
 
     private DirectionalLight directionalLight;
@@ -170,33 +170,55 @@ public class Scene {
         hiLightedNodes.remove(node);
     }
 
-    public void addProbe(Probe probe) {
+    public void addProbe(PassiveObserver probe) {
         probes.add(probe);
     }
 
-    /** Creates a renderer-only marker that references a live node without creating an occupancy. */
-    public Probe createProbe(ProbeDefinition definition, boolean preview) {
-        Probe probe = buildProbe(definition, preview);
+    /** Creates a renderer-only passive observer without creating an identity or occupancy. */
+    public PassiveObserver createProbe(ProbeDefinition definition, boolean preview) {
+        PassiveObserver probe = buildProbe(definition, preview);
         if (probe == null) return null;
         if (preview) previewProbes.add(probe);
         else probes.add(probe);
         return probe;
     }
 
-    private Probe buildProbe(ProbeDefinition definition, boolean preview) {
-        Node node = lattice.getNodeByIndex(definition.getNodeIndex());
-        if (node == null) return null;
+    private PassiveObserver buildProbe(ProbeDefinition definition, boolean preview) {
+        if (lattice.getNodeArray() == null) return null;
+        if (definition.getDetectorType() == ProbeDetectorType.RAW_NODE) {
+            Node node = lattice.getNodeByIndex(definition.getNodeIndex());
+            if (node == null) return null;
+            Entity marker = createProbeMarker(definition, node.getPosition(), node.getScale(), preview);
+            Probe probe = new Probe(definition, node, marker);
+            probe.updateMarker();
+            return probe;
+        }
+        List<Node> sourceNodes = new ArrayList<>();
+        for (ProbeDefinition.InterpolationSource source : definition.getInterpolationSources()) {
+            Node sourceNode = lattice.getNodeByIndex(source.nodeIndex());
+            if (sourceNode == null) return null;
+            sourceNodes.add(sourceNode);
+        }
+        PassiveObserver.Observation observation = ProbeInterpolation.interpolate(
+                sourceNodes, definition.getInterpolationSources());
+        double sourceScale = sourceNodes.getFirst().getScale();
+        Entity marker = createProbeMarker(
+                definition, observation.position(), sourceScale, preview);
+        InterpolatedProbe probe = new InterpolatedProbe(definition, sourceNodes, marker);
+        probe.updateMarker();
+        return probe;
+    }
+
+    private Entity createProbeMarker(ProbeDefinition definition, Vector3d position,
+                                     double sourceScale, boolean preview) {
         Entity marker = new Entity(lattice.getBaseEntity(), lattice.getModelSphere(),
-                                   new Vector3d(node.getPosition()), new Vector3d(),
-                                   node.getScale() * (preview ? 2.0 : 2.75), EntityType.ENTITY);
+                                   new Vector3d(position), new Vector3d(),
+                                   sourceScale * (preview ? 2.0 : 2.75), EntityType.ENTITY);
         marker.setOverrideModelMaterial(true);
         marker.getMaterial().setDiffuseColor(definition.getDisplayColor());
         marker.getMaterial().setAmbientColor(definition.getDisplayColor());
         marker.getMaterial().setShininess(0.0f);
-        Probe probe = new Probe(definition.getId(), node, marker, definition.getDisplayColor(),
-                                definition.getPlacement());
-        probe.updateMarker();
-        return probe;
+        return marker;
     }
 
     /** Replaces transient preview markers while leaving committed probe definitions untouched. */
@@ -219,13 +241,13 @@ public class Scene {
 
     public List<Entity> getProbeRenderEntities() {
         List<Entity> entities = new ArrayList<>();
-        for (Probe probe : probes) {
+        for (PassiveObserver probe : probes) {
             if (!replacementProbePreviewActive
                     || !probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) {
                 entities.add(probe.getMarker());
             }
         }
-        for (Probe probe : previewProbes) entities.add(probe.getMarker());
+        for (PassiveObserver probe : previewProbes) entities.add(probe.getMarker());
         return entities;
     }
 
@@ -237,9 +259,9 @@ public class Scene {
 
     /** Atomically replaces generated probe markers while preserving manually created receivers. */
     public boolean replaceGeneratedProbeDefinitions(List<ProbeDefinition> definitions) {
-        List<Probe> replacements = new ArrayList<>();
+        List<PassiveObserver> replacements = new ArrayList<>();
         for (ProbeDefinition definition : definitions) {
-            Probe replacement = buildProbe(definition, false);
+            PassiveObserver replacement = buildProbe(definition, false);
             if (replacement == null) return false;
             replacements.add(replacement);
         }
@@ -260,7 +282,7 @@ public class Scene {
     }
 
     /** Makes the committed probe the live diagnostic selection and refreshes its marker immediately. */
-    public void selectProbe(Probe probe) {
+    public void selectProbe(PassiveObserver probe) {
         if (selectedProbe != null) selectedProbe.setSelected(false);
         selectedProbe = probe;
         if (selectedProbe != null) {
@@ -271,10 +293,46 @@ public class Scene {
 
     public Probe getProbeForNode(Node node) {
         if (node == null) return null;
-        for (Probe probe : probes) {
-            if (probe.getNode() == node) return probe;
+        for (PassiveObserver observer : probes) {
+            if (observer instanceof Probe probe && probe.getNode() == node) return probe;
         }
         return null;
+    }
+
+    /** Returns the nearest interpolated marker after the unchanged node-picking path misses. */
+    public InterpolatedProbe getInterpolatedProbeFromMousePos(double xPos, double yPos) {
+        Matrix4f projectionMatrix = project.camera.getProjectionMatrix();
+        Matrix4f viewMatrix = project.camera.getViewMatrix();
+        Vector3f cameraPos = project.camera.getPosition();
+        float x = (float) (2 * xPos / appSettings.getWindowWidth() - 1);
+        float y = (float) (2 * (appSettings.getWindowHeight() - yPos)
+                / appSettings.getWindowHeight() - 1);
+        Vector4f clipCoords = new Vector4f(x, y, 0, 1);
+        Vector4f eyeCoords = new Matrix4f(projectionMatrix).invert().transform(clipCoords);
+        eyeCoords.w = 0;
+        Vector4f rayWorld = new Matrix4f(viewMatrix).invert().transform(eyeCoords);
+        Vector3f ray = new Vector3f(rayWorld.x, rayWorld.y, rayWorld.z).normalize();
+
+        InterpolatedProbe nearest = null;
+        float nearestDistance = Float.POSITIVE_INFINITY;
+        Vector4f markerPosition = new Vector4f();
+        Vector2f intersection = new Vector2f();
+        for (PassiveObserver observer : probes) {
+            if (!(observer instanceof InterpolatedProbe interpolatedProbe)) continue;
+            Entity marker = observer.getMarker();
+            marker.getTransformMatrix4f().transform(0, 0, 0, 1, markerPosition);
+            double radius = settings.scale * marker.getScale() * 0.5;
+            if (Intersectionf.intersectRaySphere(
+                    cameraPos.x, cameraPos.y, cameraPos.z,
+                    ray.x, ray.y, ray.z,
+                    markerPosition.x, markerPosition.y, markerPosition.z,
+                    (float) (radius * radius), intersection)
+                    && intersection.x >= 0.0f && intersection.x < nearestDistance) {
+                nearest = interpolatedProbe;
+                nearestDistance = intersection.x;
+            }
+        }
+        return nearest;
     }
 
     private Vector3i isWallNodeExists(Node node) {
