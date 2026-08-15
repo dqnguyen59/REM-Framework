@@ -49,8 +49,8 @@ public class NuklearController implements IMouseAndKeyboardEvents {
 	public boolean mouseCursorPosCallback(long handle, double xPos, double yPos) {
 		nuklearModel.setMouseX(xPos);
 		nuklearModel.setMouseY(yPos);
-		AbstractFrame isotropy = isotropyFrame();
-		if (isotropy != null && isotropy.updateCustomResize(xPos, yPos)) return true;
+		AbstractFrame resizingFrame = capturedResizeFrame();
+		if (resizingFrame != null && resizingFrame.updateCustomResize(xPos, yPos)) return true;
 		// GLFW cursor positions, custom frame bounds, and Nuklear input use logical window
 		// coordinates; framebuffer dimensions are only the OpenGL viewport.
 		Nuklear.nk_input_motion(context, (int)xPos, (int)yPos);
@@ -94,10 +94,9 @@ public class NuklearController implements IMouseAndKeyboardEvents {
 				nuklearModel.setNkButtonDown(action == GLFW.GLFW_PRESS);
 			}
 
-			AbstractFrame isotropy = isotropyFrame();
-			if (isotropy != null && (isotropy.isCustomResizeCaptured()
-					|| leftButtonPress && isotropy.beginCustomResize(cursorX, cursorY))) {
-				if (leftButtonRelease) isotropy.endCustomResize();
+			AbstractFrame resizingFrame = capturedResizeFrame();
+			if (resizingFrame != null || leftButtonPress && (resizingFrame = beginResizeFrame(cursorX, cursorY)) != null) {
+				if (leftButtonRelease) resizingFrame.endCustomResize();
 				return true;
 			}
 			Nuklear.nk_input_button(context, nuklearModel.getNkButton(), x, y, nuklearModel.isNkButtonDown());
@@ -107,13 +106,22 @@ public class NuklearController implements IMouseAndKeyboardEvents {
 				|| nuklearModel.isAnyDialogActive();
 	}
 
-	private AbstractFrame isotropyFrame() {
-		return (AbstractFrame)nuklearModel.getFrames().get(Frame.isotropy);
+	private AbstractFrame capturedResizeFrame() {
+		for (AbstractFrame frame : nuklearModel.getFrames().values()) {
+			if (frame.isCustomResizeCaptured()) return frame;
+		}
+		return null;
+	}
+
+	private AbstractFrame beginResizeFrame(double cursorX, double cursorY) {
+		for (AbstractFrame frame : nuklearModel.getFrames().values()) {
+			if (frame.isResizeCapabilityEnabled() && frame.beginCustomResize(cursorX, cursorY)) return frame;
+		}
+		return null;
 	}
 
 	public boolean isLeftMouseCaptureActive() {
-		AbstractFrame isotropy = isotropyFrame();
-		return isotropy != null && isotropy.isCustomResizeCaptured();
+		return capturedResizeFrame() != null;
 	}
 
 	@Override

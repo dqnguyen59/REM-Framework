@@ -117,7 +117,8 @@ public abstract class AbstractFrame implements IFrame {
     private final NkRect contentRect      = NkRect.create();
 	private NkVec2 pos = NkVec2.create();
 
-	private boolean customResizeEnabled;
+	/** Controls whether this frame owns custom resize interaction and its visual grip affordance. */
+	protected ResizeCapability resizeCapability = ResizeCapability.disabled();
 	private boolean customResizeCaptured;
 	private double initialResizeCursorX;
 	private double initialResizeCursorY;
@@ -125,9 +126,6 @@ public abstract class AbstractFrame implements IFrame {
 	private float initialResizeFrameY;
 	private float initialResizeFrameWidth;
 	private float initialResizeFrameHeight;
-	private float resizeMinimumWidth;
-	private float resizeMinimumHeight;
-	private float resizeGripSize;
 
 	public AbstractFrame(NuklearModel nuklearModel) {
 		this.nuklearModel = nuklearModel;
@@ -307,11 +305,11 @@ public abstract class AbstractFrame implements IFrame {
 	}
 
 	private void updateResizeHandleRect(NkContext ctx) {
-		if (customResizeEnabled) {
-			resizeHandleRect.x(frameRect.x() + frameRect.w() - resizeGripSize);
-			resizeHandleRect.y(frameRect.y() + frameRect.h() - resizeGripSize);
-			resizeHandleRect.w(resizeGripSize);
-			resizeHandleRect.h(resizeGripSize);
+		if (resizeCapability.enabled()) {
+			resizeHandleRect.x(frameRect.x() + frameRect.w() - resizeCapability.gripSize());
+			resizeHandleRect.y(frameRect.y() + frameRect.h() - resizeCapability.gripSize());
+			resizeHandleRect.w(resizeCapability.gripSize());
+			resizeHandleRect.h(resizeCapability.gripSize());
 			return;
 		}
 		if ((windowOptions & Nuklear.NK_WINDOW_SCALABLE) == 0) {
@@ -327,11 +325,8 @@ public abstract class AbstractFrame implements IFrame {
 		resizeHandleRect.h(scrollbarSize.y());
 	}
 
-    protected final void enableCustomResize(float minimumWidth, float minimumHeight, float gripSize) {
-		customResizeEnabled = true;
-		resizeMinimumWidth = minimumWidth;
-		resizeMinimumHeight = minimumHeight;
-		resizeGripSize = gripSize;
+	public final boolean isResizeCapabilityEnabled() {
+		return resizeCapability.enabled();
 	}
 
 	public final boolean isCustomResizeCaptured() {
@@ -340,7 +335,7 @@ public abstract class AbstractFrame implements IFrame {
 
 	/** Starts custom resize capture only when the cursor is in this frame's rendered grip. */
 	public final boolean beginCustomResize(double cursorX, double cursorY) {
-		if (!customResizeEnabled || customResizeCaptured || !isInsideResizeHandle(cursorX, cursorY)) {
+		if (!resizeCapability.enabled() || customResizeCaptured || !isInsideResizeHandle(cursorX, cursorY)) {
 			return false;
 		}
 		customResizeCaptured = true;
@@ -359,7 +354,7 @@ public abstract class AbstractFrame implements IFrame {
 		ResizeBounds bounds = boundsFromResizeDelta(initialResizeFrameX, initialResizeFrameY,
 				initialResizeFrameWidth, initialResizeFrameHeight,
 				cursorX - initialResizeCursorX, cursorY - initialResizeCursorY,
-				resizeMinimumWidth, resizeMinimumHeight,
+				resizeCapability.minimumWidth(), resizeCapability.minimumHeight(),
 				getWindowWidth(), getWindowHeight());
 		frameRect.x(bounds.x()).y(bounds.y()).w(bounds.width()).h(bounds.height());
 		windowRect.x(bounds.x()).y(bounds.y()).w(bounds.width()).h(bounds.height());
@@ -396,8 +391,44 @@ public abstract class AbstractFrame implements IFrame {
 
 	record ResizeBounds(float x, float y, float width, float height) {}
 
+	protected record ResizeCapability(boolean enabled, float minimumWidth, float minimumHeight, float gripSize) {
+		static ResizeCapability disabled() {
+			return new ResizeCapability(false, 0, 0, 0);
+		}
+
+		protected static ResizeCapability enabled(float minimumWidth, float minimumHeight, float gripSize) {
+			return new ResizeCapability(true, minimumWidth, minimumHeight, gripSize);
+		}
+	}
+
 	protected void drawOverlay(NkContext ctx) {
-		// Optional frame-owned visual overlays are drawn after content and before nk_end.
+		if (resizeCapability.enabled()) drawResizeGrip(ctx);
+		drawFrameOverlay(ctx);
+	}
+
+	/** Draws optional frame-specific overlays after the base resize affordance. */
+	protected void drawFrameOverlay(NkContext ctx) {
+	}
+
+	private void drawResizeGrip(NkContext ctx) {
+		NkRect outerBounds = NkRect.create();
+		Nuklear.nk_window_get_bounds(ctx, outerBounds);
+		NkCommandBuffer canvas = Nuklear.nk_window_get_canvas(ctx);
+		NkRect priorClip = NkRect.create().set(canvas.clip());
+		Nuklear.nk_push_scissor(canvas, outerBounds);
+		float gripSize = resizeCapability.gripSize();
+		float inset = gripSize / 6.0f;
+		float gripRight = outerBounds.x() + outerBounds.w() - inset;
+		float gripBottom = outerBounds.y() + outerBounds.h() - inset;
+		// Visual indicator for the custom resize grip; it does not handle input.
+		for (int line = 0; line < 3; line++) {
+			float offset = line * 3.0f;
+			Nuklear.nk_stroke_line(canvas,
+					gripRight - gripSize + inset + offset + 3, gripBottom,
+					gripRight + 3, gripBottom - gripSize + inset + offset,
+					1.5f, Theme.grey12);
+		}
+		Nuklear.nk_push_scissor(canvas, priorClip);
 	}
 
 	protected void createLayout(NkContext ctx, int x, int y, int width, int height) {

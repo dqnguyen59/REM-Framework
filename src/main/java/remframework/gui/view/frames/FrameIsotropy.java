@@ -2,12 +2,10 @@ package remframework.gui.view.frames;
 
 import org.joml.Vector3d;
 import org.lwjgl.nuklear.NkContext;
-import org.lwjgl.nuklear.NkCommandBuffer;
 import org.lwjgl.nuklear.NkRect;
 import org.lwjgl.nuklear.NkVec2;
 import org.lwjgl.nuklear.Nuklear;
 import remframework.gui.model.NuklearModel;
-import remframework.gui.model.Theme;
 import remframework.opengl.model.PassiveObserver;
 import remframework.opengl.model.Probe;
 import remframework.opengl.model.ProbeDefinition;
@@ -31,7 +29,7 @@ public final class FrameIsotropy extends AbstractFrame {
 
     public FrameIsotropy(NuklearModel model) {
         super(model);
-        enableCustomResize(MIN_WIDTH, MIN_HEIGHT, 12);
+        resizeCapability = ResizeCapability.enabled(MIN_WIDTH, MIN_HEIGHT, 12);
     }
 
     @Override
@@ -177,27 +175,6 @@ public final class FrameIsotropy extends AbstractFrame {
         scalar(ctx, "Samples in last completed cycle", Integer.toString(receiver.getSamplesPerCycleForAudit()));
         scalar(ctx, "Cycle completed", Boolean.toString(receiver.wasCycleCompletedThisUpdate()));
         Nuklear.nk_group_end(ctx);
-    }
-
-    @Override
-    protected void drawOverlay(NkContext ctx) {
-        NkRect outerBounds = NkRect.create();
-        Nuklear.nk_window_get_bounds(ctx, outerBounds);
-        NkRect grip = getResizeHandleRect();
-        NkCommandBuffer canvas = Nuklear.nk_window_get_canvas(ctx);
-        NkRect priorClip = NkRect.create().set(canvas.clip());
-        Nuklear.nk_push_scissor(canvas, outerBounds);
-        float inset = grip.w() / 6.0f;
-        float gripRight = grip.x() + grip.w() - inset;
-        float gripBottom = grip.y() + grip.h() - inset;
-        for (int line = 0; line < 3; line++) {
-            float offset = line * 3.0f;
-            Nuklear.nk_stroke_line(canvas,
-                    gripRight - grip.w() + inset + offset + 3, gripBottom,
-                    gripRight + 3, gripBottom - grip.h() + inset + offset,
-                    1.5f, Theme.grey12);
-        }
-        Nuklear.nk_push_scissor(canvas, priorClip);
     }
 
     static String sourceSamplesLabel(int index) {
