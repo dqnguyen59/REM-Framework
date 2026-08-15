@@ -181,15 +181,18 @@ public final class FrameIsotropy extends AbstractFrame {
 
     @Override
     protected void drawOverlay(NkContext ctx) {
-        NkRect grip = getResizeHandleRect();
-        float inset = 20.0f;
-        float left = grip.x() + 0;
-        float top = grip.y() + 0;
-        float right = grip.x() + grip.w() - inset;
-        float bottom = grip.y() + grip.h() - inset;
+        NkRect outerBounds = NkRect.create();
+        Nuklear.nk_window_get_bounds(ctx, outerBounds);
+        float right = outerBounds.x() + outerBounds.w() - 2.0f;
+        float bottom = outerBounds.y() + outerBounds.h() - 2.0f;
         NkCommandBuffer canvas = Nuklear.nk_window_get_canvas(ctx);
-        // Visual indicator for the custom resize grip; it does not handle input.
-        Nuklear.nk_fill_triangle(canvas, right, top, right, bottom, left, bottom, Theme.white);
+        for (int line = 0; line < 3; line++) {
+            float offset = line * 3.0f;
+            Nuklear.nk_stroke_line(canvas,
+                               right - 10.0f + offset, bottom,
+                                   right, bottom - 10.0f + offset,
+                       1.5f, Theme.grey12);
+                    }
     }
 
     static String sourceSamplesLabel(int index) {
