@@ -66,6 +66,9 @@ public class Scene {
     private ObjFileModel gradientArrowModel;
     private boolean showGradientArrows;
     private double gradientArrowScaleExponent = 51.0;
+    private boolean showCalibrationArrow;
+    private CalibrationDirection calibrationDirection = CalibrationDirection.NEGATIVE_X;
+    private Entity calibrationArrow;
     private Node                firstHiLightedNode;
 
     private DirectionalLight directionalLight;
@@ -280,8 +283,48 @@ public class Scene {
         return Math.pow(10.0, gradientArrowScaleExponent / 10.0);
     }
 
+    public enum CalibrationDirection {
+        NEGATIVE_X(new Vector3d(-1, 0, 0)),
+        POSITIVE_Y(new Vector3d(0, 1, 0)),
+        POSITIVE_Z(new Vector3d(0, 0, 1));
+
+        private final Vector3d vector;
+
+        CalibrationDirection(Vector3d vector) {
+            this.vector = vector;
+        }
+
+        public Vector3d vector() {
+            return new Vector3d(vector);
+        }
+    }
+
+    public boolean isShowCalibrationArrow() {
+        return showCalibrationArrow;
+    }
+
+    public void setShowCalibrationArrow(boolean showCalibrationArrow) {
+        this.showCalibrationArrow = showCalibrationArrow;
+        if (!showCalibrationArrow) clearCalibrationArrow();
+    }
+
+    public CalibrationDirection getCalibrationDirection() {
+        return calibrationDirection;
+    }
+
+    public void setCalibrationDirection(CalibrationDirection calibrationDirection) {
+        if (this.calibrationDirection == calibrationDirection) return;
+        this.calibrationDirection = calibrationDirection;
+        if (showCalibrationArrow) clearCalibrationArrow();
+    }
+
     /** Updates cached renderer-only gradient arrows without recreating their entities. */
     public List<Entity> getGradientArrowRenderEntities() {
+        if (showCalibrationArrow) {
+            hideGradientArrows();
+            Entity arrow = calibrationArrow == null ? createCalibrationArrow() : calibrationArrow;
+            return arrow == null ? List.of() : List.of(arrow);
+        }
         if (!showGradientArrows || probes.isEmpty()) {
             hideGradientArrows();
             return List.of();
@@ -304,44 +347,83 @@ public class Scene {
                     && probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) continue;
             Entity arrow = gradientArrowEntities.computeIfAbsent(probe, this::createGradientArrow);
             Vector3d gradient = probe.getStableGradientImbalance();
-            Vector3d arrowVector = new Vector3d(gradient).mul(getGradientArrowScale());
-            double length = arrowVector.length();
-            if (!Double.isFinite(length) || length <= 0.0) {
-                arrow.setVisible(false);
-                continue;
-            }
             Vector3d anchor = probe.getMarker().getPosition();
-            Vector3d rotation = GradientArrowGeometry.rotationForDirection(arrowVector);
-            if (rotation == null) {
-                arrow.setVisible(false);
-                continue;
-            }
-            arrow.setPosition(anchor);
-            arrow.setRotation(rotation);
-            arrow.setScale(length);
-            arrow.setCustomColor(new Vector4f(probe.getMarker().getMaterial().getAmbientColor()));
-            arrow.setVisible(true);
-            arrow.updateMatrix();
+            Vector3d localArrowVector = new Vector3d(probe.getStableGradientImbalance())
+                    .mul(getGradientArrowScale());
+            updateArrowFromLocalVector(arrow, anchor, localArrowVector,
+                    localArrowVector.length(),
+                    new Vector4f(probe.getMarker().getMaterial().getAmbientColor()));
+            if (!arrow.isVisible()) continue;
             visible.add(arrow);
         }
         return visible;
     }
 
+    private Entity createCalibrationArrow() {
+        if (lattice.getBaseEntity() == null) return null;
+        if (gradientArrowModel == null) {
+            gradientArrowModel = new OBJFormatLoader().loadOBJModel(Constants.MODEL_ARROW);
+        }
+        Vector3d anchor = calibrationAnchor();
+        Vector3d direction = calibrationDirection.vector();
+        calibrationArrow = lattice.createEntity(lattice.getBaseEntity(), gradientArrowModel,
+                anchor, new Vector3d(), 1.0);
+        updateArrowFromLocalVector(calibrationArrow, anchor, direction,
+                GradientArrowGeometry.CALIBRATION_LENGTH,
+                new Vector4f(0.0f, 1.0f, 1.0f, 1.0f));
+        return calibrationArrow;
+    }
+
+    /** Updates a renderer-only arrow from a vector already expressed in lattice-parent coordinates. */
+    void updateArrowFromLocalVector(Entity arrow, Vector3d anchorLocal,
+                                    Vector3d directionLocal, double visualLength,
+                                    Vector4f color) {
+        if (arrow == null || !Double.isFinite(visualLength) || visualLength <= 0.0
+                || directionLocal.lengthSquared() <= 1.0e-24) {
+            if (arrow != null) arrow.setVisible(false);
+            return;
+        }
+        arrow.setPosition(anchorLocal);
+        arrow.setRotation(GradientArrowGeometry.rotationForDirection(directionLocal));
+        arrow.setScale(visualLength / (GradientArrowGeometry.MESH_LENGTH * settings.scale));
+        arrow.setOverrideModelMaterial(true);
+        arrow.getMaterial().setDiffuseColor(new Vector4f(color));
+        arrow.getMaterial().setAmbientColor(new Vector4f(color));
+        arrow.getMaterial().setShininess(0.0f);
+        arrow.setCustomColor(new Vector4f(color));
+        arrow.setVisible(true);
+        arrow.updateMatrix();
+    }
+
+    private Vector3d calibrationAnchor() {
+        Vector3i center = new Vector3i(project.getDimensionX() / 2,
+                                      project.getDimensionY() / 2,
+                                      project.getDimensionZ() / 2);
+        Node node = lattice.getNodeByIndex(center);
+        return node == null ? new Vector3d() : new Vector3d(node.getPosition());
+    }
+
+    private void clearCalibrationArrow() {
+        if (calibrationArrow == null) return;
+        calibrationArrow.setVisible(false);
+        lattice.getEntities().remove(calibrationArrow);
+        lattice.getNonNodeRenderEntities().remove(calibrationArrow);
+        calibrationArrow = null;
+    }
+
     /** Hides and forgets cached arrows when committed probe or lattice render state is rebuilt. */
     public void hideGradientArrows() {
-        for (Entity arrow : gradientArrowEntities.values()) arrow.setVisible(false);
+        for (Entity arrow : gradientArrowEntities.values()) {
+            arrow.setVisible(false);
+            lattice.getEntities().remove(arrow);
+            lattice.getNonNodeRenderEntities().remove(arrow);
+        }
         gradientArrowEntities.clear();
     }
 
     private Entity createGradientArrow(PassiveObserver probe) {
-        Entity arrow = new Entity(lattice.getBaseEntity(), gradientArrowModel,
-                                  probe.getMarker().getPosition(), new Vector3d(), 0.0,
-                                  EntityType.ENTITY);
-        arrow.setOverrideModelMaterial(true);
-        arrow.getMaterial().setDiffuseColor(new Vector4f(1, 1, 1, 1));
-        arrow.getMaterial().setAmbientColor(new Vector4f(1, 1, 1, 1));
-        arrow.getMaterial().setShininess(0.0f);
-        return arrow;
+        return lattice.createEntity(lattice.getBaseEntity(), gradientArrowModel,
+                probe.getMarker().getPosition(), new Vector3d(), 1.0);
     }
 
     public List<Entity> getProbeRenderEntities() {
@@ -397,6 +479,7 @@ public class Scene {
 
     /** Removes all probe markers and restores the ordinary lattice render state. */
     public void clearProbes() {
+        clearCalibrationArrow();
         hideGradientArrows();
         clearProbeInteractionState();
         for (PassiveObserver probe : probes) resetProbeMeasurements(probe);

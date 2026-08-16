@@ -108,6 +108,13 @@ public class Lattice {
         return addEntity(new Entity(parent, model, position, rotation, scale, EntityType.ENTITY));
     }
 
+    /** Registers a renderer-only gradient arrow in the same non-node render path as other entities. */
+    public GradientArrowEntity createGradientArrowEntity(
+            Entity parent, ObjFileModel model, Vector3d position, double scale) {
+        return (GradientArrowEntity) addEntity(
+                new GradientArrowEntity(parent, model, position, scale));
+    }
+
     public Entity createEntity(Vector3d position, Vector3d rotation, double scale) {
         if (baseEntity == null) {
             System.out.println("Warning, baseEntity is null!");

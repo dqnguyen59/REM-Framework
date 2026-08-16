@@ -1,33 +1,27 @@
 package remframework.opengl.model;
 
-import org.joml.Quaterniond;
+import org.joml.Matrix4d;
 import org.joml.Vector3d;
 
-/** Geometry-only transforms for the arrow mesh used by passive gradient overlays. */
+/** Euler calibration for the arrow mesh used by passive gradient overlays. */
 public final class GradientArrowGeometry {
-    private static final Vector3d CANONICAL_ARROW_AXIS = new Vector3d(0, 0, 1);
-    private static final double MIN_DIRECTION_LENGTH_SQUARED = 1.0e-24;
+    /** The verified arrow mesh axis runs from local z=0 to local z=13. */
+    public static final double MESH_LENGTH = 13.0;
+    public static final double CALIBRATION_LENGTH = 10.0;
 
     private GradientArrowGeometry() {
     }
 
-    /**
-     * Returns XYZ Euler angles that rotate the arrow mesh's verified local +Z axis
-     * onto {@code direction}; returns {@code null} for a near-zero direction.
-     */
+    /** Calibrated Euler rotation for the temporary cardinal-axis comparison arrow. */
     public static Vector3d rotationForDirection(Vector3d direction) {
-        if (direction.lengthSquared() <= MIN_DIRECTION_LENGTH_SQUARED) return null;
-        Quaterniond rotation = new Quaterniond().rotationTo(
-                CANONICAL_ARROW_AXIS, new Vector3d(direction).normalize());
-        Vector3d euler = rotation.getEulerAnglesXYZ(new Vector3d());
-        return euler.mul(Math.toDegrees(1.0));
+        Vector3d unit = new Vector3d(direction).normalize();
+        double pitchX = Math.toDegrees(Math.atan2(-unit.y, unit.z));
+        double yawY = Math.toDegrees(Math.asin(unit.x));
+        return new Vector3d(pitchX, yawY, 0.0);
     }
 
-    /** Applies the same canonical-axis rotation for geometry-focused verification. */
-    public static Vector3d rotatedCanonicalAxis(Vector3d direction) {
-        if (direction.lengthSquared() <= MIN_DIRECTION_LENGTH_SQUARED) return new Vector3d();
-        return new Quaterniond().rotationTo(
-                CANONICAL_ARROW_AXIS, new Vector3d(direction).normalize())
-                .transform(new Vector3d(CANONICAL_ARROW_AXIS));
+    /** Converts a world-space arrow vector into the local coordinates of its lattice parent. */
+    public static Vector3d toParentLocalDirection(Vector3d worldDirection, Matrix4d parentWorld) {
+        return new Matrix4d(parentWorld).invert().transformDirection(new Vector3d(worldDirection));
     }
 }

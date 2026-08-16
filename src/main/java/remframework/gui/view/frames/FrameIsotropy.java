@@ -5,12 +5,14 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.NkRect;
 import org.lwjgl.nuklear.NkVec2;
 import org.lwjgl.nuklear.Nuklear;
+import org.lwjgl.system.MemoryStack;
 import remframework.gui.model.NuklearModel;
 import remframework.opengl.model.PassiveObserver;
 import remframework.opengl.model.Probe;
 import remframework.opengl.model.ProbeDefinition;
 import remframework.opengl.model.ProbeDetectorType;
 import remframework.opengl.model.ProbeComparison;
+import remframework.opengl.model.Scene;
 import remframework.opengl.model.entity.Occupancy;
 import remframework.opengl.model.entity.Node;
 import remframework.settings.Project;
@@ -73,6 +75,33 @@ public final class FrameIsotropy extends AbstractFrame {
                 Math.rint(nk_slider(ctx, 0.0, project.scene.getGradientArrowScaleExponent(), 120.0, 1)));
         scalar(ctx, "Visual scale", "10^" + (int) project.scene.getGradientArrowScaleExponent()
                 + " = " + format(project.scene.getGradientArrowScale()));
+
+        section(ctx, "Arrow calibration");
+        project.scene.setShowCalibrationArrow(nk_check_label(ctx, "Show calibration arrow",
+                                                             project.scene.isShowCalibrationArrow(), 0.7, 0.3));
+        Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
+        Nuklear.nk_label(ctx, "Direction:", Nuklear.NK_TEXT_LEFT);
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            String[] directions = {"−X", "+Y", "+Z"};
+            Scene.CalibrationDirection currentDirection = project.scene.getCalibrationDirection();
+            String currentLabel = switch (currentDirection) {
+                case NEGATIVE_X -> "−X";
+                case POSITIVE_Y -> "+Y";
+                case POSITIVE_Z -> "+Z";
+            };
+            String selected = nk_combo_options(ctx, stack, directions,
+                                               currentLabel);
+            Scene.CalibrationDirection selectedDirection = switch (selected) {
+                case "+Y" -> Scene.CalibrationDirection.POSITIVE_Y;
+                case "+Z" -> Scene.CalibrationDirection.POSITIVE_Z;
+                default -> Scene.CalibrationDirection.NEGATIVE_X;
+            };
+            project.scene.setCalibrationDirection(selectedDirection);
+        }
+        Vector3d calibrationVector = project.scene.getCalibrationDirection().vector();
+        scalar(ctx, "Calibration", calibrationDirectionLabel(project.scene.getCalibrationDirection())
+                + "  (" + (int) calibrationVector.x + ", "
+                + (int) calibrationVector.y + ", " + (int) calibrationVector.z + ")");
 
         NkVec2 contentSize = NkVec2.create();
         Nuklear.nk_window_get_content_region_size(ctx, contentSize);
@@ -238,6 +267,14 @@ public final class FrameIsotropy extends AbstractFrame {
         Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
         Nuklear.nk_label(ctx, label, Nuklear.NK_TEXT_LEFT);
         Nuklear.nk_label(ctx, value, Nuklear.NK_TEXT_RIGHT);
+    }
+
+    private static String calibrationDirectionLabel(Scene.CalibrationDirection direction) {
+        return switch (direction) {
+            case NEGATIVE_X -> "−X";
+            case POSITIVE_Y -> "+Y";
+            case POSITIVE_Z -> "+Z";
+        };
     }
 
     private static int rowHeightFor(NkContext ctx) {
