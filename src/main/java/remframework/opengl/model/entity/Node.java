@@ -182,7 +182,7 @@ public class Node extends Entity {
                 deltaPositions[i].set(neighbors[i].position).sub(position);
                 deltaAcceleration[i].set(neighbors[i].acceleration).sub(acceleration);
                 deltaVelocity[i].set(neighbors[i].velocity).sub(velocity);
-                flow[i] = deltaPositions[i].length() * deltaVelocity[i].length();
+                flow[i] = deltaPositions[i].length();
             }
         }
 

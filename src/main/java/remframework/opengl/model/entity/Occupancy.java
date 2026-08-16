@@ -121,7 +121,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     private final Vector3d initialTransportMomentum = new Vector3d();
 
-    private static final int GRADIENT_IMBALANCE_HISTORY_LENGTH = 100;
+    private static final int GRADIENT_IMBALANCE_HISTORY_LENGTH = 360;
 
     private final Vector3d[] gradientImbalanceHistory        = new Vector3d[GRADIENT_IMBALANCE_HISTORY_LENGTH];
 
@@ -471,9 +471,9 @@ public class Occupancy extends AbstractSettings implements ISettings {
         maxPositiveGradient.zero();
         maxNegativeGradient.zero();
 
-        for (Vector3d vector3d : history) {
-            maxPositiveGradient.max(vector3d);
-            maxNegativeGradient.min(vector3d);
+        for(int i = 240; i < 360; i++) {
+                maxPositiveGradient.max(history[i]);
+                maxNegativeGradient.min(history[i]);
         }
         gradientImbalance.set(maxPositiveGradient).add(maxNegativeGradient).mul(0.5);
         lastMaxPositiveGradient.set(maxPositiveGradient);

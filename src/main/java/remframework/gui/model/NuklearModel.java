@@ -291,15 +291,15 @@ public class NuklearModel {
 	}
 
 	public void close(AbstractFrame frame) {
+	    Frame frameKey = null;
 	    for (Entry<Frame, AbstractFrame> entry : framesMap.entrySet()) {
 	        if (entry.getValue().equals(frame)) {
-	    		new Thread(new Runnable() {
-	    			@Override
-	    			public void run() {
-	    	        	closeFrame(entry.getKey());
-	    			}
-	    		}).start();
+	            frameKey = entry.getKey();
+	            break;
 	        }
+	    }
+	    if (frameKey != null) {
+	        closeFrame(frameKey);
 	    }
 	}
 	
