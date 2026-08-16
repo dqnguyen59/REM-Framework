@@ -25,13 +25,13 @@ import java.util.Set;
 
 /** Non-modal workspace for creating passive, geometrically positioned probe definitions. */
 public final class FrameAddProbes extends AbstractFrame {
-    private static int retainedFirstShellRadius = 10;
-    private static int retainedShellDistance = 5;
-    private static int retainedNumberOfShells = 2;
-    private static int retained2DProbesPerShell = 5;
-    private static int retained3DProbesPerPlanePerShell = 5;
+    private static int retainedFirstShellRadius = 50;
+    private static int retainedShellDistance = 10;
+    private static int retainedNumberOfShells = 10;
+    private static int retained2DProbesPerShell = 9;
+    private static int retained3DProbesPerPlanePerShell = 9;
     private static int retainedRegion;
-    private static boolean retainedInterpolatedBinding;
+    private static boolean retainedInterpolatedBinding = true;
     private static Vector4f retainedDisplayColor = new Vector4f(0.2f, 0.8f, 1.0f, 1.0f);
 
     private final Project project = Project.getInstance();

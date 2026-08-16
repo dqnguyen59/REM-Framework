@@ -64,8 +64,8 @@ public class Scene {
     private final ProbeComparison comparison = new ProbeComparison();
     private final Map<PassiveObserver, Entity> gradientArrowEntities = new IdentityHashMap<>();
     private ObjFileModel gradientArrowModel;
-    private boolean showGradientArrows;
-    private double gradientArrowScaleExponent = 51.0;
+    private boolean showGradientArrows = true;
+    private double gradientArrowScaleExponent = 70.0;
     private boolean showCalibrationArrow;
     private CalibrationDirection calibrationDirection = CalibrationDirection.NEGATIVE_X;
     private Entity calibrationArrow;

@@ -88,7 +88,7 @@ public abstract class AbstractSettings implements ISettings {
 			
 			saveToFile(new Wini(f), "", 0);
 			ini.store();
-			System.out.println("saveToFile: " + currentFilename);
+			//System.out.println("saveToFile: " + currentFilename);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

@@ -61,8 +61,9 @@ public class Node extends Entity {
 
     private Vector3d fixedPos;
 
-    private final Vector3d[] deltaPositions   = new Vector3d[6];
-    private final Vector3d[] deltaVelocity    = new Vector3d[6];
+    private final Vector3d[] deltaPositions    = new Vector3d[6];
+    private final Vector3d[] deltaAcceleration = new Vector3d[6];
+    private final Vector3d[] deltaVelocity     = new Vector3d[6];
     private final double[]   flow             = new double[6];
     private final double[]   previousFlow     = new double[6];
     private final double[] deltaFlow         = new double[6];
@@ -91,6 +92,9 @@ public class Node extends Entity {
 
         for (int i = 0; i < deltaPositions.length; i++) {
             deltaPositions[i] = new Vector3d();
+        }
+        for (int i = 0; i < deltaAcceleration.length; i++) {
+            deltaAcceleration[i] = new Vector3d();
         }
         for (int i = 0; i < deltaVelocity.length; i++) {
             deltaVelocity[i] = new Vector3d();
@@ -166,11 +170,17 @@ public class Node extends Entity {
         return isVisible || (type == EntityType.WALL) && remModel.isWallVisible();
     }
 
+    /**
+     * flow[i] = ∆d + ∆v²
+     *
+     * @return gradientImbalance = (flow[LEFT] - flow[RIGHT], flow[BOTTOM] - flow[TOP], flow[BACK] - flow[FRONT])
+     */
     public Vector3d measureGradientImbalance() {
 
-        for (int i = 0; i < deltaPositions.length; i++) {
+        for (int i = 0; i < neighbors.length; i++) {
             if (neighbors[i] != null) {
                 deltaPositions[i].set(neighbors[i].position).sub(position);
+                deltaAcceleration[i].set(neighbors[i].acceleration).sub(acceleration);
                 deltaVelocity[i].set(neighbors[i].velocity).sub(velocity);
                 flow[i] = deltaPositions[i].length() * deltaVelocity[i].length();
             }
