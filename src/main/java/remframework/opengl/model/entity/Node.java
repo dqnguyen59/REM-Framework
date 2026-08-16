@@ -172,14 +172,14 @@ public class Node extends Entity {
             if (neighbors[i] != null) {
                 deltaPositions[i].set(neighbors[i].position).sub(position);
                 deltaVelocity[i].set(neighbors[i].velocity).sub(velocity);
-                flow[i] = deltaPositions[i].length();
+                flow[i] = deltaPositions[i].length() * deltaVelocity[i].length();
             }
         }
 
 
-        return gradientImbalance.set(flow[NEIGHBOR_RIGHT] - flow[NEIGHBOR_LEFT],
-                            flow[NEIGHBOR_TOP] - flow[NEIGHBOR_BOTTOM],
-                            flow[NEIGHBOR_FRONT] - flow[NEIGHBOR_BACK]);
+        return gradientImbalance.set(flow[NEIGHBOR_LEFT] - flow[NEIGHBOR_RIGHT],
+                            flow[NEIGHBOR_BOTTOM] - flow[NEIGHBOR_TOP],
+                            flow[NEIGHBOR_BACK] - flow[NEIGHBOR_FRONT]);
     }
 
     /**
