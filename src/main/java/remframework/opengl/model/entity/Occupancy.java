@@ -462,6 +462,13 @@ public class Occupancy extends AbstractSettings implements ISettings {
     /** Read-only completed-cycle sample-size access for compact-path equivalence auditing. */
     public int getSamplesPerCycleForAudit() { return samplesPerCycle; }
 
+    /** Returns defensive copies of the currently retained gradient samples. */
+    public java.util.List<Vector3d> getGradientImbalanceHistoryForAudit() {
+        java.util.List<Vector3d> result = new java.util.ArrayList<>(GRADIENT_IMBALANCE_HISTORY_LENGTH);
+        for (Vector3d sample : gradientImbalanceHistory) result.add(new Vector3d(sample));
+        return java.util.List.copyOf(result);
+    }
+
     public void resetMaxGradient() {
         maxPositiveGradient.zero();
         maxNegativeGradient.zero();

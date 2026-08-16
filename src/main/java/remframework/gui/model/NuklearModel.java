@@ -66,6 +66,7 @@ public class NuklearModel {
 		preferences,
 		transportSystem,
 		isotropy,
+		occupancyHistory,
 		addProbes,
 		geometryDiscoveryControls,
 		geometryDiscoveryMetrics,
@@ -199,6 +200,8 @@ public class NuklearModel {
 			return new FrameTransportSystem(this);
 		case isotropy:
 			return new FrameIsotropy(this);
+		case occupancyHistory:
+			return new FrameOccupancyHistory(this);
 		case addProbes:
 			return new FrameAddProbes(this);
 		case preferences:

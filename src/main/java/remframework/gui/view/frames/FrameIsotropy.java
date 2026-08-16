@@ -22,6 +22,8 @@ import java.util.Locale;
 /** Read-only live view of the detectGradient8 receiver state. */
 public final class FrameIsotropy extends AbstractFrame {
 
+    static final String HISTORY_BUTTON_LABEL = "▥";
+
     private static final int DEFAULT_WIDTH = 720;
     private static final int DEFAULT_HEIGHT = 720;
     private static final int MIN_WIDTH = 520;
@@ -116,7 +118,14 @@ public final class FrameIsotropy extends AbstractFrame {
         if (probe == null) {
             scalar(ctx, "Probe", "None");
         } else {
-            scalar(ctx, "Probe", probe.getId());
+            Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightFor(ctx), 2);
+            Nuklear.nk_layout_row_push(ctx, 0.82f);
+            Nuklear.nk_label(ctx, "Probe", Nuklear.NK_TEXT_LEFT);
+            Nuklear.nk_layout_row_push(ctx, 0.18f);
+            if (Nuklear.nk_button_label(ctx, HISTORY_BUTTON_LABEL))
+                nuklearModel.showFrame(NuklearModel.Frame.occupancyHistory);
+            Nuklear.nk_layout_row_end(ctx);
+            scalar(ctx, "Probe ID", probe.getId());
             scalar(ctx, "Detector type", probe.getDetectorType().name());
             ProbeDefinition.Placement placement = probe.getDefinition().getPlacement();
             if (placement != null) {
