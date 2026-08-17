@@ -443,14 +443,14 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     @Override
     public boolean mouseScrollCallback(long handle, double xOffset, double yOffset) {
         if (discoveryWorkspace.state().active()) {
-            discoveryViewport.scroll(yOffset);
+            discoveryViewport.scroll(-yOffset);
             return false;
         }
-        scene.zoomCameraAroundTarget(yOffset);
+        scene.zoomCameraAroundTarget(-yOffset);
         float incCamera = keyEvents != null && keyEvents.isCtrlPressed ? 2 : 12;
         if (!scene.isNeighborhoodInspectionActive()) {
             project.camera.movePosition(
-                    (float) (incCamera * xOffset * Constants.CAMERA_MOVE_SPEED), 0, 0);
+                    (float) (incCamera * -xOffset * Constants.CAMERA_MOVE_SPEED), 0, 0);
         }
 
         return false;
