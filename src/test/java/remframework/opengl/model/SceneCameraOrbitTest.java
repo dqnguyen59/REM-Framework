@@ -7,6 +7,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.Node;
+import remframework.opengl.helpers.Neighbor;
+import remframework.settings.AppSettings;
 import remframework.settings.Project;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -99,15 +101,14 @@ class SceneCameraOrbitTest {
                 new Vector4f(1, 0.5f, 0, 1)), node, marker);
         scene.selectProbe(probe);
         project.camera.setPosition(5, 6, 31);
-        double initialDistance = new Vector3d(project.camera.getPosition())
-                .distance(scene.getActiveCameraTarget());
         scene.enterNeighborhoodInspection();
         scene.updateCameraTransition(0.8);
         Vector3d target = scene.getActiveCameraTarget();
+        double framedDistance = new Vector3d(project.camera.getPosition()).distance(target);
 
         scene.zoomCameraAroundTarget(1.0 / 12.0);
         assertEquals(target, scene.getActiveCameraTarget());
-        assertEquals(initialDistance - 1.0,
+        assertEquals(framedDistance - 1.0,
                 new Vector3d(project.camera.getPosition()).distance(target), 1.0e-4);
 
         scene.zoomCameraAroundTarget(1000.0);
@@ -139,13 +140,78 @@ class SceneCameraOrbitTest {
         for (int i = 0; i < 3; i++) {
             scene.updateCameraTransition(0.2);
             double currentZ = project.camera.getPosition().z;
-            org.junit.jupiter.api.Assertions.assertTrue(currentZ >= previousZ);
+            org.junit.jupiter.api.Assertions.assertTrue(currentZ <= previousZ);
             previousZ = currentZ;
         }
         assertFalse(scene.isNeighborhoodInspectionActive());
         scene.updateCameraTransition(0.2);
         assertTrue(scene.isNeighborhoodInspectionActive());
         assertEquals(new Vector3d(0, 0, 20), scene.getActiveCameraTarget());
+    }
+
+    @Test
+    void inspectionFramingDistanceGrowsWithNeighborhoodExtent() {
+        Node source = new Node(null, null, new Vector3d(0, 0, 0), new Vector3d(), 1.0);
+        source.setIndex(new Vector3i(4, 4, 4));
+        Node neighbor = new Node(null, null, new Vector3d(1, 0, 0), new Vector3d(), 1.0);
+        neighbor.setIndex(new Vector3i(5, 4, 4));
+        source.setNeighbor(Neighbor.RIGHT, neighbor);
+        Entity marker = new Entity(null, null, new Vector3d(0, 0, 0), new Vector3d(), 1.0,
+                remframework.opengl.model.entity.EntityType.ENTITY);
+        Probe probe = new Probe(new ProbeDefinition("framing-probe", source.getIndex(),
+                new Vector4f(1, 0.5f, 0, 1)), source, marker);
+
+        double compactDistance = scene.calculateInspectionFraming(probe).cameraDistance();
+        neighbor.setPosition(new Vector3d(100, 0, 0));
+        neighbor.updateMatrix();
+        double expandedDistance = scene.calculateInspectionFraming(probe).cameraDistance();
+
+        assertTrue(expandedDistance > compactDistance);
+    }
+
+    @Test
+    void inspectionFramingTargetsMarkerAndFitsAllDirectPoints() {
+        Node source = new Node(null, null, new Vector3d(), new Vector3d(), 1.0);
+        source.setIndex(new Vector3i(6, 6, 6));
+        Vector3d[] positions = {
+                new Vector3d(1, 0, 0), new Vector3d(0, 1, 0), new Vector3d(0, 0, 1),
+                new Vector3d(-1, 0, 0), new Vector3d(0, -1, 0), new Vector3d(0, 0, -1)
+        };
+        Neighbor[] directions = Neighbor.values();
+        for (int index = 0; index < directions.length; index++) {
+            Node neighbor = new Node(null, null, positions[index], new Vector3d(), 1.0);
+            neighbor.setIndex(new Vector3i(6, 6, 6).add(
+                    directions[index] == Neighbor.RIGHT ? 1 : directions[index] == Neighbor.LEFT ? -1 : 0,
+                    directions[index] == Neighbor.TOP ? 1 : directions[index] == Neighbor.BOTTOM ? -1 : 0,
+                    directions[index] == Neighbor.FRONT ? 1 : directions[index] == Neighbor.BACK ? -1 : 0));
+            source.setNeighbor(directions[index], neighbor);
+        }
+        Entity marker = new Entity(null, null, new Vector3d(), new Vector3d(), 1.0,
+                remframework.opengl.model.entity.EntityType.ENTITY);
+        Probe probe = new Probe(new ProbeDefinition("fit-probe", source.getIndex(),
+                new Vector4f(1, 0.5f, 0, 1)), source, marker);
+        scene.selectProbe(probe);
+        Entity base = new Entity(null, null, new Vector3d(), new Vector3d(), 1.0,
+                remframework.opengl.model.entity.EntityType.ENTITY);
+        scene.getLattice().setBaseEntity(base);
+        project.camera.setPosition(0, 0, 100);
+
+        scene.enterNeighborhoodInspection();
+        scene.updateCameraTransition(0.8);
+
+        Vector3d target = new Vector3d(project.camera.getOrbitTarget());
+        assertEquals(new Vector3d(marker.getPosition()), target);
+        Vector3d camera = new Vector3d(project.camera.getPosition());
+        Vector3d forward = target.sub(camera).normalize();
+        double halfVerticalFov = Math.toRadians(project.camera.getFieldOfView()) * 0.5;
+        double halfHorizontalFov = Math.atan(Math.tan(halfVerticalFov)
+                * ((double) AppSettings.getInstance().getWindowWidth()
+                / AppSettings.getInstance().getWindowHeight()));
+        for (Vector3d point : positions) {
+            Vector3d toPoint = new Vector3d(point).sub(camera);
+            double angle = Math.acos(Math.clamp(forward.dot(new Vector3d(toPoint).normalize()), -1.0, 1.0));
+            assertTrue(angle <= Math.min(halfVerticalFov, halfHorizontalFov));
+        }
     }
 
     private void assertForwardPointsAtTarget() {

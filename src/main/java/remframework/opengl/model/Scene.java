@@ -25,6 +25,7 @@ import remframework.helpers.Constants;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.EntityType;
 import remframework.opengl.model.entity.Node;
+import remframework.opengl.helpers.Neighbor;
 import remframework.opengl.controller.TransportSystem;
 import remframework.opengl.model.lights.DirectionalLight;
 import remframework.opengl.helpers.OBJFormatLoader;
@@ -77,6 +78,9 @@ public class Scene {
     private CameraState savedInspectionCamera;
     private Vector3d savedInspectionTarget;
     private double inspectionCameraDistance;
+    private Vector3d inspectionFrameTarget = new Vector3d();
+    private Vector3d previousInspectionMarkerPosition = new Vector3d();
+    private double inspectionFrameDistance;
     private boolean inspectionTransitionActive;
     private boolean inspectionTransitionEntering;
     private double inspectionTransitionProgress;
@@ -85,6 +89,10 @@ public class Scene {
     private final Vector3d transitionEndPosition = new Vector3d();
     private final Vector3d transitionEndTarget = new Vector3d();
     private static final double INSPECTION_TRANSITION_SECONDS = 0.8;
+    private static final double INSPECTION_MIN_RADIUS = 2.0;
+    private static final double INSPECTION_MARKER_RADIUS = 1.0;
+    private static final double INSPECTION_SAFETY_MARGIN = 1.20;
+    private static final double INSPECTION_MIN_DISTANCE = 6.0;
 
     private record CameraState(Vector3f position, Vector3f rotation, float fov, float near, float far) {
         static CameraState capture(Camera camera) {
@@ -565,29 +573,85 @@ public class Scene {
         beginCameraTransition(false, savedInspectionCamera, savedInspectionTarget);
     }
 
+    /** The immutable camera framing computed when an inspection entry is retargeted. */
+    public record InspectionFraming(Vector3d target, double radius, double cameraDistance) {
+        public InspectionFraming {
+            target = new Vector3d(target);
+        }
+
+        @Override
+        public Vector3d target() {
+            return new Vector3d(target);
+        }
+    }
+
+    /**
+     * Computes a perspective framing for the existing probe marker, source nodes,
+     * and direct neighbors. This is read-only: it does not create or modify entities.
+     */
+    public InspectionFraming calculateInspectionFraming(PassiveObserver probe) {
+        if (probe == null || probe.getMarker() == null) {
+            return new InspectionFraming(new Vector3d(), INSPECTION_MIN_RADIUS,
+                                         INSPECTION_MIN_DISTANCE);
+        }
+        Vector3d target = worldPosition(probe.getMarker());
+        double maximumDistance = 0.0;
+
+        List<Node> sourceNodes = new ArrayList<>();
+        if (probe instanceof Probe rawProbe) {
+            sourceNodes.add(rawProbe.getNode());
+        } else if (probe instanceof InterpolatedProbe interpolatedProbe) {
+            sourceNodes.addAll(interpolatedProbe.getSourceNodes());
+        }
+        for (Node source : sourceNodes) {
+            if (source == null) continue;
+            maximumDistance = Math.max(maximumDistance, target.distance(worldPosition(source)));
+            for (Neighbor direction : Neighbor.values()) {
+                Node neighbor = source.getNeighbor(direction);
+                if (neighbor != null) {
+                    maximumDistance = Math.max(maximumDistance,
+                                               target.distance(worldPosition(neighbor)));
+                }
+            }
+        }
+        double radius = Math.max(INSPECTION_MIN_RADIUS, maximumDistance + INSPECTION_MARKER_RADIUS)
+                * INSPECTION_SAFETY_MARGIN;
+
+        double verticalHalfAngle = Math.toRadians(project.camera.getFieldOfView()) * 0.5;
+        double aspect = (double) appSettings.getWindowWidth() / Math.max(1, appSettings.getWindowHeight());
+        double horizontalHalfAngle = Math.atan(Math.tan(verticalHalfAngle) * aspect);
+        double limitingSin = Math.min(Math.sin(verticalHalfAngle), Math.sin(horizontalHalfAngle));
+        double cameraDistance = Math.max(INSPECTION_MIN_DISTANCE, radius / Math.max(1.0e-6, limitingSin));
+        return new InspectionFraming(target, radius, cameraDistance);
+    }
+
     /** Resolves the selected existing probe and starts the camera-only transition. */
     public void retargetNeighborhoodInspection() {
         if (inspectedProbe == null) inspectedProbe = selectedProbe;
         inspectionProbeMarker = inspectedProbe.getMarker();
         if (inspectionProbeMarker == null) return;
+        InspectionFraming framing = calculateInspectionFraming(inspectedProbe);
+        inspectionFrameTarget.set(framing.target());
+        inspectionFrameDistance = framing.cameraDistance();
+        previousInspectionMarkerPosition.set(worldPosition(inspectionProbeMarker));
         beginCameraTransition(true, null, null);
     }
 
     /** Keeps the orbit target attached to the existing live probe marker. */
     public void updateInspectionCameraTarget() {
         if (!neighborhoodInspectionActive || inspectionProbeMarker == null) return;
-        project.camera.followOrbitTarget(worldPosition(inspectionProbeMarker));
+        Vector3d liveMarkerPosition = worldPosition(inspectionProbeMarker);
+        Vector3d delta = new Vector3d(liveMarkerPosition).sub(previousInspectionMarkerPosition);
+        if (delta.lengthSquared() != 0.0) {
+            inspectionFrameTarget.add(delta);
+            project.camera.followOrbitTarget(inspectionFrameTarget);
+            previousInspectionMarkerPosition.set(liveMarkerPosition);
+        }
     }
 
     /** Advances the camera-only inspection transition once per render frame. */
     public void updateCameraTransition(double deltaSeconds) {
         if (inspectionTransitionActive) {
-            if (inspectionTransitionEntering && inspectionProbeMarker != null) {
-                Vector3d liveTarget = worldPosition(inspectionProbeMarker);
-                transitionEndTarget.set(liveTarget);
-                transitionEndPosition.set(liveTarget).add(
-                        new Vector3d(transitionStartPosition).sub(transitionStartTarget));
-            }
             inspectionTransitionProgress = Math.min(1.0,
                     inspectionTransitionProgress + Math.max(0.0, deltaSeconds)
                             / INSPECTION_TRANSITION_SECONDS);
@@ -605,9 +669,11 @@ public class Scene {
         if (entering) {
             transitionStartPosition.set(project.camera.getPosition());
             transitionStartTarget.set(project.camera.getOrbitTarget());
-            transitionEndTarget.set(worldPosition(inspectionProbeMarker));
-            transitionEndPosition.set(transitionEndTarget).add(
-                    new Vector3d(transitionStartPosition).sub(transitionStartTarget));
+            transitionEndTarget.set(inspectionFrameTarget);
+            Vector3d offset = new Vector3d(transitionStartPosition).sub(transitionStartTarget);
+            if (offset.lengthSquared() == 0.0) offset.set(0.0, 0.0, 1.0);
+            offset.normalize().mul(inspectionFrameDistance);
+            transitionEndPosition.set(transitionEndTarget).add(offset);
         } else {
             transitionStartPosition.set(project.camera.getPosition());
             transitionStartTarget.set(project.camera.getOrbitTarget());
@@ -646,10 +712,9 @@ public class Scene {
 
     /** Returns the single active orbit target: probe marker in inspection, base entity otherwise. */
     public Vector3d getActiveCameraTarget() {
-        Vector3d target = neighborhoodInspectionActive
-                ? (inspectionProbeMarker == null ? resolveNormalCameraTarget()
-                                                  : worldPosition(inspectionProbeMarker))
-                : resolveNormalCameraTarget();
+        if (neighborhoodInspectionActive || (inspectionTransitionActive && inspectionTransitionEntering))
+            return project.camera.getOrbitTarget();
+        Vector3d target = resolveNormalCameraTarget();
         project.camera.setOrbitTarget(target);
         return target;
     }
