@@ -8,6 +8,8 @@ import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import remframework.gui.model.NuklearModel;
 import remframework.opengl.model.PassiveObserver;
+import remframework.opengl.model.NeighborhoodInspectorModel;
+import remframework.opengl.model.InterpolatedProbe;
 import remframework.opengl.model.Probe;
 import remframework.opengl.model.ProbeDefinition;
 import remframework.opengl.model.ProbeDetectorType;
@@ -30,6 +32,11 @@ public final class FrameIsotropy extends AbstractFrame {
     private static final int MIN_HEIGHT = 420;
 
     private final Project project = Project.getInstance();
+    private boolean showSource = true;
+    private boolean showNeighbors = true;
+    private boolean showVectors = true;
+    private boolean showGradient = true;
+    private int selectedInterpolationSource;
 
     public FrameIsotropy(NuklearModel model) {
         super(model);
@@ -39,6 +46,12 @@ public final class FrameIsotropy extends AbstractFrame {
     @Override
     public String getTitle() {
         return "Isotropy";
+    }
+
+    @Override
+    public void close() {
+        project.scene.exitNeighborhoodInspection();
+        super.close();
     }
 
     @Override
@@ -118,12 +131,15 @@ public final class FrameIsotropy extends AbstractFrame {
         if (probe == null) {
             scalar(ctx, "Probe", "None");
         } else {
-            Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightFor(ctx), 2);
-            Nuklear.nk_layout_row_push(ctx, 0.82f);
+            Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightFor(ctx), 3);
+            Nuklear.nk_layout_row_push(ctx, 0.62f);
             Nuklear.nk_label(ctx, "Probe", Nuklear.NK_TEXT_LEFT);
-            Nuklear.nk_layout_row_push(ctx, 0.18f);
+            Nuklear.nk_layout_row_push(ctx, 0.19f);
             if (Nuklear.nk_button_label(ctx, HISTORY_BUTTON_LABEL))
                 nuklearModel.showFrame(NuklearModel.Frame.occupancyHistory);
+            Nuklear.nk_layout_row_push(ctx, 0.19f);
+            if (Nuklear.nk_button_label(ctx, "Inspect Neighborhood"))
+                project.scene.enterNeighborhoodInspection();
             Nuklear.nk_layout_row_end(ctx);
             scalar(ctx, "Probe ID", probe.getId());
             scalar(ctx, "Detector type", probe.getDetectorType().name());
@@ -175,6 +191,7 @@ public final class FrameIsotropy extends AbstractFrame {
                 vector(ctx, "Interpolated acceleration", observation.acceleration());
                 vector(ctx, "Interpolated velocity", observation.velocity());
             }
+            inspectorSection(ctx, probe);
             for (int index = 0; index < probe.getOccupancies().size(); index++) {
                 Occupancy occupancy = probe.getOccupancies().get(index);
                 double weight = probe.getDefinition().getDetectorType() == ProbeDetectorType.RAW_NODE
@@ -225,6 +242,20 @@ public final class FrameIsotropy extends AbstractFrame {
         scalar(ctx, "Samples in last completed cycle", Integer.toString(receiver.getSamplesPerCycleForAudit()));
         scalar(ctx, "Cycle completed", Boolean.toString(receiver.wasCycleCompletedThisUpdate()));
         Nuklear.nk_group_end(ctx);
+    }
+
+    private void inspectorSection(NkContext ctx, PassiveObserver probe) {
+        section(ctx, "Neighborhood Inspector (read-only)");
+        if (project.scene.isNeighborhoodInspectionActive()) {
+            if (nk_button_label(ctx, "Exit Inspector (Esc)")) {
+                project.scene.exitNeighborhoodInspection();
+                return;
+            }
+            scalar(ctx, "Inspected object", "Existing selected probe marker");
+            scalar(ctx, "Camera target", "Live probe marker position");
+        } else {
+            scalar(ctx, "Status", "Select a probe, then inspect (live or paused)");
+        }
     }
 
     static String sourceSamplesLabel(int index) {

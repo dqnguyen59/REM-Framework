@@ -78,7 +78,7 @@ public class Project extends AbstractSettings implements ISettings {
     public  Camera   camera   = new Camera();
     public  Scene    scene;
     public  Terrain  terrain;
-    public  Vector3d baseRotation = new Vector3d(-66.6, 0, 0);
+    public  Vector3d baseRotation = new Vector3d(-90, 0, 0);
 
     public Settings         settings      = new Settings();
     public SlitWallSettings slitWall      = new SlitWallSettings();
@@ -130,7 +130,7 @@ public class Project extends AbstractSettings implements ISettings {
         constantMagneticFactor = project.constantMagneticFactor;
         glSwapInterval         = project.glSwapInterval;
 
-        camera.setFieldOfFiew(project.camera.getFieldOfFiew());
+        camera.setFieldOfView(project.camera.getFieldOfView());
         camera.setZ_near(project.camera.getZ_near());
         camera.setZ_far(project.camera.getZ_far());
         Vector3f pos = project.camera.getPosition();
@@ -170,7 +170,7 @@ public class Project extends AbstractSettings implements ISettings {
         int z = getInt("QuantumField", "dimension.z", 15);
         setDimension(x, y, z, false);
 
-        camera.setFieldOfFiew(getFloat("Camera", "fieldOfFiew", 45));
+        camera.setFieldOfView(getFloat("Camera", "fieldOfFiew", 45));
         camera.getPosition().x = getFloat("Camera", "position.x", 0);
         camera.getPosition().y = getFloat("Camera", "position.y", 0);
         camera.getPosition().z = getFloat("Camera", "position.z", 120);
@@ -356,7 +356,7 @@ public class Project extends AbstractSettings implements ISettings {
 
         baseRotation = scene.getLattice().getBaseEntity().getRotation();
 
-        put("Camera", "fieldOfFiew", camera.getFieldOfFiew());
+        put("Camera", "fieldOfFiew", camera.getFieldOfView());
         put("Camera", "position.x", camera.getPosition().x);
         put("Camera", "position.y", camera.getPosition().y);
         put("Camera", "position.z", camera.getPosition().z);

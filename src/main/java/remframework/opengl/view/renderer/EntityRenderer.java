@@ -42,6 +42,11 @@ public class EntityRenderer implements IRenderer {
 	
 	Shader shader;
 	private Map<ObjFileModel, List<Entity>> entities = new  HashMap<>();
+	private boolean inspectionMode;
+
+	public void setInspectionMode(boolean inspectionMode) {
+		this.inspectionMode = inspectionMode;
+	}
 
 	private int numLights = Constants.INITIAL_NUM_LIGHTS;
 	private String vertexShader;
@@ -127,9 +132,13 @@ public class EntityRenderer implements IRenderer {
 		shader.setUniform("textureSampler", 0);
 		shader.setUniform("projectionMatrix", camera.getProjectionMatrix());
 		shader.setUniform("viewMatrix", camera.getViewMatrix());
-		shader.setUniform("depthVisibility", project.settings.getDepthVisibilityFactor());
+		// Inspector geometry is diagnostic and must not fade as the camera moves through
+		// the normal depth-visibility field. The shader and ordinary render path remain unchanged.
+		shader.setUniform("depthVisibility", inspectionMode
+				? 0.0f : project.settings.getDepthVisibilityFactor());
 
-		renderLights(scene.getDirectionalLight(), project.getLights(), shader);
+		if (!inspectionMode) renderLights(scene.getDirectionalLight(), project.getLights(), shader);
+		if (inspectionMode) GL11.glDisable(GL11.GL_DEPTH_TEST);
 		
 		for (ObjFileModel model : entities.keySet()) {
 			if (model != null) {
@@ -139,6 +148,9 @@ public class EntityRenderer implements IRenderer {
 				shader.setUniform("ignoreLightIndex", -1);
 
 				for (Entity entity : entityList) {
+					boolean effectiveVisible = inspectionMode
+							? entity.isInspectionVisible() : entity.isVisible();
+					if (!effectiveVisible) continue;
 					if (entity.isOverrideModelMaterial()) {
 						shader.setUniform("material", entity.getMaterial());
 					}
@@ -147,6 +159,7 @@ public class EntityRenderer implements IRenderer {
 				}
 			}
 		}
+		if (inspectionMode) GL11.glEnable(GL11.GL_DEPTH_TEST);
 
 		unbind();
 

@@ -39,6 +39,8 @@ public class Renderer {
 	private final List<Entity> gradientArrowEntities = new ArrayList<>();
 	
 	private static boolean isCulling = false;
+	private boolean inspectionMode;
+	private final List<Entity> inspectionEntities = new ArrayList<>();
 	
 	public void init() throws Exception {
 		System.out.println("Renderer.init()");
@@ -49,8 +51,13 @@ public class Renderer {
 	}
 	
 	public void render(Camera camera, Scene scene) {
-		terrainRenderer.render(camera, scene);
+		if (!inspectionMode) terrainRenderer.render(camera, scene);
 		nodeRenderer.render(camera, scene);
+	}
+
+	public void setInspectionMode(boolean inspectionMode) {
+		this.inspectionMode = inspectionMode;
+		nodeRenderer.setInspectionMode(inspectionMode);
 	}
 	
 	public void processEntity(Entity entity) {
@@ -64,6 +71,14 @@ public class Renderer {
 			newNodeList.add(entity);
 			nodeRenderer.getEntities().put(entity.getModel(), newNodeList);		
 		}
+	}
+
+	/** Adds an inspector-tagged entity without consulting ordinary visibility. */
+	public void processInspectionEntity(Entity entity) {
+		if (entity == null || !entity.isInspectionVisible()) return;
+		List<Entity> nodeList = nodeRenderer.getEntities().computeIfAbsent(
+				entity.getModel(), ignored -> new ArrayList<>());
+		if (!nodeList.contains(entity)) nodeList.add(entity);
 	}
 	
 	public void processTerrain(Terrain terrain) {
@@ -106,6 +121,18 @@ public class Renderer {
 		for (Entity entity : entities) {
 			processEntity(entity);
 			probeEntities.add(entity);
+		}
+	}
+
+	/** Synchronizes the small inspection tag set without changing ordinary render lists. */
+	public void syncInspectionEntities(List<Entity> entities, boolean active) {
+		if (inspectionMode == active && inspectionEntities.equals(entities)) return;
+		setInspectionMode(active);
+		inspectionEntities.clear();
+		if (!active) return;
+		for (Entity entity : entities) {
+			processInspectionEntity(entity);
+			inspectionEntities.add(entity);
 		}
 	}
 

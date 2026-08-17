@@ -190,6 +190,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         System.out.println("Simulator.initDefaultScene()");
         project.camera.movePosition(0, 0, 120);
         project.camera.updateProjectionMatrix();
+        scene.orbitCameraAroundTarget(45.0f, 0.0f, 0.0f);
 
         // Create a default scene with xyz nodes.
         project.setDimension(appSettings.getDefaultDimensionX(), appSettings.getDefaultDimensionY(),
@@ -296,8 +297,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 deltaX = (float) y;
         }
         if (rightButtonPress) {
-            project.camera.moveRotation(deltaX * Constants.MOUSE_SENSITIVITY,
-                                        deltaY * Constants.MOUSE_SENSITIVITY, 0);
+            scene.orbitCameraAroundTarget(deltaX * Constants.MOUSE_SENSITIVITY,
+                                           deltaY * Constants.MOUSE_SENSITIVITY, 0.0f);
         }
 
         lastMousePos.x = xPos;
@@ -375,7 +376,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 discoveryViewport.button(button, action, glWindow.getWidth(), glWindow.getHeight());
             return false;
         }
-        if (nuklearModel.getFocusedFrame() == null) {
+        if (nuklearModel.getFocusedFrame() == null || scene.isNeighborhoodInspectionActive()) {
             rightButtonPress   = button == GLFW.GLFW_MOUSE_BUTTON_2 && action == GLFW.GLFW_PRESS;
 
             if (node != null) {
@@ -445,12 +446,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             discoveryViewport.scroll(yOffset);
             return false;
         }
+        scene.zoomCameraAroundTarget(yOffset);
         float incCamera = keyEvents != null && keyEvents.isCtrlPressed ? 2 : 12;
-        project.camera.movePosition(
-                (float) (incCamera * xOffset * Constants.CAMERA_MOVE_SPEED),
-                0,
-                (float) (incCamera * yOffset * Constants.CAMERA_MOVE_SPEED)
-                                   );
+        if (!scene.isNeighborhoodInspectionActive()) {
+            project.camera.movePosition(
+                    (float) (incCamera * xOffset * Constants.CAMERA_MOVE_SPEED), 0, 0);
+        }
 
         return false;
     }
@@ -603,37 +604,37 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 break;
             case GLFW.GLFW_KEY_KP_4:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(0.0f, inc, 0.0f);
+                    scene.orbitCameraAroundTarget(0.0f, inc, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_6:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(0.0f, -inc, 0.0f);
+                    scene.orbitCameraAroundTarget(0.0f, -inc, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_2:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(-inc, 0.0f, 0.0f);
+                    scene.orbitCameraAroundTarget(-inc, 0.0f, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_8:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(inc, 0.0f, 0.0f);
+                    scene.orbitCameraAroundTarget(inc, 0.0f, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_3:
-                if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(0.0f, 0.0f, inc);
-                }
+//                if (keyEvents.isCtrlPressed) {
+//                    scene.orbitCameraAroundTarget(0.0f, 0.0f, inc);
+//                }
                 break;
             case GLFW.GLFW_KEY_KP_1:
-                if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(0.0f, 0.0f, -inc);
-                }
+//                if (keyEvents.isCtrlPressed) {
+//                    scene.orbitCameraAroundTarget(0.0f, 0.0f, -inc);
+//                }
                 break;
             case GLFW.GLFW_KEY_KP_5:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().setRotation(0, 0, 0);
+                    scene.resetCameraOrbit();
                 }
                 break;
             case GLFW.GLFW_KEY_SPACE:
@@ -681,6 +682,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
         if (isReleased) {
             switch (key) {
+                case GLFW.GLFW_KEY_ESCAPE:
+                    if (scene.isNeighborhoodInspectionActive()) {
+                        scene.exitNeighborhoodInspection();
+                        return true;
+                    }
+                    break;
                 case GLFW.GLFW_KEY_O:
                     if (keyEvents.isCtrlPressed) {
                         project.openFile();
@@ -1270,8 +1277,14 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         for (PassiveObserver probe : scene.getPreviewProbes()) {
             probe.updateMarker();
         }
-        renderer.syncProbeEntities(scene.getProbeRenderEntities());
-        renderer.syncGradientArrowEntities(scene.getGradientArrowRenderEntities());
+        scene.updateInspectionCameraTarget();
+        // Ordinary probe/gradient render lists are filtered out during inspection.
+        // Do not tear them down and rebuild them while the diagnostic view is active;
+        // they are synchronized normally on the first frame after exit.
+        if (!scene.isNeighborhoodInspectionActive()) {
+            renderer.syncProbeEntities(scene.getProbeRenderEntities());
+            renderer.syncGradientArrowEntities(scene.getGradientArrowRenderEntities());
+        }
         if (project.terrain.isVisible())
             renderer.processTerrain(project.terrain);
         renderer.render(project.camera, scene);

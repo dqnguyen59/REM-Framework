@@ -71,6 +71,27 @@ public class Scene {
     private Entity calibrationArrow;
     private Node                firstHiLightedNode;
 
+    private boolean neighborhoodInspectionActive;
+    private PassiveObserver inspectedProbe;
+    private Entity inspectionProbeMarker;
+    private CameraState savedInspectionCamera;
+    private Vector3d savedInspectionTarget;
+    private double inspectionCameraDistance;
+
+    private record CameraState(Vector3f position, Vector3f rotation, float fov, float near, float far) {
+        static CameraState capture(Camera camera) {
+            return new CameraState(new Vector3f(camera.getPosition()), new Vector3f(camera.getRotation()),
+                                   camera.getFieldOfView(), camera.getZ_near(), camera.getZ_far());
+        }
+        void restore(Camera camera) {
+            camera.setPosition(position.x, position.y, position.z);
+            camera.setRotation(rotation.x, rotation.y, rotation.z);
+            camera.setFieldOfView(fov);
+            camera.setZ_near(near);
+            camera.setZ_far(far);
+        }
+    }
+
     private DirectionalLight directionalLight;
 
     private boolean animated;
@@ -258,6 +279,7 @@ public class Scene {
 
     /** Removes transient preview markers without changing committed probes or project data. */
     public void clearPreviewProbes() {
+        if (neighborhoodInspectionActive) exitNeighborhoodInspection();
         previewProbes.clear();
         replacementProbePreviewActive = false;
     }
@@ -446,6 +468,7 @@ public class Scene {
 
     /** Atomically replaces generated probe markers while preserving manually created receivers. */
     public boolean replaceGeneratedProbeDefinitions(List<ProbeDefinition> definitions) {
+        if (neighborhoodInspectionActive) exitNeighborhoodInspection();
         hideGradientArrows();
         List<PassiveObserver> replacements = new ArrayList<>();
         for (ProbeDefinition definition : definitions) {
@@ -479,6 +502,7 @@ public class Scene {
 
     /** Removes all probe markers and restores the ordinary lattice render state. */
     public void clearProbes() {
+        if (neighborhoodInspectionActive) exitNeighborhoodInspection();
         clearCalibrationArrow();
         hideGradientArrows();
         clearProbeInteractionState();
@@ -495,12 +519,107 @@ public class Scene {
 
     /** Makes the committed probe the live diagnostic selection and refreshes its marker immediately. */
     public void selectProbe(PassiveObserver probe) {
+        boolean probeChanged = selectedProbe != probe;
         if (selectedProbe != null) selectedProbe.setSelected(false);
         selectedProbe = probe;
         if (selectedProbe != null) {
             selectedProbe.setSelected(true);
             selectedProbe.updateMarker();
         }
+        if (neighborhoodInspectionActive && probeChanged) retargetNeighborhoodInspection();
+    }
+
+    public boolean isNeighborhoodInspectionActive() { return neighborhoodInspectionActive; }
+
+    public PassiveObserver getInspectedProbe() { return inspectedProbe; }
+
+
+    /** Enters a renderer-only inspection session for the currently selected passive probe. */
+    public boolean enterNeighborhoodInspection() {
+        if (selectedProbe == null) return false;
+        if (neighborhoodInspectionActive && inspectedProbe == selectedProbe)
+            return inspectionProbeMarker != null;
+        if (!neighborhoodInspectionActive) {
+            savedInspectionCamera = CameraState.capture(project.camera);
+            savedInspectionTarget = resolveNormalCameraTarget();
+            neighborhoodInspectionActive = true;
+        }
+        inspectedProbe = selectedProbe;
+        retargetNeighborhoodInspection();
+        return inspectionProbeMarker != null;
+    }
+
+    public void exitNeighborhoodInspection() {
+        inspectionProbeMarker = null;
+        project.camera.setOrbitTarget(resolveNormalCameraTarget());
+        neighborhoodInspectionActive = false;
+        inspectedProbe = null;
+        if (savedInspectionCamera != null) savedInspectionCamera.restore(project.camera);
+        if (savedInspectionTarget != null) project.camera.setOrbitTarget(savedInspectionTarget);
+        savedInspectionTarget = null;
+        savedInspectionCamera = null;
+    }
+
+    /** Resolves and tags only the small existing entity set; ordinary visibility is untouched. */
+    public void retargetNeighborhoodInspection() {
+        if (!neighborhoodInspectionActive) return;
+        if (inspectedProbe == null) inspectedProbe = selectedProbe;
+        inspectionProbeMarker = inspectedProbe.getMarker();
+        if (inspectionProbeMarker == null) return;
+        project.camera.setOrbitTarget(worldPosition(inspectionProbeMarker));
+        cameraFocusOnInspectionTarget();
+    }
+
+    /** Keeps the orbit target attached to the existing live probe marker. */
+    public void updateInspectionCameraTarget() {
+        if (!neighborhoodInspectionActive || inspectionProbeMarker == null) return;
+        project.camera.followOrbitTarget(worldPosition(inspectionProbeMarker));
+    }
+
+    /** Returns the single active orbit target: probe marker in inspection, base entity otherwise. */
+    public Vector3d getActiveCameraTarget() {
+        Vector3d target = neighborhoodInspectionActive
+                ? (inspectionProbeMarker == null ? resolveNormalCameraTarget()
+                                                  : worldPosition(inspectionProbeMarker))
+                : resolveNormalCameraTarget();
+        project.camera.setOrbitTarget(target);
+        return target;
+    }
+
+    /** Orbits the camera around the active target without changing any entity transform. */
+    public void orbitCameraAroundTarget(float rotationX, float rotationY, float rotationZ) {
+        getActiveCameraTarget();
+        project.camera.orbitAroundTarget(rotationX, rotationY, rotationZ);
+    }
+
+    public void zoomInspectionCamera(double scroll) {
+        zoomCameraAroundTarget(scroll);
+    }
+
+    /** Shared normal/inspection zoom operation using the active camera target. */
+    public void zoomCameraAroundTarget(double scroll) {
+        getActiveCameraTarget();
+        project.camera.zoomAroundTarget(scroll * 12.0, 2.0, 1000.0);
+    }
+
+    /** Resets orientation around the active target while preserving the current distance. */
+    public void resetCameraOrbit() {
+        getActiveCameraTarget();
+        project.camera.resetOrbitTopView();
+    }
+
+    private void cameraFocusOnInspectionTarget() {
+        inspectionCameraDistance = 24.0;
+        project.camera.focusOrbit(inspectionCameraDistance);
+    }
+
+    private Vector3d resolveNormalCameraTarget() {
+        Entity base = lattice == null ? null : lattice.getBaseEntity();
+        return base == null ? new Vector3d() : worldPosition(base);
+    }
+
+    private static Vector3d worldPosition(Entity entity) {
+        return entity.getTransformMatrix().transformPosition(new Vector3d());
     }
 
     /** Changes hover state only; probe observations and their source nodes remain untouched. */

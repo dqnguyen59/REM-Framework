@@ -89,6 +89,8 @@ public class Entity {
     protected Vector4f customColor;
 
     protected boolean isVisible   = true;
+    /** Renderer-only filter used by the paused/live neighborhood inspector. */
+    protected boolean inspectionVisible = false;
     protected boolean isSelected  = false;
     protected boolean isHiLighted = false;
 

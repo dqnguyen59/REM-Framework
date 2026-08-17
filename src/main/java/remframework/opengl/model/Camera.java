@@ -19,6 +19,7 @@
 package remframework.opengl.model;
 
 import org.joml.Matrix4f;
+import org.joml.Vector3d;
 import org.joml.Vector3f;
 import remframework.settings.AppSettings;
 
@@ -29,12 +30,14 @@ public class Camera {
 	private Vector3f position = new Vector3f(0, 0, 0);
 	private Vector3f rotation = new Vector3f(0, 0, 0);
 	
-	private float fieldOfFiew = 45;
-	private float z_near = 0.01f;
+	private float fieldOfView = 45;
+	private float z_near      = 0.01f;
 	private float z_far = 1000f;
 
 	private Matrix4f viewMatrix = new Matrix4f();
 	private Matrix4f projectionMatrix = new Matrix4f();
+	private final Vector3d orbitTarget = new Vector3d();
+	private double orbitDistance;
 
 	public Camera() {
 	}
@@ -44,12 +47,12 @@ public class Camera {
 		this.rotation = rotation;
 	}
 	
-	public float getFieldOfFiew() {
-		return fieldOfFiew;
+	public float getFieldOfView() {
+		return fieldOfView;
 	}
 
-	public void setFieldOfFiew(float fieldOfFiew) {
-		this.fieldOfFiew = fieldOfFiew;
+	public void setFieldOfView(float fieldOfView) {
+		this.fieldOfView = fieldOfView;
 		updateProjectionMatrix();
 	}
 
@@ -110,6 +113,75 @@ public class Camera {
 		this.rotation.z = z;
 	}
 
+	/** Sets the target used by camera-centered orbit operations. */
+	public void setOrbitTarget(Vector3d target) {
+		orbitTarget.set(target);
+		orbitDistance = new Vector3d(position).distance(orbitTarget);
+	}
+
+	public Vector3d getOrbitTarget() {
+		return new Vector3d(orbitTarget);
+	}
+
+	public double getOrbitDistance() {
+		return orbitDistance;
+	}
+
+	/** Moves the orbit target with a live object while preserving the camera offset. */
+	public void followOrbitTarget(Vector3d target) {
+		Vector3d delta = new Vector3d(target).sub(orbitTarget);
+		if (delta.lengthSquared() != 0.0) {
+			position.add((float) delta.x, (float) delta.y, (float) delta.z);
+			orbitTarget.set(target);
+		}
+	}
+
+	/** Orbits around the target, preserving distance and recomputing the look direction. */
+	public void orbitAroundTarget(float rotationX, float rotationY, float rotationZ) {
+		if (orbitDistance <= 0.0)
+			orbitDistance = new Vector3d(position).distance(orbitTarget);
+		moveRotation(rotationX, rotationY, rotationZ);
+		applyOrbitOffset();
+	}
+
+	/** Places the camera above the target, looking down with zero roll. */
+	public void resetOrbitTopView() {
+		if (orbitDistance <= 0.0)
+			orbitDistance = new Vector3d(position).distance(orbitTarget);
+		setRotation(90.0f, 0.0f, 0.0f);
+		applyOrbitOffset();
+	}
+
+	/** Focuses the orbit at a chosen distance without changing the target. */
+	public void focusOrbit(double distance) {
+		orbitDistance = Math.max(0.001, distance);
+		setRotation(0.0f, 0.0f, 0.0f);
+		applyOrbitOffset();
+	}
+
+	/** Moves along the camera-to-target ray; positive amount zooms toward the target. */
+	public void zoomAroundTarget(double amount, double minimumDistance, double maximumDistance) {
+		double distance = new Vector3d(position).distance(orbitTarget);
+		if (distance <= 0.0) return;
+		double nextDistance = Math.clamp(distance - amount,
+				minimumDistance, maximumDistance);
+		Vector3d directionFromTarget = new Vector3d(position)
+				.sub(orbitTarget).normalize();
+		position.set((float) (orbitTarget.x + directionFromTarget.x * nextDistance),
+				(float) (orbitTarget.y + directionFromTarget.y * nextDistance),
+				(float) (orbitTarget.z + directionFromTarget.z * nextDistance));
+		orbitDistance = nextDistance;
+	}
+
+	private void applyOrbitOffset() {
+		double pitch = Math.toRadians(rotation.x);
+		double yaw = Math.toRadians(rotation.y);
+		double horizontal = orbitDistance * Math.cos(pitch);
+		position.x = (float) (orbitTarget.x - Math.sin(yaw) * horizontal);
+		position.y = (float) (orbitTarget.y + Math.sin(pitch) * orbitDistance);
+		position.z = (float) (orbitTarget.z + Math.cos(yaw) * horizontal);
+	}
+
 	public Matrix4f getViewMatrix() {
 		return viewMatrix.identity()
 		.rotate((float) Math.toRadians(rotation.x), new Vector3f(1, 0, 0))
@@ -125,7 +197,7 @@ public class Camera {
 	public Matrix4f updateProjectionMatrix() {
 		float aspectRatio = (float) appSettings.getWindowWidth() / appSettings.getWindowHeight();
 		return projectionMatrix.setPerspective(
-				(float) Math.toRadians(fieldOfFiew),
+				(float) Math.toRadians(fieldOfView),
 				aspectRatio,
 				z_near,
 				z_far
