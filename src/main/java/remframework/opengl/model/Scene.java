@@ -75,8 +75,7 @@ public class Scene {
     private boolean neighborhoodInspectionActive;
     private PassiveObserver inspectedProbe;
     private Entity inspectionProbeMarker;
-    private CameraState savedInspectionCamera;
-    private Vector3d savedInspectionTarget;
+    private InspectionNavigationSnapshot savedInspectionNavigation;
     private double inspectionCameraDistance;
     private Vector3d inspectionFrameTarget = new Vector3d();
     private Vector3d previousInspectionMarkerPosition = new Vector3d();
@@ -94,17 +93,65 @@ public class Scene {
     private static final double INSPECTION_SAFETY_MARGIN = 1.20;
     private static final double INSPECTION_MIN_DISTANCE = 6.0;
 
-    private record CameraState(Vector3f position, Vector3f rotation, float fov, float near, float far) {
+    private record CameraState(Vector3f position, Vector3f rotation, float fov, float near, float far,
+                               Vector3d orbitTarget, double orbitDistance) {
         static CameraState capture(Camera camera) {
             return new CameraState(new Vector3f(camera.getPosition()), new Vector3f(camera.getRotation()),
-                                   camera.getFieldOfView(), camera.getZ_near(), camera.getZ_far());
+                                   camera.getFieldOfView(), camera.getZ_near(), camera.getZ_far(),
+                                   camera.getOrbitTarget(), camera.getOrbitDistance());
+        }
+        CameraState {
+            position = new Vector3f(position);
+            rotation = new Vector3f(rotation);
+            orbitTarget = new Vector3d(orbitTarget);
         }
         void restore(Camera camera) {
-            camera.setPosition(position.x, position.y, position.z);
-            camera.setRotation(rotation.x, rotation.y, rotation.z);
             camera.setFieldOfView(fov);
             camera.setZ_near(near);
             camera.setZ_far(far);
+            camera.setOrbitState(new Vector3d(position), orbitTarget, orbitDistance);
+            camera.setRotation(rotation.x, rotation.y, rotation.z);
+        }
+    }
+
+    /** Immutable inspection-entry snapshot, including any pre-existing camera flight state. */
+    private record InspectionNavigationSnapshot(
+            CameraState camera,
+            boolean transitionActive,
+            boolean transitionEntering,
+            double transitionProgress,
+            Vector3d transitionStartPosition,
+            Vector3d transitionStartTarget,
+            Vector3d transitionEndPosition,
+            Vector3d transitionEndTarget) {
+        InspectionNavigationSnapshot {
+            transitionStartPosition = new Vector3d(transitionStartPosition);
+            transitionStartTarget = new Vector3d(transitionStartTarget);
+            transitionEndPosition = new Vector3d(transitionEndPosition);
+            transitionEndTarget = new Vector3d(transitionEndTarget);
+        }
+
+        static InspectionNavigationSnapshot capture(Scene scene) {
+            return new InspectionNavigationSnapshot(
+                    CameraState.capture(scene.project.camera),
+                    scene.inspectionTransitionActive,
+                    scene.inspectionTransitionEntering,
+                    scene.inspectionTransitionProgress,
+                    scene.transitionStartPosition,
+                    scene.transitionStartTarget,
+                    scene.transitionEndPosition,
+                    scene.transitionEndTarget);
+        }
+
+        void restore(Scene scene) {
+            camera.restore(scene.project.camera);
+            scene.inspectionTransitionActive = transitionActive;
+            scene.inspectionTransitionEntering = transitionEntering;
+            scene.inspectionTransitionProgress = transitionProgress;
+            scene.transitionStartPosition.set(transitionStartPosition);
+            scene.transitionStartTarget.set(transitionStartTarget);
+            scene.transitionEndPosition.set(transitionEndPosition);
+            scene.transitionEndTarget.set(transitionEndTarget);
         }
     }
 
@@ -559,9 +606,8 @@ public class Scene {
         if ((neighborhoodInspectionActive || inspectionTransitionActive) && inspectedProbe == selectedProbe)
             return inspectionProbeMarker != null;
         if (!neighborhoodInspectionActive && !inspectionTransitionActive) {
+            savedInspectionNavigation = InspectionNavigationSnapshot.capture(this);
             project.camera.setOrbitTarget(resolveNormalCameraTarget());
-            savedInspectionCamera = CameraState.capture(project.camera);
-            savedInspectionTarget = project.camera.getOrbitTarget();
         }
         inspectedProbe = selectedProbe;
         retargetNeighborhoodInspection();
@@ -569,8 +615,16 @@ public class Scene {
     }
 
     public void exitNeighborhoodInspection() {
-        if (savedInspectionCamera == null) return;
-        beginCameraTransition(false, savedInspectionCamera, savedInspectionTarget);
+        if (savedInspectionNavigation == null) return;
+        // A second exit during the return flight is intentionally a no-op.
+        if (inspectionTransitionActive && !inspectionTransitionEntering) return;
+        // Cancel the entry/live-inspection update and reuse the same transition path
+        // for the return. The snapshot remains valid until that flight completes.
+        inspectionTransitionActive = false;
+        inspectionTransitionEntering = false;
+        neighborhoodInspectionActive = false;
+        beginCameraTransition(false, savedInspectionNavigation.camera(),
+                              savedInspectionNavigation.camera().orbitTarget());
     }
 
     /** The immutable camera framing computed when an inspection entry is retargeted. */
@@ -695,10 +749,11 @@ public class Scene {
             neighborhoodInspectionActive = false;
             inspectionProbeMarker = null;
             inspectedProbe = null;
-            if (savedInspectionCamera != null) savedInspectionCamera.restore(project.camera);
-            if (savedInspectionTarget != null) project.camera.setOrbitTarget(savedInspectionTarget);
-            savedInspectionTarget = null;
-            savedInspectionCamera = null;
+            if (savedInspectionNavigation != null) {
+                InspectionNavigationSnapshot snapshot = savedInspectionNavigation;
+                savedInspectionNavigation = null;
+                snapshot.camera().restore(project.camera);
+            }
         }
     }
 

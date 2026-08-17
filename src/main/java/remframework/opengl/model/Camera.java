@@ -126,6 +126,13 @@ public class Camera {
 		orbitDistance = position.distance(target);
 	}
 
+	/** Restores a complete orbit state, including a deliberately preserved radius. */
+	public void setOrbitState(Vector3d position, Vector3d target, double distance) {
+		this.position.set((float) position.x, (float) position.y, (float) position.z);
+		orbitTarget.set(target);
+		orbitDistance = distance;
+	}
+
 	/** Recomputes yaw/pitch so the camera looks at the current orbit target. */
 	public void lookAtOrbitTarget() {
 		Vector3d offset = new Vector3d(position).sub(orbitTarget);

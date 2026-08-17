@@ -214,6 +214,69 @@ class SceneCameraOrbitTest {
         }
     }
 
+    @Test
+    void inspectionExitRestoresCompleteNavigationSnapshotImmediatelyAndIdempotently() {
+        Node node = new Node(null, null, new Vector3d(2, 3, 4), new Vector3d(), 1.0);
+        node.setIndex(new Vector3i(9, 9, 9));
+        Entity marker = new Entity(null, null, new Vector3d(2, 3, 4), new Vector3d(), 1.0,
+                remframework.opengl.model.entity.EntityType.ENTITY);
+        Probe probe = new Probe(new ProbeDefinition("restore-probe", node.getIndex(),
+                new Vector4f(1, 0.5f, 0, 1)), node, marker);
+        scene.selectProbe(probe);
+
+        Vector3d originalPosition = new Vector3d(20, 30, 40);
+        Vector3d originalTarget = new Vector3d(3, 4, 5);
+        Vector3d originalRotation = new Vector3d(17, 231, -12);
+        project.camera.setOrbitState(originalPosition, originalTarget);
+        project.camera.setRotation((float) originalRotation.x, (float) originalRotation.y,
+                                   (float) originalRotation.z);
+        project.camera.setFieldOfView(57.0f);
+        project.camera.setZ_near(0.2f);
+        project.camera.setZ_far(4321.0f);
+        double originalDistance = project.camera.getOrbitDistance();
+
+        scene.enterNeighborhoodInspection();
+        for (int index = 0; index < 5; index++) scene.orbitCameraAroundTarget(3, 7, 2);
+        scene.exitNeighborhoodInspection();
+
+        assertTrue(scene.isNeighborhoodInspectionTransitionActive());
+        scene.updateCameraTransition(0.8);
+        assertNavigationEquals(originalPosition, originalRotation, originalTarget, originalDistance,
+                               57.0f, 0.2f, 4321.0f);
+        scene.updateCameraTransition(10.0);
+        assertNavigationEquals(originalPosition, originalRotation, originalTarget, originalDistance,
+                               57.0f, 0.2f, 4321.0f);
+        scene.exitNeighborhoodInspection();
+        assertNavigationEquals(originalPosition, originalRotation, originalTarget, originalDistance,
+                               57.0f, 0.2f, 4321.0f);
+
+        for (int cycle = 0; cycle < 3; cycle++) {
+            scene.enterNeighborhoodInspection();
+            scene.updateCameraTransition(0.8);
+            scene.exitNeighborhoodInspection();
+            scene.updateCameraTransition(0.8);
+            assertNavigationEquals(originalPosition, originalRotation, originalTarget, originalDistance,
+                                   57.0f, 0.2f, 4321.0f);
+        }
+    }
+
+    private void assertNavigationEquals(Vector3d position, Vector3d rotation, Vector3d target,
+                                         double distance, float fov, float near, float far) {
+        assertVectorEquals(position, new Vector3d(project.camera.getPosition()));
+        assertVectorEquals(rotation, new Vector3d(project.camera.getRotation()));
+        assertVectorEquals(target, project.camera.getOrbitTarget());
+        assertEquals(distance, project.camera.getOrbitDistance(), 1.0e-6);
+        assertEquals(fov, project.camera.getFieldOfView(), 1.0e-6);
+        assertEquals(near, project.camera.getZ_near(), 1.0e-6);
+        assertEquals(far, project.camera.getZ_far(), 1.0e-6);
+    }
+
+    private void assertVectorEquals(Vector3d expected, Vector3d actual) {
+        assertEquals(expected.x, actual.x, 1.0e-6);
+        assertEquals(expected.y, actual.y, 1.0e-6);
+        assertEquals(expected.z, actual.z, 1.0e-6);
+    }
+
     private void assertForwardPointsAtTarget() {
         Vector3d target = scene.getActiveCameraTarget();
         Vector3d camera = new Vector3d(project.camera.getPosition());
