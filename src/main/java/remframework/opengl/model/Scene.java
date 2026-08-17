@@ -87,6 +87,16 @@ public class Scene {
     private final Vector3d transitionStartTarget = new Vector3d();
     private final Vector3d transitionEndPosition = new Vector3d();
     private final Vector3d transitionEndTarget = new Vector3d();
+    private final Vector3d transitionStartRotation = new Vector3d();
+    private final Vector3d transitionEndRotation = new Vector3d();
+    private double transitionStartDistance;
+    private double transitionEndDistance;
+    private float transitionStartFov;
+    private float transitionEndFov;
+    private float transitionStartNear;
+    private float transitionEndNear;
+    private float transitionStartFar;
+    private float transitionEndFar;
     private static final double INSPECTION_TRANSITION_SECONDS = 0.8;
     private static final double INSPECTION_MIN_RADIUS = 2.0;
     private static final double INSPECTION_MARKER_RADIUS = 1.0;
@@ -712,7 +722,18 @@ public class Scene {
             double eased = smoothstep(inspectionTransitionProgress);
             Vector3d position = interpolate(transitionStartPosition, transitionEndPosition, eased);
             Vector3d target = interpolate(transitionStartTarget, transitionEndTarget, eased);
-            project.camera.setOrbitState(position, target);
+            if (inspectionTransitionEntering) {
+                project.camera.setOrbitState(position, target);
+            } else {
+                double distance = lerp(transitionStartDistance, transitionEndDistance, eased);
+                project.camera.setOrbitState(position, target, distance);
+                Vector3d rotation = interpolateRotation(transitionStartRotation,
+                                                         transitionEndRotation, eased);
+                project.camera.setRotation((float) rotation.x, (float) rotation.y, (float) rotation.z);
+                project.camera.setFieldOfView(lerp(transitionStartFov, transitionEndFov, eased));
+                project.camera.setZ_near(lerp(transitionStartNear, transitionEndNear, eased));
+                project.camera.setZ_far(lerp(transitionStartFar, transitionEndFar, eased));
+            }
             if (inspectionTransitionProgress >= 1.0) finishCameraTransition();
             return;
         }
@@ -728,11 +749,32 @@ public class Scene {
             if (offset.lengthSquared() == 0.0) offset.set(0.0, 0.0, 1.0);
             offset.normalize().mul(inspectionFrameDistance);
             transitionEndPosition.set(transitionEndTarget).add(offset);
+            transitionStartRotation.set(project.camera.getRotation().x,
+                                        project.camera.getRotation().y,
+                                        project.camera.getRotation().z);
+            transitionEndRotation.set(transitionStartRotation);
+            transitionStartDistance = project.camera.getOrbitDistance();
+            transitionEndDistance = transitionStartDistance;
+            transitionStartFov = transitionEndFov = project.camera.getFieldOfView();
+            transitionStartNear = transitionEndNear = project.camera.getZ_near();
+            transitionStartFar = transitionEndFar = project.camera.getZ_far();
         } else {
             transitionStartPosition.set(project.camera.getPosition());
             transitionStartTarget.set(project.camera.getOrbitTarget());
             transitionEndPosition.set(returnState.position());
             transitionEndTarget.set(returnTarget);
+            transitionStartRotation.set(project.camera.getRotation().x,
+                                        project.camera.getRotation().y,
+                                        project.camera.getRotation().z);
+            transitionEndRotation.set(returnState.rotation());
+            transitionStartDistance = project.camera.getOrbitDistance();
+            transitionEndDistance = returnState.orbitDistance();
+            transitionStartFov = project.camera.getFieldOfView();
+            transitionEndFov = returnState.fov();
+            transitionStartNear = project.camera.getZ_near();
+            transitionEndNear = returnState.near();
+            transitionStartFar = project.camera.getZ_far();
+            transitionEndFar = returnState.far();
         }
         inspectionTransitionEntering = entering;
         inspectionTransitionProgress = 0.0;
@@ -763,6 +805,27 @@ public class Scene {
 
     private static Vector3d interpolate(Vector3d start, Vector3d end, double amount) {
         return new Vector3d(start).lerp(end, amount);
+    }
+
+    private static Vector3d interpolateRotation(Vector3d start, Vector3d end, double amount) {
+        return new Vector3d(
+                interpolateAngle(start.x, end.x, amount),
+                interpolateAngle(start.y, end.y, amount),
+                interpolateAngle(start.z, end.z, amount));
+    }
+
+    private static double interpolateAngle(double start, double end, double amount) {
+        double delta = end - start;
+        delta = ((delta + 180.0) % 360.0 + 360.0) % 360.0 - 180.0;
+        return start + delta * amount;
+    }
+
+    private static double lerp(double start, double end, double amount) {
+        return start + (end - start) * amount;
+    }
+
+    private static float lerp(float start, float end, double amount) {
+        return (float) (start + (end - start) * amount);
     }
 
     /** Returns the single active orbit target: probe marker in inspection, base entity otherwise. */

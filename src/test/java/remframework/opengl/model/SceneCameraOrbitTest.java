@@ -240,6 +240,11 @@ class SceneCameraOrbitTest {
         scene.exitNeighborhoodInspection();
 
         assertTrue(scene.isNeighborhoodInspectionTransitionActive());
+        assertTrue(new Vector3d(project.camera.getPosition()).distance(originalPosition) > 1.0e-4);
+        assertTrue(new Vector3d(project.camera.getRotation()).distance(originalRotation) > 1.0e-4);
+        scene.updateCameraTransition(0.4);
+        assertTrue(new Vector3d(project.camera.getPosition()).distance(originalPosition) > 1.0e-4);
+        assertTrue(new Vector3d(project.camera.getRotation()).distance(originalRotation) > 1.0e-4);
         scene.updateCameraTransition(0.8);
         assertNavigationEquals(originalPosition, originalRotation, originalTarget, originalDistance,
                                57.0f, 0.2f, 4321.0f);
