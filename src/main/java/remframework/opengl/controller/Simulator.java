@@ -827,7 +827,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         }
     }
 
-    private void calcNextFrame() {
+    private void calcNextFrame(boolean singleStepUpdate) {
         //isCalcNextPhysicsReady = false;
         numFrameCalculation++;
         // While the GPU is rendering on the current buffer,
@@ -878,6 +878,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             PerformanceMonitor.stop(Measurement.totalCPURenderTime);
 
             //isCalcNextPhysicsReady = true;
+            if (singleStepUpdate) remModel.finishSingleStep();
             numFrameCalculation--;
             if (numFrameCalculation != 0) {
                 System.out.println("Error: numPhysicsFrameCalculation: " + numFrameCalculation);
@@ -891,8 +892,18 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         }
     }
 
+    /** Keeps the render/picking matrix buffer current without advancing simulation state. */
+    private void refreshRenderMatrices() {
+        int numThreads = appSettings.getNumThreads();
+        int numNodes = scene.getLattice().getEntities().size();
+        int segmentSize = numNodes > numThreads ? numNodes / numThreads + 1 : numNodes;
+        Node.swapBuffer();
+        scene.updateMatrix(numThreads, segmentSize);
+        scene.waitForAllTasksReady();
+    }
+
     private void simulateOccupancies() {
-        if (remModel.isSimulating() && !updateLimitReached) {
+        if (remModel.isSimulationUpdateActive() && !updateLimitReached) {
             GravityExperimentController controller = GravityExperimentController.getInstance();
             controller.beginSimulationUpdate();
             GravityPressureExperimentController.getInstance().beginSimulationUpdate();
@@ -925,7 +936,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private void samplePassiveDetectors() {
         DetectorExperimentController controller =
                 DetectorExperimentController.getInstance();
-        if (!remModel.isSimulating() || updateLimitReached
+        if (!remModel.isSimulationUpdateActive() || updateLimitReached
                 || !controller.isEnabled()) {
             return;
         }
@@ -960,7 +971,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void simulateRain() {
-        if (remModel.isSimulating() && project.rainModel.isActive()) {
+        if (remModel.isSimulationUpdateActive() && project.rainModel.isActive()) {
             Vector3i index = new Vector3i();
 
             for (int i = 0; i < project.rainModel.getIterations(); i++) {
@@ -1243,7 +1254,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             waitForRenderingReady();
             resetMonitoringDeadThreads();
             // Meanwhile, start calculating the next frame while rendering.
-            calcNextFrame();
+            boolean singleStepUpdate = remModel.consumeSingleStepRequest();
+            if (remModel.isSimulating() || singleStepUpdate)
+                calcNextFrame(singleStepUpdate);
+            else
+                refreshRenderMatrices();
         }
 
         PerformanceMonitor.start(Measurement.sendToGPU);

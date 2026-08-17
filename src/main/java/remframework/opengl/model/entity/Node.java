@@ -216,7 +216,7 @@ public class Node extends Entity {
 
     public void updateNodeProperties(NodeFormulaVersion nodeFormulaVersion) {
         // If set to false then the node stops updating its position
-        if (!remModel.isSimulating()) return;
+        if (!remModel.isSimulationUpdateActive()) return;
 
         switch (nodeFormulaVersion) {
             case v_0_3:

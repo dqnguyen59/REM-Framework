@@ -909,7 +909,7 @@ public class Scene {
             int i = start;
 
             // If set to false then the node stops updating its position
-            if (REMModel.isSimulating()) {
+            if (REMModel.isSimulationUpdateActive()) {
                 while (i < end) {
                     ((Node) lattice.getNodeArray()[i++]).updateNodeProperties(
                             settings.getNodeFormulaVersion());
