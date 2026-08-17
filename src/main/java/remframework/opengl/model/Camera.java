@@ -119,6 +119,23 @@ public class Camera {
 		orbitDistance = new Vector3d(position).distance(orbitTarget);
 	}
 
+	/** Sets position and target together without changing any scene entity. */
+	public void setOrbitState(Vector3d position, Vector3d target) {
+		this.position.set((float) position.x, (float) position.y, (float) position.z);
+		orbitTarget.set(target);
+		orbitDistance = position.distance(target);
+	}
+
+	/** Recomputes yaw/pitch so the camera looks at the current orbit target. */
+	public void lookAtOrbitTarget() {
+		Vector3d offset = new Vector3d(position).sub(orbitTarget);
+		if (offset.lengthSquared() == 0.0) return;
+		double distance = offset.length();
+		setRotation((float) Math.toDegrees(Math.asin(offset.y / distance)),
+				(float) Math.toDegrees(Math.atan2(-offset.x, offset.z)), 0.0f);
+		orbitDistance = distance;
+	}
+
 	public Vector3d getOrbitTarget() {
 		return new Vector3d(orbitTarget);
 	}

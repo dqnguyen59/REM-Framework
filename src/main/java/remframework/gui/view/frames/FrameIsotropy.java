@@ -246,7 +246,8 @@ public final class FrameIsotropy extends AbstractFrame {
 
     private void inspectorSection(NkContext ctx, PassiveObserver probe) {
         section(ctx, "Neighborhood Inspector (read-only)");
-        if (project.scene.isNeighborhoodInspectionActive()) {
+        if (project.scene.isNeighborhoodInspectionActive()
+                || project.scene.isNeighborhoodInspectionTransitionActive()) {
             if (nk_button_label(ctx, "Exit Inspector (Esc)")) {
                 project.scene.exitNeighborhoodInspection();
                 return;

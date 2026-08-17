@@ -77,6 +77,14 @@ public class Scene {
     private CameraState savedInspectionCamera;
     private Vector3d savedInspectionTarget;
     private double inspectionCameraDistance;
+    private boolean inspectionTransitionActive;
+    private boolean inspectionTransitionEntering;
+    private double inspectionTransitionProgress;
+    private final Vector3d transitionStartPosition = new Vector3d();
+    private final Vector3d transitionStartTarget = new Vector3d();
+    private final Vector3d transitionEndPosition = new Vector3d();
+    private final Vector3d transitionEndTarget = new Vector3d();
+    private static final double INSPECTION_TRANSITION_SECONDS = 0.8;
 
     private record CameraState(Vector3f position, Vector3f rotation, float fov, float near, float far) {
         static CameraState capture(Camera camera) {
@@ -526,10 +534,13 @@ public class Scene {
             selectedProbe.setSelected(true);
             selectedProbe.updateMarker();
         }
-        if (neighborhoodInspectionActive && probeChanged) retargetNeighborhoodInspection();
+        if ((neighborhoodInspectionActive || inspectionTransitionActive) && probeChanged)
+            retargetNeighborhoodInspection();
     }
 
     public boolean isNeighborhoodInspectionActive() { return neighborhoodInspectionActive; }
+
+    public boolean isNeighborhoodInspectionTransitionActive() { return inspectionTransitionActive; }
 
     public PassiveObserver getInspectedProbe() { return inspectedProbe; }
 
@@ -537,12 +548,12 @@ public class Scene {
     /** Enters a renderer-only inspection session for the currently selected passive probe. */
     public boolean enterNeighborhoodInspection() {
         if (selectedProbe == null) return false;
-        if (neighborhoodInspectionActive && inspectedProbe == selectedProbe)
+        if ((neighborhoodInspectionActive || inspectionTransitionActive) && inspectedProbe == selectedProbe)
             return inspectionProbeMarker != null;
-        if (!neighborhoodInspectionActive) {
+        if (!neighborhoodInspectionActive && !inspectionTransitionActive) {
+            project.camera.setOrbitTarget(resolveNormalCameraTarget());
             savedInspectionCamera = CameraState.capture(project.camera);
-            savedInspectionTarget = resolveNormalCameraTarget();
-            neighborhoodInspectionActive = true;
+            savedInspectionTarget = project.camera.getOrbitTarget();
         }
         inspectedProbe = selectedProbe;
         retargetNeighborhoodInspection();
@@ -550,30 +561,87 @@ public class Scene {
     }
 
     public void exitNeighborhoodInspection() {
-        inspectionProbeMarker = null;
-        project.camera.setOrbitTarget(resolveNormalCameraTarget());
-        neighborhoodInspectionActive = false;
-        inspectedProbe = null;
-        if (savedInspectionCamera != null) savedInspectionCamera.restore(project.camera);
-        if (savedInspectionTarget != null) project.camera.setOrbitTarget(savedInspectionTarget);
-        savedInspectionTarget = null;
-        savedInspectionCamera = null;
+        if (savedInspectionCamera == null) return;
+        beginCameraTransition(false, savedInspectionCamera, savedInspectionTarget);
     }
 
-    /** Resolves and tags only the small existing entity set; ordinary visibility is untouched. */
+    /** Resolves the selected existing probe and starts the camera-only transition. */
     public void retargetNeighborhoodInspection() {
-        if (!neighborhoodInspectionActive) return;
         if (inspectedProbe == null) inspectedProbe = selectedProbe;
         inspectionProbeMarker = inspectedProbe.getMarker();
         if (inspectionProbeMarker == null) return;
-        project.camera.setOrbitTarget(worldPosition(inspectionProbeMarker));
-        cameraFocusOnInspectionTarget();
+        beginCameraTransition(true, null, null);
     }
 
     /** Keeps the orbit target attached to the existing live probe marker. */
     public void updateInspectionCameraTarget() {
         if (!neighborhoodInspectionActive || inspectionProbeMarker == null) return;
         project.camera.followOrbitTarget(worldPosition(inspectionProbeMarker));
+    }
+
+    /** Advances the camera-only inspection transition once per render frame. */
+    public void updateCameraTransition(double deltaSeconds) {
+        if (inspectionTransitionActive) {
+            if (inspectionTransitionEntering && inspectionProbeMarker != null) {
+                Vector3d liveTarget = worldPosition(inspectionProbeMarker);
+                transitionEndTarget.set(liveTarget);
+                transitionEndPosition.set(liveTarget).add(
+                        new Vector3d(transitionStartPosition).sub(transitionStartTarget));
+            }
+            inspectionTransitionProgress = Math.min(1.0,
+                    inspectionTransitionProgress + Math.max(0.0, deltaSeconds)
+                            / INSPECTION_TRANSITION_SECONDS);
+            double eased = smoothstep(inspectionTransitionProgress);
+            Vector3d position = interpolate(transitionStartPosition, transitionEndPosition, eased);
+            Vector3d target = interpolate(transitionStartTarget, transitionEndTarget, eased);
+            project.camera.setOrbitState(position, target);
+            if (inspectionTransitionProgress >= 1.0) finishCameraTransition();
+            return;
+        }
+        updateInspectionCameraTarget();
+    }
+
+    private void beginCameraTransition(boolean entering, CameraState returnState, Vector3d returnTarget) {
+        if (entering) {
+            transitionStartPosition.set(project.camera.getPosition());
+            transitionStartTarget.set(project.camera.getOrbitTarget());
+            transitionEndTarget.set(worldPosition(inspectionProbeMarker));
+            transitionEndPosition.set(transitionEndTarget).add(
+                    new Vector3d(transitionStartPosition).sub(transitionStartTarget));
+        } else {
+            transitionStartPosition.set(project.camera.getPosition());
+            transitionStartTarget.set(project.camera.getOrbitTarget());
+            transitionEndPosition.set(returnState.position());
+            transitionEndTarget.set(returnTarget);
+        }
+        inspectionTransitionEntering = entering;
+        inspectionTransitionProgress = 0.0;
+        inspectionTransitionActive = true;
+        if (entering) neighborhoodInspectionActive = false;
+    }
+
+    private void finishCameraTransition() {
+        inspectionTransitionActive = false;
+        if (inspectionTransitionEntering) {
+            neighborhoodInspectionActive = true;
+            project.camera.lookAtOrbitTarget();
+        } else {
+            neighborhoodInspectionActive = false;
+            inspectionProbeMarker = null;
+            inspectedProbe = null;
+            if (savedInspectionCamera != null) savedInspectionCamera.restore(project.camera);
+            if (savedInspectionTarget != null) project.camera.setOrbitTarget(savedInspectionTarget);
+            savedInspectionTarget = null;
+            savedInspectionCamera = null;
+        }
+    }
+
+    private static double smoothstep(double value) {
+        return value * value * (3.0 - 2.0 * value);
+    }
+
+    private static Vector3d interpolate(Vector3d start, Vector3d end, double amount) {
+        return new Vector3d(start).lerp(end, amount);
     }
 
     /** Returns the single active orbit target: probe marker in inspection, base entity otherwise. */

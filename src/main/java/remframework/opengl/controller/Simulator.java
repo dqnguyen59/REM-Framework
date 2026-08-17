@@ -1277,7 +1277,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         for (PassiveObserver probe : scene.getPreviewProbes()) {
             probe.updateMarker();
         }
-        scene.updateInspectionCameraTarget();
+        scene.updateCameraTransition(1.0 / 60.0);
         // Ordinary probe/gradient render lists are filtered out during inspection.
         // Do not tear them down and rebuild them while the diagnostic view is active;
         // they are synchronized normally on the first frame after exit.
