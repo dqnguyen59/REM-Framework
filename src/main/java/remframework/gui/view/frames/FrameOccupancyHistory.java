@@ -10,6 +10,7 @@ import remframework.gui.model.NuklearModel;
 import remframework.gui.model.Theme;
 import remframework.opengl.model.OccupancyHistory;
 import remframework.opengl.model.PassiveObserver;
+import remframework.opengl.model.entity.OccupancyHistorySnapshot;
 import remframework.settings.Project;
 
 import java.util.ArrayList;
@@ -57,7 +58,12 @@ public final class FrameOccupancyHistory extends AbstractFrame {
         List<OccupancyHistory.Series> series = OccupancyHistory.forProbe(probe);
         int historyLength = historyLength(probe);
         scalar(ctx, "Probe", probe.getId());
-        scalar(ctx, "History length", Integer.toString(historyLength));
+        scalar(ctx, "Configured capacity", Integer.toString(historyCapacity(probe)));
+        scalar(ctx, "Chart history length", Integer.toString(historyLength));
+        scalar(ctx, "Populated slots", Integer.toString(populatedSlots(probe)));
+        scalar(ctx, "Current phase index", Integer.toString(phaseIndex(probe)));
+        scalar(ctx, "Completed cycles", Long.toString(completedCycles(probe)));
+        scalar(ctx, "Cumulative samples", Long.toString(cumulativeSamples(probe)));
         scalar(ctx, "Samples per cycle", Integer.toString(samplesPerCycle(probe)));
         if (probe.getDetectorType() != remframework.opengl.model.ProbeDetectorType.RAW_NODE)
             Nuklear.nk_label_wrap(ctx, "Interpolated estimate — not a node history. Each sample is Σ(weight_i × source_i[s]).");
@@ -250,12 +256,36 @@ public final class FrameOccupancyHistory extends AbstractFrame {
     }
 
     static int historyLength(PassiveObserver probe) {
-        return Math.min(360, probe.getOccupancies().stream()
-                .mapToInt(o -> o.getCycleSampleCountForAudit()).min().orElse(0));
+        return historyCapacity(probe);
     }
 
     static int samplesPerCycle(PassiveObserver probe) {
-        return probe.getOccupancies().stream().mapToInt(o -> o.getSamplesPerCycleForAudit()).min().orElse(0);
+        return snapshots(probe).stream().mapToInt(OccupancyHistorySnapshot::configuredSamplesPerCycle)
+                .min().orElse(0);
+    }
+
+    private static int historyCapacity(PassiveObserver probe) {
+        return snapshots(probe).stream().mapToInt(OccupancyHistorySnapshot::capacity).min().orElse(0);
+    }
+
+    private static int populatedSlots(PassiveObserver probe) {
+        return snapshots(probe).stream().mapToInt(OccupancyHistorySnapshot::populatedSlots).min().orElse(0);
+    }
+
+    private static int phaseIndex(PassiveObserver probe) {
+        return snapshots(probe).stream().mapToInt(OccupancyHistorySnapshot::phaseIndex).min().orElse(0);
+    }
+
+    private static long completedCycles(PassiveObserver probe) {
+        return snapshots(probe).stream().mapToLong(OccupancyHistorySnapshot::completedCycleCount).min().orElse(0);
+    }
+
+    private static long cumulativeSamples(PassiveObserver probe) {
+        return snapshots(probe).stream().mapToLong(OccupancyHistorySnapshot::cumulativeSampleCount).min().orElse(0);
+    }
+
+    private static List<OccupancyHistorySnapshot> snapshots(PassiveObserver probe) {
+        return probe.getOccupancies().stream().map(o -> o.getHistorySnapshotForAudit()).toList();
     }
 
     private static void section(NkContext ctx, String label) {

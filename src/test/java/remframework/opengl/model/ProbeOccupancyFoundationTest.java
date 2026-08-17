@@ -59,7 +59,7 @@ class ProbeOccupancyFoundationTest {
             transport.update(occupancy);
 
             assertTrue(occupancy.wasCycleCompletedThisUpdate());
-            assertEquals(2, occupancy.getSamplesPerCycleForAudit());
+            assertEquals(360, occupancy.getSamplesPerCycleForAudit());
             assertEquals(2.0, occupancy.getLastMaxPositiveGradient().x, 1.0e-12);
             assertEquals(0.0, occupancy.getLastMaxNegativeGradient().x, 1.0e-12);
             assertEquals(1.0, occupancy.getGradientImbalance().x, 1.0e-12);

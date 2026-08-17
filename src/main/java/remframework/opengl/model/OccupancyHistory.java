@@ -3,6 +3,7 @@ package remframework.opengl.model;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
 import remframework.opengl.model.entity.Occupancy;
+import remframework.opengl.model.entity.OccupancyHistorySnapshot;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,8 +47,9 @@ public final class OccupancyHistory {
     public static List<Series> forProbe(PassiveObserver probe) {
         if (probe instanceof Probe raw) {
             Occupancy occupancy = raw.getOccupancies().getFirst();
+            OccupancyHistorySnapshot snapshot = occupancy.getHistorySnapshotForAudit();
             return List.of(new Series("Raw node", raw.getNodeCoordinate(), 1.0,
-                    occupancy.getGradientImbalanceHistoryForAudit()));
+                    snapshot.samples()));
         }
         if (!(probe instanceof InterpolatedProbe interpolated)) return List.of();
         List<Series> sources = new ArrayList<>();
@@ -55,8 +57,9 @@ public final class OccupancyHistory {
         List<Double> weights = new ArrayList<>();
         for (int index = 0; index < interpolated.getOccupancies().size(); index++) {
             var source = interpolated.getDefinition().getInterpolationSources().get(index);
-            List<Vector3d> history = interpolated.getOccupancies().get(index)
-                    .getGradientImbalanceHistoryForAudit();
+            OccupancyHistorySnapshot snapshot = interpolated.getOccupancies().get(index)
+                    .getHistorySnapshotForAudit();
+            List<Vector3d> history = snapshot.samples();
             sources.add(new Series("Source " + (index + 1), source.nodeIndex(), source.weight(), history));
             histories.add(history);
             weights.add(source.weight());

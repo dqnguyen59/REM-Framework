@@ -180,16 +180,19 @@ public class Node extends Entity {
         for (int i = 0; i < neighbors.length; i++) {
             if (neighbors[i] != null) {
                 deltaPositions[i].set(neighbors[i].position).sub(position);
-                deltaAcceleration[i].set(neighbors[i].acceleration).sub(acceleration);
-                deltaVelocity[i].set(neighbors[i].velocity).sub(velocity);
+//                deltaAcceleration[i].set(neighbors[i].acceleration).sub(acceleration);
+//                deltaVelocity[i].set(neighbors[i].velocity).sub(velocity);
                 flow[i] = deltaPositions[i].length();
             }
         }
 
 
-        return gradientImbalance.set(flow[NEIGHBOR_LEFT] - flow[NEIGHBOR_RIGHT],
-                            flow[NEIGHBOR_BOTTOM] - flow[NEIGHBOR_TOP],
-                            flow[NEIGHBOR_BACK] - flow[NEIGHBOR_FRONT]);
+        return gradientImbalance.set(flow[NEIGHBOR_RIGHT] - flow[NEIGHBOR_LEFT],
+                                     flow[NEIGHBOR_TOP] - flow[NEIGHBOR_BOTTOM],
+                                     flow[NEIGHBOR_FRONT] - flow[NEIGHBOR_BACK]);
+//        return gradientImbalance.set(flow[NEIGHBOR_LEFT] - flow[NEIGHBOR_RIGHT],
+//                                     flow[NEIGHBOR_BOTTOM] - flow[NEIGHBOR_TOP],
+//                                     flow[NEIGHBOR_BACK] - flow[NEIGHBOR_FRONT]);
     }
 
     /**
