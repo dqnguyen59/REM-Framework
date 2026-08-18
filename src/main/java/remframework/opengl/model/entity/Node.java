@@ -167,7 +167,7 @@ public class Node extends Entity {
 
     @Override
     public boolean isVisible() {
-        return isVisible || (type == EntityType.WALL) && remModel.isWallVisible();
+        return visible || (type == EntityType.WALL) && remModel.isWallVisible();
     }
 
     /**

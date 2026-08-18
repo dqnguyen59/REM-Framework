@@ -72,6 +72,8 @@ public class Scene {
     private Node                firstHiLightedNode;
 
     private boolean neighborhoodInspectionActive;
+
+    private boolean inspectionMode;
     private PassiveObserver inspectedProbe;
     private Entity inspectionProbeMarker;
     private InspectionNavigationSnapshot savedInspectionNavigation;
@@ -82,6 +84,7 @@ public class Scene {
     private boolean inspectionTransitionActive;
     private boolean inspectionTransitionEntering;
     private double inspectionTransitionProgress;
+
     private final Vector3d transitionStartPosition = new Vector3d();
     private final Vector3d transitionStartTarget = new Vector3d();
     private final Vector3d transitionEndPosition = new Vector3d();
@@ -97,10 +100,6 @@ public class Scene {
     private float transitionStartFar;
     private float transitionEndFar;
     private static final double INSPECTION_TRANSITION_SECONDS = 0.8;
-    private static final double INSPECTION_MIN_RADIUS = 2.0;
-    private static final double INSPECTION_MARKER_RADIUS = 1.0;
-    private static final double INSPECTION_SAFETY_MARGIN = 1.20;
-    private static final double INSPECTION_MIN_DISTANCE = 6.0;
 
     private record CameraState(Vector3f position, Vector3f rotation, float fov, float near, float far,
                                Vector3d orbitTarget, double orbitDistance) {
@@ -152,16 +151,6 @@ public class Scene {
                     scene.transitionEndTarget);
         }
 
-        void restore(Scene scene) {
-            camera.restore(scene.project.camera);
-            scene.inspectionTransitionActive = transitionActive;
-            scene.inspectionTransitionEntering = transitionEntering;
-            scene.inspectionTransitionProgress = transitionProgress;
-            scene.transitionStartPosition.set(transitionStartPosition);
-            scene.transitionStartTarget.set(transitionStartTarget);
-            scene.transitionEndPosition.set(transitionEndPosition);
-            scene.transitionEndTarget.set(transitionEndTarget);
-        }
     }
 
     private DirectionalLight directionalLight;
@@ -337,11 +326,6 @@ public class Scene {
         return marker;
     }
 
-    /** Replaces transient preview markers while leaving committed probe definitions untouched. */
-    public void setPreviewDefinitions(List<ProbeDefinition> definitions) {
-        setPreviewDefinitions(definitions, false);
-    }
-
     /** Shows replacement previews without rendering duplicate committed generated markers. */
     public void setPreviewDefinitions(List<ProbeDefinition> definitions, boolean replacesGenerated) {
         clearPreviewProbes();
@@ -424,7 +408,6 @@ public class Scene {
             if (replacementProbePreviewActive
                     && probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) continue;
             Entity arrow = gradientArrowEntities.computeIfAbsent(probe, this::createGradientArrow);
-            Vector3d gradient = probe.getStableGradientImbalance();
             Vector3d anchor = probe.getMarker().getPosition();
             Vector3d localArrowVector = new Vector3d(probe.getStableGradientImbalance())
                     .mul(getGradientArrowScale());
@@ -516,12 +499,6 @@ public class Scene {
         return entities;
     }
 
-    /** Replaces previews with committed renderer-only markers for the supplied definitions. */
-    public void commitProbeDefinitions(List<ProbeDefinition> definitions) {
-        clearPreviewProbes();
-        for (ProbeDefinition definition : definitions) createProbe(definition, false);
-    }
-
     /** Atomically replaces generated probe markers while preserving manually created receivers. */
     public boolean replaceGeneratedProbeDefinitions(List<ProbeDefinition> definitions) {
         if (neighborhoodInspectionActive) exitNeighborhoodInspection();
@@ -588,6 +565,24 @@ public class Scene {
 
     public boolean isNeighborhoodInspectionTransitionActive() { return inspectionTransitionActive; }
 
+    public void setNeighborNodesInspectionVisibility(Node node, boolean isVisible) {
+        for (Node neighbor : node.getNeighbors()) {
+            if (neighbor != null) neighbor.setInspectionVisible(isVisible);
+        }
+    }
+
+    public void setInspectionProbeAndNeighborsVisible(PassiveObserver inspectedProbe, boolean isVisible) {
+        if (inspectedProbe instanceof Probe probe) {
+            probe.getNode().setInspectionVisible(isVisible);
+            setNeighborNodesInspectionVisibility(probe.getNode(), isVisible);
+        }
+        else if (inspectedProbe instanceof InterpolatedProbe probe) {
+            for (Node node: probe.getSourceNodes()) {
+                node.setInspectionVisible(isVisible);
+                setNeighborNodesInspectionVisibility(node, isVisible);
+            }
+        }
+    }
 
     /** Enters a renderer-only inspection session for the currently selected passive probe. */
     public boolean enterNeighborhoodInspection() {
@@ -599,6 +594,7 @@ public class Scene {
             project.camera.setOrbitTarget(resolveNormalCameraTarget());
         }
         inspectedProbe = selectedProbe;
+
         retargetNeighborhoodInspection();
         return inspectionProbeMarker != null;
     }
@@ -727,9 +723,11 @@ public class Scene {
     private void finishCameraTransition() {
         inspectionTransitionActive = false;
         if (inspectionTransitionEntering) {
+            inspectionMode = true;
             neighborhoodInspectionActive = true;
             project.camera.lookAtOrbitTarget();
         } else {
+            inspectionMode = false;
             neighborhoodInspectionActive = false;
             inspectionProbeMarker = null;
             inspectedProbe = null;
@@ -739,6 +737,7 @@ public class Scene {
                 snapshot.camera().restore(project.camera);
             }
         }
+        setInspectionProbeAndNeighborsVisible(selectedProbe, inspectionMode);
     }
 
     private static double smoothstep(double value) {
@@ -1192,9 +1191,7 @@ public class Scene {
                     node.setCustomScale(-1);
                     node.setCustomColor(null);
                 }
-                else {
-                    entity.updateMatrix();
-                }
+                entity.updateMatrix();
             }
         }));
     }

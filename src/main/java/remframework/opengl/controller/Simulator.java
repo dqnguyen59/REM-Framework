@@ -1009,7 +1009,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             for (Entity entity : scene.getLattice().getNonNodeRenderEntities()) {
                 renderer.processEntity(entity);
             }
-            return;
         }
 
         for (Entity entity : scene.getLattice().getEntities()) {
