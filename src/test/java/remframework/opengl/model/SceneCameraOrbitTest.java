@@ -118,6 +118,51 @@ class SceneCameraOrbitTest {
     }
 
     @Test
+    void inspectionShowsOnlyExistingProbeNeighborhoodAndPreservesNodeMotion() {
+        Node source = new Node(null, null, new Vector3d(0, 0, 0), new Vector3d(), 1.0);
+        source.setIndex(new Vector3i(4, 4, 4));
+        Node rightNeighbor = new Node(null, null, new Vector3d(1, 0, 0), new Vector3d(), 1.0);
+        rightNeighbor.setIndex(new Vector3i(5, 4, 4));
+        Node leftNeighbor = new Node(null, null, new Vector3d(-1, 0, 0), new Vector3d(), 1.0);
+        leftNeighbor.setIndex(new Vector3i(3, 4, 4));
+        Node unrelated = new Node(null, null, new Vector3d(0, 4, 0), new Vector3d(), 1.0);
+        unrelated.setIndex(new Vector3i(4, 8, 4));
+        source.setNeighbor(Neighbor.RIGHT, rightNeighbor);
+        source.setNeighbor(Neighbor.LEFT, leftNeighbor);
+
+        Entity marker = new Entity(null, null, new Vector3d(), new Vector3d(), 1.0,
+                remframework.opengl.model.entity.EntityType.ENTITY);
+        Probe probe = new Probe(new ProbeDefinition("inspection-visibility-probe", source.getIndex(),
+                new Vector4f(1, 0.5f, 0, 1)), source, marker);
+        int entityCountBeforeInspection = scene.getLattice().getEntities().size();
+
+        scene.selectProbe(probe);
+        assertTrue(scene.enterNeighborhoodInspection());
+        scene.updateCameraTransition(1.0);
+
+        assertTrue(scene.isInspectionMode());
+        assertTrue(source.isInspectionVisible());
+        assertTrue(rightNeighbor.isInspectionVisible());
+        assertTrue(leftNeighbor.isInspectionVisible());
+        assertFalse(unrelated.isInspectionVisible());
+        assertEquals(entityCountBeforeInspection, scene.getLattice().getEntities().size());
+
+        Vector3d beforeMotion = new Vector3d(rightNeighbor.getPosition());
+        rightNeighbor.incPosition(0.25, 0.5, 0.75);
+        rightNeighbor.updatePosition();
+        rightNeighbor.updateMatrix();
+        assertNotEquals(beforeMotion, new Vector3d(rightNeighbor.getPosition()));
+        assertTrue(rightNeighbor.isInspectionVisible());
+
+        scene.exitNeighborhoodInspection();
+        scene.updateCameraTransition(1.0);
+        assertFalse(scene.isInspectionMode());
+        assertFalse(source.isInspectionVisible());
+        assertFalse(rightNeighbor.isInspectionVisible());
+        assertFalse(leftNeighbor.isInspectionVisible());
+    }
+
+    @Test
     void inspectionEntryUsesEasedCameraOnlyTransition() {
         Entity base = new Entity(null, null, new Vector3d(), new Vector3d(), 1.0,
                 remframework.opengl.model.entity.EntityType.ENTITY);
