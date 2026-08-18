@@ -37,6 +37,7 @@ public final class FrameIsotropy extends AbstractFrame {
     private boolean showVectors = true;
     private boolean showGradient = true;
     private int selectedInterpolationSource;
+    private int selectedTab;
 
     public FrameIsotropy(NuklearModel model) {
         super(model);
@@ -81,6 +82,34 @@ public final class FrameIsotropy extends AbstractFrame {
         }
         Nuklear.nk_label(ctx, "Probe center is the lattice geometric center", Nuklear.NK_TEXT_LEFT);
 
+        Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 3);
+        if (Nuklear.nk_button_label(ctx, "Gradient visualization")) selectedTab = 0;
+        if (Nuklear.nk_button_label(ctx, "Calibration")) selectedTab = 1;
+        if (Nuklear.nk_button_label(ctx, "Gradient Imbalance Comparison")) selectedTab = 2;
+
+        NkVec2 contentSize = NkVec2.create();
+        Nuklear.nk_window_get_content_region_size(ctx, contentSize);
+        int tabHeight = Math.max(rowHeight, Math.round(contentSize.y()) - rowHeight);
+        Nuklear.nk_layout_row_dynamic(ctx, tabHeight, 1);
+        String tabContentTitle = switch (selectedTab) {
+            case 1 -> "Calibration content";
+            case 2 -> "Gradient Imbalance Comparison content";
+            default -> "Gradient visualization content";
+        };
+        if (!Nuklear.nk_group_begin(ctx, tabContentTitle,
+                                    Nuklear.NK_WINDOW_SCROLL_AUTO_HIDE)) return;
+
+        if (selectedTab == 1) {
+            calibrationSection(ctx);
+            Nuklear.nk_group_end(ctx);
+            return;
+        }
+        if (selectedTab == 2) {
+            comparisonSection(ctx);
+            Nuklear.nk_group_end(ctx);
+            return;
+        }
+
         section(ctx, "Gradient visualization");
         project.scene.setShowGradientArrows(nk_check_label(ctx, "Show gradient imbalance arrows",
                                                             project.scene.isShowGradientArrows(), 0.7, 0.3));
@@ -90,41 +119,6 @@ public final class FrameIsotropy extends AbstractFrame {
                 Math.rint(nk_slider(ctx, 0.0, project.scene.getGradientArrowScaleExponent(), 120.0, 1)));
         scalar(ctx, "Visual scale", "10^" + (int) project.scene.getGradientArrowScaleExponent()
                 + " = " + format(project.scene.getGradientArrowScale()));
-
-        section(ctx, "Arrow calibration");
-        project.scene.setShowCalibrationArrow(nk_check_label(ctx, "Show calibration arrow",
-                                                             project.scene.isShowCalibrationArrow(), 0.7, 0.3));
-        Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
-        Nuklear.nk_label(ctx, "Direction:", Nuklear.NK_TEXT_LEFT);
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            String[] directions = {"−X", "+Y", "+Z"};
-            Scene.CalibrationDirection currentDirection = project.scene.getCalibrationDirection();
-            String currentLabel = switch (currentDirection) {
-                case NEGATIVE_X -> "−X";
-                case POSITIVE_Y -> "+Y";
-                case POSITIVE_Z -> "+Z";
-            };
-            String selected = nk_combo_options(ctx, stack, directions,
-                                               currentLabel);
-            Scene.CalibrationDirection selectedDirection = switch (selected) {
-                case "+Y" -> Scene.CalibrationDirection.POSITIVE_Y;
-                case "+Z" -> Scene.CalibrationDirection.POSITIVE_Z;
-                default -> Scene.CalibrationDirection.NEGATIVE_X;
-            };
-            project.scene.setCalibrationDirection(selectedDirection);
-        }
-        Vector3d calibrationVector = project.scene.getCalibrationDirection().vector();
-        scalar(ctx, "Calibration", calibrationDirectionLabel(project.scene.getCalibrationDirection())
-                + "  (" + (int) calibrationVector.x + ", "
-                + (int) calibrationVector.y + ", " + (int) calibrationVector.z + ")");
-
-        NkVec2 contentSize = NkVec2.create();
-        Nuklear.nk_window_get_content_region_size(ctx, contentSize);
-        int detailsHeight = Math.max(rowHeight, Math.round(contentSize.y()) - rowHeight);
-        Nuklear.nk_layout_row_dynamic(ctx, detailsHeight, 1);
-        if (!Nuklear.nk_group_begin(ctx, "Isotropy details", Nuklear.NK_WINDOW_SCROLL_AUTO_HIDE)) {
-            return;
-        }
 
         PassiveObserver probe = project.scene.getSelectedProbe();
         section(ctx, "Selected passive probe");
@@ -211,8 +205,6 @@ public final class FrameIsotropy extends AbstractFrame {
             scalar(ctx, "Cycle state", "N/A (Occupancy only)");
         }
 
-        comparisonSection(ctx);
-
         section(ctx, "Receiver Occupancy reference");
         Occupancy receiver = project.occupancies.size() > 1 ? project.occupancies.get(1) : null;
         if (receiver == null) {
@@ -242,6 +234,34 @@ public final class FrameIsotropy extends AbstractFrame {
         scalar(ctx, "Samples in last completed cycle", Integer.toString(receiver.getSamplesPerCycleForAudit()));
         scalar(ctx, "Cycle completed", Boolean.toString(receiver.wasCycleCompletedThisUpdate()));
         Nuklear.nk_group_end(ctx);
+    }
+
+    private void calibrationSection(NkContext ctx) {
+        section(ctx, "Arrow calibration");
+        project.scene.setShowCalibrationArrow(nk_check_label(ctx, "Show calibration arrow",
+                                                             project.scene.isShowCalibrationArrow(), 0.7, 0.3));
+        Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
+        Nuklear.nk_label(ctx, "Direction:", Nuklear.NK_TEXT_LEFT);
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            String[] directions = {"−X", "+Y", "+Z"};
+            Scene.CalibrationDirection currentDirection = project.scene.getCalibrationDirection();
+            String currentLabel = switch (currentDirection) {
+                case NEGATIVE_X -> "−X";
+                case POSITIVE_Y -> "+Y";
+                case POSITIVE_Z -> "+Z";
+            };
+            String selected = nk_combo_options(ctx, stack, directions, currentLabel);
+            Scene.CalibrationDirection selectedDirection = switch (selected) {
+                case "+Y" -> Scene.CalibrationDirection.POSITIVE_Y;
+                case "+Z" -> Scene.CalibrationDirection.POSITIVE_Z;
+                default -> Scene.CalibrationDirection.NEGATIVE_X;
+            };
+            project.scene.setCalibrationDirection(selectedDirection);
+        }
+        Vector3d calibrationVector = project.scene.getCalibrationDirection().vector();
+        scalar(ctx, "Calibration", calibrationDirectionLabel(project.scene.getCalibrationDirection())
+                + "  (" + (int) calibrationVector.x + ", "
+                + (int) calibrationVector.y + ", " + (int) calibrationVector.z + ")");
     }
 
     private void inspectorSection(NkContext ctx, PassiveObserver probe) {
