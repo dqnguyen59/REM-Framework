@@ -1,6 +1,8 @@
 package remframework.gui.view.frames;
 
 import org.joml.Vector3d;
+import org.joml.Vector3f;
+import org.joml.Matrix4f;
 import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.NkRect;
 import org.lwjgl.nuklear.NkVec2;
@@ -31,6 +33,7 @@ public final class FrameIsotropy extends AbstractFrame {
     private static final int DEFAULT_HEIGHT = 720;
     private static final int MIN_WIDTH = 520;
     private static final int MIN_HEIGHT = 420;
+    private static final int INSPECTOR_ROW_HEIGHT = 22;
 
     private final Project project = Project.getInstance();
     private boolean showSource = true;
@@ -39,6 +42,7 @@ public final class FrameIsotropy extends AbstractFrame {
     private boolean showGradient = true;
     private int selectedInterpolationSource;
     private int selectedTab;
+    private boolean inspectorPositionedForSession;
 
     public FrameIsotropy(NuklearModel model) {
         super(model);
@@ -70,6 +74,18 @@ public final class FrameIsotropy extends AbstractFrame {
             savedRect.w(width);
             savedRect.h(height);
         }
+        boolean inspectionActive = project.scene.isNeighborhoodInspectionActive()
+                || project.scene.isNeighborhoodInspectionTransitionActive();
+        if (!inspectionActive) {
+            inspectorPositionedForSession = false;
+        } else if (!inspectorPositionedForSession) {
+            if (savedRect == null) {
+                savedRect = NkRect.create();
+                appSettings.getFrameRectMap().put(getTitle(), savedRect);
+            }
+            positionNearInspectionCluster(savedRect, width, height);
+            inspectorPositionedForSession = true;
+        }
         createLayout(ctx, 40, nuklearModel.getMenuBarHeight() + 50, width, height);
     }
 
@@ -88,9 +104,22 @@ public final class FrameIsotropy extends AbstractFrame {
         if (Nuklear.nk_button_label(ctx, "Calibration")) selectedTab = 1;
         if (Nuklear.nk_button_label(ctx, "Gradient Imbalance Comparison")) selectedTab = 2;
 
+        boolean inspectionActive = project.scene.isNeighborhoodInspectionActive()
+                || project.scene.isNeighborhoodInspectionTransitionActive();
+        if (inspectionActive && selectedTab == 0) {
+            Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
+            Nuklear.nk_label(ctx, "Neighborhood Inspector", Nuklear.NK_TEXT_LEFT);
+            if (Nuklear.nk_button_label(ctx, "Exit Inspector (Esc)")) {
+                project.scene.exitNeighborhoodInspection();
+            }
+        }
+
         NkVec2 contentSize = NkVec2.create();
         Nuklear.nk_window_get_content_region_size(ctx, contentSize);
-        int tabHeight = Math.max(rowHeight, Math.round(contentSize.y()) - rowHeight);
+        int fixedHeight = rowHeight + rowHeightFor(ctx)
+                + (inspectionActive && selectedTab == 0 ? rowHeightFor(ctx) : 0);
+        int tabHeight = Math.max(rowHeight,
+                                Math.round(contentSize.y()) - fixedHeight);
         Nuklear.nk_layout_row_dynamic(ctx, tabHeight, 1);
         String tabContentTitle = switch (selectedTab) {
             case 1 -> "Calibration content";
@@ -273,12 +302,21 @@ public final class FrameIsotropy extends AbstractFrame {
         section(ctx, "Neighborhood Inspector (read-only)");
         if (project.scene.isNeighborhoodInspectionActive()
                 || project.scene.isNeighborhoodInspectionTransitionActive()) {
-            if (nk_button_label(ctx, "Exit Inspector (Esc)")) {
-                project.scene.exitNeighborhoodInspection();
-                return;
-            }
             scalar(ctx, "Inspected object", "Existing selected probe marker");
-            scalar(ctx, "Camera target", "Live probe marker position");
+            scalar(ctx, "Camera target", probe instanceof InterpolatedProbe
+                    ? "Selected interpolation source position" : "Live probe marker position");
+            Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
+            Nuklear.nk_label(ctx, "Inspection alpha", Nuklear.NK_TEXT_LEFT);
+            project.scene.setInspectionSourceAlpha(
+                    nk_slider(ctx, 0.0, project.scene.getInspectionSourceAlpha(), 1.0, 0.05));
+            project.scene.setShowInspectionProbe(
+                    nk_check_label(ctx, "Show probe", project.scene.isShowInspectionProbe(), 0.7, 0.3));
+            section(ctx, "Inspection legend");
+            scalar(ctx, "Selected source", "Opaque green");
+            scalar(ctx, "Direct neighbor", "Grey / configured alpha");
+            scalar(ctx, "Other source", "Orange / configured alpha");
+            scalar(ctx, "Probe marker", project.scene.isShowInspectionProbe()
+                    ? "Shown / configured alpha" : "Hidden");
         } else {
             scalar(ctx, "Status", "Select a probe, then inspect (live or paused)");
         }
@@ -412,7 +450,47 @@ public final class FrameIsotropy extends AbstractFrame {
     }
 
     private static int rowHeightFor(NkContext ctx) {
-        return 22;
+        return INSPECTOR_ROW_HEIGHT;
+    }
+
+    static int inspectorContentHeight(int rowCount) {
+        return Math.max(0, rowCount) * INSPECTOR_ROW_HEIGHT;
+    }
+
+    static int inspectorRowHeight() {
+        return INSPECTOR_ROW_HEIGHT;
+    }
+
+    static int inspectorScrollMaximum(int contentHeight, int visibleHeight) {
+        return Math.max(0, contentHeight - Math.max(0, visibleHeight));
+    }
+
+    static int[] clampInspectorPosition(int x, int y, int width, int height,
+                                         int viewportWidth, int viewportHeight, int minimumY) {
+        int maxX = Math.max(0, viewportWidth - width);
+        int maxY = Math.max(minimumY, viewportHeight - height);
+        return new int[]{Math.max(0, Math.min(x, maxX)),
+                Math.max(minimumY, Math.min(y, maxY))};
+    }
+
+    private void positionNearInspectionCluster(NkRect rect, int width, int height) {
+        PassiveObserver probe = project.scene.getSelectedProbe();
+        if (probe == null) return;
+        Vector3d anchor = project.scene.getInspectionFocusNode() == null
+                ? probe.getObservation().position()
+                : project.scene.getInspectionFocusNode().toWorldPosition();
+        int[] viewport = {0, 0, appSettings.getWindowWidth(), appSettings.getWindowHeight()};
+        Vector3f screen = new Matrix4f(project.camera.getProjectionMatrix())
+                .mul(project.camera.getViewMatrix())
+                .project(new Vector3f((float) anchor.x, (float) anchor.y, (float) anchor.z),
+                         viewport, new Vector3f());
+        int proposedX = Math.round(screen.x + 24.0f);
+        int proposedY = Math.round(appSettings.getWindowHeight() - screen.y - height * 0.35f);
+        int[] position = clampInspectorPosition(proposedX, proposedY, width, height,
+                                                appSettings.getWindowWidth(),
+                                                appSettings.getWindowHeight(),
+                                                nuklearModel.getMenuBarHeight() + 5);
+        rect.x(position[0]).y(position[1]).w(width).h(height);
     }
 
     private static void vector(NkContext ctx, String label, Vector3d value) {
