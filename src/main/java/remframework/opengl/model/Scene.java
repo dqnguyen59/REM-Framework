@@ -356,21 +356,13 @@ public class Scene {
         replacementProbePreviewActive = false;
     }
 
-    public boolean isShowGradientArrows() {
-        return showGradientArrows;
-    }
-
     public void setShowGradientArrows(boolean showGradientArrows) {
         this.showGradientArrows = showGradientArrows;
         if (!showGradientArrows) hideGradientArrows();
     }
 
-    public double getGradientArrowScaleExponent() {
-        return gradientArrowScaleExponent;
-    }
-
     public void setGradientArrowScaleExponent(double exponent) {
-        gradientArrowScaleExponent = Math.max(0.0, Math.min(120.0, exponent));
+        gradientArrowScaleExponent = Math.clamp(exponent, 0.0, 120.0);
     }
 
     public double getGradientArrowScale() {
@@ -393,17 +385,9 @@ public class Scene {
         }
     }
 
-    public boolean isShowCalibrationArrow() {
-        return showCalibrationArrow;
-    }
-
     public void setShowCalibrationArrow(boolean showCalibrationArrow) {
         this.showCalibrationArrow = showCalibrationArrow;
         if (!showCalibrationArrow) clearCalibrationArrow();
-    }
-
-    public CalibrationDirection getCalibrationDirection() {
-        return calibrationDirection;
     }
 
     public void setCalibrationDirection(CalibrationDirection calibrationDirection) {
@@ -602,11 +586,7 @@ public class Scene {
             retargetNeighborhoodInspection();
     }
 
-    public boolean isNeighborhoodInspectionActive() { return neighborhoodInspectionActive; }
-
     public boolean isNeighborhoodInspectionTransitionActive() { return inspectionTransitionActive; }
-
-    public PassiveObserver getInspectedProbe() { return inspectedProbe; }
 
 
     /** Enters a renderer-only inspection session for the currently selected passive probe. */
@@ -634,18 +614,6 @@ public class Scene {
         neighborhoodInspectionActive = false;
         beginCameraTransition(false, savedInspectionNavigation.camera(),
                               savedInspectionNavigation.camera().orbitTarget());
-    }
-
-    /** The immutable camera framing computed when an inspection entry is retargeted. */
-    public record InspectionFraming(Vector3d target, double radius, double cameraDistance) {
-        public InspectionFraming {
-            target = new Vector3d(target);
-        }
-
-        @Override
-        public Vector3d target() {
-            return new Vector3d(target);
-        }
     }
 
     public double getCameraDistance(ProbeDetectorType probeDetectorType) {
@@ -874,10 +842,6 @@ public class Scene {
     public void clearComparison() {
         comparison.clear();
         applyComparisonSlots();
-    }
-
-    public ProbeComparison getComparison() {
-        return comparison;
     }
 
     private void applyComparisonSlots() {
