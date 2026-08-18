@@ -352,4 +352,8 @@ public class Entity {
         return transformMatrix4fList[1 - swapBufIndex];
     }
 
+    public Vector3d toWorldPosition() {
+        return getTransformMatrix().transformPosition(new Vector3d());
+    }
+
 }

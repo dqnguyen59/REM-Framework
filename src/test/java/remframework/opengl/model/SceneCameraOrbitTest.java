@@ -161,10 +161,10 @@ class SceneCameraOrbitTest {
         Probe probe = new Probe(new ProbeDefinition("framing-probe", source.getIndex(),
                 new Vector4f(1, 0.5f, 0, 1)), source, marker);
 
-        double compactDistance = scene.calculateInspectionFraming(probe).cameraDistance();
+        double compactDistance = scene.getCameraDistance(probe.getDetectorType());
         neighbor.setPosition(new Vector3d(100, 0, 0));
         neighbor.updateMatrix();
-        double expandedDistance = scene.calculateInspectionFraming(probe).cameraDistance();
+        double expandedDistance = scene.getCameraDistance(probe.getDetectorType());
 
         assertTrue(expandedDistance > compactDistance);
     }
