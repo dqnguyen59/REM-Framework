@@ -91,6 +91,8 @@ public class Entity {
     protected boolean visible           = true;
     /** Renderer-only filter used by the paused/live neighborhood inspector. */
     protected boolean inspectionVisible = false;
+    /** Temporary renderer color used only while neighborhood inspection is active. */
+    protected Vector4f inspectionColor;
     protected boolean isSelected  = false;
     protected boolean isHiLighted = false;
 
@@ -140,7 +142,10 @@ public class Entity {
         float    intensity3     = intensity2 * intensity * absorptionFactor;
         float    alphaIntensity = settings.getAlpha();
 
-        if (customColor != null) {
+        if (inspectionColor != null) {
+            color.set(inspectionColor).mul(2.0f);
+            alpha = 1.0f;
+        } else if (customColor != null) {
             color.set(customColor).mul(2.0f);
             alpha = 1.0f;
         } else if (isSelected && !(type == EntityType.ANIMATED)) {

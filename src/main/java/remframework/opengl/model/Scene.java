@@ -35,9 +35,11 @@ import remframework.settings.SlitWallSettings;
 
 import java.lang.Math;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -75,7 +77,10 @@ public class Scene {
 
     private boolean inspectionMode;
     private PassiveObserver inspectedProbe;
+    private int inspectedSourceIndex = 0;
     private Entity inspectionProbeMarker;
+    private final Set<Node> inspectionTemporaryNodes =
+            Collections.newSetFromMap(new IdentityHashMap<>());
     private InspectionNavigationSnapshot savedInspectionNavigation;
     private double inspectionCameraDistance;
     private Vector3d inspectionFrameTarget = new Vector3d();
@@ -100,6 +105,13 @@ public class Scene {
     private float transitionStartFar;
     private float transitionEndFar;
     private static final double INSPECTION_TRANSITION_SECONDS = 0.8;
+
+    private static final Vector4f INSPECTION_SELECTED_SOURCE_COLOR =
+            new Vector4f(1.0f, 0.65f, 0.05f, 1.0f);
+    private static final Vector4f INSPECTION_SOURCE_COLOR =
+            new Vector4f(1.0f, 0.9f, 0.2f, 1.0f);
+    private static final Vector4f INSPECTION_NEIGHBOR_COLOR =
+            new Vector4f(0.1f, 0.7f, 1.0f, 1.0f);
 
     private record CameraState(Vector3f position, Vector3f rotation, float fov, float near, float far,
                                Vector3d orbitTarget, double orbitDistance) {
@@ -335,6 +347,7 @@ public class Scene {
 
     /** Removes transient preview markers without changing committed probes or project data. */
     public void clearPreviewProbes() {
+        clearInspectionState();
         if (neighborhoodInspectionActive) exitNeighborhoodInspection();
         previewProbes.clear();
         replacementProbePreviewActive = false;
@@ -501,6 +514,7 @@ public class Scene {
 
     /** Atomically replaces generated probe markers while preserving manually created receivers. */
     public boolean replaceGeneratedProbeDefinitions(List<ProbeDefinition> definitions) {
+        clearInspectionState();
         if (neighborhoodInspectionActive) exitNeighborhoodInspection();
         hideGradientArrows();
         List<PassiveObserver> replacements = new ArrayList<>();
@@ -526,6 +540,7 @@ public class Scene {
 
     /** Clears committed and transient probe interaction state before rebuilding the lattice. */
     public void clearProbeInteractionState() {
+        clearInspectionState();
         if (selectedProbe != null) selectedProbe.setSelected(false);
         if (hoveredProbe != null) hoveredProbe.setHovered(false);
         selectedProbe = null;
@@ -535,6 +550,7 @@ public class Scene {
 
     /** Removes all probe markers and restores the ordinary lattice render state. */
     public void clearProbes() {
+        clearInspectionState();
         if (neighborhoodInspectionActive) exitNeighborhoodInspection();
         clearCalibrationArrow();
         hideGradientArrows();
@@ -559,29 +575,96 @@ public class Scene {
             selectedProbe.setSelected(true);
             selectedProbe.updateMarker();
         }
-        if ((neighborhoodInspectionActive || inspectionTransitionActive) && probeChanged)
+        if ((neighborhoodInspectionActive || inspectionTransitionActive) && probeChanged) {
+            inspectedProbe = selectedProbe;
+            inspectedSourceIndex = 0;
             retargetNeighborhoodInspection();
+        }
     }
 
     public boolean isNeighborhoodInspectionTransitionActive() { return inspectionTransitionActive; }
 
-    public void setNeighborNodesInspectionVisibility(Node node, boolean isVisible) {
+    /** Clears only the nodes and colors temporarily touched by neighborhood inspection. */
+    public void clearInspectionState() {
+        for (Node node : inspectionTemporaryNodes) {
+            node.setInspectionVisible(false);
+            node.setInspectionColor(null);
+            node.updateMatrix();
+        }
+        inspectionTemporaryNodes.clear();
+    }
+
+    private void markInspectionNode(Node node, Vector4f color) {
+        if (node == null) return;
+        node.setInspectionVisible(true);
+        node.setInspectionColor(color);
+        inspectionTemporaryNodes.add(node);
+    }
+
+    private void markInspectionNeighbors(Node node) {
+        if (node == null) return;
         for (Node neighbor : node.getNeighbors()) {
-            if (neighbor != null) neighbor.setInspectionVisible(isVisible);
+            if (neighbor != null) markInspectionNode(neighbor, INSPECTION_NEIGHBOR_COLOR);
         }
     }
 
+    /** Applies temporary visibility and color state without changing ordinary node visibility. */
     public void setInspectionProbeAndNeighborsVisible(PassiveObserver inspectedProbe, boolean isVisible) {
+        clearInspectionState();
+        if (!isVisible || inspectedProbe == null) return;
+
         if (inspectedProbe instanceof Probe probe) {
-            probe.getNode().setInspectionVisible(isVisible);
-            setNeighborNodesInspectionVisibility(probe.getNode(), isVisible);
+            markInspectionNode(probe.getNode(), INSPECTION_SELECTED_SOURCE_COLOR);
+            markInspectionNeighbors(probe.getNode());
+            return;
         }
-        else if (inspectedProbe instanceof InterpolatedProbe probe) {
-            for (Node node: probe.getSourceNodes()) {
-                node.setInspectionVisible(isVisible);
-                setNeighborNodesInspectionVisibility(node, isVisible);
+        if (inspectedProbe instanceof InterpolatedProbe probe) {
+            List<Node> sources = probe.getSourceNodes();
+            int selected = Math.clamp(inspectedSourceIndex, 0, sources.size() - 1);
+            for (int index = 0; index < sources.size(); index++) {
+                markInspectionNode(sources.get(index),
+                                   index == selected
+                                           ? INSPECTION_SELECTED_SOURCE_COLOR
+                                           : INSPECTION_SOURCE_COLOR);
+            }
+            // Source colors are applied after neighbors so source priority is preserved.
+            markInspectionNeighbors(sources.get(selected));
+            for (int index = 0; index < sources.size(); index++) {
+                if (index == selected) sources.get(index).setInspectionColor(INSPECTION_SELECTED_SOURCE_COLOR);
+                else sources.get(index).setInspectionColor(INSPECTION_SOURCE_COLOR);
             }
         }
+    }
+
+    public List<Node> getInspectionSourceNodes() {
+        return inspectedProbe instanceof InterpolatedProbe probe
+                ? probe.getSourceNodes() : List.of();
+    }
+
+    public int getInspectedSourceIndex() {
+        return inspectedSourceIndex;
+    }
+
+    /** Selects an interpolation source and retargets the active inspection camera to it. */
+    public boolean selectInspectionSource(int sourceIndex) {
+        if (!(selectedProbe instanceof InterpolatedProbe probe)
+                || sourceIndex < 0 || sourceIndex >= probe.getSourceNodes().size()) return false;
+        if (inspectedSourceIndex == sourceIndex && inspectedProbe == selectedProbe) return true;
+        inspectedSourceIndex = sourceIndex;
+        if (inspectionMode || (inspectionTransitionActive && inspectionTransitionEntering)) {
+            inspectedProbe = selectedProbe;
+            retargetNeighborhoodInspection();
+        }
+        return true;
+    }
+
+    public Node getInspectionFocusNode() {
+        if (inspectedProbe instanceof InterpolatedProbe probe) {
+            List<Node> sources = probe.getSourceNodes();
+            if (!sources.isEmpty()) return sources.get(
+                    Math.clamp(inspectedSourceIndex, 0, sources.size() - 1));
+        }
+        return null;
     }
 
     /** Enters a renderer-only inspection session for the currently selected passive probe. */
@@ -593,6 +676,7 @@ public class Scene {
             savedInspectionNavigation = InspectionNavigationSnapshot.capture(this);
             project.camera.setOrbitTarget(resolveNormalCameraTarget());
         }
+        if (inspectedProbe != selectedProbe) inspectedSourceIndex = 0;
         inspectedProbe = selectedProbe;
 
         retargetNeighborhoodInspection();
@@ -633,16 +717,23 @@ public class Scene {
         if (inspectedProbe == null) inspectedProbe = selectedProbe;
         inspectionProbeMarker = inspectedProbe.getMarker();
         if (inspectionProbeMarker == null) return;
-        inspectionFrameTarget.set(inspectionProbeMarker.toWorldPosition());
+        Node focusNode = getInspectionFocusNode();
+        inspectionFrameTarget.set(focusNode == null
+                                          ? inspectionProbeMarker.toWorldPosition()
+                                          : focusNode.toWorldPosition());
         inspectionFrameDistance = getCameraDistance(inspectedProbe.getDetectorType());
-        previousInspectionMarkerPosition.set(inspectionProbeMarker.toWorldPosition());
+        previousInspectionMarkerPosition.set(inspectionFrameTarget);
+        if (inspectionMode || (inspectionTransitionActive && inspectionTransitionEntering))
+            setInspectionProbeAndNeighborsVisible(inspectedProbe, true);
         beginCameraTransition(true, null, null);
     }
 
     /** Keeps the orbit target attached to the existing live probe marker. */
     public void updateInspectionCameraTarget() {
         if (!neighborhoodInspectionActive || inspectionProbeMarker == null) return;
-        Vector3d liveMarkerPosition = inspectionProbeMarker.toWorldPosition();
+        Node focusNode = getInspectionFocusNode();
+        Vector3d liveMarkerPosition = focusNode == null
+                ? inspectionProbeMarker.toWorldPosition() : focusNode.toWorldPosition();
         Vector3d delta = new Vector3d(liveMarkerPosition).sub(previousInspectionMarkerPosition);
         if (delta.lengthSquared() != 0.0) {
             inspectionFrameTarget.add(delta);
@@ -737,7 +828,8 @@ public class Scene {
                 snapshot.camera().restore(project.camera);
             }
         }
-        setInspectionProbeAndNeighborsVisible(selectedProbe, inspectionMode);
+        setInspectionProbeAndNeighborsVisible(inspectedProbe == null ? selectedProbe : inspectedProbe,
+                                              inspectionMode);
     }
 
     private static double smoothstep(double value) {

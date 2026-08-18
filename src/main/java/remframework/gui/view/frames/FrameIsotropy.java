@@ -17,6 +17,7 @@ import remframework.opengl.model.ProbeComparison;
 import remframework.opengl.model.Scene;
 import remframework.opengl.model.entity.Occupancy;
 import remframework.opengl.model.entity.Node;
+import remframework.opengl.helpers.Neighbor;
 import remframework.settings.Project;
 
 import java.util.Locale;
@@ -167,6 +168,9 @@ public final class FrameIsotropy extends AbstractFrame {
                     }
                 }
             }
+            if (probe instanceof InterpolatedProbe interpolatedProbe) {
+                interpolationSourcesSection(ctx, interpolatedProbe);
+            }
             PassiveObserver.Observation observation = probe.getObservation();
             if (probe instanceof Probe rawProbe) {
                 Node node = rawProbe.getNode();
@@ -177,13 +181,14 @@ public final class FrameIsotropy extends AbstractFrame {
                 scalar(ctx, "Gradient strength |g|", format(probe.getStableGradientImbalance().length()));
                 vector(ctx, "Acceleration", node.getAcceleration());
                 vector(ctx, "Node Velocity", node.getVelocity());
-            } else {
+            } else if (probe instanceof InterpolatedProbe interpolatedProbe) {
                 scalar(ctx, "Measurement", "Interpolated estimate — not a node measurement");
                 vector(ctx, "Interpolated live position", observation.position());
                 vector(ctx, "Weighted stable gradient imbalance", probe.getStableGradientImbalance());
                 scalar(ctx, "Gradient strength |g|", format(probe.getStableGradientImbalance().length()));
                 vector(ctx, "Interpolated acceleration", observation.acceleration());
                 vector(ctx, "Interpolated velocity", observation.velocity());
+                interpolationSourceDetails(ctx, interpolatedProbe);
             }
             inspectorSection(ctx, probe);
             for (int index = 0; index < probe.getOccupancies().size(); index++) {
@@ -277,6 +282,74 @@ public final class FrameIsotropy extends AbstractFrame {
         } else {
             scalar(ctx, "Status", "Select a probe, then inspect (live or paused)");
         }
+    }
+
+    private void interpolationSourcesSection(NkContext ctx, InterpolatedProbe probe) {
+        section(ctx, "Interpolation Sources");
+        int selectedIndex = project.scene.getInspectedSourceIndex();
+        for (int index = 0; index < probe.getSourceNodes().size(); index++) {
+            Node source = probe.getSourceNodes().get(index);
+            ProbeDefinition.InterpolationSource definitionSource = probe.getDefinition()
+                    .getInterpolationSources().get(index);
+            Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightFor(ctx), 3);
+            Nuklear.nk_layout_row_push(ctx, 0.26f);
+            if (Nuklear.nk_button_label(ctx,
+                    (index == selectedIndex ? "▶ " : "") + "Source " + (index + 1))) {
+                project.scene.selectInspectionSource(index);
+            }
+            Nuklear.nk_layout_row_push(ctx, 0.49f);
+            Nuklear.nk_label(ctx, formatCoordinate(source.getIndex()), Nuklear.NK_TEXT_LEFT);
+            Nuklear.nk_layout_row_push(ctx, 0.25f);
+            Nuklear.nk_label(ctx, "weight " + format(definitionSource.weight()), Nuklear.NK_TEXT_RIGHT);
+            Nuklear.nk_layout_row_end(ctx);
+        }
+    }
+
+    private void interpolationSourceDetails(NkContext ctx, InterpolatedProbe probe) {
+        int selectedIndex = Math.clamp(project.scene.getInspectedSourceIndex(),
+                                       0, probe.getSourceNodes().size() - 1);
+        Node source = probe.getSourceNodes().get(selectedIndex);
+        ProbeDefinition.InterpolationSource definitionSource = probe.getDefinition()
+                .getInterpolationSources().get(selectedIndex);
+        section(ctx, "Selected interpolation source");
+        scalar(ctx, "Source", "Source " + (selectedIndex + 1));
+        vector(ctx, "Source coordinate", source.getIndex());
+        scalar(ctx, "Interpolation weight", format(definitionSource.weight()));
+        vector(ctx, "Source position", source.getPosition());
+        vector(ctx, "Source velocity", source.getVelocity());
+        vector(ctx, "Source acceleration", source.getAcceleration());
+        vector(ctx, "Source stable gradient", probe.getOccupancies().get(selectedIndex)
+                .getGradientImbalance());
+
+        section(ctx, "Direct neighbors of selected source");
+        for (Neighbor direction : Neighbor.values()) {
+            Node neighbor = source.getNeighbor(direction);
+            if (neighbor == null) {
+                scalar(ctx, directionLabel(direction), "Unavailable");
+                continue;
+            }
+            vector(ctx, directionLabel(direction) + " coordinate", neighbor.getIndex());
+            vector(ctx, directionLabel(direction) + " position", neighbor.getPosition());
+            vector(ctx, directionLabel(direction) + " velocity", neighbor.getVelocity());
+            vector(ctx, directionLabel(direction) + " acceleration", neighbor.getAcceleration());
+            vector(ctx, directionLabel(direction) + " stable gradient",
+                   neighbor.getGradientImbalance());
+        }
+    }
+
+    private static String formatCoordinate(org.joml.Vector3i coordinate) {
+        return "(" + coordinate.x + ", " + coordinate.y + ", " + coordinate.z + ")";
+    }
+
+    private static String directionLabel(Neighbor direction) {
+        return switch (direction) {
+            case RIGHT -> "+X";
+            case TOP -> "+Y";
+            case FRONT -> "+Z";
+            case LEFT -> "−X";
+            case BOTTOM -> "−Y";
+            case BACK -> "−Z";
+        };
     }
 
     static String sourceSamplesLabel(int index) {
