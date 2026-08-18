@@ -150,7 +150,7 @@ class SceneCameraOrbitTest {
     }
 
     @Test
-    void inspectionFramingDistanceGrowsWithNeighborhoodExtent() {
+    void inspectionFramingDistanceRemainsFixedForNeighborhoodExtent() {
         Node source = new Node(null, null, new Vector3d(0, 0, 0), new Vector3d(), 1.0);
         source.setIndex(new Vector3i(4, 4, 4));
         Node neighbor = new Node(null, null, new Vector3d(1, 0, 0), new Vector3d(), 1.0);
@@ -166,7 +166,7 @@ class SceneCameraOrbitTest {
         neighbor.updateMatrix();
         double expandedDistance = scene.getCameraDistance(probe.getDetectorType());
 
-        assertTrue(expandedDistance > compactDistance);
+        assertEquals(compactDistance, expandedDistance);
     }
 
     @Test
