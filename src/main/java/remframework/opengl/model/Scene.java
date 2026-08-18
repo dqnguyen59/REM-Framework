@@ -811,10 +811,6 @@ public class Scene {
         return base == null ? new Vector3d() : base.toWorldPosition();
     }
 
-//    private static Vector3d worldPosition(Entity entity) {
-//        return entity.getTransformMatrix().transformPosition(new Vector3d());
-//    }
-
     /** Changes hover state only; probe observations and their source nodes remain untouched. */
     public void setHoveredProbe(PassiveObserver probe) {
         if (hoveredProbe == probe) return;
