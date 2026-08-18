@@ -144,7 +144,7 @@ public class Entity {
 
         if (inspectionColor != null) {
             color.set(inspectionColor).mul(2.0f);
-            alpha = 1.0f;
+            alpha = Math.max(0.0f, Math.min(1.0f, inspectionColor.w));
         } else if (customColor != null) {
             color.set(customColor).mul(2.0f);
             alpha = 1.0f;

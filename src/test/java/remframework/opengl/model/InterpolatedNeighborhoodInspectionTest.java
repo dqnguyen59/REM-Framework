@@ -48,7 +48,7 @@ class InterpolatedNeighborhoodInspectionTest {
     }
 
     @Test
-    void selectingSourceChangesFocusAndDirectNeighborSet() {
+    void selectingSourceChangesFocusAndKeepsAllSourceNeighborsVisible() {
         InterpolatedProbe probe = createProbe(ProbeDetectorType.INTERPOLATED_2D, 4);
         Node first = probe.getSourceNodes().get(0);
         Node second = probe.getSourceNodes().get(1);
@@ -62,17 +62,20 @@ class InterpolatedNeighborhoodInspectionTest {
 
         assertEquals(0, scene.getInspectedSourceIndex());
         assertTrue(firstNeighbor.isInspectionVisible());
-        assertFalse(secondNeighbor.isInspectionVisible());
+        assertTrue(secondNeighbor.isInspectionVisible());
 
         assertTrue(scene.selectInspectionSource(1));
         scene.updateCameraTransition(1.0);
 
         assertEquals(1, scene.getInspectedSourceIndex());
         assertEquals(second.toWorldPosition(), scene.getActiveCameraTarget());
-        assertFalse(firstNeighbor.isInspectionVisible());
+        assertTrue(firstNeighbor.isInspectionVisible());
         assertTrue(secondNeighbor.isInspectionVisible());
+        assertEquals(0.45f, secondNeighbor.getInspectionColor().w, 1.0e-6f);
         assertTrue(first.isInspectionVisible());
         assertTrue(second.isInspectionVisible());
+        assertEquals(new Vector4f(0.0f, 1.0f, 0.0f, 1.0f),
+                     second.getInspectionColor());
     }
 
     @Test
@@ -87,10 +90,53 @@ class InterpolatedNeighborhoodInspectionTest {
         scene.enterNeighborhoodInspection();
         scene.updateCameraTransition(1.0);
 
-        assertNotEquals(first.getInspectionColor(), second.getInspectionColor());
-        assertEquals(second.getInspectionColor(), probe.getSourceNodes().get(2).getInspectionColor());
+        assertEquals(new Vector4f(0.0f, 1.0f, 0.0f, 1.0f), first.getInspectionColor());
+        assertEquals(probe.getSourceNodes().get(2).getInspectionColor(), second.getInspectionColor());
         assertNotEquals(ordinaryNeighbor.getInspectionColor(), second.getInspectionColor());
         assertTrue(second.isInspectionVisible());
+        assertEquals(new Vector4f(0.5f, 0.5f, 0.5f, 0.45f), ordinaryNeighbor.getInspectionColor());
+    }
+
+    @Test
+    void inspectionUsesDeduplicatedUnionOfAllSourceNeighbors() {
+        InterpolatedProbe probe = createProbe(ProbeDetectorType.INTERPOLATED_2D, 4);
+        Node sharedNeighbor = newNode(10, 0, 0);
+        Node uniqueNeighbor = newNode(11, 0, 0);
+        probe.getSourceNodes().get(0).setNeighbor(Neighbor.RIGHT, sharedNeighbor);
+        probe.getSourceNodes().get(1).setNeighbor(Neighbor.RIGHT, sharedNeighbor);
+        probe.getSourceNodes().get(2).setNeighbor(Neighbor.RIGHT, uniqueNeighbor);
+        scene.selectProbe(probe);
+        scene.enterNeighborhoodInspection();
+        scene.updateCameraTransition(1.0);
+
+        for (Node source : probe.getSourceNodes()) assertTrue(source.isInspectionVisible());
+        assertTrue(sharedNeighbor.isInspectionVisible());
+        assertTrue(uniqueNeighbor.isInspectionVisible());
+        assertEquals(6, scene.getInspectionTemporaryNodeCount());
+        assertEquals(sharedNeighbor.getInspectionColor(), uniqueNeighbor.getInspectionColor());
+    }
+
+    @Test
+    void nonSelectedSourcesAndProbeUseConfiguredAlphaAndProbeCanBeHidden() {
+        InterpolatedProbe probe = createProbe(ProbeDetectorType.INTERPOLATED_2D, 4);
+        Node neighbor = newNode(9, 0, 0);
+        probe.getSourceNodes().get(2).setNeighbor(Neighbor.RIGHT, neighbor);
+        scene.selectProbe(probe);
+        scene.enterNeighborhoodInspection();
+        scene.updateCameraTransition(1.0);
+
+        scene.setInspectionSourceAlpha(0.25);
+        assertEquals(0.25f, probe.getSourceNodes().get(1).getInspectionColor().w, 1.0e-6f);
+        assertEquals(0.25f, neighbor.getInspectionColor().w, 1.0e-6f);
+        assertEquals(0.25f, probe.getMarker().getInspectionColor().w, 1.0e-6f);
+        assertTrue(probe.getMarker().isInspectionVisible());
+        assertEquals(1.0f, probe.getSourceNodes().get(0).getInspectionColor().w, 1.0e-6f);
+
+        scene.setShowInspectionProbe(false);
+        assertFalse(probe.getMarker().isInspectionVisible());
+        assertTrue(probe.getSourceNodes().get(0).isInspectionVisible());
+        scene.setShowInspectionProbe(true);
+        assertTrue(probe.getMarker().isInspectionVisible());
     }
 
     @Test
@@ -110,6 +156,8 @@ class InterpolatedNeighborhoodInspectionTest {
         assertFalse(source.isVisible());
         assertNull(source.getInspectionColor());
         assertNull(probe.getSourceNodes().get(1).getInspectionColor());
+        assertFalse(probe.getMarker().isInspectionVisible());
+        assertNull(probe.getMarker().getInspectionColor());
     }
 
     private InterpolatedProbe createProbe(ProbeDetectorType detectorType, int sourceCount) {

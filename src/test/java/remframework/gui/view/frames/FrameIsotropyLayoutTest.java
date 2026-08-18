@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import remframework.gui.model.NuklearModel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FrameIsotropyLayoutTest {
 
@@ -29,5 +30,21 @@ class FrameIsotropyLayoutTest {
                 model.createInstance(NuklearModel.Frame.occupancyHistory).getTitle());
         assertEquals(true,
                 model.createInstance(NuklearModel.Frame.occupancyHistory).isResizeCapabilityEnabled());
+    }
+
+    @Test
+    void inspectorScrollAndPositionMetricsKeepBottomRowsReachable() {
+        int visibleHeight = 420;
+        int contentHeight = FrameIsotropy.inspectorContentHeight(40);
+        int scrollMaximum = FrameIsotropy.inspectorScrollMaximum(contentHeight, visibleHeight);
+
+        assertTrue(contentHeight > visibleHeight);
+        assertEquals(contentHeight, visibleHeight + scrollMaximum);
+        assertTrue(FrameIsotropy.inspectorRowHeight() >= 22);
+
+        int[] position = FrameIsotropy.clampInspectorPosition(
+                900, 700, 720, 720, 1280, 900, 31);
+        assertEquals(560, position[0]);
+        assertEquals(180, position[1]);
     }
 }

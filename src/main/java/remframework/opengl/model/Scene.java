@@ -78,6 +78,8 @@ public class Scene {
     private boolean inspectionMode;
     private PassiveObserver inspectedProbe;
     private int inspectedSourceIndex = 0;
+    private double inspectionSourceAlpha = 0.45;
+    private boolean showInspectionProbe = true;
     private Entity inspectionProbeMarker;
     private final Set<Node> inspectionTemporaryNodes =
             Collections.newSetFromMap(new IdentityHashMap<>());
@@ -107,11 +109,11 @@ public class Scene {
     private static final double INSPECTION_TRANSITION_SECONDS = 0.8;
 
     private static final Vector4f INSPECTION_SELECTED_SOURCE_COLOR =
-            new Vector4f(1.0f, 0.65f, 0.05f, 1.0f);
+            new Vector4f(0.0f, 1.0f, 0.0f, 1.0f);
     private static final Vector4f INSPECTION_SOURCE_COLOR =
-            new Vector4f(1.0f, 0.9f, 0.2f, 1.0f);
+            new Vector4f(1.0f, 0.5f, 0.0f, 1.0f);
     private static final Vector4f INSPECTION_NEIGHBOR_COLOR =
-            new Vector4f(0.1f, 0.7f, 1.0f, 1.0f);
+            new Vector4f(0.5f, 0.5f, 0.5f, 1.0f);
 
     private record CameraState(Vector3f position, Vector3f rotation, float fov, float near, float far,
                                Vector3d orbitTarget, double orbitDistance) {
@@ -592,6 +594,11 @@ public class Scene {
             node.updateMatrix();
         }
         inspectionTemporaryNodes.clear();
+        if (inspectionProbeMarker != null) {
+            inspectionProbeMarker.setInspectionVisible(false);
+            inspectionProbeMarker.setInspectionColor(null);
+            inspectionProbeMarker.updateMatrix();
+        }
     }
 
     private void markInspectionNode(Node node, Vector4f color) {
@@ -599,6 +606,58 @@ public class Scene {
         node.setInspectionVisible(true);
         node.setInspectionColor(color);
         inspectionTemporaryNodes.add(node);
+    }
+
+    private static Vector4f withAlpha(Vector4f color, double alpha) {
+        return new Vector4f(color.x, color.y, color.z, (float) alpha);
+    }
+
+    private Vector4f inspectionMarkerColor(PassiveObserver probe) {
+        Vector4f color;
+        int comparisonSlot;
+        boolean selected;
+        Vector4f displayColor;
+        if (probe instanceof Probe rawProbe) {
+            comparisonSlot = rawProbe.getComparisonSlot();
+            selected = rawProbe.isSelected();
+            displayColor = rawProbe.getDisplayColor();
+        } else if (probe instanceof InterpolatedProbe interpolatedProbe) {
+            comparisonSlot = interpolatedProbe.getComparisonSlot();
+            selected = interpolatedProbe.isSelected();
+            displayColor = interpolatedProbe.getDisplayColor();
+        } else {
+            comparisonSlot = -1;
+            selected = false;
+            displayColor = new Vector4f(1.0f);
+        }
+        if (comparisonSlot == 0) color = new Vector4f(0.0f, 1.0f, 0.0f, 1.0f);
+        else if (comparisonSlot == 1) color = new Vector4f(1.0f, 0.0f, 1.0f, 1.0f);
+        else if (selected) color = new Vector4f(1.0f, 0.35f, 0.0f, 1.0f);
+        else color = new Vector4f(displayColor);
+        color.w = (float) inspectionSourceAlpha;
+        return color;
+    }
+
+    private void refreshInspectionVisuals() {
+        if (inspectionMode || (inspectionTransitionActive && inspectionTransitionEntering))
+            setInspectionProbeAndNeighborsVisible(inspectedProbe, true);
+    }
+
+    public double getInspectionSourceAlpha() { return inspectionSourceAlpha; }
+
+    public void setInspectionSourceAlpha(double alpha) {
+        double clamped = Math.max(0.0, Math.min(1.0, alpha));
+        if (Double.compare(inspectionSourceAlpha, clamped) == 0) return;
+        inspectionSourceAlpha = clamped;
+        refreshInspectionVisuals();
+    }
+
+    public boolean isShowInspectionProbe() { return showInspectionProbe; }
+
+    public void setShowInspectionProbe(boolean show) {
+        if (showInspectionProbe == show) return;
+        showInspectionProbe = show;
+        refreshInspectionVisuals();
     }
 
     private void markInspectionNeighbors(Node node) {
@@ -616,23 +675,37 @@ public class Scene {
         if (inspectedProbe instanceof Probe probe) {
             markInspectionNode(probe.getNode(), INSPECTION_SELECTED_SOURCE_COLOR);
             markInspectionNeighbors(probe.getNode());
-            return;
-        }
-        if (inspectedProbe instanceof InterpolatedProbe probe) {
+        } else if (inspectedProbe instanceof InterpolatedProbe probe) {
             List<Node> sources = probe.getSourceNodes();
             int selected = Math.clamp(inspectedSourceIndex, 0, sources.size() - 1);
+            Set<Node> sourceSet = Collections.newSetFromMap(new IdentityHashMap<>());
+            Set<Node> neighborUnion = Collections.newSetFromMap(new IdentityHashMap<>());
             for (int index = 0; index < sources.size(); index++) {
-                markInspectionNode(sources.get(index),
+                Node source = sources.get(index);
+                sourceSet.add(source);
+                markInspectionNode(source,
                                    index == selected
                                            ? INSPECTION_SELECTED_SOURCE_COLOR
-                                           : INSPECTION_SOURCE_COLOR);
+                                           : withAlpha(INSPECTION_SOURCE_COLOR, inspectionSourceAlpha));
+                for (Node neighbor : source.getNeighbors()) {
+                    if (neighbor != null) neighborUnion.add(neighbor);
+                }
             }
-            // Source colors are applied after neighbors so source priority is preserved.
-            markInspectionNeighbors(sources.get(selected));
-            for (int index = 0; index < sources.size(); index++) {
-                if (index == selected) sources.get(index).setInspectionColor(INSPECTION_SELECTED_SOURCE_COLOR);
-                else sources.get(index).setInspectionColor(INSPECTION_SOURCE_COLOR);
+            // Sources retain priority over neighbor coloring.
+            for (Node neighbor : neighborUnion) {
+                if (!sourceSet.contains(neighbor)) {
+                    markInspectionNode(neighbor,
+                            withAlpha(INSPECTION_NEIGHBOR_COLOR, inspectionSourceAlpha));
+                } else {
+                    neighbor.setInspectionVisible(true);
+                }
             }
+        }
+        if (inspectionProbeMarker != null) {
+            inspectionProbeMarker.setInspectionVisible(showInspectionProbe);
+            inspectionProbeMarker.setInspectionColor(showInspectionProbe
+                    ? inspectionMarkerColor(inspectedProbe) : null);
+            inspectionProbeMarker.updateMatrix();
         }
     }
 
@@ -643,6 +716,10 @@ public class Scene {
 
     public int getInspectedSourceIndex() {
         return inspectedSourceIndex;
+    }
+
+    int getInspectionTemporaryNodeCount() {
+        return inspectionTemporaryNodes.size();
     }
 
     /** Selects an interpolation source and retargets the active inspection camera to it. */
@@ -817,7 +894,9 @@ public class Scene {
             inspectionMode = true;
             neighborhoodInspectionActive = true;
             project.camera.lookAtOrbitTarget();
+            setInspectionProbeAndNeighborsVisible(inspectedProbe, true);
         } else {
+            clearInspectionState();
             inspectionMode = false;
             neighborhoodInspectionActive = false;
             inspectionProbeMarker = null;
@@ -828,8 +907,6 @@ public class Scene {
                 snapshot.camera().restore(project.camera);
             }
         }
-        setInspectionProbeAndNeighborsVisible(inspectedProbe == null ? selectedProbe : inspectedProbe,
-                                              inspectionMode);
     }
 
     private static double smoothstep(double value) {
