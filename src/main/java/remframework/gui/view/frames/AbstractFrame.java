@@ -329,6 +329,12 @@ public abstract class AbstractFrame implements IFrame {
 		return resizeCapability.enabled();
 	}
 
+	/** Returns whether the current cursor position is inside this rendered frame. */
+	public final boolean containsPoint(double cursorX, double cursorY) {
+		return cursorX >= frameRect.x() && cursorX <= frameRect.x() + frameRect.w()
+				&& cursorY >= frameRect.y() && cursorY <= frameRect.y() + frameRect.h();
+	}
+
 	public final boolean isCustomResizeCaptured() {
 		return customResizeCaptured;
 	}

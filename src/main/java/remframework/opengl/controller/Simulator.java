@@ -442,6 +442,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     @Override
     public boolean mouseScrollCallback(long handle, double xOffset, double yOffset) {
+        if (nuklearModel.isMouseOverAnyFrame()) return false;
         if (discoveryWorkspace.state().active()) {
             discoveryViewport.scroll(-yOffset);
             return false;

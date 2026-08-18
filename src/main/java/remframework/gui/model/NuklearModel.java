@@ -126,6 +126,14 @@ public class NuklearModel {
 	public boolean isAnyFrameFocused() {
 		return focusedFrame != null;
 	}
+
+	/** Returns whether the cursor is over any currently visible rendered frame. */
+	public boolean isMouseOverAnyFrame() {
+		for (AbstractFrame frame : visibleFrames) {
+			if (frame.containsPoint(mouseX, mouseY)) return true;
+		}
+		return false;
+	}
 	
 	public void unfocusAllFrames() {
 		focusedFrame = null;
