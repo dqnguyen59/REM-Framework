@@ -23,6 +23,10 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL31;
+import org.lwjgl.opengl.GL33;
+import org.lwjgl.system.MemoryUtil;
 import remframework.helpers.Constants;
 import remframework.opengl.model.Camera;
 import remframework.opengl.model.ObjFileModel;
@@ -31,11 +35,13 @@ import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.lights.DirectionalLight;
 import remframework.opengl.model.lights.Light;
 import remframework.settings.Project;
+import remframework.settings.Settings;
 import remframework.helpers.Utils;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.nio.FloatBuffer;
 
 public class EntityRenderer implements IRenderer {
 
@@ -48,6 +54,33 @@ public class EntityRenderer implements IRenderer {
 	private int numLights = Constants.INITIAL_NUM_LIGHTS;
 	private String vertexShader;
 	private String fragmentShader;
+	private final Map<ObjFileModel, Integer> instanceBuffers = new HashMap<>();
+	private final Map<ObjFileModel, List<Entity>> visibleEntityCache = new HashMap<>();
+	private boolean visibleEntityCacheDirty = true;
+	private boolean cachedInspectionMode;
+	private long cachedInspectionVisibilityVersion = Long.MIN_VALUE;
+	private static final int INSTANCE_FLOATS = 29;
+	private static final int INSTANCE_STRIDE_BYTES = INSTANCE_FLOATS * Float.BYTES;
+	private static final int INSTANCE_THRESHOLD = 32;
+	private long instanceRenderWindowStartedNanos;
+	private long instanceRenderWindowNanos;
+	private long instanceRenderWindowCalls;
+	private long instanceRenderWindowInstances;
+	private long instanceRenderLastNanos;
+	private long instanceBufferUploadWindowNanos;
+	private long instanceBufferUploadWindowCalls;
+	private long instanceBufferUploadLastNanos;
+	private long instanceBufferUploadMaxNanos;
+	private long instancePreparationWindowNanos;
+	private long instancePreparationLastNanos;
+	private long instancePreparationMaxNanos;
+	private long instanceDrawWindowNanos;
+	private long instanceDrawLastNanos;
+	private long instanceDrawMaxNanos;
+	private long renderWindowStartedNanos;
+	private long renderWindowNanos;
+	private long renderWindowCalls;
+	private long renderLastNanos;
 	
 	public EntityRenderer() throws Exception {
 		entities = new HashMap<>();
@@ -76,6 +109,7 @@ public class EntityRenderer implements IRenderer {
 			shader.createUniform("specularPower");
 			shader.createUniform("depthVisibility");
 			shader.createUniform("ignoreLightIndex");
+			shader.createUniform("useInstanceMaterial");
 			shader.createDirectionalLightUniform("directionalLight");
 			shader.createLightListUniform("lights", numLights);
 		} catch (Exception e) {
@@ -125,6 +159,7 @@ public class EntityRenderer implements IRenderer {
 	
 	@Override
 	public void render(Camera camera, Scene scene) {
+		long startedNanos = System.nanoTime();
 		shader.bind();
 		shader.setUniform("textureSampler", 0);
 		shader.setUniform("projectionMatrix", camera.getProjectionMatrix());
@@ -135,6 +170,61 @@ public class EntityRenderer implements IRenderer {
 				? 0.0f : project.settings.getDepthVisibilityFactor());
 
 		renderLights(scene.getDirectionalLight(), project.getLights(), shader);
+		shader.setUniform("useInstanceMaterial", 0);
+		if (project.settings.getRenderingMethod() == Settings.RenderingMethod.DEFAULT_RENDERING) {
+			renderDefault(scene);
+		} else {
+			renderEnhanced(scene);
+		}
+
+		unbind();
+		shader.unbind();
+		recordRenderMeasurement(startedNanos);
+	}
+
+	/** Invalidates cached visibility after the renderer entity set changes. */
+	public void invalidateVisibleEntityCache() {
+		visibleEntityCacheDirty = true;
+		visibleEntityCache.clear();
+	}
+
+	private void recordRenderMeasurement(long startedNanos) {
+		long now = System.nanoTime();
+		long elapsedNanos = now - startedNanos;
+		if (renderWindowStartedNanos == 0L) renderWindowStartedNanos = startedNanos;
+		renderLastNanos = elapsedNanos;
+		renderWindowNanos += elapsedNanos;
+		renderWindowCalls++;
+		if (now - renderWindowStartedNanos >= 500_000_000L) {
+			double averageMillis = renderWindowNanos
+					/ (double) renderWindowCalls / 1_000_000.0;
+			System.out.printf("EntityRenderer.render: calls=%d last=%.3f ms average=%.3f ms%n",
+					renderWindowCalls, renderLastNanos / 1_000_000.0, averageMillis);
+			renderWindowStartedNanos = now;
+			renderWindowNanos = 0L;
+			renderWindowCalls = 0L;
+		}
+	}
+
+	private void renderDefault(Scene scene) {
+		for (ObjFileModel model : entities.keySet()) {
+			if (model == null) continue;
+			bind(model);
+			shader.setUniform("ignoreLightIndex", -1);
+			List<Entity> entityList = entities.get(model);
+			for (Entity entity : entityList) {
+				boolean effectiveVisible = scene.isInspectionMode()
+						? entity.isInspectionVisible() : entity.isVisible();
+				if (!effectiveVisible) continue;
+				if (entity.isOverrideModelMaterial()) shader.setUniform("material", entity.getMaterial());
+				shader.setUniform("transformationMatrix", entity.getTransformMatrix4f());
+				GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(), GL11.GL_UNSIGNED_INT, 0);
+			}
+		}
+	}
+
+	private void renderEnhanced(Scene scene) {
+		ensureVisibleEntityCache(scene);
 
 		for (ObjFileModel model : entities.keySet()) {
 			if (model != null) {
@@ -142,23 +232,179 @@ public class EntityRenderer implements IRenderer {
 				
 				List<Entity> entityList = entities.get(model);
 				shader.setUniform("ignoreLightIndex", -1);
-
-				for (Entity entity : entityList) {
-					boolean effectiveVisible = scene.isInspectionMode()
-							? entity.isInspectionVisible() : entity.isVisible();
-					if (!effectiveVisible) continue;
-					if (entity.isOverrideModelMaterial()) {
-						shader.setUniform("material", entity.getMaterial());
-					}
-					shader.setUniform("transformationMatrix", entity.getTransformMatrix4f());
-					GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(), GL11.GL_UNSIGNED_INT, 0);
+				List<Entity> visibleEntities = visibleEntityCache.getOrDefault(model, List.of());
+				if (canInstance(visibleEntities)) {
+					renderInstanced(model, visibleEntities);
+					continue;
 				}
+
+//				for (Entity entity : visibleEntities) {
+//					if (entity.isOverrideModelMaterial()) {
+//						shader.setUniform("material", entity.getMaterial());
+//					}
+//					shader.setUniform("transformationMatrix", entity.getTransformMatrix4f());
+//					GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(), GL11.GL_UNSIGNED_INT, 0);
+//				}
 			}
 		}
 
-		unbind();
+	}
 
-		shader.unbind();
+	private void ensureVisibleEntityCache(Scene scene) {
+		boolean inspectionMode = scene.isInspectionMode();
+		long inspectionVersion = scene.getInspectionVisibilityVersion();
+		if (!visibleEntityCacheDirty
+				&& cachedInspectionMode == inspectionMode
+				&& cachedInspectionVisibilityVersion == inspectionVersion) return;
+
+		visibleEntityCache.clear();
+		for (Map.Entry<ObjFileModel, List<Entity>> entry : entities.entrySet()) {
+			List<Entity> visible = visibleEntities(entry.getValue(), scene);
+			visibleEntityCache.put(entry.getKey(), visible);
+		}
+		cachedInspectionMode = inspectionMode;
+		cachedInspectionVisibilityVersion = inspectionVersion;
+		visibleEntityCacheDirty = false;
+	}
+
+	private List<Entity> visibleEntities(List<Entity> entityList, Scene scene) {
+		List<Entity> visible = new java.util.ArrayList<>(entityList.size());
+		for (Entity entity : entityList) {
+			if (scene.isInspectionMode() ? entity.isInspectionVisible() : entity.isVisible())
+				visible.add(entity);
+		}
+		return visible;
+	}
+
+	private boolean canInstance(List<Entity> visibleEntities) {
+		if (visibleEntities.size() < INSTANCE_THRESHOLD) return false;
+		for (Entity entity : visibleEntities) {
+			if (!entity.isOverrideModelMaterial() || entity.getMaterial().hasTexture()) return false;
+		}
+		return true;
+	}
+
+	private void renderInstanced(ObjFileModel model, List<Entity> visibleEntities) {
+		long startedNanos = System.nanoTime();
+		int bufferId = instanceBuffers.computeIfAbsent(model, this::createInstanceBuffer);
+		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, bufferId);
+		long preparationStartedNanos = System.nanoTime();
+		FloatBuffer data = MemoryUtil.memAllocFloat(visibleEntities.size() * INSTANCE_FLOATS);
+		try {
+			for (Entity entity : visibleEntities) {
+				entity.getTransformMatrix4f().get(data);
+				// JOML writes at the current position but intentionally does not
+				// advance the FloatBuffer cursor.
+				data.position(data.position() + 16);
+				put(data, entity.getMaterial().getAmbientIntensityColor());
+				put(data, entity.getMaterial().getDiffuseIntensityColor());
+				put(data, entity.getMaterial().getSpecularIntensityColor());
+				data.put((float) entity.getMaterial().getShininess());
+			}
+			data.flip();
+			long preparationElapsedNanos = System.nanoTime() - preparationStartedNanos;
+			instancePreparationLastNanos = preparationElapsedNanos;
+			instancePreparationWindowNanos += preparationElapsedNanos;
+			instancePreparationMaxNanos = Math.max(instancePreparationMaxNanos,
+					preparationElapsedNanos);
+			long bufferUploadStartedNanos = System.nanoTime();
+			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, data, GL15.GL_STREAM_DRAW);
+			long bufferUploadElapsedNanos = System.nanoTime() - bufferUploadStartedNanos;
+			instanceBufferUploadLastNanos = bufferUploadElapsedNanos;
+			instanceBufferUploadWindowNanos += bufferUploadElapsedNanos;
+			instanceBufferUploadWindowCalls++;
+			instanceBufferUploadMaxNanos = Math.max(instanceBufferUploadMaxNanos,
+					bufferUploadElapsedNanos);
+		} finally {
+			MemoryUtil.memFree(data);
+		}
+		shader.setUniform("useInstanceMaterial", 1);
+		GL30.glBindVertexArray(model.getId());
+		long drawStartedNanos = System.nanoTime();
+		GL31.glDrawElementsInstanced(GL11.GL_TRIANGLES, model.getVertexCount(),
+				GL11.GL_UNSIGNED_INT, 0, visibleEntities.size());
+		long drawElapsedNanos = System.nanoTime() - drawStartedNanos;
+		instanceDrawLastNanos = drawElapsedNanos;
+		instanceDrawWindowNanos += drawElapsedNanos;
+		instanceDrawMaxNanos = Math.max(instanceDrawMaxNanos, drawElapsedNanos);
+		shader.setUniform("useInstanceMaterial", 0);
+
+		long elapsedNanos = System.nanoTime() - startedNanos;
+		if (instanceRenderWindowStartedNanos == 0L)
+			instanceRenderWindowStartedNanos = startedNanos;
+		instanceRenderLastNanos = elapsedNanos;
+		instanceRenderWindowNanos += elapsedNanos;
+		instanceRenderWindowCalls++;
+		instanceRenderWindowInstances += visibleEntities.size();
+		if (System.nanoTime() - instanceRenderWindowStartedNanos >= 500_000_000L) {
+			double averageMillis = instanceRenderWindowNanos
+					/ (double) instanceRenderWindowCalls / 1_000_000.0;
+			double bufferUploadAverageMillis = instanceBufferUploadWindowNanos
+					/ (double) instanceBufferUploadWindowCalls / 1_000_000.0;
+			System.out.printf("EntityRenderer.renderInstanced: calls=%d instances=%d "
+					+ "last=%.3f ms average=%.3f ms; preparation "
+					+ "last=%.3f ms average=%.3f ms max=%.3f ms; glBufferData "
+					+ "last=%.3f ms average=%.3f ms max=%.3f ms; draw "
+					+ "last=%.3f ms average=%.3f ms max=%.3f ms%n",
+					instanceRenderWindowCalls, instanceRenderWindowInstances,
+					instanceRenderLastNanos / 1_000_000.0, averageMillis,
+					instancePreparationLastNanos / 1_000_000.0,
+					instancePreparationWindowNanos
+							/ (double) instanceRenderWindowCalls / 1_000_000.0,
+					instancePreparationMaxNanos / 1_000_000.0,
+					instanceBufferUploadLastNanos / 1_000_000.0,
+					bufferUploadAverageMillis,
+					instanceBufferUploadMaxNanos / 1_000_000.0,
+					instanceDrawLastNanos / 1_000_000.0,
+					instanceDrawWindowNanos
+							/ (double) instanceRenderWindowCalls / 1_000_000.0,
+					instanceDrawMaxNanos / 1_000_000.0);
+			instanceRenderWindowStartedNanos = System.nanoTime();
+			instanceRenderWindowNanos = 0L;
+			instanceRenderWindowCalls = 0L;
+			instanceRenderWindowInstances = 0L;
+			instanceBufferUploadWindowNanos = 0L;
+			instanceBufferUploadWindowCalls = 0L;
+			instanceBufferUploadMaxNanos = 0L;
+			instancePreparationWindowNanos = 0L;
+			instancePreparationMaxNanos = 0L;
+			instanceDrawWindowNanos = 0L;
+			instanceDrawMaxNanos = 0L;
+		}
+	}
+
+	private static void put(FloatBuffer data, org.joml.Vector4f value) {
+		data.put(value.x).put(value.y).put(value.z).put(value.w);
+	}
+
+	private int createInstanceBuffer(ObjFileModel model) {
+		int bufferId = GL15.glGenBuffers();
+		GL30.glBindVertexArray(model.getId());
+		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, bufferId);
+		for (int column = 0; column < 4; column++) {
+			int location = 3 + column;
+			GL20.glEnableVertexAttribArray(location);
+			GL20.glVertexAttribPointer(location, 4, GL11.GL_FLOAT, false,
+					INSTANCE_STRIDE_BYTES, (long) column * 4 * Float.BYTES);
+			GL33.glVertexAttribDivisor(location, 1);
+		}
+		instanceAttribute(7, 16L * Float.BYTES);
+		instanceAttribute(8, 20L * Float.BYTES);
+		instanceAttribute(9, 24L * Float.BYTES);
+		GL20.glEnableVertexAttribArray(10);
+		GL20.glVertexAttribPointer(10, 1, GL11.GL_FLOAT, false, INSTANCE_STRIDE_BYTES,
+				27L * Float.BYTES);
+		GL33.glVertexAttribDivisor(10, 1);
+		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+		GL30.glBindVertexArray(0);
+		return bufferId;
+	}
+
+	private static void instanceAttribute(int location, long offset) {
+		GL20.glEnableVertexAttribArray(location);
+		GL20.glVertexAttribPointer(location, 4, GL11.GL_FLOAT, false,
+				INSTANCE_STRIDE_BYTES, offset);
+		GL33.glVertexAttribDivisor(location, 1);
 	}
 
 	@Override
@@ -190,6 +436,10 @@ public class EntityRenderer implements IRenderer {
 
 	@Override
 	public void cleanup() {
+		for (int bufferId : instanceBuffers.values()) {
+			GL15.glDeleteBuffers(bufferId);
+		}
+		instanceBuffers.clear();
 		shader.cleanup();
 	}
 

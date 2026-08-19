@@ -9,6 +9,10 @@ in vec3 fragPos;
 in vec3 fragNormal;
 in vec3 camDirection;
 in float vDepthVisibility;
+in vec4 vInstanceAmbient;
+in vec4 vInstanceDiffuse;
+in vec4 vInstanceSpecular;
+in float vInstanceShininess;
 
 out vec4 fragColor;
 
@@ -45,6 +49,7 @@ uniform float specularPower;
 uniform DirectionalLight directionalLight;
 uniform Light lights[MAX_LIGHTS];
 uniform int ignoreLightIndex;
+uniform int useInstanceMaterial;
 
 vec4 ambientC;
 vec4 diffuseC;
@@ -84,7 +89,8 @@ vec4 calcLightColor(vec3 light_color, float light_intensity, vec3 position, vec3
 // 	vec3 halfwayDir = normalize(to_light_dir + camera_direction);
 // 	float specularFactor = pow(max(dot(normal, halfwayDir), 0.0), specularPower * pow(vDepthVisibility, 3));
 
-	specColor = specularC * light_intensity * specularFactor * material.shininess * specularFactor * vec4(light_color, 1.0);
+	float materialShininess = useInstanceMaterial == 1 ? vInstanceShininess : material.shininess;
+	specColor = specularC * light_intensity * specularFactor * materialShininess * specularFactor * vec4(light_color, 1.0);
 
 	return max(minVec4, min(diffuseColor, maxVec4)) + max(minVec4, min(specColor, maxVec4));
 }
@@ -118,7 +124,13 @@ vec4 calcLight(Light light, vec3 position, vec3 normal) {
 }
 
 void main() {
-	initColor(material, fragTextureCoord);
+	if (useInstanceMaterial == 1) {
+		ambientC = vInstanceAmbient;
+		diffuseC = vInstanceDiffuse;
+		specularC = vInstanceSpecular;
+	} else {
+		initColor(material, fragTextureCoord);
+	}
 
     vec3 fragN = normalize(fragNormal);
 
@@ -132,4 +144,3 @@ void main() {
 
 	fragColor = max(minVec4, min((ambientC * vec4(ambientLight, 1) + max(minVec4, min(diffuseSpecularComp, maxVec4))) * vDepthVisibility, maxVec4));
 }
-

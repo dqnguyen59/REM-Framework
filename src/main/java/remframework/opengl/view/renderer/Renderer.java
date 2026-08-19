@@ -79,6 +79,7 @@ public class Renderer {
 
 	public void cleanupNodes() {
 		System.out.println("Renderer.cleanupNodes()");
+		nodeRenderer.invalidateVisibleEntityCache();
 		nodeRenderer.getEntities().clear();
 		probeEntities.clear();
 		gradientArrowEntities.clear();

@@ -34,6 +34,7 @@ import org.lwjgl.system.MemoryStack;
 import remframework.gui.model.NuklearModel;
 import remframework.opengl.model.RainModel;
 import remframework.settings.Project;
+import remframework.settings.Settings;
 import remframework.lattice.LatticeDescriptor;
 import remframework.lattice.LatticeManager;
 
@@ -64,7 +65,7 @@ public class FramePreferences extends AbstractFrame {
 		super.render(windowHandle, ctx);
 
         int width = 470;
-        int height = 350;
+        int height = 380;
         createLayout(ctx, 0, nuklearModel.getMenuBarHeight() + 120, width, height + (appSettings.isUseFixedNodes() ? 0 : 120));
 	}
 
@@ -117,7 +118,16 @@ public class FramePreferences extends AbstractFrame {
 
             appSettings.setNumThreads(nk_label_edit(ctx, stack, " CPU Threads:", bufNumThreads, appSettings.getNumThreads(), leftCol,
                                                     rightCol));
-			nk_spacer(ctx, spacer1, 1);
+            nk_spacer(ctx, spacer1, 1);
+
+            Settings.RenderingMethod renderingMethod = project.settings.getRenderingMethod();
+            String chosenRenderingMethod = nk_label_combo_options(ctx, stack, " Rendering Method:",
+                    Settings.RenderingMethod.getValues(), renderingMethod.getLabel(), leftCol, rightCol);
+            if (!chosenRenderingMethod.equals(renderingMethod.getLabel())) {
+                project.settings.setRenderingMethod(
+                        Settings.RenderingMethod.fromLabel(chosenRenderingMethod));
+            }
+            nk_spacer(ctx, spacer1, 1);
 			
 			appSettings.setUseFixedNodes(nk_check_label(ctx, " Use Fixed Nodes:", appSettings.isUseFixedNodes(), leftCol, rightCol));
 			nk_spacer(ctx, spacer1, 1);

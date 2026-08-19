@@ -76,6 +76,7 @@ public class Scene {
     private boolean neighborhoodInspectionActive;
 
     private boolean inspectionMode;
+    private long inspectionVisibilityVersion;
     private PassiveObserver inspectedProbe;
     private int inspectedSourceIndex = 0;
     private double inspectionSourceAlpha = 0.45;
@@ -588,6 +589,7 @@ public class Scene {
 
     /** Clears only the nodes and colors temporarily touched by neighborhood inspection. */
     public void clearInspectionState() {
+        inspectionVisibilityVersion++;
         for (Node node : inspectionTemporaryNodes) {
             node.setInspectionVisible(false);
             node.setInspectionColor(null);
@@ -599,6 +601,11 @@ public class Scene {
             inspectionProbeMarker.setInspectionColor(null);
             inspectionProbeMarker.updateMatrix();
         }
+    }
+
+    /** Changes whenever renderer-only inspection visibility is rebuilt. */
+    public long getInspectionVisibilityVersion() {
+        return inspectionVisibilityVersion;
     }
 
     private void markInspectionNode(Node node, Vector4f color) {

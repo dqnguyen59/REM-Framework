@@ -1297,8 +1297,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         PerformanceMonitor.start(Measurement.sendToGPU);
         isRenderingReady = false;
 
-        if (project.terrain.isVisible())
-            renderer.processTerrain(project.terrain);
+//        if (project.terrain.isVisible())
+//            renderer.processTerrain(project.terrain);
 
         // Render all nodes
         renderer.render(project.camera, scene);
