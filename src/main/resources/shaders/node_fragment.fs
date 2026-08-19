@@ -13,6 +13,7 @@ in vec4 vInstanceAmbient;
 in vec4 vInstanceDiffuse;
 in vec4 vInstanceSpecular;
 in float vInstanceShininess;
+in float vInstanceVisible;
 
 out vec4 fragColor;
 
@@ -124,6 +125,7 @@ vec4 calcLight(Light light, vec3 position, vec3 normal) {
 }
 
 void main() {
+	if (useInstanceMaterial == 1 && vInstanceVisible < 0.5) discard;
 	if (useInstanceMaterial == 1) {
 		ambientC = vInstanceAmbient;
 		diffuseC = vInstanceDiffuse;

@@ -59,7 +59,7 @@ public class EntityRenderer implements IRenderer {
 	private boolean visibleEntityCacheDirty = true;
 	private boolean cachedInspectionMode;
 	private long cachedInspectionVisibilityVersion = Long.MIN_VALUE;
-	private static final int INSTANCE_FLOATS = 29;
+	private static final int INSTANCE_FLOATS = 30;
 	private static final int INSTANCE_STRIDE_BYTES = INSTANCE_FLOATS * Float.BYTES;
 	private static final int INSTANCE_THRESHOLD = 32;
 	private long instanceRenderWindowStartedNanos;
@@ -234,7 +234,7 @@ public class EntityRenderer implements IRenderer {
 				shader.setUniform("ignoreLightIndex", -1);
 				List<Entity> visibleEntities = visibleEntityCache.getOrDefault(model, List.of());
 				if (canInstance(visibleEntities)) {
-					renderInstanced(model, visibleEntities);
+					renderInstanced(model, visibleEntities, scene);
 					continue;
 				}
 
@@ -285,23 +285,31 @@ public class EntityRenderer implements IRenderer {
 	}
 
 	private void renderInstanced(ObjFileModel model, List<Entity> visibleEntities) {
+		renderInstanced(model, visibleEntities, null);
+	}
+
+	private void renderInstanced(ObjFileModel model, List<Entity> visibleEntities, Scene scene) {
 		long startedNanos = System.nanoTime();
 		int bufferId = instanceBuffers.computeIfAbsent(model, this::createInstanceBuffer);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, bufferId);
 		long preparationStartedNanos = System.nanoTime();
-		FloatBuffer data = MemoryUtil.memAllocFloat(visibleEntities.size() * INSTANCE_FLOATS);
+		FloatBuffer data = preparedInstanceData(scene, model);
+		boolean ownsData = data == null;
+		int instanceCount = ownsData ? visibleEntities.size() : scene.getRenderInstanceEntityCount(model);
+		if (ownsData) data = MemoryUtil.memAllocFloat(visibleEntities.size() * INSTANCE_FLOATS);
 		try {
-			for (Entity entity : visibleEntities) {
-				entity.getTransformMatrix4f().get(data);
-				// JOML writes at the current position but intentionally does not
-				// advance the FloatBuffer cursor.
-				data.position(data.position() + 16);
-				put(data, entity.getMaterial().getAmbientIntensityColor());
-				put(data, entity.getMaterial().getDiffuseIntensityColor());
-				put(data, entity.getMaterial().getSpecularIntensityColor());
-				data.put((float) entity.getMaterial().getShininess());
+			if (ownsData) {
+				for (Entity entity : visibleEntities) {
+					entity.getTransformMatrix4f().get(data);
+					data.position(data.position() + 16);
+					put(data, entity.getMaterial().getAmbientIntensityColor());
+					put(data, entity.getMaterial().getDiffuseIntensityColor());
+					put(data, entity.getMaterial().getSpecularIntensityColor());
+					data.put((float) entity.getMaterial().getShininess());
+					data.put(1.0f);
+				}
+				data.flip();
 			}
-			data.flip();
 			long preparationElapsedNanos = System.nanoTime() - preparationStartedNanos;
 			instancePreparationLastNanos = preparationElapsedNanos;
 			instancePreparationWindowNanos += preparationElapsedNanos;
@@ -316,13 +324,13 @@ public class EntityRenderer implements IRenderer {
 			instanceBufferUploadMaxNanos = Math.max(instanceBufferUploadMaxNanos,
 					bufferUploadElapsedNanos);
 		} finally {
-			MemoryUtil.memFree(data);
+			if (ownsData) MemoryUtil.memFree(data);
 		}
 		shader.setUniform("useInstanceMaterial", 1);
 		GL30.glBindVertexArray(model.getId());
 		long drawStartedNanos = System.nanoTime();
 		GL31.glDrawElementsInstanced(GL11.GL_TRIANGLES, model.getVertexCount(),
-				GL11.GL_UNSIGNED_INT, 0, visibleEntities.size());
+				GL11.GL_UNSIGNED_INT, 0, instanceCount);
 		long drawElapsedNanos = System.nanoTime() - drawStartedNanos;
 		instanceDrawLastNanos = drawElapsedNanos;
 		instanceDrawWindowNanos += drawElapsedNanos;
@@ -335,7 +343,7 @@ public class EntityRenderer implements IRenderer {
 		instanceRenderLastNanos = elapsedNanos;
 		instanceRenderWindowNanos += elapsedNanos;
 		instanceRenderWindowCalls++;
-		instanceRenderWindowInstances += visibleEntities.size();
+		instanceRenderWindowInstances += instanceCount;
 		if (System.nanoTime() - instanceRenderWindowStartedNanos >= 500_000_000L) {
 			double averageMillis = instanceRenderWindowNanos
 					/ (double) instanceRenderWindowCalls / 1_000_000.0;
@@ -373,6 +381,11 @@ public class EntityRenderer implements IRenderer {
 		}
 	}
 
+	private FloatBuffer preparedInstanceData(Scene scene, ObjFileModel model) {
+		return scene == null || scene.isInspectionMode() || model == null
+				? null : scene.getRenderInstanceData(model);
+	}
+
 	private static void put(FloatBuffer data, org.joml.Vector4f value) {
 		data.put(value.x).put(value.y).put(value.z).put(value.w);
 	}
@@ -395,6 +408,10 @@ public class EntityRenderer implements IRenderer {
 		GL20.glVertexAttribPointer(10, 1, GL11.GL_FLOAT, false, INSTANCE_STRIDE_BYTES,
 				27L * Float.BYTES);
 		GL33.glVertexAttribDivisor(10, 1);
+		GL20.glEnableVertexAttribArray(11);
+		GL20.glVertexAttribPointer(11, 1, GL11.GL_FLOAT, false, INSTANCE_STRIDE_BYTES,
+				29L * Float.BYTES);
+		GL33.glVertexAttribDivisor(11, 1);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 		GL30.glBindVertexArray(0);
 		return bufferId;

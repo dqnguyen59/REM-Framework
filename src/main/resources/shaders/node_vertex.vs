@@ -8,6 +8,7 @@ layout (location = 7) in vec4 instanceAmbient;
 layout (location = 8) in vec4 instanceDiffuse;
 layout (location = 9) in vec4 instanceSpecular;
 layout (location = 10) in float instanceShininess;
+layout (location = 11) in float instanceVisible;
 
 out vec2 fragTextureCoord;
 out vec3 fragNormal;
@@ -18,6 +19,7 @@ out vec4 vInstanceAmbient;
 out vec4 vInstanceDiffuse;
 out vec4 vInstanceSpecular;
 out float vInstanceShininess;
+out float vInstanceVisible;
 
 uniform mat4 projectionMatrix;
 uniform mat4 viewMatrix;
@@ -41,4 +43,5 @@ void main() {
 	vInstanceDiffuse = instanceDiffuse;
 	vInstanceSpecular = instanceSpecular;
 	vInstanceShininess = instanceShininess;
+	vInstanceVisible = instanceVisible;
 }

@@ -312,6 +312,10 @@ public class Entity {
         swapBufIndex = 1 - swapBufIndex;
     }
 
+    public static int getSwapBufferIndex() {
+        return swapBufIndex;
+    }
+
     public void updateMatrix() {
 //        updatePosition();
 //        updateRotation();

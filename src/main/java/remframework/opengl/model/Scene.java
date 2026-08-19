@@ -32,6 +32,7 @@ import remframework.settings.AppSettings;
 import remframework.settings.Project;
 import remframework.settings.Settings;
 import remframework.settings.SlitWallSettings;
+import org.lwjgl.system.MemoryUtil;
 
 import java.lang.Math;
 import java.util.ArrayList;
@@ -40,10 +41,13 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.nio.FloatBuffer;
 
 @Getter
 @Setter
 public class Scene {
+
+    private static final int INSTANCE_FLOATS = 30;
 
     private AppSettings appSettings = AppSettings.getInstance();
 
@@ -84,6 +88,13 @@ public class Scene {
     private Entity inspectionProbeMarker;
     private final Set<Node> inspectionTemporaryNodes =
             Collections.newSetFromMap(new IdentityHashMap<>());
+    /**
+     * Packed render data written alongside the back transform matrix buffer.
+     * Each entity owns one fixed 29-float record at its entity-array index.
+     */
+    private final Map<ObjFileModel, FloatBuffer[]> instanceDataBuffers = new IdentityHashMap<>();
+    private final Map<ObjFileModel, Integer> instanceDataEntityCounts = new IdentityHashMap<>();
+    private final IdentityHashMap<Entity, Integer> instanceDataSlots = new IdentityHashMap<>();
     private InspectionNavigationSnapshot savedInspectionNavigation;
     private double inspectionCameraDistance;
     private Vector3d inspectionFrameTarget = new Vector3d();
@@ -1368,17 +1379,102 @@ public class Scene {
                     node.setCustomColor(null);
                 }
                 entity.updateMatrix();
+                writeInstanceData(entity, i - 1);
             }
         }));
     }
 
+    private void writeInstanceData(Entity entity, int entityIndex) {
+        ObjFileModel model = entity.getModel();
+        if (model == null) return;
+        FloatBuffer[] buffers = instanceDataBuffers.get(model);
+        Integer slot = instanceDataSlots.get(entity);
+        if (buffers == null || slot == null) return;
+        FloatBuffer data = buffers[Entity.getSwapBufferIndex()];
+
+        int offset = slot * INSTANCE_FLOATS;
+        entity.getTransformMatrix4f().get(offset, data);
+        put(data, offset + 16, entity.getMaterial().getAmbientIntensityColor());
+        put(data, offset + 20, entity.getMaterial().getDiffuseIntensityColor());
+        put(data, offset + 24, entity.getMaterial().getSpecularIntensityColor());
+        data.put(offset + 28, (float) entity.getMaterial().getShininess());
+        data.put(offset + 29, entity.getModel() != null && entity.isVisible() ? 1.0f : 0.0f);
+    }
+
+    private static void put(FloatBuffer data, int offset, Vector4f value) {
+        data.put(offset, value.x);
+        data.put(offset + 1, value.y);
+        data.put(offset + 2, value.z);
+        data.put(offset + 3, value.w);
+    }
+
+    private void ensureInstanceDataBuffers() {
+        Object[] entityArray = lattice.getEntityArray();
+        if (entityArray == null) return;
+        boolean sameEntities = !instanceDataBuffers.isEmpty();
+        if (sameEntities) {
+            for (Object value : entityArray) {
+                if (value instanceof Entity entity && entity.getModel() != null
+                        && !instanceDataSlots.containsKey(entity)) {
+                    sameEntities = false;
+                    break;
+                }
+            }
+        }
+        if (sameEntities) return;
+
+        for (FloatBuffer[] buffers : instanceDataBuffers.values()) {
+            MemoryUtil.memFree(buffers[0]);
+            MemoryUtil.memFree(buffers[1]);
+        }
+        instanceDataBuffers.clear();
+        instanceDataEntityCounts.clear();
+        instanceDataSlots.clear();
+
+        Map<ObjFileModel, Integer> counts = new IdentityHashMap<>();
+        for (Object value : entityArray) {
+            if (value instanceof Entity entity && entity.getModel() != null)
+                counts.merge(entity.getModel(), 1, Integer::sum);
+        }
+        for (Map.Entry<ObjFileModel, Integer> entry : counts.entrySet()) {
+            int floatCount = Math.multiplyExact(entry.getValue(), INSTANCE_FLOATS);
+            instanceDataBuffers.put(entry.getKey(), new FloatBuffer[] {
+                    MemoryUtil.memAllocFloat(floatCount),
+                    MemoryUtil.memAllocFloat(floatCount)
+            });
+            instanceDataEntityCounts.put(entry.getKey(), entry.getValue());
+        }
+
+        Map<ObjFileModel, Integer> nextSlots = new IdentityHashMap<>();
+        for (Object value : entityArray) {
+            if (value instanceof Entity entity && entity.getModel() != null)
+                instanceDataSlots.put(entity,
+                        nextSlots.merge(entity.getModel(), 1, Integer::sum) - 1);
+        }
+    }
+
     public void updateMatrix(int numThreads, int segmentSize) {
+        ensureInstanceDataBuffers();
         for (int i = 0; i < numThreads; i++) {
             int start = i * segmentSize;
             int end   = start + segmentSize;
             end = Math.min(end, lattice.getEntityArray().length);
             threadUpdateMatrix(start, end);
         }
+    }
+
+    /** Returns the completed packed buffer corresponding to the render transform buffer. */
+    public FloatBuffer getRenderInstanceData(ObjFileModel model) {
+        FloatBuffer[] buffers = instanceDataBuffers.get(model);
+        if (buffers == null) return null;
+        FloatBuffer data = buffers[1 - Entity.getSwapBufferIndex()];
+        data.position(0);
+        data.limit(instanceDataEntityCounts.get(model) * INSTANCE_FLOATS);
+        return data;
+    }
+
+    public int getRenderInstanceEntityCount(ObjFileModel model) {
+        return instanceDataEntityCounts.getOrDefault(model, 0);
     }
 
     private void threadCalcRemField(final int start, final int end) {
