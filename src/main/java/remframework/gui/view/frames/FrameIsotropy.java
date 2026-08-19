@@ -10,7 +10,6 @@ import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import remframework.gui.model.NuklearModel;
 import remframework.opengl.model.PassiveObserver;
-import remframework.opengl.model.NeighborhoodInspectorModel;
 import remframework.opengl.model.InterpolatedProbe;
 import remframework.opengl.model.Probe;
 import remframework.opengl.model.ProbeDefinition;
@@ -277,10 +276,10 @@ public final class FrameIsotropy extends AbstractFrame {
         Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
         Nuklear.nk_label(ctx, "Direction:", Nuklear.NK_TEXT_LEFT);
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            String[] directions = {"−X", "+Y", "+Z"};
+            String[] directions = {"-X", "+Y", "+Z"};
             Scene.CalibrationDirection currentDirection = project.scene.getCalibrationDirection();
             String currentLabel = switch (currentDirection) {
-                case NEGATIVE_X -> "−X";
+                case NEGATIVE_X -> "-X";
                 case POSITIVE_Y -> "+Y";
                 case POSITIVE_Z -> "+Z";
             };
@@ -332,7 +331,7 @@ public final class FrameIsotropy extends AbstractFrame {
             Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightFor(ctx), 3);
             Nuklear.nk_layout_row_push(ctx, 0.26f);
             if (Nuklear.nk_button_label(ctx,
-                    (index == selectedIndex ? "▶ " : "") + "Source " + (index + 1))) {
+                    (index == selectedIndex ? "> " : "") + "Source " + (index + 1))) {
                 project.scene.selectInspectionSource(index);
             }
             Nuklear.nk_layout_row_push(ctx, 0.49f);
@@ -384,9 +383,9 @@ public final class FrameIsotropy extends AbstractFrame {
             case RIGHT -> "+X";
             case TOP -> "+Y";
             case FRONT -> "+Z";
-            case LEFT -> "−X";
-            case BOTTOM -> "−Y";
-            case BACK -> "−Z";
+            case LEFT -> "-X";
+            case BOTTOM -> "-Y";
+            case BACK -> "-Z";
         };
     }
 

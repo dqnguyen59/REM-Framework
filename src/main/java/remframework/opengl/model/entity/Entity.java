@@ -313,18 +313,18 @@ public class Entity {
     }
 
     public void updateMatrix() {
-        updatePosition();
-        updateRotation();
-
-        transformMatrix
-                .identity()
-                .translate(position)
-                .setRotationXYZ(rotationRad.x, rotationRad.y, rotationRad.z)
-                .scale(scale);
-
-        if (parent != null)
-            parent.transformMatrix.mul(transformMatrix, transformMatrix);
-        transformMatrix4fList[swapBufIndex].set(transformMatrix);
+//        updatePosition();
+//        updateRotation();
+//
+//        transformMatrix
+//                .identity()
+//                .translate(position)
+//                .setRotationXYZ(rotationRad.x, rotationRad.y, rotationRad.z)
+//                .scale(scale);
+//
+//        if (parent != null)
+//            parent.transformMatrix.mul(transformMatrix, transformMatrix);
+//        transformMatrix4fList[swapBufIndex].set(transformMatrix);
 
         updatePosition();
         updateRotation();
