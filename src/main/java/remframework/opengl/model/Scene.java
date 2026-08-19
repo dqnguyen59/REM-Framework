@@ -97,6 +97,7 @@ public class Scene {
     private Object[] preparedInstanceEntities;
     private FloatBuffer[][] instanceDataBuffersByEntity;
     private int[] instanceDataSlotsByEntity;
+    private volatile boolean instanceDataLayoutDirty = true;
     private InspectionNavigationSnapshot savedInspectionNavigation;
     private double inspectionCameraDistance;
     private Vector3d inspectionFrameTarget = new Vector3d();
@@ -625,6 +626,7 @@ public class Scene {
         if (node == null) return;
         node.setInspectionVisible(true);
         node.setInspectionColor(color);
+        node.updateMatrix();
         inspectionTemporaryNodes.add(node);
     }
 
@@ -1374,11 +1376,12 @@ public class Scene {
 
             while (i < end) {
                 Entity entity = (Entity) lattice.getEntityArray()[i++];
-                if (settings.getSliceType() == Settings.SliceType.identitiesOnly
-                        && entity instanceof Node node) {
+                if (entity instanceof Node node && !node.isVisible()
+                        && !(inspectionMode && node.isInspectionVisible())) {
                     node.updatePosition();
                     node.setCustomScale(-1);
                     node.setCustomColor(null);
+                    continue;
                 }
                 entity.updateMatrix();
                 writeInstanceData(entity, i - 1);
@@ -1410,7 +1413,7 @@ public class Scene {
     private void ensureInstanceDataBuffers() {
         Object[] entityArray = lattice.getEntityArray();
         if (entityArray == null) return;
-        if (entityArray == preparedInstanceEntities) return;
+        if (!instanceDataLayoutDirty && entityArray == preparedInstanceEntities) return;
 
         for (FloatBuffer[] buffers : instanceDataBuffers.values()) {
             MemoryUtil.memFree(buffers[0]);
@@ -1423,7 +1426,7 @@ public class Scene {
 
         Map<ObjFileModel, Integer> counts = new IdentityHashMap<>();
         for (Object value : entityArray) {
-            if (value instanceof Entity entity && entity.getModel() != null)
+            if (value instanceof Entity entity && entity.getModel() != null && entity.isVisible())
                 counts.merge(entity.getModel(), 1, Integer::sum);
         }
         for (Map.Entry<ObjFileModel, Integer> entry : counts.entrySet()) {
@@ -1437,13 +1440,23 @@ public class Scene {
 
         Map<ObjFileModel, Integer> nextSlots = new IdentityHashMap<>();
         for (int i = 0; i < entityArray.length; i++) {
-            if (entityArray[i] instanceof Entity entity && entity.getModel() != null) {
+            if (entityArray[i] instanceof Entity entity && entity.getModel() != null
+                    && entity.isVisible()) {
                 instanceDataBuffersByEntity[i] = instanceDataBuffers.get(entity.getModel());
                 instanceDataSlotsByEntity[i] =
                         nextSlots.merge(entity.getModel(), 1, Integer::sum) - 1;
             }
         }
         preparedInstanceEntities = entityArray;
+        instanceDataLayoutDirty = false;
+    }
+
+    public void invalidateRenderInstanceDataLayout() {
+        instanceDataLayoutDirty = true;
+    }
+
+    public boolean isRenderInstanceDataLayoutDirty() {
+        return instanceDataLayoutDirty || lattice.getEntityArray() != preparedInstanceEntities;
     }
 
     public void updateMatrix(int numThreads, int segmentSize) {

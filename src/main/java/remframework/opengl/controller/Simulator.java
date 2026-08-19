@@ -1077,6 +1077,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             renderer.processEntity(entity);
         }
 
+        scene.invalidateRenderInstanceDataLayout();
         createIsotropyProbe();
     }
 
@@ -1295,6 +1296,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             // Meanwhile, start calculating the next frame while rendering.
             boolean singleStepUpdate = remModel.consumeSingleStepRequest();
             if (remModel.isSimulating() || singleStepUpdate) {
+                if (scene.isRenderInstanceDataLayoutDirty()) refreshRenderMatrices();
                 pausedRenderMatricesCurrent = false;
                 renderMatricesDirty = false;
                 calcNextFrame(singleStepUpdate);

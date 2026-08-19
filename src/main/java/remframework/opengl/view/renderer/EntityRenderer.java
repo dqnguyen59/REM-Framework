@@ -293,7 +293,7 @@ public class EntityRenderer implements IRenderer {
 		int bufferId = instanceBuffers.computeIfAbsent(model, this::createInstanceBuffer);
 		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, bufferId);
 		long preparationStartedNanos = System.nanoTime();
-		FloatBuffer data = preparedInstanceData(scene, model);
+		FloatBuffer data = preparedInstanceData(scene, model, visibleEntities.size());
 		boolean ownsData = data == null;
 		int instanceCount = ownsData ? visibleEntities.size() : scene.getRenderInstanceEntityCount(model);
 		if (ownsData) data = MemoryUtil.memAllocFloat(visibleEntities.size() * INSTANCE_FLOATS);
@@ -381,8 +381,10 @@ public class EntityRenderer implements IRenderer {
 		}
 	}
 
-	private FloatBuffer preparedInstanceData(Scene scene, ObjFileModel model) {
+	private FloatBuffer preparedInstanceData(Scene scene, ObjFileModel model,
+			int visibleEntityCount) {
 		return scene == null || scene.isInspectionMode() || model == null
+				|| scene.getRenderInstanceEntityCount(model) != visibleEntityCount
 				? null : scene.getRenderInstanceData(model);
 	}
 
