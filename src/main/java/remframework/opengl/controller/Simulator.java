@@ -103,6 +103,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private volatile     boolean         isRenderingReady;
     private              boolean         isLoadingStarted;
     private              boolean         isNodesUpdateRequired;
+    private              boolean         renderMatricesDirty = true;
+    private              boolean         pausedRenderMatricesCurrent;
     private              KeyEvents       keyEvents;
     private final        ArrayList<Node> customNodeFixed               = new ArrayList<>();
     private              int             waitAfterReset                = 0;
@@ -328,6 +330,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 remModel.getCurrentMouseNodeIndex().set(selectedNode.getIndex());
                 remModel.setCurrentMouseNode(selectedNode);
             }
+            renderMatricesDirty = true;
         }
 
         PassiveObserver hoveredProbe = scene.getProbeForNode(node);
@@ -717,6 +720,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     break;
                 case GLFW.GLFW_KEY_F4:
                     scene.toggleAnimation();
+                    renderMatricesDirty = true;
                     break;
                 case GLFW.GLFW_KEY_F5:
                     scene.updateWalls();
@@ -806,6 +810,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         if (selectedNode != null) {
             selectedNode.setSelected(true);
         }
+        renderMatricesDirty = true;
     }
 
     private void updateTerrain() {
@@ -1012,6 +1017,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private void updateNodesProperties() {
         System.out.println("Simulator.updateNodesProperties()");
+        renderMatricesDirty = true;
         renderer.cleanupNodes();
 
         if (settings.getSliceType() == SliceType.identitiesOnly) {
@@ -1288,10 +1294,19 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
             // Meanwhile, start calculating the next frame while rendering.
             boolean singleStepUpdate = remModel.consumeSingleStepRequest();
-            if (remModel.isSimulating() || singleStepUpdate)
+            if (remModel.isSimulating() || singleStepUpdate) {
+                pausedRenderMatricesCurrent = false;
+                renderMatricesDirty = false;
                 calcNextFrame(singleStepUpdate);
-            else
+            } else if (!pausedRenderMatricesCurrent || renderMatricesDirty || scene.isAnimated()) {
                 refreshRenderMatrices();
+                pausedRenderMatricesCurrent = true;
+                renderMatricesDirty = false;
+            } else {
+                PerformanceMonitor.reset(Measurement.physics);
+                PerformanceMonitor.reset(Measurement.updateMatrix);
+                PerformanceMonitor.reset(Measurement.totalCPURenderTime);
+            }
         }
 
         PerformanceMonitor.start(Measurement.sendToGPU);

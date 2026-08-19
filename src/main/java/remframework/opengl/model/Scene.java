@@ -94,7 +94,9 @@ public class Scene {
      */
     private final Map<ObjFileModel, FloatBuffer[]> instanceDataBuffers = new IdentityHashMap<>();
     private final Map<ObjFileModel, Integer> instanceDataEntityCounts = new IdentityHashMap<>();
-    private final IdentityHashMap<Entity, Integer> instanceDataSlots = new IdentityHashMap<>();
+    private Object[] preparedInstanceEntities;
+    private FloatBuffer[][] instanceDataBuffersByEntity;
+    private int[] instanceDataSlotsByEntity;
     private InspectionNavigationSnapshot savedInspectionNavigation;
     private double inspectionCameraDistance;
     private Vector3d inspectionFrameTarget = new Vector3d();
@@ -1385,14 +1387,11 @@ public class Scene {
     }
 
     private void writeInstanceData(Entity entity, int entityIndex) {
-        ObjFileModel model = entity.getModel();
-        if (model == null) return;
-        FloatBuffer[] buffers = instanceDataBuffers.get(model);
-        Integer slot = instanceDataSlots.get(entity);
-        if (buffers == null || slot == null) return;
+        FloatBuffer[] buffers = instanceDataBuffersByEntity[entityIndex];
+        if (buffers == null) return;
         FloatBuffer data = buffers[Entity.getSwapBufferIndex()];
 
-        int offset = slot * INSTANCE_FLOATS;
+        int offset = instanceDataSlotsByEntity[entityIndex] * INSTANCE_FLOATS;
         entity.getTransformMatrix4f().get(offset, data);
         put(data, offset + 16, entity.getMaterial().getAmbientIntensityColor());
         put(data, offset + 20, entity.getMaterial().getDiffuseIntensityColor());
@@ -1411,17 +1410,7 @@ public class Scene {
     private void ensureInstanceDataBuffers() {
         Object[] entityArray = lattice.getEntityArray();
         if (entityArray == null) return;
-        boolean sameEntities = !instanceDataBuffers.isEmpty();
-        if (sameEntities) {
-            for (Object value : entityArray) {
-                if (value instanceof Entity entity && entity.getModel() != null
-                        && !instanceDataSlots.containsKey(entity)) {
-                    sameEntities = false;
-                    break;
-                }
-            }
-        }
-        if (sameEntities) return;
+        if (entityArray == preparedInstanceEntities) return;
 
         for (FloatBuffer[] buffers : instanceDataBuffers.values()) {
             MemoryUtil.memFree(buffers[0]);
@@ -1429,7 +1418,8 @@ public class Scene {
         }
         instanceDataBuffers.clear();
         instanceDataEntityCounts.clear();
-        instanceDataSlots.clear();
+        instanceDataBuffersByEntity = new FloatBuffer[entityArray.length][];
+        instanceDataSlotsByEntity = new int[entityArray.length];
 
         Map<ObjFileModel, Integer> counts = new IdentityHashMap<>();
         for (Object value : entityArray) {
@@ -1446,11 +1436,14 @@ public class Scene {
         }
 
         Map<ObjFileModel, Integer> nextSlots = new IdentityHashMap<>();
-        for (Object value : entityArray) {
-            if (value instanceof Entity entity && entity.getModel() != null)
-                instanceDataSlots.put(entity,
-                        nextSlots.merge(entity.getModel(), 1, Integer::sum) - 1);
+        for (int i = 0; i < entityArray.length; i++) {
+            if (entityArray[i] instanceof Entity entity && entity.getModel() != null) {
+                instanceDataBuffersByEntity[i] = instanceDataBuffers.get(entity.getModel());
+                instanceDataSlotsByEntity[i] =
+                        nextSlots.merge(entity.getModel(), 1, Integer::sum) - 1;
+            }
         }
+        preparedInstanceEntities = entityArray;
     }
 
     public void updateMatrix(int numThreads, int segmentSize) {

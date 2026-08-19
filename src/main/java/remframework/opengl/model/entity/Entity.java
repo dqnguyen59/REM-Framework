@@ -108,6 +108,7 @@ public class Entity {
         this.position.set(position);
         initPosition(position);
         this.rotation.set(rotation);
+        updateRotation();
         this.scale               = scale;
         transformMatrix4fList[0] = new Matrix4f();
         transformMatrix4fList[1] = new Matrix4f();
@@ -331,16 +332,12 @@ public class Entity {
 //        transformMatrix4fList[swapBufIndex].set(transformMatrix);
 
         updatePosition();
-        updateRotation();
-
-        transformMatrix
-                .identity()
-                .translate(position)
-                .setRotationXYZ(rotationRad.x, rotationRad.y, rotationRad.z)
-                .scale(settings.scale)
-                .scale(customScale > 0 ? customScale : scale);
-
-        if (parent != null) parent.getTransformMatrix().mul(getTransformMatrix(), getTransformMatrix());
+        if (parent == null) transformMatrix.identity();
+        else transformMatrix.set(parent.getTransformMatrix());
+        transformMatrix.translate(position);
+        if (rotationRad.x != 0.0 || rotationRad.y != 0.0 || rotationRad.z != 0.0)
+            transformMatrix.rotateXYZ(rotationRad.x, rotationRad.y, rotationRad.z);
+        transformMatrix.scale(settings.scale * (customScale > 0 ? customScale : scale));
         transformMatrix4fList[swapBufIndex].set(getTransformMatrix());
         customScale = -1;
         setColor(FIXED_COLOR);
