@@ -861,7 +861,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             }
             scene.updateProbeMeasurements(transportSystem);
             simulateDetection();
+
+            // Run the physics calculations of the nodes through all available threads.
             scene.processRemFieldEngine(numThreads, segmentSize);
+
+            // Wait until all physics calculations are ready.
             scene.waitForAllTasksReady();
 
             if (remModel.isSimulating())
@@ -871,8 +875,13 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             PerformanceMonitor.reset(Measurement.physics);
 
             PerformanceMonitor.start(Measurement.updateMatrix);
+
+            // Update the matrix of all nodes through all available threads.
             scene.updateMatrix(numThreads, segmentSize);
+
+            // Wait until all matrices are updated.
             scene.waitForAllTasksReady();
+
             samplePassiveDetectors();
             FeasibilityPilotTelemetry telemetry =
                     FeasibilityPilotTelemetry.getInstance();
@@ -1260,6 +1269,23 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         } else if (!updateLimitReached) {
             waitForRenderingReady();
             resetMonitoringDeadThreads();
+
+            processDeferredHoverPick();
+            for (PassiveObserver probe : scene.getProbes()) {
+                probe.updateMarker();
+            }
+            for (PassiveObserver probe : scene.getPreviewProbes()) {
+                probe.updateMarker();
+            }
+            scene.updateCameraTransition(1.0 / 60.0);
+            // Ordinary probe/gradient render lists are filtered out during inspection.
+            // Do not tear them down and rebuild them while the diagnostic view is active;
+            // they are synchronized normally on the first frame after exit.
+            if (!scene.isNeighborhoodInspectionActive()) {
+                renderer.syncProbeEntities(scene.getProbeRenderEntities());
+                renderer.syncGradientArrowEntities(scene.getGradientArrowRenderEntities());
+            }
+
             // Meanwhile, start calculating the next frame while rendering.
             boolean singleStepUpdate = remModel.consumeSingleStepRequest();
             if (remModel.isSimulating() || singleStepUpdate)
@@ -1270,23 +1296,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
         PerformanceMonitor.start(Measurement.sendToGPU);
         isRenderingReady = false;
-        processDeferredHoverPick();
-        for (PassiveObserver probe : scene.getProbes()) {
-            probe.updateMarker();
-        }
-        for (PassiveObserver probe : scene.getPreviewProbes()) {
-            probe.updateMarker();
-        }
-        scene.updateCameraTransition(1.0 / 60.0);
-        // Ordinary probe/gradient render lists are filtered out during inspection.
-        // Do not tear them down and rebuild them while the diagnostic view is active;
-        // they are synchronized normally on the first frame after exit.
-        if (!scene.isNeighborhoodInspectionActive()) {
-            renderer.syncProbeEntities(scene.getProbeRenderEntities());
-            renderer.syncGradientArrowEntities(scene.getGradientArrowRenderEntities());
-        }
+
         if (project.terrain.isVisible())
             renderer.processTerrain(project.terrain);
+
+        // Render all nodes
         renderer.render(project.camera, scene);
         isRenderingReady = true;
         PerformanceMonitor.stop(Measurement.sendToGPU);
