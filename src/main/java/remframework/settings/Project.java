@@ -72,7 +72,7 @@ public class Project extends AbstractSettings implements ISettings {
     private double constantMagneticFactor = 0.94;
 
     // Don't set the glSwapInterval below 1! It will cause instability of the application and freeze.
-    private int glSwapInterval = 2;
+    private int glSwapInterval = 1;
 
     private RemModel remModel = new RemModel();
     public  Camera   camera   = new Camera();

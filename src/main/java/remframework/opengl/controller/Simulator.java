@@ -165,20 +165,21 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         pointLight.setDirection(lightDirection);
         pointLight.setName("DefaultPointLight");
         pointLight.setSpotLight(false);
+        pointLight.setScale(0);
 
         //Spot light
-        lightIntensity = 1.0f;
-        lightPosition  = new Vector3d(25.0f, 40.0f, -10.0f);
-        lightRotation  = new Vector3d(0, 0, 0);
-        lightDirection = new Vector3d(-0.3, -1, 0.1);
-        cutOff         = 25;
-        lightColor     = new Vector3f(0.5f, 1.0f, 0.5f);
-        Light spotLight = project.createLight(null, modelSphere, modelSpotLight, lightPosition, lightRotation,
-                                              1.0);
-        spotLight.set(lightColor, lightIntensity, 0.1, 0.03, 0.0007, cutOff);
-        spotLight.setDirection(lightDirection);
-        spotLight.setName("DefaultSpotLight");
-        spotLight.setSpotLight(true);
+//        lightIntensity = 1.0f;
+//        lightPosition  = new Vector3d(25.0f, 40.0f, -10.0f);
+//        lightRotation  = new Vector3d(0, 0, 0);
+//        lightDirection = new Vector3d(-0.3, -1, 0.1);
+//        cutOff         = 25;
+//        lightColor     = new Vector3f(0.5f, 1.0f, 0.5f);
+//        Light spotLight = project.createLight(null, modelSphere, modelSpotLight, lightPosition, lightRotation,
+//                                              1.0);
+//        spotLight.set(lightColor, lightIntensity, 0.1, 0.03, 0.0007, cutOff);
+//        spotLight.setDirection(lightDirection);
+//        spotLight.setName("DefaultSpotLight");
+//        spotLight.setSpotLight(true);
 
         // Directional light
         lightIntensity = 0.0f;
@@ -1026,6 +1027,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             }
         }
 
+        Performance.numVisibleNodes = 0;
+
         for (Entity entity : scene.getLattice().getEntities()) {
             if (entity.getClass() == Node.class) {
                 Node node = (Node) entity;
@@ -1070,7 +1073,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     };
 
                     node.setVisible(isVisible || node.isHiLighted());
-
+                    if (node.isVisible()) Performance.numVisibleNodes++;
                 }
 
             }

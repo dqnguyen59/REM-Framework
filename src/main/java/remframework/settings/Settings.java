@@ -40,6 +40,7 @@ import java.util.Objects;
 @Setter
 public class Settings extends AbstractSettings implements ISettings {
 
+    @Getter
     public enum SliceType {
         sliceX("Visible slice X"),
         sliceY("Visible slice Y"),
@@ -78,9 +79,6 @@ public class Settings extends AbstractSettings implements ISettings {
             throw new IllegalArgumentException("Unknown rendering mode: " + label);
         }
 
-        public String getLabel() {
-            return label;
-        }
     }
 
     public enum ColorMode {
@@ -176,7 +174,7 @@ public class Settings extends AbstractSettings implements ISettings {
     private ColorMode          lastColorMode          = ColorMode.normal;
     private NodeFormulaVersion nodeFormulaVersion     = NodeFormulaVersion.v_0_1;
     private NodeFormulaVersion lastNodeFormulaVersion = NodeFormulaVersion.v_0_1;
-    private RenderingMethod    renderingMethod        = RenderingMethod.DEFAULT_RENDERING;
+    private RenderingMethod    renderingMethod        = RenderingMethod.ENHANCED_RENDERING;
     private int                visibleIndexX;
     private int                visibleIndexY;
     private int                visibleIndexZ;
