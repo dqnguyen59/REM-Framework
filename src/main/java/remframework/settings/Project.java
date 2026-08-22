@@ -165,6 +165,8 @@ public class Project extends AbstractSettings implements ISettings {
         setConstantElectricFactor(getDouble("QuantumField", "constantElectricFactor", 0.025));
         setConstantMagneticFactor(getDouble("QuantumField", "constantMagneticFactor", 0.0003));
         setGlSwapInterval(getInt("QuantumField", "glSwapInterval", 1));
+        scene.getLattice().setNumEdgeAbsorptionLayers(
+                getInt("QuantumField", "numEdgeAbsorptionLayers", 30));
         int x = getInt("QuantumField", "dimension.x", 15);
         int y = getInt("QuantumField", "dimension.y", 15);
         int z = getInt("QuantumField", "dimension.z", 15);
@@ -348,6 +350,8 @@ public class Project extends AbstractSettings implements ISettings {
         put("QuantumField", "constantElectricFactor", constantElectricFactor);
         put("QuantumField", "constantMagneticFactor", constantMagneticFactor);
         put("QuantumField", "glSwapInterval", glSwapInterval);
+        put("QuantumField", "numEdgeAbsorptionLayers",
+                scene.getLattice().getNumEdgeAbsorptionLayers());
         put("QuantumField", "dimension.x", dimension.x);
         put("QuantumField", "dimension.y", dimension.y);
         put("QuantumField", "dimension.z", dimension.z);

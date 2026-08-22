@@ -1253,6 +1253,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
         if (discoveryWorkspace.state().active()) {
             waitForNextFrameIsReady();
+            if (scene.getLattice().applyPendingAbsorptionLayerChange()) {
+                renderMatricesDirty = true;
+            }
             PerformanceMonitor.start(Measurement.sendToGPU);
             discoveryWorkspace.phasedWorkflow().advanceGeometryTestFrame();
             discoveryViewport.render(glWindow.getWidth(), glWindow.getHeight());
@@ -1264,6 +1267,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         checkSettingsChanged();
 
         waitForNextFrameIsReady();
+        if (scene.getLattice().applyPendingAbsorptionLayerChange()) {
+            renderMatricesDirty = true;
+        }
 
         if (updateLimitReached) {
             glWindow.requestClose();

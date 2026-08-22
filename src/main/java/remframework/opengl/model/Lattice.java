@@ -59,14 +59,15 @@ public class Lattice {
     private Object[] nodeArray;
     private Object[] entityArray;
 
-    private int numEdgeAbsorptionLayers = 30;
-
     /**
      * Number of boundary layers that absorb outgoing waves.
      * <br><br>
      * 0 = perfectly reflecting boundaries.
      * Larger values create a wider absorbing region.
      */
+    private volatile int numEdgeAbsorptionLayers = 30;
+    private volatile boolean absorptionFactorsDirty;
+
     private static Lattice latticeInstance;
 
     public static Lattice getInstance() {
@@ -187,6 +188,49 @@ public class Lattice {
         float t = (edgeDistance + 1.0f) / (numEdgeAbsorptionLayers + 1.0f);
 
         return (float) (0.5 - 0.5 * Math.cos(Math.PI * t));
+    }
+
+    /**
+     * Requests a new edge-absorption width for the active lattice.
+     * <br><br>
+     * The node factors are reapplied by {@link #applyPendingAbsorptionLayerChange()}
+     * at a simulation-frame boundary. Negative values are treated as 0.
+     */
+    public synchronized void setNumEdgeAbsorptionLayers(int numEdgeAbsorptionLayers) {
+        int normalizedLayers = Math.max(0, numEdgeAbsorptionLayers);
+        if (this.numEdgeAbsorptionLayers == normalizedLayers) return;
+        this.numEdgeAbsorptionLayers = normalizedLayers;
+        absorptionFactorsDirty = true;
+    }
+
+    /**
+     * Recomputes the persisted absorption factor of every existing node after
+     * a runtime edge-layer change.
+     * <br><br>
+     * This method is intended to run after the preceding simulation update has
+     * completed and before the next update starts.
+     * <br><br>
+     * @return true when existing node factors were updated
+     */
+    public synchronized boolean applyPendingAbsorptionLayerChange() {
+        if (!absorptionFactorsDirty || nodeMatrix == null) return false;
+
+        int sizeK = nodeMatrix.length;
+        int sizeJ = sizeK == 0 ? 0 : nodeMatrix[0].length;
+        int sizeI = sizeJ == 0 ? 0 : nodeMatrix[0][0].length;
+        for (int k = 0; k < sizeK; k++) {
+            for (int j = 0; j < sizeJ; j++) {
+                for (int i = 0; i < sizeI; i++) {
+                    Node node = nodeMatrix[k][j][i];
+                    if (node != null) {
+                        node.setAbsorptionFactor(
+                                computeAbsorptionFactor(i, j, k, sizeI, sizeJ, sizeK));
+                    }
+                }
+            }
+        }
+        absorptionFactorsDirty = false;
+        return true;
     }
 
     public Entity build() {
