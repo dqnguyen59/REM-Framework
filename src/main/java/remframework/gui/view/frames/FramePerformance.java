@@ -39,13 +39,13 @@ import remframework.helpers.PerformanceMonitor.Measurement;
 
 public class FramePerformance extends AbstractFrame {
 
-	private int width = 300;
-	private int height = 420;
-	private float leftCol = 0.7f;
-	private float rightCol = 0.3f;
-	private long savedTime;
-	private double mPhysics;
-	private double mUpdateMatrix;
+	private       int     width    = 230;
+	private       int     height   = 400;
+	private       float   leftCol  = 0.7f;
+	private       float   rightCol = 0.3f;
+	private       long    savedTime;
+	private       double  mPhysics;
+	private       double  mUpdateMatrix;
 	private double mTotalCPURenderTime;
 	private double mSendToGPU;
 	private double mGUI2D;
@@ -53,7 +53,7 @@ public class FramePerformance extends AbstractFrame {
 
 	public FramePerformance(NuklearModel frames) {
 		super(frames);
-		windowOptions = 0;
+		windowOptions = Nuklear.NK_WINDOW_NO_SCROLLBAR;
 	}
 
 	@Override
@@ -69,7 +69,7 @@ public class FramePerformance extends AbstractFrame {
 		
 		ctx.style().window().fixed_background().data().color(Constants.TRANSPARENT_BG_COLOR);
 
-		createLayout(ctx, getWindowWidth() - width, nuklearModel.getMenuBarHeight(), width, height);
+		createStickyLayout(ctx, 0, 0, width, height, StickToBorder.stickToTopRight);
 		
 		ctx.style().window().fixed_background().data().color(savedColor);
 	}
@@ -79,16 +79,14 @@ public class FramePerformance extends AbstractFrame {
 		
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFontBold());
 		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
-		Nuklear.nk_label(ctx, String.format(" #Nodes: %d (%d, %d, %d)",
+		Nuklear.nk_label(ctx, String.format(" Nodes: %d (%d, %d, %d)",
         		Performance.numNodes,
         		Performance.numNodesX,
         		Performance.numNodesY,
         		Performance.numNodesZ
         		), Nuklear.NK_TEXT_LEFT);
-		Nuklear.nk_label(ctx, String.format(" #Nodes on plane.xy: %d (%d, %d)",
-				Performance.numNodesX * Performance.numNodesY,
-        		Performance.numNodesX,
-        		Performance.numNodesY
+		Nuklear.nk_label(ctx, String.format(" Visible Nodes: %d",
+				Performance.numVisibleNodes
         		), Nuklear.NK_TEXT_LEFT);
 		Nuklear.nk_style_set_font(ctx, nuklearModel.getDefaultFont());
 

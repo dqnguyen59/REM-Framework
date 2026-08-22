@@ -178,7 +178,7 @@ public abstract class AbstractFrame implements IFrame {
 	}
 
 	private void _createLayout(NkContext ctx, int x, int y, int width, int height,
-							   boolean centered, boolean fixed) {
+							   boolean centered, boolean fixed, StickToBorder stickToBorder) {
 		String title = getTitle();
 
         //System.out.println("width, height: " + lastWidth + ", " + lastHeight + ", " + width + ", " + height + ", ");
@@ -204,9 +204,38 @@ public abstract class AbstractFrame implements IFrame {
 			NkRect r = appSettings.getFrameRectMap().get(title);
 
             if (r != null) {
-				if (title.equals("Statusbar")) {
-					r.y(getWindowHeight() - r.h());
-				}
+				switch (stickToBorder) {
+                    case stickToNone -> {
+                    }
+                    case stickToBottom -> {
+						r.x(x);
+						r.y(getWindowHeight() - height);
+                    }
+                    case stickToLeft -> {
+						r.x(0);
+						r.y(y);
+                    }
+                    case stickToRight -> {
+						r.x(getWindowWidth() - width);
+						r.y(y);
+                    }
+                    case stickToTopLeft -> {
+						r.x(0);
+						r.y(nuklearModel.getMenuBarHeight() + 4);
+                    }
+                    case stickToTopRight -> {
+						r.x(getWindowWidth() - width);
+						r.y(nuklearModel.getMenuBarHeight() + 4);
+                    }
+                    case stickToBottomLeft -> {
+						r.x(0);
+						r.y(getWindowHeight() - height - Constants.STATUS_BAR_HEIGHT);
+                    }
+                    case stickToBottomRight -> {
+						r.x(getWindowWidth() - width);
+						r.y(getWindowHeight() - height - Constants.STATUS_BAR_HEIGHT);
+                    }
+                }
 				x = (int) r.x();
 				y = (int) r.y();
 				if (lastHeight == height && lastWidth == width) {
@@ -438,15 +467,19 @@ public abstract class AbstractFrame implements IFrame {
 	}
 
 	protected void createLayout(NkContext ctx, int x, int y, int width, int height) {
-		_createLayout(ctx, x, y, width, height, false, false);
+		_createLayout(ctx, x, y, width, height, false, false, StickToBorder.stickToNone);
+	}
+
+	protected void createStickyLayout(NkContext ctx, int x, int y, int width, int height, StickToBorder stickToBorder) {
+		_createLayout(ctx, x, y, width, height, false, false, stickToBorder);
 	}
 
 	protected void createLayoutCentered(NkContext ctx, int width, int height) {
-		_createLayout(ctx, 0, 0, width, height, true, false);
+		_createLayout(ctx, 0, 0, width, height, true, false, StickToBorder.stickToNone);
 	}
 
 	protected void createFixedLayout(NkContext ctx, int x, int y, int width, int height) {
-		_createLayout(ctx, x, y, width, height, false, true);
+		_createLayout(ctx, x, y, width, height, false, true, StickToBorder.stickToNone);
 	}
 
 	abstract protected void layout(NkContext ctx, int x, int y, int width, int height);

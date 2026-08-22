@@ -60,14 +60,13 @@ public class FrameStatusBar extends AbstractFrame {
     public void render(long windowHandle, NkContext ctx) {
         super.render(windowHandle, ctx);
 
-        int width = getWindowWidth();
         int height = Constants.STATUS_BAR_HEIGHT;
 
         NkColor savedColor = NkColor.create().set(ctx.style().window().fixed_background().data().color());
 
         ctx.style().window().fixed_background().data().color(Constants.TRANSPARENT_BG_COLOR);
 
-        createLayout(ctx, 0, getWindowHeight() - height, width, height);
+        createStickyLayout(ctx, 0, getWindowHeight() - height, getWindowWidth(), height, StickToBorder.stickToBottom);
         ctx.style().window().fixed_background().data().color(savedColor);
     }
 
