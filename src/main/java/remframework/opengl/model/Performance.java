@@ -20,6 +20,7 @@ package remframework.opengl.model;
 
 public class Performance {
 	public static int numNodes;
+	public static int numVisibleNodes;
 	public static int numNodesX;
 	public static int numNodesY;
 	public static int numNodesZ;
