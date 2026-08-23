@@ -277,22 +277,19 @@ public class EntityRenderer implements IRenderer {
 		for (ObjFileModel model : entities.keySet()) {
 			if (model != null) {
 				bind(model);
-				
-				List<Entity> entityList = entities.get(model);
 				shader.setUniform("ignoreLightIndex", -1);
 				List<Entity> visibleEntities = visibleEntityCache.getOrDefault(model, List.of());
 				if (canInstance(visibleEntities)) {
 					renderInstanced(model, visibleEntities, scene);
 					continue;
 				}
-
-//				for (Entity entity : visibleEntities) {
-//					if (entity.isOverrideModelMaterial()) {
-//						shader.setUniform("material", entity.getMaterial());
-//					}
-//					shader.setUniform("transformationMatrix", entity.getTransformMatrix4f());
-//					GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(), GL11.GL_UNSIGNED_INT, 0);
-//				}
+				shader.setUniform("useInstanceMaterial", 0);
+				for (Entity entity : visibleEntities) {
+					shader.setUniform("material", entity.getMaterial());
+					shader.setUniform("transformationMatrix", entity.getTransformMatrix4f());
+					GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(),
+							GL11.GL_UNSIGNED_INT, 0);
+				}
 			}
 		}
 
