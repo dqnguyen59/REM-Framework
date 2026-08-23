@@ -68,6 +68,8 @@ public class Scene {
     private PassiveObserver     selectedProbe;
     private PassiveObserver     hoveredProbe;
     private final ProbeComparison comparison = new ProbeComparison();
+    private final ProbeArrivalMeasurement probeArrivalMeasurement =
+            new ProbeArrivalMeasurement();
     private final Map<PassiveObserver, Entity> gradientArrowEntities = new IdentityHashMap<>();
     private ObjFileModel gradientArrowModel;
     private boolean showGradientArrows = true;
@@ -305,6 +307,7 @@ public class Scene {
                 interpolatedProbe.updateMeasurements(transportSystem);
             }
         }
+        probeArrivalMeasurement.sample();
     }
 
     /** Reconstructs a renderer-only passive observer without adding a project Identity Occupancy. */
@@ -531,6 +534,7 @@ public class Scene {
 
     /** Atomically replaces generated probe markers while preserving manually created receivers. */
     public boolean replaceGeneratedProbeDefinitions(List<ProbeDefinition> definitions) {
+        probeArrivalMeasurement.clear();
         clearInspectionState();
         if (neighborhoodInspectionActive) exitNeighborhoodInspection();
         hideGradientArrows();
@@ -567,6 +571,7 @@ public class Scene {
 
     /** Removes all probe markers and restores the ordinary lattice render state. */
     public void clearProbes() {
+        probeArrivalMeasurement.clear();
         clearInspectionState();
         if (neighborhoodInspectionActive) exitNeighborhoodInspection();
         clearCalibrationArrow();

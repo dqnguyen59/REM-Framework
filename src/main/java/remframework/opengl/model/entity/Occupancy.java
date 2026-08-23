@@ -484,6 +484,17 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     public synchronized long getCumulativeSampleCountForAudit() { return sampleCount; }
 
+    /** Copies the latest per-update scaled gradient into a caller-owned vector. */
+    public synchronized Vector3d copyLastMeasuredGradientForAudit(Vector3d destination) {
+        return destination.set(lastMeasuredGradient);
+    }
+
+    /** Adds a weighted latest sample to a caller-owned diagnostic accumulator. */
+    public synchronized void accumulateLastMeasuredGradientForAudit(
+            Vector3d accumulator, double weight) {
+        accumulator.fma(weight, lastMeasuredGradient);
+    }
+
     /** Captures a stable, immutable copy for diagnostic rendering. */
     public synchronized OccupancyHistorySnapshot getHistorySnapshotForAudit() {
         return new OccupancyHistorySnapshot(GRADIENT_IMBALANCE_HISTORY_LENGTH,

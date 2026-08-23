@@ -4,14 +4,17 @@ import org.joml.Vector3d;
 import org.joml.Vector3f;
 import org.joml.Matrix4f;
 import org.lwjgl.nuklear.NkContext;
+import org.lwjgl.nuklear.NkCommandBuffer;
 import org.lwjgl.nuklear.NkRect;
 import org.lwjgl.nuklear.NkVec2;
 import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import remframework.gui.model.NuklearModel;
+import remframework.gui.model.Theme;
 import remframework.opengl.model.PassiveObserver;
 import remframework.opengl.model.InterpolatedProbe;
 import remframework.opengl.model.Probe;
+import remframework.opengl.model.ProbeArrivalMeasurement;
 import remframework.opengl.model.ProbeDefinition;
 import remframework.opengl.model.ProbeDetectorType;
 import remframework.opengl.model.ProbeComparison;
@@ -21,6 +24,7 @@ import remframework.opengl.model.entity.Node;
 import remframework.opengl.helpers.Neighbor;
 import remframework.settings.Project;
 
+import java.util.List;
 import java.util.Locale;
 
 /** Read-only live view of the detectGradient8 receiver state. */
@@ -41,6 +45,9 @@ public final class FrameIsotropy extends AbstractFrame {
     private boolean showGradient = true;
     private int selectedInterpolationSource;
     private int selectedTab;
+    private int selectedArrivalShell = -1;
+    private double positionThresholdExponent = -12.0;
+    private double gradientThresholdExponent = -12.0;
     private boolean inspectorPositionedForSession;
 
     public FrameIsotropy(NuklearModel model) {
@@ -98,10 +105,11 @@ public final class FrameIsotropy extends AbstractFrame {
         }
         Nuklear.nk_label(ctx, "Probe center is the lattice geometric center", Nuklear.NK_TEXT_LEFT);
 
-        Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 3);
+        Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 4);
         if (Nuklear.nk_button_label(ctx, "Gradient visualization")) selectedTab = 0;
         if (Nuklear.nk_button_label(ctx, "Calibration")) selectedTab = 1;
         if (Nuklear.nk_button_label(ctx, "Gradient Imbalance Comparison")) selectedTab = 2;
+        if (Nuklear.nk_button_label(ctx, "Propagation Arrival")) selectedTab = 3;
 
         boolean inspectionActive = project.scene.isNeighborhoodInspectionActive()
                 || project.scene.isNeighborhoodInspectionTransitionActive();
@@ -123,6 +131,7 @@ public final class FrameIsotropy extends AbstractFrame {
         String tabContentTitle = switch (selectedTab) {
             case 1 -> "Calibration content";
             case 2 -> "Gradient Imbalance Comparison content";
+            case 3 -> "Propagation Arrival content";
             default -> "Gradient visualization content";
         };
         if (!Nuklear.nk_group_begin(ctx, tabContentTitle,
@@ -135,6 +144,11 @@ public final class FrameIsotropy extends AbstractFrame {
         }
         if (selectedTab == 2) {
             comparisonSection(ctx);
+            Nuklear.nk_group_end(ctx);
+            return;
+        }
+        if (selectedTab == 3) {
+            arrivalSection(ctx);
             Nuklear.nk_group_end(ctx);
             return;
         }
@@ -419,6 +433,249 @@ public final class FrameIsotropy extends AbstractFrame {
         scalar(ctx, label + " |g|", format(measurement.gradient().length()));
         scalar(ctx, label + " g_parallel", format(measurement.radial()));
         scalar(ctx, label + " g_perp", format(measurement.sideways()));
+    }
+
+    private void arrivalSection(NkContext ctx) {
+        section(ctx, "Propagation arrival by probe shell");
+        List<Integer> shells = ProbeArrivalMeasurement.availableShells(project.scene.getProbes());
+        if (shells.isEmpty()) {
+            Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 1);
+            Nuklear.nk_label_wrap(ctx,
+                    "No generated probe shell is available. Add passive probes first.");
+            return;
+        }
+        if (!shells.contains(selectedArrivalShell)) selectedArrivalShell = shells.getFirst();
+
+        Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
+        Nuklear.nk_label(ctx, "Shell", Nuklear.NK_TEXT_LEFT);
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            String[] options = shells.stream()
+                    .map(shell -> "Shell " + (shell + 1))
+                    .toArray(String[]::new);
+            String current = "Shell " + (selectedArrivalShell + 1);
+            String selected = nk_combo_options(ctx, stack, options, current);
+            int option = java.util.Arrays.asList(options).indexOf(selected);
+            if (option >= 0 && selectedArrivalShell != shells.get(option)) {
+                selectedArrivalShell = shells.get(option);
+                project.scene.getProbeArrivalMeasurement().clear();
+            }
+        }
+
+        scalar(ctx, "Position change threshold", "10^" + (int) positionThresholdExponent);
+        positionThresholdExponent = Math.rint(nk_slider(
+                ctx, -18.0, positionThresholdExponent, 0.0, 1.0));
+        scalar(ctx, "Gradient change threshold", "10^" + (int) gradientThresholdExponent);
+        gradientThresholdExponent = Math.rint(nk_slider(
+                ctx, -18.0, gradientThresholdExponent, 0.0, 1.0));
+
+        ProbeArrivalMeasurement measurement = project.scene.getProbeArrivalMeasurement();
+        Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
+        if (Nuklear.nk_button_label(ctx, "Start / Reset Measurement")) {
+            measurement.start(List.copyOf(project.scene.getProbes()), selectedArrivalShell,
+                    Math.pow(10.0, positionThresholdExponent),
+                    Math.pow(10.0, gradientThresholdExponent));
+        }
+        if (Nuklear.nk_button_label(ctx, "Clear")) measurement.clear();
+
+        ProbeArrivalMeasurement.Snapshot snapshot = measurement.snapshot();
+        scalar(ctx, "Time unit", "simulation updates since Start");
+        scalar(ctx, "Status", arrivalStatus(snapshot));
+        scalar(ctx, "Elapsed updates", Long.toString(snapshot.elapsedUpdates()));
+        Nuklear.nk_layout_row_dynamic(ctx, 42, 1);
+        Nuklear.nk_label_wrap(ctx,
+                "Position: first n with |x(n) - x(0)| >= threshold. Gradient: first n with "
+                + "|g(n) - g(0)| >= threshold. Combined arrival is max(position, gradient).");
+
+        if (!snapshot.hasMeasurement()) {
+            Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 1);
+            Nuklear.nk_label(ctx,
+                    "Choose a shell and press Start / Reset Measurement.", Nuklear.NK_TEXT_LEFT);
+            return;
+        }
+
+        section(ctx, "Arrival chart — Y: arrival update | X: probe P1 ... PN");
+        scalar(ctx, "Legend", "Position = cyan | Gradient = yellow | Combined = red");
+        drawArrivalChart(ctx, snapshot);
+
+        section(ctx, "Exact arrival updates");
+        Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightFor(ctx), 6);
+        Nuklear.nk_layout_row_push(ctx, 0.07f);
+        Nuklear.nk_label(ctx, "Probe", Nuklear.NK_TEXT_LEFT);
+        Nuklear.nk_layout_row_push(ctx, 0.20f);
+        Nuklear.nk_label(ctx, "ID", Nuklear.NK_TEXT_LEFT);
+        Nuklear.nk_layout_row_push(ctx, 0.31f);
+        Nuklear.nk_label(ctx, "Represented ray", Nuklear.NK_TEXT_LEFT);
+        Nuklear.nk_layout_row_push(ctx, 0.14f);
+        Nuklear.nk_label(ctx, "Position", Nuklear.NK_TEXT_RIGHT);
+        Nuklear.nk_layout_row_push(ctx, 0.14f);
+        Nuklear.nk_label(ctx, "Gradient", Nuklear.NK_TEXT_RIGHT);
+        Nuklear.nk_layout_row_push(ctx, 0.14f);
+        Nuklear.nk_label(ctx, "Combined", Nuklear.NK_TEXT_RIGHT);
+        Nuklear.nk_layout_row_end(ctx);
+        for (ProbeArrivalMeasurement.Result result : snapshot.results()) {
+            Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightFor(ctx), 6);
+            Nuklear.nk_layout_row_push(ctx, 0.07f);
+            Nuklear.nk_label(ctx, "P" + result.ordinal(), Nuklear.NK_TEXT_LEFT);
+            Nuklear.nk_layout_row_push(ctx, 0.20f);
+            Nuklear.nk_label(ctx, result.probeId(), Nuklear.NK_TEXT_LEFT);
+            Nuklear.nk_layout_row_push(ctx, 0.31f);
+            Nuklear.nk_label(ctx, result.representedRays(), Nuklear.NK_TEXT_LEFT);
+            Nuklear.nk_layout_row_push(ctx, 0.14f);
+            Nuklear.nk_label(ctx, arrivalValue(result.positionArrivalUpdate()), Nuklear.NK_TEXT_RIGHT);
+            Nuklear.nk_layout_row_push(ctx, 0.14f);
+            Nuklear.nk_label(ctx, arrivalValue(result.gradientArrivalUpdate()), Nuklear.NK_TEXT_RIGHT);
+            Nuklear.nk_layout_row_push(ctx, 0.14f);
+            Nuklear.nk_label(ctx, arrivalValue(result.combinedArrivalUpdate()), Nuklear.NK_TEXT_RIGHT);
+            Nuklear.nk_layout_row_end(ctx);
+        }
+    }
+
+    /** Draws three first-change line series with numeric probe and update axes. */
+    private void drawArrivalChart(NkContext ctx, ProbeArrivalMeasurement.Snapshot snapshot) {
+        Nuklear.nk_layout_row_dynamic(ctx, 280, 1);
+        NkRect bounds = NkRect.create();
+        if (Nuklear.nk_widget(bounds, ctx) == Nuklear.NK_WIDGET_INVALID) return;
+        NkCommandBuffer canvas = Nuklear.nk_window_get_canvas(ctx);
+        NkRect plot = NkRect.create().set(bounds.x() + 52, bounds.y() + 10,
+                Math.max(1, bounds.w() - 64), Math.max(1, bounds.h() - 42));
+        NkRect priorClip = NkRect.create().set(canvas.clip());
+        NkRect chartClip = intersect(bounds, priorClip, NkRect.create());
+        Nuklear.nk_push_scissor(canvas, chartClip);
+        Nuklear.nk_fill_rect(canvas, bounds, 0, Theme.colorChart);
+
+        ArrivalAxisRange yRange = arrivalAxisRange(snapshot);
+        int yTicks = yRange.tickCount();
+        NkRect labelBounds = NkRect.create();
+        for (int tick = 0; tick <= yTicks; tick++) {
+            long value = yRange.minimum() + yRange.tickStep() * tick;
+            float y = arrivalY(plot, value, yRange);
+            Nuklear.nk_stroke_line(canvas, plot.x(), y, plot.x() + plot.w(), y,
+                    tick == 0 ? 2.0f : 1.0f, tick == 0 ? Theme.grey12 : Theme.grey05);
+            labelBounds.set(bounds.x() + 2, y - 8, 46, 16);
+            Nuklear.nk_draw_text(canvas, labelBounds, Long.toString(value),
+                    nuklearModel.getDefaultFont(), Theme.colorChart, Theme.grey12);
+        }
+
+        int count = snapshot.results().size();
+        int xStride = arrivalProbeTickStride(count);
+        for (int index = 0; index < count; index++) {
+            if (index % xStride != 0 && index != count - 1) continue;
+            float x = arrivalX(plot, index, count);
+            Nuklear.nk_stroke_line(canvas, x, plot.y() + plot.h(), x,
+                    plot.y() + plot.h() + 4, 1.0f, Theme.grey12);
+            labelBounds.set(x - 12, plot.y() + plot.h() + 7, 24, 16);
+            Nuklear.nk_draw_text(canvas, labelBounds,
+                    Integer.toString(snapshot.results().get(index).ordinal()),
+                    nuklearModel.getDefaultFont(), Theme.colorChart, Theme.grey12);
+        }
+
+        drawArrivalSeries(canvas, plot, snapshot, yRange, 0, Theme.blue4);
+        drawArrivalSeries(canvas, plot, snapshot, yRange, 1, Theme.yellow);
+        drawArrivalSeries(canvas, plot, snapshot, yRange, 2, Theme.red);
+        Nuklear.nk_push_scissor(canvas, priorClip);
+    }
+
+    private static void drawArrivalSeries(
+            NkCommandBuffer canvas, NkRect plot, ProbeArrivalMeasurement.Snapshot snapshot,
+            ArrivalAxisRange yRange, int series, org.lwjgl.nuklear.NkColor color) {
+        boolean hasPrevious = false;
+        float previousX = 0.0f;
+        float previousY = 0.0f;
+        NkRect marker = NkRect.create();
+        int count = snapshot.results().size();
+        for (int index = 0; index < count; index++) {
+            long arrival = arrivalValue(snapshot.results().get(index), series);
+            if (arrival < 0) {
+                hasPrevious = false;
+                continue;
+            }
+            float x = arrivalX(plot, index, count);
+            float y = arrivalY(plot, arrival, yRange);
+            if (hasPrevious) {
+                Nuklear.nk_stroke_line(canvas, previousX, previousY, x, y, 2.0f, color);
+            }
+            marker.set(x - 3, y - 3, 6, 6);
+            Nuklear.nk_fill_circle(canvas, marker, color);
+            previousX = x;
+            previousY = y;
+            hasPrevious = true;
+        }
+    }
+
+    private static long arrivalValue(ProbeArrivalMeasurement.Result result, int series) {
+        return switch (series) {
+            case 0 -> result.positionArrivalUpdate();
+            case 1 -> result.gradientArrivalUpdate();
+            default -> result.combinedArrivalUpdate();
+        };
+    }
+
+    record ArrivalAxisRange(long minimum, long maximum, long tickStep) {
+        ArrivalAxisRange {
+            if (minimum < 0 || maximum <= minimum || tickStep <= 0) {
+                throw new IllegalArgumentException("Invalid arrival-axis range.");
+            }
+        }
+
+        int tickCount() {
+            return Math.toIntExact((maximum - minimum) / tickStep);
+        }
+    }
+
+    static ArrivalAxisRange arrivalAxisRange(ProbeArrivalMeasurement.Snapshot snapshot) {
+        long firstArrival = Long.MAX_VALUE;
+        long lastArrival = Long.MIN_VALUE;
+        for (ProbeArrivalMeasurement.Result result : snapshot.results()) {
+            for (long arrival : new long[]{result.positionArrivalUpdate(),
+                    result.gradientArrivalUpdate(), result.combinedArrivalUpdate()}) {
+                if (arrival < 0) continue;
+                firstArrival = Math.min(firstArrival, arrival);
+                lastArrival = Math.max(lastArrival, arrival);
+            }
+        }
+        if (firstArrival == Long.MAX_VALUE) return new ArrivalAxisRange(0, 4, 1);
+
+        long spread = lastArrival - firstArrival;
+        long padding = Math.max(1, (long) Math.ceil(Math.max(1, spread) * 0.1));
+        long paddedMinimum = Math.max(0, firstArrival - padding);
+        long paddedMaximum = lastArrival + padding;
+        long tickStep = Math.max(1, (paddedMaximum - paddedMinimum + 3) / 4);
+        long minimum = paddedMinimum / tickStep * tickStep;
+        long maximum = (paddedMaximum + tickStep - 1) / tickStep * tickStep;
+        return new ArrivalAxisRange(minimum, maximum, tickStep);
+    }
+
+    static int arrivalProbeTickStride(int probeCount) {
+        return Math.max(1, (probeCount + 19) / 20);
+    }
+
+    private static float arrivalX(NkRect plot, int probeIndex, int probeCount) {
+        if (probeCount <= 1) return plot.x() + plot.w() * 0.5f;
+        return plot.x() + plot.w() * probeIndex / (probeCount - 1.0f);
+    }
+
+    private static float arrivalY(NkRect plot, long arrival, ArrivalAxisRange range) {
+        double normalized = (arrival - range.minimum())
+                / (double) (range.maximum() - range.minimum());
+        return (float) (plot.y() + plot.h() * (1.0 - normalized));
+    }
+
+    private static NkRect intersect(NkRect first, NkRect second, NkRect destination) {
+        float left = Math.max(first.x(), second.x());
+        float top = Math.max(first.y(), second.y());
+        float right = Math.min(first.x() + first.w(), second.x() + second.w());
+        float bottom = Math.min(first.y() + first.h(), second.y() + second.h());
+        return destination.set(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
+    }
+
+    private static String arrivalStatus(ProbeArrivalMeasurement.Snapshot snapshot) {
+        if (!snapshot.hasMeasurement()) return "Not started";
+        if (snapshot.complete()) return "Complete";
+        return snapshot.running() ? "Measuring" : "Stopped";
+    }
+
+    private static String arrivalValue(long update) {
+        return update < 0 ? "Waiting" : Long.toString(update);
     }
 
     private static void section(NkContext ctx, String label) {
