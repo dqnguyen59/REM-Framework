@@ -51,7 +51,7 @@ public class Renderer {
 	
 	public void render(Camera camera, Scene scene) {
 		if (!scene.isInspectionMode()) terrainRenderer.render(camera, scene);
-		nodeRenderer.render(camera, scene);
+		nodeRenderer.render(camera, scene, probeEntities, gradientArrowEntities);
 	}
 
 	public void processEntity(Entity entity) {
@@ -85,30 +85,30 @@ public class Renderer {
 		gradientArrowEntities.clear();
 	}
 
-	/** Synchronizes cached passive-probe arrows without adding them to the lattice entity set. */
+	/** Synchronizes passive-probe arrows in the separate dynamic overlay batch. */
 	public void syncGradientArrowEntities(List<Entity> entities) {
-		for (Entity entity : gradientArrowEntities) {
-			List<Entity> rendered = nodeRenderer.getEntities().get(entity.getModel());
-			if (rendered != null) rendered.remove(entity);
-		}
-		gradientArrowEntities.clear();
-		for (Entity entity : entities) {
-			processEntity(entity);
-			gradientArrowEntities.add(entity);
-		}
+		syncOverlayEntities(gradientArrowEntities, entities);
 	}
 
-	/** Synchronizes passive probe markers without adding them to the lattice entity set. */
+	/** Synchronizes passive probe markers in the separate dynamic overlay batch. */
 	public void syncProbeEntities(List<Entity> entities) {
-		for (Entity entity : probeEntities) {
-			List<Entity> rendered = nodeRenderer.getEntities().get(entity.getModel());
-			if (rendered != null) rendered.remove(entity);
+		syncOverlayEntities(probeEntities, entities);
+	}
+
+	/** Avoids rewriting stable overlay membership on every rendered frame. */
+	private static void syncOverlayEntities(List<Entity> current, List<Entity> requested) {
+		if (current.size() == requested.size()) {
+			boolean unchanged = true;
+			for (int index = 0; index < current.size(); index++) {
+				if (current.get(index) != requested.get(index)) {
+					unchanged = false;
+					break;
+				}
+			}
+			if (unchanged) return;
 		}
-		probeEntities.clear();
-		for (Entity entity : entities) {
-			processEntity(entity);
-			probeEntities.add(entity);
-		}
+		current.clear();
+		current.addAll(requested);
 	}
 
 	public static void enableCulling() {

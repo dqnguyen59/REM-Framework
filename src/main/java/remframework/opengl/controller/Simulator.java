@@ -878,7 +878,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 PerformanceMonitor.stop(Measurement.physics);
             else
                 PerformanceMonitor.reset(Measurement.physics);
-            PerformanceMonitor.reset(Measurement.physics);
 
             PerformanceMonitor.start(Measurement.updateMatrix);
 

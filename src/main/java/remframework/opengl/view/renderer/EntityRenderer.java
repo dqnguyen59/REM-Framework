@@ -38,10 +38,12 @@ import remframework.settings.Project;
 import remframework.settings.Settings;
 import remframework.helpers.Utils;
 
+import java.nio.FloatBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
-import java.nio.FloatBuffer;
 
 public class EntityRenderer implements IRenderer {
 
@@ -159,6 +161,12 @@ public class EntityRenderer implements IRenderer {
 	
 	@Override
 	public void render(Camera camera, Scene scene) {
+		render(camera, scene, List.of(), List.of());
+	}
+
+	/** Renders the static lattice batch followed by small, independently packed overlay batches. */
+	public void render(Camera camera, Scene scene, List<Entity> probeEntities,
+			List<Entity> gradientArrowEntities) {
 		long startedNanos = System.nanoTime();
 		shader.bind();
 		shader.setUniform("textureSampler", 0);
@@ -171,15 +179,55 @@ public class EntityRenderer implements IRenderer {
 
 		renderLights(scene.getDirectionalLight(), project.getLights(), shader);
 		shader.setUniform("useInstanceMaterial", 0);
-		if (project.settings.getRenderingMethod() == Settings.RenderingMethod.DEFAULT_RENDERING) {
+		boolean enhancedRendering = project.settings.getRenderingMethod()
+				!= Settings.RenderingMethod.DEFAULT_RENDERING;
+		if (!enhancedRendering) {
 			renderDefault(scene);
 		} else {
 			renderEnhanced(scene);
 		}
+		renderOverlays(scene, probeEntities, gradientArrowEntities, enhancedRendering);
 
 		unbind();
 		shader.unbind();
 		recordRenderMeasurement(startedNanos);
+	}
+
+	/** Keeps dynamic probe geometry out of the prepared lattice-node instance buffer. */
+	private void renderOverlays(Scene scene, List<Entity> probeEntities,
+			List<Entity> gradientArrowEntities, boolean enhancedRendering) {
+		Map<ObjFileModel, List<Entity>> overlaysByModel = new IdentityHashMap<>();
+		collectVisibleOverlays(scene, probeEntities, overlaysByModel);
+		collectVisibleOverlays(scene, gradientArrowEntities, overlaysByModel);
+		for (Map.Entry<ObjFileModel, List<Entity>> entry : overlaysByModel.entrySet()) {
+			ObjFileModel model = entry.getKey();
+			List<Entity> visibleEntities = entry.getValue();
+			if (model == null || visibleEntities.isEmpty()) continue;
+			if (enhancedRendering && canInstance(visibleEntities)) {
+				renderInstanced(model, visibleEntities);
+				continue;
+			}
+			bind(model);
+			shader.setUniform("ignoreLightIndex", -1);
+			shader.setUniform("useInstanceMaterial", 0);
+			for (Entity entity : visibleEntities) {
+				shader.setUniform("material", entity.getMaterial());
+				shader.setUniform("transformationMatrix", entity.getTransformMatrix4f());
+				GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(),
+						GL11.GL_UNSIGNED_INT, 0);
+			}
+		}
+	}
+
+	private void collectVisibleOverlays(Scene scene, List<Entity> overlays,
+			Map<ObjFileModel, List<Entity>> overlaysByModel) {
+		for (Entity entity : overlays) {
+			boolean effectiveVisible = scene.isInspectionMode()
+					? entity.isInspectionVisible() : entity.isVisible();
+			if (!effectiveVisible || entity.getModel() == null) continue;
+			overlaysByModel.computeIfAbsent(entity.getModel(), ignored -> new ArrayList<>())
+					.add(entity);
+		}
 	}
 
 	/** Invalidates cached visibility after the renderer entity set changes. */
