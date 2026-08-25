@@ -453,7 +453,7 @@ public class EntityRenderer implements IRenderer {
 		instanceAttribute(9, 24L * Float.BYTES);
 		GL20.glEnableVertexAttribArray(10);
 		GL20.glVertexAttribPointer(10, 1, GL11.GL_FLOAT, false, INSTANCE_STRIDE_BYTES,
-				27L * Float.BYTES);
+				28L * Float.BYTES);
 		GL33.glVertexAttribDivisor(10, 1);
 		GL20.glEnableVertexAttribArray(11);
 		GL20.glVertexAttribPointer(11, 1, GL11.GL_FLOAT, false, INSTANCE_STRIDE_BYTES,

@@ -91,7 +91,7 @@ public class Lattice {
         return getNode(node.x, node.y, node.z);
     }
 
-    private Entity addEntity(Entity entity) {
+    private synchronized Entity addEntity(Entity entity) {
         entities.add(entity);
         if (!(entity instanceof Node)) {
             nonNodeRenderEntities.add(entity);
@@ -99,7 +99,7 @@ public class Lattice {
         return entity;
     }
 
-    public void clearEntities() {
+    public synchronized void clearEntities() {
         entities.clear();
         nonNodeRenderEntities.clear();
     }
@@ -132,7 +132,7 @@ public class Lattice {
         return (Node) addEntity(new Node(parent, model, position, rotation, scale));
     }
 
-    public void deleteEntity(Node node) {
+    public synchronized void deleteEntity(Node node) {
         if (node != null) {
             entities.remove(node);
         }

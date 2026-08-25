@@ -214,19 +214,34 @@ public class Node extends Entity {
         return neighbor == null ? 0.0 : neighbor.position.distance(position);
     }
 
+    /** Immutable mechanical inputs shared by every node in one simulation update. */
+    public record FrameParameters(NodeFormulaVersion nodeFormulaVersion,
+                                  double waveStep, double electricFactor,
+                                  double magneticFactor, double absorption,
+                                  boolean useFixedNodes) {
+    }
+
     public void updateNodeProperties(NodeFormulaVersion nodeFormulaVersion) {
         // If set to false then the node stops updating its position
         if (!remModel.isSimulationUpdateActive()) return;
 
-        switch (nodeFormulaVersion) {
+        updateNodeProperties(new FrameParameters(nodeFormulaVersion,
+                project.getConstantWaveSpeed() / 6.0,
+                project.getConstantElectricFactor(), project.getConstantMagneticFactor(),
+                appSettings.getAbsorption(), appSettings.isUseFixedNodes()));
+    }
+
+    /** Applies one already-accepted frame using its stable parameter snapshot. */
+    public void updateNodeProperties(FrameParameters parameters) {
+        switch (parameters.nodeFormulaVersion()) {
             case v_0_3:
-                updateNodeProperties_v0_3();
+                updateNodeProperties_v0_3(parameters);
                 break;
             case v_0_2:
-                updateNodeProperties_v0_2();
+                updateNodeProperties_v0_2(parameters);
                 break;
             default:
-                updateNodeProperties_v0_1();
+                updateNodeProperties_v0_1(parameters);
                 break;
         }
     }
@@ -286,10 +301,17 @@ public class Node extends Entity {
      *
      */
     public void updateNodeProperties_v0_1() {
+        updateNodeProperties_v0_1(new FrameParameters(NodeFormulaVersion.v_0_1,
+                project.getConstantWaveSpeed() / 6.0,
+                project.getConstantElectricFactor(), project.getConstantMagneticFactor(),
+                appSettings.getAbsorption(), appSettings.isUseFixedNodes()));
+    }
+
+    private void updateNodeProperties_v0_1(FrameParameters parameters) {
         boolean isFixed = type == EntityType.FIXED;
         boolean isWall  = type == EntityType.WALL;
-        double  cws     = project.getConstantWaveSpeed() / 6;
-        double  gamma   = project.getConstantElectricFactor();
+        double  cws     = parameters.waveStep();
+        double  gamma   = parameters.electricFactor();
 
         ef.set(0);
 
@@ -324,11 +346,18 @@ public class Node extends Entity {
     }
 
     public void updateNodeProperties_v0_2() {
+        updateNodeProperties_v0_2(new FrameParameters(NodeFormulaVersion.v_0_2,
+                project.getConstantWaveSpeed() / 6.0,
+                project.getConstantElectricFactor(), project.getConstantMagneticFactor(),
+                appSettings.getAbsorption(), appSettings.isUseFixedNodes()));
+    }
+
+    private void updateNodeProperties_v0_2(FrameParameters parameters) {
         boolean isFixed = type == EntityType.FIXED;
         boolean isWall  = type == EntityType.WALL;
-        double  cws     = project.getConstantWaveSpeed() / 6;
-        double  gamma   = project.getConstantElectricFactor();
-        double  beta    = project.getConstantMagneticFactor();
+        double  cws     = parameters.waveStep();
+        double  gamma   = parameters.electricFactor();
+        double  beta    = parameters.magneticFactor();
         double  f       = 0.1;
 
         ef.set(0);
@@ -337,22 +366,22 @@ public class Node extends Entity {
         for (Node neighbor : neighbors) {
             if (neighbor != null) {
                 if (isFixed || isWall) {
-                    double alpha = isWall ? 0.00 : (1.0 - appSettings.getAbsorption());
+                    double alpha = isWall ? 0.00 : (1.0 - parameters.absorption());
 
                     if (alpha == 0) {
                         velocity.set(0);
                         posBuff.set(fixedPos);
                     }
 
-                    if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                    if ((isXFixed || isFixed && parameters.useFixedNodes()) || isWall) {
                         ef.y += (neighbor.position.y - position.y) * alpha;
                         ef.z += (neighbor.position.z - position.z) * alpha;
                     }
-                    if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                    if ((isYFixed || isFixed && parameters.useFixedNodes()) || isWall) {
                         ef.x += (neighbor.position.x - position.x) * alpha;
                         ef.z += (neighbor.position.z - position.z) * alpha;
                     }
-                    if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) {
+                    if ((isZFixed || isFixed && parameters.useFixedNodes()) || isWall) {
                         ef.x += (neighbor.position.x - position.x) * alpha;
                         ef.y += (neighbor.position.y - position.y) * alpha;
                     }
@@ -391,18 +420,25 @@ public class Node extends Entity {
         //			positionBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul
         //			(0.5));
 
-        if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.x = fixedPos.x;
-        if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;
-        if ((isZFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.z = fixedPos.z;
+        if ((isXFixed || isFixed && parameters.useFixedNodes()) || isWall) posBuff.x = fixedPos.x;
+        if ((isYFixed || isFixed && parameters.useFixedNodes()) || isWall) posBuff.y = fixedPos.y;
+        if ((isZFixed || isFixed && parameters.useFixedNodes()) || isWall) posBuff.z = fixedPos.z;
 
         setColor(isFixed ? FIXED_COLOR : ef);
     }
 
     public void updateNodeProperties_v0_3() {
+        updateNodeProperties_v0_3(new FrameParameters(NodeFormulaVersion.v_0_3,
+                project.getConstantWaveSpeed() / 6.0,
+                project.getConstantElectricFactor(), project.getConstantMagneticFactor(),
+                appSettings.getAbsorption(), appSettings.isUseFixedNodes()));
+    }
+
+    private void updateNodeProperties_v0_3(FrameParameters parameters) {
         boolean isFixed = type == EntityType.FIXED;
-        double  cws     = project.getConstantWaveSpeed() / 6;
-        double  gamma   = project.getConstantElectricFactor();
-        double  beta    = project.getConstantMagneticFactor();
+        double  cws     = parameters.waveStep();
+        double  gamma   = parameters.electricFactor();
+        double  beta    = parameters.magneticFactor();
         double  f       = 0.1;
 
         ef.set(0);

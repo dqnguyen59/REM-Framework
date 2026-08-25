@@ -273,6 +273,10 @@ public class Entity {
         updateRotation();
     }
 
+    public void setRotation(Vector3d rotation) {
+        setRotation(rotation.x, rotation.y, rotation.z);
+    }
+
     /**
      * Values are in degrees.
      * Range: 0..360
@@ -318,6 +322,11 @@ public class Entity {
     }
 
     public void updateMatrix() {
+        updateMatrix(settings.scale);
+    }
+
+    /** Updates this entity using the render scale captured for the current frame. */
+    public void updateMatrix(double renderScale) {
 //        updatePosition();
 //        updateRotation();
 //
@@ -337,7 +346,7 @@ public class Entity {
         transformMatrix.translate(position);
         if (rotationRad.x != 0.0 || rotationRad.y != 0.0 || rotationRad.z != 0.0)
             transformMatrix.rotateXYZ(rotationRad.x, rotationRad.y, rotationRad.z);
-        transformMatrix.scale(settings.scale * (customScale > 0 ? customScale : scale));
+        transformMatrix.scale(renderScale * (customScale > 0 ? customScale : scale));
         transformMatrix4fList[swapBufIndex].set(getTransformMatrix());
         customScale = -1;
         setColor(FIXED_COLOR);
@@ -356,6 +365,26 @@ public class Entity {
      */
     public Matrix4f getTransformMatrix4f() {
         return transformMatrix4fList[1 - swapBufIndex];
+    }
+
+    /**
+     * Returns the matrix being calculated for the next published render frame.
+     * <br><br>
+     * Physics and matrix workers may write this buffer while OpenGL reads
+     * {@link #getTransformMatrix4f()} from the opposite buffer.
+     */
+    public Matrix4f getCalculatedTransformMatrix4f() {
+        return transformMatrix4fList[swapBufIndex];
+    }
+
+    /**
+     * Mirrors the newly calculated matrix into the render buffer.
+     * <br><br>
+     * This is used only by synchronous matrix refreshes, when OpenGL is not
+     * drawing, so paused and layout-rebuild frames start with two valid buffers.
+     */
+    public void synchronizeTransformMatrixBuffers() {
+        transformMatrix4fList[1 - swapBufIndex].set(transformMatrix4fList[swapBufIndex]);
     }
 
     public Vector3d toWorldPosition() {

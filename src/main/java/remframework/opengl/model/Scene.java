@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.nio.FloatBuffer;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Getter
 @Setter
@@ -92,11 +93,12 @@ public class Scene {
             Collections.newSetFromMap(new IdentityHashMap<>());
     /**
      * Packed render data written alongside the back transform matrix buffer.
-     * Each entity owns one fixed 29-float record at its entity-array index.
+     * Each entity owns one fixed 30-float record at its entity-array index.
      */
     private final Map<ObjFileModel, FloatBuffer[]> instanceDataBuffers = new IdentityHashMap<>();
     private final Map<ObjFileModel, Integer> instanceDataEntityCounts = new IdentityHashMap<>();
     private Object[] preparedInstanceEntities;
+    private int preparedBaseEntityIndex = -1;
     private FloatBuffer[][] instanceDataBuffersByEntity;
     private int[] instanceDataSlotsByEntity;
     private volatile boolean instanceDataLayoutDirty = true;
@@ -194,7 +196,8 @@ public class Scene {
 
     public String status = "";
 
-    List<Thread> threads = new ArrayList<>();
+    private final List<Thread> threads = new ArrayList<>();
+    private final AtomicReference<Throwable> taskFailure = new AtomicReference<>();
 
     public Scene() {
         System.out.println("Scene.Scene()");
@@ -478,7 +481,8 @@ public class Scene {
             return;
         }
         arrow.setPosition(anchorLocal);
-        arrow.setRotation(GradientArrowGeometry.rotationForDirection(directionLocal));
+        Vector3d rotation = GradientArrowGeometry.rotationForDirection(directionLocal);
+        arrow.setRotation(rotation.x, rotation.y, rotation.z);
         arrow.setScale(visualLength / (GradientArrowGeometry.MESH_LENGTH * settings.scale));
         arrow.setOverrideModelMaterial(true);
         arrow.getMaterial().setDiffuseColor(new Vector4f(color));
@@ -1375,12 +1379,14 @@ public class Scene {
         return null;
     }
 
-    private void threadUpdateMatrix(final int start, final int end) {
-        threads.add(Thread.startVirtualThread(() -> {
+    private void threadUpdateMatrix(final int start, final int end, final double renderScale,
+                                    final boolean synchronizeBothBuffers) {
+        startTask(() -> {
             int i = start;
 
             while (i < end) {
-                Entity entity = (Entity) lattice.getEntityArray()[i++];
+                int entityIndex = i++;
+                Entity entity = (Entity) lattice.getEntityArray()[entityIndex];
                 if (entity instanceof Node node && !node.isVisible()
                         && !(inspectionMode && node.isInspectionVisible())) {
                     node.updatePosition();
@@ -1388,19 +1394,26 @@ public class Scene {
                     node.setCustomColor(null);
                     continue;
                 }
-                entity.updateMatrix();
-                writeInstanceData(entity, i - 1);
+                entity.updateMatrix(renderScale);
+                if (synchronizeBothBuffers) entity.synchronizeTransformMatrixBuffers();
+                writeInstanceData(entity, entityIndex, synchronizeBothBuffers);
             }
-        }));
+        });
     }
 
-    private void writeInstanceData(Entity entity, int entityIndex) {
+    private void writeInstanceData(Entity entity, int entityIndex,
+                                   boolean synchronizeBothBuffers) {
         FloatBuffer[] buffers = instanceDataBuffersByEntity[entityIndex];
         if (buffers == null) return;
-        FloatBuffer data = buffers[Entity.getSwapBufferIndex()];
+        writeInstanceData(entity, buffers[Entity.getSwapBufferIndex()], entityIndex);
+        if (synchronizeBothBuffers) {
+            writeInstanceData(entity, buffers[1 - Entity.getSwapBufferIndex()], entityIndex);
+        }
+    }
 
+    private void writeInstanceData(Entity entity, FloatBuffer data, int entityIndex) {
         int offset = instanceDataSlotsByEntity[entityIndex] * INSTANCE_FLOATS;
-        entity.getTransformMatrix4f().get(offset, data);
+        entity.getCalculatedTransformMatrix4f().get(offset, data);
         put(data, offset + 16, entity.getMaterial().getAmbientIntensityColor());
         put(data, offset + 20, entity.getMaterial().getDiffuseIntensityColor());
         put(data, offset + 24, entity.getMaterial().getSpecularIntensityColor());
@@ -1428,6 +1441,7 @@ public class Scene {
         instanceDataEntityCounts.clear();
         instanceDataBuffersByEntity = new FloatBuffer[entityArray.length][];
         instanceDataSlotsByEntity = new int[entityArray.length];
+        preparedBaseEntityIndex = -1;
 
         Map<ObjFileModel, Integer> counts = new IdentityHashMap<>();
         for (Object value : entityArray) {
@@ -1445,6 +1459,7 @@ public class Scene {
 
         Map<ObjFileModel, Integer> nextSlots = new IdentityHashMap<>();
         for (int i = 0; i < entityArray.length; i++) {
+            if (entityArray[i] == lattice.getBaseEntity()) preparedBaseEntityIndex = i;
             if (entityArray[i] instanceof Entity entity && entity.getModel() != null
                     && entity.isVisible()) {
                 instanceDataBuffersByEntity[i] = instanceDataBuffers.get(entity.getModel());
@@ -1465,12 +1480,45 @@ public class Scene {
     }
 
     public void updateMatrix(int numThreads, int segmentSize) {
+        updateMatrix(numThreads, segmentSize, false);
+    }
+
+    /**
+     * Updates entity matrices in parallel after publishing one stable lattice-root matrix.
+     * <br><br>
+     * When {@code synchronizeBothBuffers} is true, the caller has guaranteed that OpenGL
+     * is not drawing. Both transform and packed-instance buffers are initialized so a
+     * paused refresh or visibility-layout rebuild cannot expose an uninitialized frame.
+     */
+    public void updateMatrix(int numThreads, int segmentSize, boolean synchronizeBothBuffers) {
         ensureInstanceDataBuffers();
+        double renderScale = settings.getScale();
+        Entity baseEntity = lattice.getBaseEntity();
+        if (baseEntity != null) {
+            baseEntity.updateMatrix(renderScale);
+            if (synchronizeBothBuffers) baseEntity.synchronizeTransformMatrixBuffers();
+            if (preparedBaseEntityIndex >= 0) {
+                writeInstanceData(baseEntity, preparedBaseEntityIndex, synchronizeBothBuffers);
+            }
+        }
+        int entityCount = lattice.getEntityArray().length;
         for (int i = 0; i < numThreads; i++) {
             int start = i * segmentSize;
+            if (start >= entityCount) break;
             int end   = start + segmentSize;
-            end = Math.min(end, lattice.getEntityArray().length);
-            threadUpdateMatrix(start, end);
+            end = Math.min(end, entityCount);
+            if (preparedBaseEntityIndex >= start && preparedBaseEntityIndex < end) {
+                if (start < preparedBaseEntityIndex) {
+                    threadUpdateMatrix(start, preparedBaseEntityIndex, renderScale,
+                            synchronizeBothBuffers);
+                }
+                if (preparedBaseEntityIndex + 1 < end) {
+                    threadUpdateMatrix(preparedBaseEntityIndex + 1, end, renderScale,
+                            synchronizeBothBuffers);
+                }
+            } else {
+                threadUpdateMatrix(start, end, renderScale, synchronizeBothBuffers);
+            }
         }
     }
 
@@ -1488,40 +1536,63 @@ public class Scene {
         return instanceDataEntityCounts.getOrDefault(model, 0);
     }
 
-    private void threadCalcRemField(final int start, final int end) {
-        threads.add(Thread.startVirtualThread(() -> {
+    private void threadCalcRemField(final int start, final int end,
+                                    final Node.FrameParameters parameters) {
+        startTask(() -> {
             int i = start;
 
-            // If set to false then the node stops updating its position
-            if (REMModel.isSimulationUpdateActive()) {
-                while (i < end) {
-                    ((Node) lattice.getNodeArray()[i++]).updateNodeProperties(
-                            settings.getNodeFormulaVersion());
-                }
+            while (i < end) {
+                ((Node) lattice.getNodeArray()[i++]).updateNodeProperties(parameters);
+            }
+        });
+    }
+
+    public void processRemFieldEngine(int numThreads, int segmentSize) {
+        if (!REMModel.isSimulationUpdateActive()) return;
+        Node.FrameParameters parameters = new Node.FrameParameters(
+                settings.getNodeFormulaVersion(), project.getConstantWaveSpeed() / 6.0,
+                project.getConstantElectricFactor(), project.getConstantMagneticFactor(),
+                appSettings.getAbsorption(), appSettings.isUseFixedNodes());
+        int nodeCount = lattice.getNodeArray().length;
+        for (int i = 0; i < numThreads; i++) {
+            int start = i * segmentSize;
+            if (start >= nodeCount) break;
+            int end   = start + segmentSize;
+            end = Math.min(end, nodeCount);
+            threadCalcRemField(start, end, parameters);
+        }
+    }
+
+    private void startTask(Runnable task) {
+        threads.add(Thread.startVirtualThread(() -> {
+            try {
+                task.run();
+            } catch (Throwable failure) {
+                taskFailure.compareAndSet(null, failure);
             }
         }));
     }
 
-    public void processRemFieldEngine(int numThreads, int segmentSize) {
-        for (int i = 0; i < numThreads; i++) {
-            int start = i * segmentSize;
-            int end   = start + segmentSize;
-            end = Math.min(end, lattice.getNodeArray().length);
-            threadCalcRemField(start, end);
-        }
-    }
-
     public void waitForAllTasksReady() {
+        boolean interrupted = false;
         for (Thread thread : threads) {
-            try {
-                thread.join();
-            }
-            catch (InterruptedException e) {
-                e.printStackTrace();
-                throw new RuntimeException(e);
+            while (thread.isAlive()) {
+                try {
+                    thread.join();
+                } catch (InterruptedException exception) {
+                    interrupted = true;
+                }
             }
         }
         threads.clear();
+        Throwable failure = taskFailure.getAndSet(null);
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for frame workers.");
+        }
+        if (failure instanceof RuntimeException runtimeException) throw runtimeException;
+        if (failure instanceof Error error) throw error;
+        if (failure != null) throw new IllegalStateException("Frame worker failed.", failure);
     }
 
     public void startAnimation() {

@@ -112,6 +112,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     protected            long            currentTime;
     private              int             numFrameCalculation;
     private              Thread          thread;
+    private volatile     Throwable       frameCalculationFailure;
     private final        Long            updateLimit;
     private volatile     boolean         updateLimitReached;
     private final WorkspaceController discoveryWorkspace =
@@ -830,82 +831,122 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
      * Preventing calculating next frame
      */
     private void waitForNextFrameIsReady() {
-        try {
-            if (thread != null) {
-                thread.join();
+        Thread pendingFrame = thread;
+        if (pendingFrame == null) return;
+        boolean interrupted = false;
+        while (pendingFrame.isAlive()) {
+            try {
+                pendingFrame.join();
+            } catch (InterruptedException exception) {
+                interrupted = true;
             }
         }
-        catch (InterruptedException e) {
+        thread = null;
+        Throwable failure = frameCalculationFailure;
+        frameCalculationFailure = null;
+        if (interrupted) {
             Thread.currentThread().interrupt();
-            System.out.println("Something's wrong");
+            IllegalStateException interruption = new IllegalStateException(
+                    "Interrupted while waiting for calcNextFrame().");
+            if (failure != null) interruption.addSuppressed(failure);
+            throw interruption;
         }
+        if (failure instanceof RuntimeException runtimeException) throw runtimeException;
+        if (failure instanceof Error error) throw error;
+        if (failure != null) throw new IllegalStateException("calcNextFrame() failed.", failure);
     }
 
     private void calcNextFrame(boolean singleStepUpdate) {
-        //isCalcNextPhysicsReady = false;
         numFrameCalculation++;
         // While the GPU is rendering on the current buffer,
         // swap the buffer to calculate physics on another buffer.
         Node.swapBuffer();
         FeasibilityPilotTelemetry.getInstance().beginUpdate();
+        frameCalculationFailure = null;
 
-        //thread = new Thread(() -> {
         thread = Thread.startVirtualThread(() -> {
-            PerformanceMonitor.start(Measurement.totalCPURenderTime);
+            try {
+                PerformanceMonitor.start(Measurement.totalCPURenderTime);
 
-            int numThreads  = appSettings.getNumThreads();
-            int numNodes    = scene.getLattice().getEntities().size();
-            int segmentSize = numNodes > numThreads ? numNodes / numThreads + 1 : numNodes;
+                Object[] nodeArray = scene.getLattice().getNodeArray();
+                Object[] entityArray = scene.getLattice().getEntityArray();
+                if (nodeArray == null || entityArray == null) {
+                    throw new IllegalStateException("Lattice arrays are not ready for calculation.");
+                }
+                int requestedThreads = appSettings.getNumThreads();
 
-            PerformanceMonitor.start(Measurement.physics);
+                PerformanceMonitor.start(Measurement.physics);
 
-            if (waitAfterReset <= 0) {
-                simulateRain();
-                simulateOccupancies();
-            } else {
-                waitAfterReset--;
-            }
-            scene.updateProbeMeasurements(transportSystem);
-            simulateDetection();
+                if (waitAfterReset <= 0) {
+                    simulateRain();
+                    simulateOccupancies();
+                } else {
+                    waitAfterReset--;
+                }
+                scene.updateProbeMeasurements(transportSystem);
+                simulateDetection();
 
-            // Run the physics calculations of the nodes through all available threads.
-            scene.processRemFieldEngine(numThreads, segmentSize);
+                int nodeWorkers = workerCount(requestedThreads, nodeArray.length);
+                if (nodeWorkers > 0) {
+                    scene.processRemFieldEngine(nodeWorkers,
+                            Math.ceilDiv(nodeArray.length, nodeWorkers));
+                    scene.waitForAllTasksReady();
+                }
 
-            // Wait until all physics calculations are ready.
-            scene.waitForAllTasksReady();
+                if (remModel.isSimulating())
+                    PerformanceMonitor.stop(Measurement.physics);
+                else
+                    PerformanceMonitor.reset(Measurement.physics);
 
-            if (remModel.isSimulating())
-                PerformanceMonitor.stop(Measurement.physics);
-            else
-                PerformanceMonitor.reset(Measurement.physics);
+                PerformanceMonitor.start(Measurement.updateMatrix);
 
-            PerformanceMonitor.start(Measurement.updateMatrix);
+                int entityWorkers = workerCount(requestedThreads, entityArray.length);
+                if (entityWorkers > 0) {
+                    scene.updateMatrix(entityWorkers,
+                            Math.ceilDiv(entityArray.length, entityWorkers));
+                    scene.waitForAllTasksReady();
+                }
 
-            // Update the matrix of all nodes through all available threads.
-            scene.updateMatrix(numThreads, segmentSize);
-
-            // Wait until all matrices are updated.
-            scene.waitForAllTasksReady();
-
-            samplePassiveDetectors();
-            FeasibilityPilotTelemetry telemetry =
-                    FeasibilityPilotTelemetry.getInstance();
-            if (telemetry.isEnabled()) {
-                telemetry.endUpdate(
-                        DetectorExperimentController.getInstance()
-                                .getUpdatesRecorded());
-            }
-            PerformanceMonitor.stop(Measurement.updateMatrix);
-
-            PerformanceMonitor.stop(Measurement.totalCPURenderTime);
-
-            //isCalcNextPhysicsReady = true;
-            if (singleStepUpdate) remModel.finishSingleStep();
-            numFrameCalculation--;
-            if (numFrameCalculation != 0) {
-                System.out.println("Error: numPhysicsFrameCalculation: " + numFrameCalculation);
+                samplePassiveDetectors();
+                FeasibilityPilotTelemetry telemetry = FeasibilityPilotTelemetry.getInstance();
+                if (telemetry.isEnabled()) {
+                    telemetry.endUpdate(DetectorExperimentController.getInstance()
+                            .getUpdatesRecorded());
+                }
+                PerformanceMonitor.stop(Measurement.updateMatrix);
+                PerformanceMonitor.stop(Measurement.totalCPURenderTime);
+            } catch (Throwable failure) {
+                frameCalculationFailure = failure;
+            } finally {
+                if (singleStepUpdate) remModel.finishSingleStep();
+                numFrameCalculation--;
+                if (numFrameCalculation != 0) {
+                    System.out.println("Error: numPhysicsFrameCalculation: "
+                            + numFrameCalculation);
+                }
             }
         });
+    }
+
+    private static int workerCount(int requestedThreads, int itemCount) {
+        if (itemCount <= 0) return 0;
+        return Math.min(Math.max(1, requestedThreads), itemCount);
+    }
+
+    /** Keeps the complete finite lattice inside the camera far plane. */
+    private void ensureCameraFarPlaneContainsLattice() {
+        double scale = Math.abs(settings.getScale()) * Constants.EP_DEFAULT_DISTANCE;
+        double halfX = Math.max(0, project.getDimensionX() - 1) * scale * 0.5;
+        double halfY = Math.max(0, project.getDimensionY() - 1) * scale * 0.5;
+        double halfZ = Math.max(0, project.getDimensionZ() - 1) * scale * 0.5;
+        double radius = Math.sqrt(halfX * halfX + halfY * halfY + halfZ * halfZ);
+        Vector3f cameraPosition = project.camera.getPosition();
+        double distanceToOrigin = Math.sqrt(cameraPosition.x * cameraPosition.x
+                + cameraPosition.y * cameraPosition.y + cameraPosition.z * cameraPosition.z);
+        double required = distanceToOrigin + radius + Math.max(1.0, scale);
+        if (Double.isFinite(required) && required > project.camera.getZ_far() * 0.95) {
+            project.camera.setZ_far((float) Math.min(Float.MAX_VALUE, required * 1.10));
+        }
     }
 
     private void resetOccupancies() {
@@ -916,11 +957,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     /** Keeps the render/picking matrix buffer current without advancing simulation state. */
     private void refreshRenderMatrices() {
-        int numThreads = appSettings.getNumThreads();
-        int numNodes = scene.getLattice().getEntities().size();
-        int segmentSize = numNodes > numThreads ? numNodes / numThreads + 1 : numNodes;
+        Object[] entityArray = scene.getLattice().getEntityArray();
+        if (entityArray == null || entityArray.length == 0) return;
+        int numThreads = workerCount(appSettings.getNumThreads(), entityArray.length);
+        int segmentSize = Math.ceilDiv(entityArray.length, numThreads);
         Node.swapBuffer();
-        scene.updateMatrix(numThreads, segmentSize);
+        scene.updateMatrix(numThreads, segmentSize, true);
         scene.waitForAllTasksReady();
     }
 
@@ -1199,6 +1241,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     @Override
     public void cleanUp() {
         System.out.println("simulator.cleanUp();");
+        Throwable pendingFrameFailure = null;
+        try {
+            waitForNextFrameIsReady();
+        } catch (Throwable failure) {
+            pendingFrameFailure = failure;
+        }
         GravityExperimentController controller = GravityExperimentController.getInstance();
         GravityPressureExperimentController pressureController =
                 GravityPressureExperimentController.getInstance();
@@ -1240,6 +1288,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 System.out.println("CSV: " + controller.getOutputFile());
             }
         }
+        if (pendingFrameFailure instanceof RuntimeException runtimeException)
+            throw runtimeException;
+        if (pendingFrameFailure instanceof Error error) throw error;
+        if (pendingFrameFailure != null)
+            throw new IllegalStateException("Final calcNextFrame() failed.", pendingFrameFailure);
     }
 
     @Override
@@ -1263,9 +1316,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             return;
         }
 
-        checkSettingsChanged();
-
         waitForNextFrameIsReady();
+        checkSettingsChanged();
         if (scene.getLattice().applyPendingAbsorptionLayerChange()) {
             renderMatricesDirty = true;
         }
@@ -1278,12 +1330,28 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             // Make sure it is not doing any calculation while updating new scene.
             if (remModel.isLoadingReady()) {
                 updateNodesArray();
+                // Constructor-time child matrices predate the final root rotation. Initialize
+                // both buffers before the newly loaded lattice is rendered for the first time.
+                refreshRenderMatrices();
+                renderMatricesDirty = false;
+                boolean singleStepUpdate = remModel.consumeSingleStepRequest();
+                if (remModel.isSimulating() || singleStepUpdate) {
+                    pausedRenderMatricesCurrent = false;
+                    calcNextFrame(singleStepUpdate);
+                } else {
+                    pausedRenderMatricesCurrent = true;
+                }
                 isLoadingStarted = false;
                 System.out.println("isLoadingStarted: " + isLoadingStarted);
             }
         } else if (!updateLimitReached) {
             waitForRenderingReady();
             resetMonitoringDeadThreads();
+
+            // Animation changes frame input only after the preceding calculation has joined.
+            scene.runAnimation();
+            if (scene.isAnimated()) renderMatricesDirty = true;
+            ensureCameraFarPlaneContainsLattice();
 
             processDeferredHoverPick();
             for (PassiveObserver probe : scene.getProbes()) {
@@ -1329,8 +1397,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         renderer.render(project.camera, scene);
         isRenderingReady = true;
         PerformanceMonitor.stop(Measurement.sendToGPU);
-
-        scene.runAnimation();
 
         super.render(scene.isAnimated());
 

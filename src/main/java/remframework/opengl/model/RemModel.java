@@ -65,7 +65,7 @@ public class RemModel {
     /** True only while that existing update loop is executing a paused step. */
     private volatile boolean singleStepInProgress;
 
-    private boolean isLoadingReady = false;
+    private volatile boolean isLoadingReady = false;
 
     private boolean isWallVisible = false;
     private boolean isChanged     = false;
