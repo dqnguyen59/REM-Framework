@@ -77,7 +77,7 @@ public class Constants {
     public static final String SHADER_NODE_VERTEX_FILE      = "shaders/node_vertex.vs";
     public static final String SHADER_NODE_FRAGMENT_FILE    = "shaders/node_fragment.fs";
 
-    public static final String MODEL_NODE       = "models/cube.obj";
+    public static final String MODEL_NODE       = "models/sphere3.obj";
     public static final String MODEL_LIGHT_BULB = "models/sphere.obj";
     public static final String MODEL_LIGHT_CAP  = "models/spotLight.obj";
     public static final String MODEL_ARROW      = "models/arrow.obj";
