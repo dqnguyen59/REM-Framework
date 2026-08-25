@@ -138,7 +138,7 @@ public class OBJFormatLoader {
 		storeDataInAttribList(1, 2, textureCoords);
 		
 		unbind();
-		return new ObjFileModel(id, indices.length);
+		return new ObjFileModel(id, indices.length, vertices, textureCoords, null, indices);
 	}
 	
 	public ObjFileModel loadModel(float[] vertices, float[] textureCoords, float[] normals, int[] indices) {
@@ -149,7 +149,7 @@ public class OBJFormatLoader {
 		storeDataInAttribList(2, 3, normals);
 		
 		unbind();
-		return new ObjFileModel(id, indices.length);
+		return new ObjFileModel(id, indices.length, vertices, textureCoords, normals, indices);
 	}
 	
 	public int loadTexture(String filename) throws Exception {

@@ -88,6 +88,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private final Renderer        renderer;
     private final OBJFormatLoader loader;
+    private final Offscreen3DRenderer offscreen3DRenderer;
+    private Renderer.RenderState renderState;
+    private long renderStateVersion = Long.MIN_VALUE;
 
     private       Node     selectedNode;
     private final Vector2d lastMousePos = new Vector2d();
@@ -124,6 +127,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         this.updateLimit = updateLimit;
         renderer = new Renderer();
         loader   = new OBJFormatLoader();
+        offscreen3DRenderer = new Offscreen3DRenderer(glWindow);
     }
 
     @Override
@@ -140,6 +144,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         initDefaultScene();
         //updateNodesProperties();
         remModel.startSimulation();
+        offscreen3DRenderer.start();
     }
 
     public void initDefaultLights() {
@@ -1243,6 +1248,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         discoveryWorkspace.close();
         if (discoveryViewport != null) discoveryViewport.close();
         scene.stopAnimation();
+        offscreen3DRenderer.stop();
         renderer.cleanup();
         loader.cleanup();
         super.cleanUp();
@@ -1384,11 +1390,17 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         PerformanceMonitor.start(Measurement.sendToGPU);
         isRenderingReady = false;
 
-//        if (project.terrain.isVisible())
-//            renderer.processTerrain(project.terrain);
-
-        // Render all nodes
-        renderer.render(project.camera, scene);
+        // Submit a complete membership/camera snapshot to the independent 3D context. The
+        // display context presents its latest finished texture immediately and never waits for
+        // this request to finish.
+        long currentRenderStateVersion = renderer.stateVersion();
+        if (renderState == null || renderStateVersion != currentRenderStateVersion) {
+            renderState = renderer.snapshot();
+            renderStateVersion = currentRenderStateVersion;
+        }
+        offscreen3DRenderer.request(renderState, project.camera, scene,
+                glWindow.getWidth(), glWindow.getHeight());
+        offscreen3DRenderer.presentLatest(glWindow.getWidth(), glWindow.getHeight());
         isRenderingReady = true;
         PerformanceMonitor.stop(Measurement.sendToGPU);
 
