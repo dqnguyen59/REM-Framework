@@ -168,6 +168,8 @@ public class EntityRenderer implements IRenderer {
 	public void render(Camera camera, Scene scene, List<Entity> probeEntities,
 			List<Entity> gradientArrowEntities) {
 		long startedNanos = System.nanoTime();
+		GL11.glEnable(GL11.GL_BLEND);
+		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 		shader.bind();
 		shader.setUniform("textureSampler", 0);
 		shader.setUniform("projectionMatrix", camera.getProjectionMatrix());
@@ -190,6 +192,7 @@ public class EntityRenderer implements IRenderer {
 
 		unbind();
 		shader.unbind();
+		GL11.glDisable(GL11.GL_BLEND);
 		recordRenderMeasurement(startedNanos);
 	}
 

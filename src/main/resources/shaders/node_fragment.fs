@@ -144,5 +144,9 @@ void main() {
 		}
 	}
 
-	fragColor = max(minVec4, min((ambientC * vec4(ambientLight, 1) + max(minVec4, min(diffuseSpecularComp, maxVec4))) * vDepthVisibility, maxVec4));
+	vec4 litColor = max(minVec4, min((ambientC * vec4(ambientLight, 1) + max(minVec4, min(diffuseSpecularComp, maxVec4))) * vDepthVisibility, maxVec4));
+	// Opacity is a material property, not the sum of ambient and lighting terms.
+	// Using the lit alpha made a low diffuse alpha appear opaque whenever ambient alpha
+	// remained at its default value of one.
+	fragColor = vec4(litColor.rgb, diffuseC.a * vDepthVisibility);
 }
