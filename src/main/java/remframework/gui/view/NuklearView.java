@@ -253,12 +253,22 @@ public class NuklearView {
     }
 
     public void render() {
+        prepareFrame();
+        renderPreparedFrame();
+    }
+
+    /** Builds the Nuklear command list and processes widget interaction without drawing it. */
+    public void prepareFrame() {
         if (windowHandle == 0) return;
 
         updateWindowState();
 
         nuklearModel.render(windowHandle, context);
+    }
 
+    /** Draws the command list prepared by {@link #prepareFrame()}. */
+    public void renderPreparedFrame() {
+        if (windowHandle == 0) return;
         render(Nuklear.NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);
     }
 

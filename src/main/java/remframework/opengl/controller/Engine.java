@@ -78,6 +78,8 @@ public abstract class Engine {
 	private int renderCounter;
 	private Long frameLimit;
     private long currentTime;
+	private long guiPreparationNanos;
+	private boolean guiFramePrepared;
 
 	public Engine(GLWindow glWindow) {
 		this.glWindow = glWindow;
@@ -332,9 +334,9 @@ public abstract class Engine {
 		GL11.glCullFace(GL11.GL_BACK);
 	}
 	
-	protected void render(boolean isAnimated) {
-		PerformanceMonitor.start(Measurement.gui2D);
-
+	/** Polls input and builds the 2D command list before potentially expensive 3D work. */
+	protected void beginGuiFrame(boolean isAnimated) {
+		long startedNanos = System.nanoTime();
 		processKeyboardInput();
 		processGuiMouseInput();
 
@@ -342,15 +344,25 @@ public abstract class Engine {
 
 		checkFrameFocus();
 
-		if (!isAnimated && !Screenshot.isTakingScreenShot()) {
-			nuklearView.render();
-		}
+		guiFramePrepared = !isAnimated && !Screenshot.isTakingScreenShot();
+		if (guiFramePrepared) nuklearView.prepareFrame();
+		guiPreparationNanos = System.nanoTime() - startedNanos;
+	}
 
-		PerformanceMonitor.stop(Measurement.gui2D);
-
+	/** Draws the prepared 2D commands, presents the window, and never waits for simulation. */
+	protected void finishGuiFrame() {
+		long startedNanos = System.nanoTime();
+		if (guiFramePrepared) nuklearView.renderPreparedFrame();
+		PerformanceMonitor.record(Measurement.gui2D,
+				guiPreparationNanos + System.nanoTime() - startedNanos);
 		glWindow.update();
-
 		renderCounter++;
+		guiFramePrepared = false;
+	}
+
+	protected void render(boolean isAnimated) {
+		beginGuiFrame(isAnimated);
+		finishGuiFrame();
 	}
 	
 	public void start() throws Exception {

@@ -49,6 +49,10 @@ public class PerformanceMonitor {
 		iMeasurements[measurement.ordinal()] = System.nanoTime() - iMeasurements[measurement.ordinal()];
 		measurements[measurement.ordinal()] = iMeasurements[measurement.ordinal()];
 	}
+
+	public static void record(Measurement measurement, long elapsedNanos) {
+		measurements[measurement.ordinal()] = elapsedNanos;
+	}
 	
 	public static double getMeasurement(Measurement measurement) {
 		return measurements[measurement.ordinal()] / ONE_MILLION_NANO_SECONDS;

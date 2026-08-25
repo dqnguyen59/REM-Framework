@@ -111,8 +111,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private              Node            lastSelectedNode;
     protected            long            currentTime;
     private              int             numFrameCalculation;
-    private              Thread          thread;
-    private volatile     Throwable       frameCalculationFailure;
+    private final NonBlockingFrameTask frameCalculation = new NonBlockingFrameTask();
     private final        Long            updateLimit;
     private volatile     boolean         updateLimitReached;
     private final WorkspaceController discoveryWorkspace =
@@ -827,105 +826,89 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         }
     }
 
-    /**
-     * Preventing calculating next frame
-     */
+    /** Waits only for shutdown or another terminal transition. */
     private void waitForNextFrameIsReady() {
-        Thread pendingFrame = thread;
-        if (pendingFrame == null) return;
-        boolean interrupted = false;
-        while (pendingFrame.isAlive()) {
-            try {
-                pendingFrame.join();
-            } catch (InterruptedException exception) {
-                interrupted = true;
-            }
-        }
-        thread = null;
-        Throwable failure = frameCalculationFailure;
-        frameCalculationFailure = null;
-        if (interrupted) {
-            Thread.currentThread().interrupt();
-            IllegalStateException interruption = new IllegalStateException(
-                    "Interrupted while waiting for calcNextFrame().");
-            if (failure != null) interruption.addSuppressed(failure);
-            throw interruption;
-        }
-        if (failure instanceof RuntimeException runtimeException) throw runtimeException;
-        if (failure instanceof Error error) throw error;
-        if (failure != null) throw new IllegalStateException("calcNextFrame() failed.", failure);
+        frameCalculation.awaitComplete();
+    }
+
+    /** Publishes a completed back buffer without ever waiting for a running calculation. */
+    private boolean publishNextFrameIfReady() {
+        if (!frameCalculation.tryComplete()) return false;
+        Node.swapBuffer();
+        return true;
     }
 
     private void calcNextFrame(boolean singleStepUpdate) {
         numFrameCalculation++;
-        // While the GPU is rendering on the current buffer,
-        // swap the buffer to calculate physics on another buffer.
-        Node.swapBuffer();
         FeasibilityPilotTelemetry.getInstance().beginUpdate();
-        frameCalculationFailure = null;
 
-        thread = Thread.startVirtualThread(() -> {
-            try {
-                PerformanceMonitor.start(Measurement.totalCPURenderTime);
+        try {
+            frameCalculation.start(() -> {
+                try {
+                    PerformanceMonitor.start(Measurement.totalCPURenderTime);
 
-                Object[] nodeArray = scene.getLattice().getNodeArray();
-                Object[] entityArray = scene.getLattice().getEntityArray();
-                if (nodeArray == null || entityArray == null) {
-                    throw new IllegalStateException("Lattice arrays are not ready for calculation.");
+                    Object[] nodeArray = scene.getLattice().getNodeArray();
+                    Object[] entityArray = scene.getLattice().getEntityArray();
+                    if (nodeArray == null || entityArray == null) {
+                        throw new IllegalStateException(
+                                "Lattice arrays are not ready for calculation.");
+                    }
+                    int requestedThreads = appSettings.getNumThreads();
+
+                    PerformanceMonitor.start(Measurement.physics);
+
+                    if (waitAfterReset <= 0) {
+                        simulateRain();
+                        simulateOccupancies();
+                    } else {
+                        waitAfterReset--;
+                    }
+                    scene.updateProbeMeasurements(transportSystem);
+                    simulateDetection();
+
+                    int nodeWorkers = workerCount(requestedThreads, nodeArray.length);
+                    if (nodeWorkers > 0) {
+                        scene.processRemFieldEngine(nodeWorkers,
+                                Math.ceilDiv(nodeArray.length, nodeWorkers));
+                        scene.waitForAllTasksReady();
+                    }
+
+                    if (remModel.isSimulating())
+                        PerformanceMonitor.stop(Measurement.physics);
+                    else
+                        PerformanceMonitor.reset(Measurement.physics);
+
+                    PerformanceMonitor.start(Measurement.updateMatrix);
+
+                    int entityWorkers = workerCount(requestedThreads, entityArray.length);
+                    if (entityWorkers > 0) {
+                        scene.updateMatrix(entityWorkers,
+                                Math.ceilDiv(entityArray.length, entityWorkers));
+                        scene.waitForAllTasksReady();
+                    }
+
+                    samplePassiveDetectors();
+                    FeasibilityPilotTelemetry telemetry =
+                            FeasibilityPilotTelemetry.getInstance();
+                    if (telemetry.isEnabled()) {
+                        telemetry.endUpdate(DetectorExperimentController.getInstance()
+                                .getUpdatesRecorded());
+                    }
+                    PerformanceMonitor.stop(Measurement.updateMatrix);
+                    PerformanceMonitor.stop(Measurement.totalCPURenderTime);
+                } finally {
+                    if (singleStepUpdate) remModel.finishSingleStep();
+                    numFrameCalculation--;
+                    if (numFrameCalculation != 0) {
+                        System.out.println("Error: numPhysicsFrameCalculation: "
+                                + numFrameCalculation);
+                    }
                 }
-                int requestedThreads = appSettings.getNumThreads();
-
-                PerformanceMonitor.start(Measurement.physics);
-
-                if (waitAfterReset <= 0) {
-                    simulateRain();
-                    simulateOccupancies();
-                } else {
-                    waitAfterReset--;
-                }
-                scene.updateProbeMeasurements(transportSystem);
-                simulateDetection();
-
-                int nodeWorkers = workerCount(requestedThreads, nodeArray.length);
-                if (nodeWorkers > 0) {
-                    scene.processRemFieldEngine(nodeWorkers,
-                            Math.ceilDiv(nodeArray.length, nodeWorkers));
-                    scene.waitForAllTasksReady();
-                }
-
-                if (remModel.isSimulating())
-                    PerformanceMonitor.stop(Measurement.physics);
-                else
-                    PerformanceMonitor.reset(Measurement.physics);
-
-                PerformanceMonitor.start(Measurement.updateMatrix);
-
-                int entityWorkers = workerCount(requestedThreads, entityArray.length);
-                if (entityWorkers > 0) {
-                    scene.updateMatrix(entityWorkers,
-                            Math.ceilDiv(entityArray.length, entityWorkers));
-                    scene.waitForAllTasksReady();
-                }
-
-                samplePassiveDetectors();
-                FeasibilityPilotTelemetry telemetry = FeasibilityPilotTelemetry.getInstance();
-                if (telemetry.isEnabled()) {
-                    telemetry.endUpdate(DetectorExperimentController.getInstance()
-                            .getUpdatesRecorded());
-                }
-                PerformanceMonitor.stop(Measurement.updateMatrix);
-                PerformanceMonitor.stop(Measurement.totalCPURenderTime);
-            } catch (Throwable failure) {
-                frameCalculationFailure = failure;
-            } finally {
-                if (singleStepUpdate) remModel.finishSingleStep();
-                numFrameCalculation--;
-                if (numFrameCalculation != 0) {
-                    System.out.println("Error: numPhysicsFrameCalculation: "
-                            + numFrameCalculation);
-                }
-            }
-        });
+            });
+        } catch (Throwable failure) {
+            numFrameCalculation--;
+            throw failure;
+        }
     }
 
     private static int workerCount(int requestedThreads, int itemCount) {
@@ -1303,30 +1286,39 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             GL11.glViewport(0, 0, glWindow.getWidth(), glWindow.getHeight());
         }
 
+        // Input and Nuklear command generation must run before any 3D work. The GUI keeps
+        // processing while a calculated back buffer is not ready for publication.
+        beginGuiFrame(scene.isAnimated());
+        publishNextFrameIfReady();
+        boolean calculationPending = frameCalculation.isPending();
+
         if (discoveryWorkspace.state().active()) {
-            waitForNextFrameIsReady();
-            if (scene.getLattice().applyPendingAbsorptionLayerChange()) {
+            if (!calculationPending
+                    && scene.getLattice().applyPendingAbsorptionLayerChange()) {
                 renderMatricesDirty = true;
             }
             PerformanceMonitor.start(Measurement.sendToGPU);
             discoveryWorkspace.phasedWorkflow().advanceGeometryTestFrame();
             discoveryViewport.render(glWindow.getWidth(), glWindow.getHeight());
             PerformanceMonitor.stop(Measurement.sendToGPU);
-            super.render(false);
+            finishGuiFrame();
             return;
         }
 
-        waitForNextFrameIsReady();
-        checkSettingsChanged();
-        if (scene.getLattice().applyPendingAbsorptionLayerChange()) {
-            renderMatricesDirty = true;
+        // Scene rebuilds and other structural mutations are accepted only at a completed
+        // frame boundary. GUI interaction itself is never delayed while one is pending.
+        if (!calculationPending) {
+            checkSettingsChanged();
+            if (scene.getLattice().applyPendingAbsorptionLayerChange()) {
+                renderMatricesDirty = true;
+            }
         }
 
         if (updateLimitReached) {
             glWindow.requestClose();
         }
 
-        if (isLoadingStarted) {
+        if (!calculationPending && isLoadingStarted) {
             // Make sure it is not doing any calculation while updating new scene.
             if (remModel.isLoadingReady()) {
                 updateNodesArray();
@@ -1344,11 +1336,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 isLoadingStarted = false;
                 System.out.println("isLoadingStarted: " + isLoadingStarted);
             }
-        } else if (!updateLimitReached) {
+        } else if (!calculationPending && !updateLimitReached) {
             waitForRenderingReady();
             resetMonitoringDeadThreads();
 
-            // Animation changes frame input only after the preceding calculation has joined.
+            // Animation changes frame input only at a completed calculation boundary.
             scene.runAnimation();
             if (scene.isAnimated()) renderMatricesDirty = true;
             ensureCameraFarPlaneContainsLattice();
@@ -1360,7 +1352,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             for (PassiveObserver probe : scene.getPreviewProbes()) {
                 probe.updateMarker();
             }
-            scene.updateCameraTransition(1.0 / 60.0);
             // Ordinary probe/gradient render lists are filtered out during inspection.
             // Do not tear them down and rebuild them while the diagnostic view is active;
             // they are synchronized normally on the first frame after exit.
@@ -1387,6 +1378,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             }
         }
 
+        // Camera-only transitions remain responsive and read the stable published matrices.
+        scene.updateCameraTransition(1.0 / 60.0);
+
         PerformanceMonitor.start(Measurement.sendToGPU);
         isRenderingReady = false;
 
@@ -1398,7 +1392,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         isRenderingReady = true;
         PerformanceMonitor.stop(Measurement.sendToGPU);
 
-        super.render(scene.isAnimated());
+        finishGuiFrame();
 
         if (Screenshot.isTakingScreenShot()) {
             Screenshot.takeScreenShot();
