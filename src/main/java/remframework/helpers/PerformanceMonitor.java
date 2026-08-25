@@ -18,6 +18,8 @@
  */
 package remframework.helpers;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 public class PerformanceMonitor {
 	
 	private static final double ONE_MILLION_NANO_SECONDS = 1000000.0;
@@ -41,6 +43,9 @@ public class PerformanceMonitor {
 
 	public static double fps = 0.0;
 
+	private static final AtomicLong completed3DFrames = new AtomicLong();
+	private static final double FPS_SMOOTHING = 0.2;
+
 	public static void start(Measurement measurement) {
 		iMeasurements[measurement.ordinal()] = System.nanoTime();
 	}
@@ -60,5 +65,20 @@ public class PerformanceMonitor {
 
 	public static void reset(Measurement measurement) {
 		measurements[measurement.ordinal()] = 0;
+	}
+
+	/** Records a frame that has completed in the independent 3D renderer. */
+	public static void record3DFrame() {
+		completed3DFrames.incrementAndGet();
+	}
+
+	/** Samples FPS from completed 3D publications, independent of the responsive 2D loop. */
+	public static double sample3DFps(long elapsedNanos) {
+		long frameCount = completed3DFrames.getAndSet(0);
+		double instantaneous = elapsedNanos > 0
+				? frameCount * Constants.NANOSECOND / elapsedNanos : 0.0;
+		if (fps == 0.0) fps = instantaneous;
+		else fps += FPS_SMOOTHING * (instantaneous - fps);
+		return fps;
 	}
 }

@@ -11,6 +11,7 @@ import remframework.opengl.model.Camera;
 import remframework.opengl.model.Scene;
 import remframework.opengl.view.GLWindow;
 import remframework.opengl.view.renderer.Renderer;
+import remframework.helpers.PerformanceMonitor;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -211,6 +212,7 @@ final class Offscreen3DRenderer {
                 GL11.glFlush();
                 GL11.glFinish();
                 publishedFrame = new PublishedFrame(writeIndex, textures[writeIndex], currentWidth, currentHeight);
+                PerformanceMonitor.record3DFrame();
             }
         } catch (Throwable error) {
             if (running) failure = error;

@@ -399,7 +399,7 @@ public abstract class Engine {
 		if ((deltaTime = System.nanoTime() - currentTime) >= Constants.UPDATE_RATE * Constants.MILLISECOND) {
 			if (glWindow.windowShouldClose()) stop();
 			PerformanceMonitor.totalFrames += PerformanceMonitor.frames;
-			PerformanceMonitor.fps = PerformanceMonitor.frames * Constants.NANOSECOND / deltaTime;
+			PerformanceMonitor.sample3DFps(deltaTime);
 			String custom_title = customTitle;
 			if (!custom_title.isEmpty())
 				custom_title = "| File: " + custom_title;
