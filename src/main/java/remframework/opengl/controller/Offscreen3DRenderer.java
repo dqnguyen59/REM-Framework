@@ -48,6 +48,7 @@ final class Offscreen3DRenderer {
     private volatile Throwable failure;
     private volatile boolean running;
     private Thread workerThread;
+    private long workerWindow;
     private int compositorProgram;
     private int compositorVao;
     private int compositorSamplerLocation;
@@ -59,6 +60,21 @@ final class Offscreen3DRenderer {
     void start() {
         if (running) return;
         createCompositor();
+        // GLFW window creation belongs on the display thread. On Windows the shared
+        // display context must not be current on a different thread during creation.
+        GLFW.glfwDefaultWindowHints();
+        GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GL11.GL_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
+        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
+        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GL11.GL_TRUE);
+        GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, displayWindow.getAppSettings().getAntiAliasing());
+        workerWindow = GLFW.glfwCreateWindow(1, 1, "REM 3D", MemoryUtil.NULL,
+                displayWindow.getWindowHandle());
+        if (workerWindow == MemoryUtil.NULL) {
+            throw new IllegalStateException("Unable to create shared 3D context.");
+        }
+        failure = null;
         running = true;
         workerThread = Thread.ofPlatform().name("rem-3d-renderer").start(this::runWorker);
     }
@@ -98,12 +114,20 @@ final class Offscreen3DRenderer {
             wake.notifyAll();
         }
         if (workerThread != null) {
-            try {
-                workerThread.join();
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
+            boolean interrupted = false;
+            while (workerThread.isAlive()) {
+                try {
+                    workerThread.join();
+                } catch (InterruptedException exception) {
+                    interrupted = true;
+                }
             }
+            if (interrupted) Thread.currentThread().interrupt();
             workerThread = null;
+        }
+        if (workerWindow != MemoryUtil.NULL) {
+            GLFW.glfwDestroyWindow(workerWindow);
+            workerWindow = MemoryUtil.NULL;
         }
         if (compositorVao != 0) GL30.glDeleteVertexArrays(compositorVao);
         if (compositorProgram != 0) GL20.glDeleteProgram(compositorProgram);
@@ -147,7 +171,7 @@ final class Offscreen3DRenderer {
     }
 
     private void runWorker() {
-        long window = MemoryUtil.NULL;
+        long window = workerWindow;
         Renderer renderer = null;
         int[] framebuffers = new int[2];
         int[] depthBuffers = new int[2];
@@ -155,15 +179,6 @@ final class Offscreen3DRenderer {
         int currentWidth = 0;
         int currentHeight = 0;
         try {
-            GLFW.glfwDefaultWindowHints();
-            GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GL11.GL_FALSE);
-            GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
-            GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
-            GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
-            GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GL11.GL_TRUE);
-            window = GLFW.glfwCreateWindow(1, 1, "REM 3D", MemoryUtil.NULL,
-                    displayWindow.getWindowHandle());
-            if (window == MemoryUtil.NULL) throw new IllegalStateException("Unable to create shared 3D context.");
             GLFW.glfwMakeContextCurrent(window);
             GL.createCapabilities();
             renderer = new Renderer();
@@ -217,10 +232,11 @@ final class Offscreen3DRenderer {
         } catch (Throwable error) {
             if (running) failure = error;
         } finally {
-            if (renderer != null) renderer.cleanup();
-            if (window != MemoryUtil.NULL) {
+            try {
+                if (renderer != null) renderer.cleanup();
+            } finally {
                 GLFW.glfwMakeContextCurrent(MemoryUtil.NULL);
-                GLFW.glfwDestroyWindow(window);
+                GL.setCapabilities(null);
             }
         }
     }
