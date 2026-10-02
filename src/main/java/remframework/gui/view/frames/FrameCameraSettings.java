@@ -62,8 +62,8 @@ public class FrameCameraSettings extends AbstractFrame {
 	@Override
 	protected void layout(NkContext ctx, int x, int y, int width, int height) {
 		try (MemoryStack stack = MemoryStack.stackPush()) {
-			camera.setFieldOfFiew(nk_label_edit(ctx, stack, " Field of View:", bufFieldOfView, camera.getFieldOfFiew(), 0.5, 0.5));
-			camera.setFieldOfFiew(nk_slider(ctx, 0, camera.getFieldOfFiew(), 100, 1.00));
+			camera.setFieldOfView(nk_label_edit(ctx, stack, " Field of View:", bufFieldOfView, camera.getFieldOfView(), 0.5, 0.5));
+			camera.setFieldOfView(nk_slider(ctx, 0, camera.getFieldOfView(), 100, 1.00));
 		}
 	}
 

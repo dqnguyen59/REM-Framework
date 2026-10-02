@@ -31,7 +31,7 @@ import remframework.helpers.AbstractSettings;
 import remframework.helpers.ISettings;
 
 /**
- * Represents the relationship between an Identity and a Node.
+ * Represents the relationship between an Occupant and a Node.
  * <br>
  * <br>
  * An Identity does not directly have a position in REM-FIELD.
@@ -41,7 +41,7 @@ import remframework.helpers.ISettings;
  * The Occupancy object is also the location where transport state is stored.
  * This is important because pressure belongs to the relationship:
  * <br>
- *     Identity <-> Node
+ *     Occupant <-> Node
  * <br>
  * <br>
  * and not to the Identity itself or the Node itself.
@@ -67,6 +67,9 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     /** Identity currently occupying this node. */
     private Identity identity;
+
+    /** Runtime occupant; Identity remains separately persisted for .qfs compatibility. */
+    private transient Occupant occupant;
 
     /**
      * The lattice node currently occupied by this Identity.
@@ -118,7 +121,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     private final Vector3d initialTransportMomentum = new Vector3d();
 
-    private static final int GRADIENT_IMBALANCE_HISTORY_LENGTH = 100;
+    private static final int GRADIENT_IMBALANCE_HISTORY_LENGTH = 360;
 
     private final Vector3d[] gradientImbalanceHistory        = new Vector3d[GRADIENT_IMBALANCE_HISTORY_LENGTH];
 
@@ -129,8 +132,12 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     private final Vector3d gradientSum = new Vector3d();
 
+    /** Next fixed phase slot to receive a sample. */
     private int gradientHistoryIndex = 0;
-    private int sampleCount          = 0;
+    /** Cumulative number of samples written over the lifetime of this relation. */
+    private long sampleCount          = 0;
+    private int populatedHistorySlots = 0;
+    private long completedCycleCount = 0;
 
     private boolean isPositiveX = true;
     private boolean isPositiveY = true;
@@ -141,6 +148,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     private boolean cycleCompletedThisUpdate;
     private boolean lastPositiveY   = true;
     private boolean lastPositiveZ   = true;
+    /** Configured cycle length; it is intentionally not inferred from observed frame counts. */
     private int     samplesPerCycle = GRADIENT_IMBALANCE_HISTORY_LENGTH;
     private int cycleSampleCount;
 
@@ -169,11 +177,39 @@ public class Occupancy extends AbstractSettings implements ISettings {
      */
     public Occupancy(Identity identity, Node node) {
         this.identity = identity;
+        this.occupant = identity;
+        if (identity != null) identity.setOccupancy(this);
         this.node = node;
         if (node != null) {
             nodeIndex.set(node.getIndex());
         }
         resetHistory();
+    }
+
+    /** Creates a general Occupant–Node relation without changing Identity serialization. */
+    public Occupancy(Occupant occupant, Node node) {
+        this.occupant = occupant;
+        this.identity = occupant instanceof Identity identityValue ? identityValue : null;
+        if (identity != null) identity.setOccupancy(this);
+        this.node = node;
+        if (node != null) nodeIndex.set(node.getIndex());
+        resetHistory();
+    }
+
+    /** Returns the runtime occupant, falling back to the persisted Identity after loading. */
+    public Occupant getOccupant() {
+        return occupant != null ? occupant : identity;
+    }
+
+    /** Assigns a runtime occupant without altering the legacy Identity field. */
+    public void setOccupant(Occupant occupant) {
+        this.occupant = occupant;
+        if (occupant instanceof Identity identityValue) this.identity = identityValue;
+    }
+
+    /** Compatibility accessor retained for existing Identity callers and project files. */
+    public Identity getIdentity() {
+        return identity;
     }
 
     public int getGraphRadius() { return graphRadius; }
@@ -300,6 +336,16 @@ public class Occupancy extends AbstractSettings implements ISettings {
         }
     }
 
+    private void resetHistoryState() {
+        resetHistory();
+        gradientHistoryIndex = 0;
+        sampleCount = 0;
+        populatedHistorySlots = 0;
+        completedCycleCount = 0;
+        cycleSampleCount = 0;
+        samplesPerCycle = GRADIENT_IMBALANCE_HISTORY_LENGTH;
+    }
+
     @Override
     public void loadFromFile(Wini ini, String section, int index) {
         System.out.println("Occupancy.loadFromFile()");
@@ -317,6 +363,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
         identity = new Identity("");
         identity.loadFromFile(ini, section, index);
+        identity.setOccupancy(this);
     }
 
     @Override
@@ -333,7 +380,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     public boolean isOccupied() {
-        return identity != null && nodeIndex != null;// && node != null;
+        return getOccupant() != null && nodeIndex != null;// && node != null;
     }
 
     public void setNode(Node node) {
@@ -343,12 +390,16 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     @Override
-    public void reset() {
+    public synchronized void reset() {
         System.out.println("Occupancy.reset()");
+        if (identity == null) {
+            resetMeasurementState();
+            return;
+        }
         identity.reset();
         pressure.zero();
         resetMaxGradient();
-        resetHistory();
+        resetHistoryState();
         Entity entity = Lattice.getInstance().createEntity(new Vector3d(), new Vector3d(), 4.0f);
         entity.setOverrideModelMaterial(true);
         entity.getMaterial().setDiffuseColor(new Vector4f(0.0f, 0.0f, 0.0f, 0.0f));
@@ -358,18 +409,36 @@ public class Occupancy extends AbstractSettings implements ISettings {
         identity.setEntity(entity);
     }
 
-    public void saveGradientToHistory(Vector3d gradient) {
+    /** Clears measurement-only state for a Probe Occupancy without creating an Identity entity. */
+    public synchronized void resetMeasurementState() {
+        gradientImbalance.zero();
+        lastMeasuredGradient.zero();
+        acceleration.zero();
+        pressure.zero();
+        transportMomentum.zero();
+        resetMaxGradient();
+        resetHistoryState();
+        signIsPositiveZ = true;
+        cycleCompletedThisUpdate = false;
+        transportCyclesX = 0;
+        transportCyclesY = 0;
+        transportCyclesZ = 0;
+        addAccX = 0.0;
+        addAccY = 0.0;
+        addAccZ = 0.0;
+    }
+
+    public synchronized void saveGradientToHistory(Vector3d gradient) {
         lastMeasuredGradient.set(gradient);
-        // Store the newest sample
+        // Slot i is always phase/sample i. The next cycle overwrites the same slots.
         gradientImbalanceHistory[gradientHistoryIndex].set(gradient);
-
-        // Advance circular buffer
         gradientHistoryIndex = (gradientHistoryIndex + 1) % GRADIENT_IMBALANCE_HISTORY_LENGTH;
-
+        populatedHistorySlots = Math.min(GRADIENT_IMBALANCE_HISTORY_LENGTH, populatedHistorySlots + 1);
+        sampleCount++;
         cycleSampleCount++;
     }
 
-    public boolean isCycleCompleted() {
+    public synchronized boolean isCycleCompleted() {
         cycleCompletedThisUpdate = false;
         if (signIsPositiveZ && node.getVelocity().z < 0) {
             // Set to negative
@@ -379,11 +448,12 @@ public class Occupancy extends AbstractSettings implements ISettings {
             updateMaxGradient(gradientImbalanceHistory);
             // Set to positive
             signIsPositiveZ      = true;
-            samplesPerCycle      = cycleSampleCount;
+            // Preserve the fixed phase buffer. A cycle transition only starts
+            // writing at phase zero; it does not clear or resize the history.
             gradientHistoryIndex = 0;
             cycleSampleCount = 0;
+            completedCycleCount++;
             resetMaxGradient();
-            resetHistory();
             cycleCompletedThisUpdate = true;
             return true;
         }
@@ -404,6 +474,39 @@ public class Occupancy extends AbstractSettings implements ISettings {
     /** Read-only completed-cycle sample-size access for compact-path equivalence auditing. */
     public int getSamplesPerCycleForAudit() { return samplesPerCycle; }
 
+    /** Returns the current phase slot that will receive the next sample. */
+    public synchronized int getHistoryPhaseIndexForAudit() { return gradientHistoryIndex; }
+
+    /** Returns the number of fixed phase slots populated at least once. */
+    public synchronized int getPopulatedHistorySlotsForAudit() { return populatedHistorySlots; }
+
+    public synchronized long getCompletedCycleCountForAudit() { return completedCycleCount; }
+
+    public synchronized long getCumulativeSampleCountForAudit() { return sampleCount; }
+
+    /** Copies the latest per-update scaled gradient into a caller-owned vector. */
+    public synchronized Vector3d copyLastMeasuredGradientForAudit(Vector3d destination) {
+        return destination.set(lastMeasuredGradient);
+    }
+
+    /** Adds a weighted latest sample to a caller-owned diagnostic accumulator. */
+    public synchronized void accumulateLastMeasuredGradientForAudit(
+            Vector3d accumulator, double weight) {
+        accumulator.fma(weight, lastMeasuredGradient);
+    }
+
+    /** Captures a stable, immutable copy for diagnostic rendering. */
+    public synchronized OccupancyHistorySnapshot getHistorySnapshotForAudit() {
+        return new OccupancyHistorySnapshot(GRADIENT_IMBALANCE_HISTORY_LENGTH,
+                java.util.Arrays.asList(gradientImbalanceHistory), populatedHistorySlots,
+                gradientHistoryIndex, completedCycleCount, sampleCount, samplesPerCycle);
+    }
+
+    /** Returns defensive copies of the currently retained gradient samples. */
+    public java.util.List<Vector3d> getGradientImbalanceHistoryForAudit() {
+        return getHistorySnapshotForAudit().samples();
+    }
+
     public void resetMaxGradient() {
         maxPositiveGradient.zero();
         maxNegativeGradient.zero();
@@ -413,9 +516,9 @@ public class Occupancy extends AbstractSettings implements ISettings {
         maxPositiveGradient.zero();
         maxNegativeGradient.zero();
 
-        for (Vector3d vector3d : history) {
-            maxPositiveGradient.max(vector3d);
-            maxNegativeGradient.min(vector3d);
+        for(int i = 0; i < 360; i++) {
+                maxPositiveGradient.max(history[i]);
+                maxNegativeGradient.min(history[i]);
         }
         gradientImbalance.set(maxPositiveGradient).add(maxNegativeGradient).mul(0.5);
         lastMaxPositiveGradient.set(maxPositiveGradient);

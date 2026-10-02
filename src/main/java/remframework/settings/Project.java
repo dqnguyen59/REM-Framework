@@ -72,13 +72,13 @@ public class Project extends AbstractSettings implements ISettings {
     private double constantMagneticFactor = 0.94;
 
     // Don't set the glSwapInterval below 1! It will cause instability of the application and freeze.
-    private int glSwapInterval = 2;
+    private int glSwapInterval = 1;
 
     private RemModel remModel = new RemModel();
     public  Camera   camera   = new Camera();
     public  Scene    scene;
     public  Terrain  terrain;
-    public  Vector3d baseRotation = new Vector3d(-66.6, 0, 0);
+    public  Vector3d baseRotation = new Vector3d(-90, 0, 0);
 
     public Settings         settings      = new Settings();
     public SlitWallSettings slitWall      = new SlitWallSettings();
@@ -88,6 +88,7 @@ public class Project extends AbstractSettings implements ISettings {
     private final ArrayList<Light> lights = new ArrayList<>();
 
     public List<Occupancy> occupancies = new ArrayList<>();
+    private List<ProbeDefinition> probeDefinitions = new ArrayList<>();
     private List<Detector> detectors = List.of();
 
     public static Project getInstance() {
@@ -100,6 +101,16 @@ public class Project extends AbstractSettings implements ISettings {
 
     public Project() {
         super();
+    }
+
+    /** Atomically replaces session-generated probes while preserving non-generated receivers. */
+    public void replaceGeneratedProbeDefinitions(List<ProbeDefinition> generatedDefinitions) {
+        List<ProbeDefinition> replacement = new ArrayList<>();
+        for (ProbeDefinition definition : probeDefinitions) {
+            if (!definition.isGenerated()) replacement.add(definition);
+        }
+        replacement.addAll(generatedDefinitions);
+        probeDefinitions = replacement;
     }
 
     public Project(Project project) {
@@ -119,7 +130,7 @@ public class Project extends AbstractSettings implements ISettings {
         constantMagneticFactor = project.constantMagneticFactor;
         glSwapInterval         = project.glSwapInterval;
 
-        camera.setFieldOfFiew(project.camera.getFieldOfFiew());
+        camera.setFieldOfView(project.camera.getFieldOfView());
         camera.setZ_near(project.camera.getZ_near());
         camera.setZ_far(project.camera.getZ_far());
         Vector3f pos = project.camera.getPosition();
@@ -154,12 +165,14 @@ public class Project extends AbstractSettings implements ISettings {
         setConstantElectricFactor(getDouble("QuantumField", "constantElectricFactor", 0.025));
         setConstantMagneticFactor(getDouble("QuantumField", "constantMagneticFactor", 0.0003));
         setGlSwapInterval(getInt("QuantumField", "glSwapInterval", 1));
+        scene.getLattice().setNumEdgeAbsorptionLayers(
+                getInt("QuantumField", "numEdgeAbsorptionLayers", 30));
         int x = getInt("QuantumField", "dimension.x", 15);
         int y = getInt("QuantumField", "dimension.y", 15);
         int z = getInt("QuantumField", "dimension.z", 15);
         setDimension(x, y, z, false);
 
-        camera.setFieldOfFiew(getFloat("Camera", "fieldOfFiew", 45));
+        camera.setFieldOfView(getFloat("Camera", "fieldOfFiew", 45));
         camera.getPosition().x = getFloat("Camera", "position.x", 0);
         camera.getPosition().y = getFloat("Camera", "position.y", 0);
         camera.getPosition().z = getFloat("Camera", "position.z", 120);
@@ -181,6 +194,8 @@ public class Project extends AbstractSettings implements ISettings {
         settings.loadFromFile(ini, "QFSSettings", 0);
         slitWall.loadFromFile(ini, "SlitWall", 0);
 
+        probeDefinitions.clear();
+
         int size = getInt("Oscillators", "Size", 0);
 
         TransportSystem.getInstance().loadFromFile(ini, "TransportSystem", 0);
@@ -190,6 +205,13 @@ public class Project extends AbstractSettings implements ISettings {
             Occupancy occupancy = new Occupancy();
             occupancy.loadFromFile(ini, "Oscillator", i);
             occupancies.add(occupancy);
+        }
+
+        if (Path.of(currentFilename).getFileName().toString().equals("detectGradient8.qfs")) {
+            TransportSystem.getInstance().configureReceiverStatusLogging(
+                    Path.of("measurements", "detectGradient8-receiver-status.csv"));
+        } else {
+            TransportSystem.getInstance().closeReceiverStatusLogging();
         }
 
         detectors = DetectorConfiguration.load(ini, dimension);
@@ -328,6 +350,8 @@ public class Project extends AbstractSettings implements ISettings {
         put("QuantumField", "constantElectricFactor", constantElectricFactor);
         put("QuantumField", "constantMagneticFactor", constantMagneticFactor);
         put("QuantumField", "glSwapInterval", glSwapInterval);
+        put("QuantumField", "numEdgeAbsorptionLayers",
+                scene.getLattice().getNumEdgeAbsorptionLayers());
         put("QuantumField", "dimension.x", dimension.x);
         put("QuantumField", "dimension.y", dimension.y);
         put("QuantumField", "dimension.z", dimension.z);
@@ -336,7 +360,7 @@ public class Project extends AbstractSettings implements ISettings {
 
         baseRotation = scene.getLattice().getBaseEntity().getRotation();
 
-        put("Camera", "fieldOfFiew", camera.getFieldOfFiew());
+        put("Camera", "fieldOfFiew", camera.getFieldOfView());
         put("Camera", "position.x", camera.getPosition().x);
         put("Camera", "position.y", camera.getPosition().y);
         put("Camera", "position.z", camera.getPosition().z);

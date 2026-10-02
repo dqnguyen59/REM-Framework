@@ -179,6 +179,11 @@ public class FrameMenu extends AbstractFrame {
                     Nuklear.nk_menu_close(ctx);
                 }
 
+                if (nk_menu_item_label(ctx, "Isotropy", stack)) {
+                    nuklearModel.toggleFrame(Frame.isotropy);
+                    Nuklear.nk_menu_close(ctx);
+                }
+
                 if (nk_menu_item_label(ctx, "Geometry Discovery", stack)) {
                     GeometryDiscoveryWorkspaceManager.getInstance().openWorkspace();
                     Nuklear.nk_menu_close(ctx);

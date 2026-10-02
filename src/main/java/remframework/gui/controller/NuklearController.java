@@ -28,7 +28,9 @@ import org.lwjgl.system.MemoryStack;
 import remframework.helpers.IMouseAndKeyboardEvents;
 import remframework.gui.model.NuklearModel;
 import remframework.gui.model.NuklearModel.Frame;
+import remframework.gui.view.frames.AbstractFrame;
 import remframework.opengl.controller.KeyEvents;
+import remframework.settings.Project;
 
 public class NuklearController implements IMouseAndKeyboardEvents {
 
@@ -37,6 +39,10 @@ public class NuklearController implements IMouseAndKeyboardEvents {
 	private NuklearModel nuklearModel;
 
 	private boolean keyPressed;
+
+	private boolean neighborhoodInspectionActive() {
+		return Project.getInstance().scene.isNeighborhoodInspectionActive();
+	}
 
 	public NuklearController(NkContext context, NuklearModel nuklearModel) {
 		super();
@@ -48,20 +54,31 @@ public class NuklearController implements IMouseAndKeyboardEvents {
 	public boolean mouseCursorPosCallback(long handle, double xPos, double yPos) {
 		nuklearModel.setMouseX(xPos);
 		nuklearModel.setMouseY(yPos);
+		AbstractFrame resizingFrame = capturedResizeFrame();
+		if (resizingFrame != null && resizingFrame.updateCustomResize(xPos, yPos)) return true;
+		// GLFW cursor positions, custom frame bounds, and Nuklear input use logical window
+		// coordinates; framebuffer dimensions are only the OpenGL viewport.
 		Nuklear.nk_input_motion(context, (int)xPos, (int)yPos);
-		return Nuklear.nk_window_is_any_hovered(context) || nuklearModel.isAnyDialogActive();
+		return !neighborhoodInspectionActive() && (Nuklear.nk_window_is_any_hovered(context)
+				|| nuklearModel.isAnyDialogActive());
 	}
 
 	@Override
 	public boolean mouseButtonCallback(long handle, int button, int action, int mods) {
+		boolean leftButtonPress = button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_PRESS;
+		boolean leftButtonRelease = button == GLFW.GLFW_MOUSE_BUTTON_LEFT && action == GLFW.GLFW_RELEASE;
+		double cursorX;
+		double cursorY;
 		try (MemoryStack stack = MemoryStack.stackPush()) {
 			DoubleBuffer cx = stack.mallocDouble(1);
 			DoubleBuffer cy = stack.mallocDouble(1);
 
 			GLFW.glfwGetCursorPos(handle, cx, cy);
 
-			int x = (int)cx.get(0);
-			int y = (int)cy.get(0);
+			cursorX = cx.get(0);
+			cursorY = cy.get(0);
+			int x = (int)cursorX;
+			int y = (int)cursorY;
 
 			if (action == GLFW.GLFW_REPEAT) {
 				nuklearModel.setNkButton(Nuklear.NK_BUTTON_DOUBLE);
@@ -82,9 +99,36 @@ public class NuklearController implements IMouseAndKeyboardEvents {
 				nuklearModel.setNkButtonDown(action == GLFW.GLFW_PRESS);
 			}
 
+			AbstractFrame resizingFrame = capturedResizeFrame();
+			if (resizingFrame != null || leftButtonPress && (resizingFrame = beginResizeFrame(cursorX, cursorY)) != null) {
+				if (leftButtonRelease) resizingFrame.endCustomResize();
+				return true;
+			}
 			Nuklear.nk_input_button(context, nuklearModel.getNkButton(), x, y, nuklearModel.isNkButtonDown());
 		}
-		return Nuklear.nk_window_is_any_hovered(context) || nuklearModel.isNkButtonDown() && nuklearModel.isAnyFrameFocused() || nuklearModel.isAnyDialogActive();
+		boolean cameraButton = neighborhoodInspectionActive()
+				&& button != GLFW.GLFW_MOUSE_BUTTON_LEFT;
+		return !cameraButton && (Nuklear.nk_window_is_any_hovered(context)
+				|| nuklearModel.isNkButtonDown() && nuklearModel.isAnyFrameFocused()
+				|| nuklearModel.isAnyDialogActive());
+	}
+
+	private AbstractFrame capturedResizeFrame() {
+		for (AbstractFrame frame : nuklearModel.getFrames().values()) {
+			if (frame.isCustomResizeCaptured()) return frame;
+		}
+		return null;
+	}
+
+	private AbstractFrame beginResizeFrame(double cursorX, double cursorY) {
+		for (AbstractFrame frame : nuklearModel.getFrames().values()) {
+			if (frame.isResizeCapabilityEnabled() && frame.beginCustomResize(cursorX, cursorY)) return frame;
+		}
+		return null;
+	}
+
+	public boolean isLeftMouseCaptureActive() {
+		return capturedResizeFrame() != null;
 	}
 
 	@Override
@@ -95,7 +139,8 @@ public class NuklearController implements IMouseAndKeyboardEvents {
 					.y((float)yoffset);
 			Nuklear.nk_input_scroll(context, scroll);
 		}
-		return Nuklear.nk_window_is_any_hovered(context) || nuklearModel.isAnyDialogActive();
+		return !neighborhoodInspectionActive()
+				&& (Nuklear.nk_window_is_any_hovered(context) || nuklearModel.isAnyDialogActive());
 	}
 
 	@Override

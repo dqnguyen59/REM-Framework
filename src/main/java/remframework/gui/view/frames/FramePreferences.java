@@ -32,8 +32,10 @@ import org.lwjgl.nuklear.NkContext;
 import org.lwjgl.nuklear.Nuklear;
 import org.lwjgl.system.MemoryStack;
 import remframework.gui.model.NuklearModel;
+import remframework.opengl.model.Lattice;
 import remframework.opengl.model.RainModel;
 import remframework.settings.Project;
+import remframework.settings.Settings;
 import remframework.lattice.LatticeDescriptor;
 import remframework.lattice.LatticeManager;
 
@@ -41,11 +43,13 @@ import java.util.List;
 
 public class FramePreferences extends AbstractFrame {
 
-    private final Project   project   = Project.getInstance();
+	private final Project   project   = Project.getInstance();
 	private final RainModel rainModel = project.rainModel;
+	private final Lattice lattice = project.scene.getLattice();
 	private final LatticeManager latticeManager = LatticeManager.getInstance();
 	
 	private final StringBuffer bufNumThreads   = new StringBuffer();
+	private final StringBuffer bufEdgeAbsorptionLayers = new StringBuffer();
 	private final StringBuffer bufSwapInterval         = new StringBuffer();
 	private final StringBuffer bufForce                = new StringBuffer();
 	private final StringBuffer bufAbsorptionFixedNodes = new StringBuffer();
@@ -64,7 +68,7 @@ public class FramePreferences extends AbstractFrame {
 		super.render(windowHandle, ctx);
 
         int width = 470;
-        int height = 350;
+        int height = 420;
         createLayout(ctx, 0, nuklearModel.getMenuBarHeight() + 120, width, height + (appSettings.isUseFixedNodes() ? 0 : 120));
 	}
 
@@ -117,7 +121,21 @@ public class FramePreferences extends AbstractFrame {
 
             appSettings.setNumThreads(nk_label_edit(ctx, stack, " CPU Threads:", bufNumThreads, appSettings.getNumThreads(), leftCol,
                                                     rightCol));
-			nk_spacer(ctx, spacer1, 1);
+            nk_spacer(ctx, spacer1, 1);
+
+            Settings.RenderingMethod renderingMethod = project.settings.getRenderingMethod();
+            String chosenRenderingMethod = nk_label_combo_options(ctx, stack, " Rendering Method:",
+                    Settings.RenderingMethod.getValues(), renderingMethod.getLabel(), leftCol, rightCol);
+            if (!chosenRenderingMethod.equals(renderingMethod.getLabel())) {
+                project.settings.setRenderingMethod(
+                        Settings.RenderingMethod.fromLabel(chosenRenderingMethod));
+            }
+            nk_spacer(ctx, spacer1, 1);
+
+            lattice.setNumEdgeAbsorptionLayers(nk_label_edit(
+                    ctx, stack, " Edge Absorption Layers:", bufEdgeAbsorptionLayers,
+                    lattice.getNumEdgeAbsorptionLayers(), leftCol, rightCol));
+            nk_spacer(ctx, spacer1, 1);
 			
 			appSettings.setUseFixedNodes(nk_check_label(ctx, " Use Fixed Nodes:", appSettings.isUseFixedNodes(), leftCol, rightCol));
 			nk_spacer(ctx, spacer1, 1);

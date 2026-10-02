@@ -29,6 +29,7 @@ import remframework.gui.view.frames.*;
 import remframework.gui.view.frames.dialogs.FrameConfirmDialog;
 import remframework.gui.view.frames.dialogs.FrameOpenFileDialog;
 import remframework.gui.view.frames.dialogs.FrameSaveFileDialog;
+import remframework.gui.view.frames.dialogs.FrameAddProbes;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -64,6 +65,9 @@ public class NuklearModel {
 		detector,
 		preferences,
 		transportSystem,
+		isotropy,
+		occupancyHistory,
+		addProbes,
 		geometryDiscoveryControls,
 		geometryDiscoveryMetrics,
 		geometryDiscoveryNode,
@@ -121,6 +125,14 @@ public class NuklearModel {
 
 	public boolean isAnyFrameFocused() {
 		return focusedFrame != null;
+	}
+
+	/** Returns whether the cursor is over any currently visible rendered frame. */
+	public boolean isMouseOverAnyFrame() {
+		for (AbstractFrame frame : visibleFrames) {
+			if (frame.containsPoint(mouseX, mouseY)) return true;
+		}
+		return false;
 	}
 	
 	public void unfocusAllFrames() {
@@ -194,6 +206,12 @@ public class NuklearModel {
 			return new FrameSettings(this);
 		case transportSystem:
 			return new FrameTransportSystem(this);
+		case isotropy:
+			return new FrameIsotropy(this);
+		case occupancyHistory:
+			return new FrameOccupancyHistory(this);
+		case addProbes:
+			return new FrameAddProbes(this);
 		case preferences:
 			return new FramePreferences(this);
 		case terrainSettings:
@@ -284,15 +302,15 @@ public class NuklearModel {
 	}
 
 	public void close(AbstractFrame frame) {
+	    Frame frameKey = null;
 	    for (Entry<Frame, AbstractFrame> entry : framesMap.entrySet()) {
 	        if (entry.getValue().equals(frame)) {
-	    		new Thread(new Runnable() {
-	    			@Override
-	    			public void run() {
-	    	        	closeFrame(entry.getKey());
-	    			}
-	    		}).start();
+	            frameKey = entry.getKey();
+	            break;
 	        }
+	    }
+	    if (frameKey != null) {
+	        closeFrame(frameKey);
 	    }
 	}
 	

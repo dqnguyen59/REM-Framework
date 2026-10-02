@@ -41,6 +41,7 @@ import remframework.measurement.detector.DetectorExperimentController;
 import remframework.measurement.detector.FeasibilityPilotTelemetry;
 import remframework.opengl.model.RemModel.TranslationMode;
 import remframework.opengl.model.RemModel.NodeSelectionMode;
+import remframework.opengl.model.Probe;
 import remframework.opengl.model.entity.Entity;
 import remframework.opengl.model.entity.EntityType;
 import remframework.opengl.model.entity.Node;
@@ -64,7 +65,9 @@ import remframework.geometry.discovery.workflow.WorkspaceController;
 import remframework.geometry.discovery.GeometryDiscoveryWorkspaceManager;
 
 import java.lang.Math;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class Simulator extends Engine implements IMouseAndKeyboardEvents {
@@ -85,9 +88,17 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private final Renderer        renderer;
     private final OBJFormatLoader loader;
+    private final Offscreen3DRenderer offscreen3DRenderer;
+    private Renderer.RenderState renderState;
+    private long renderStateVersion = Long.MIN_VALUE;
 
     private       Node     selectedNode;
     private final Vector2d lastMousePos = new Vector2d();
+    private final Vector2d lastHoverPickMousePos = new Vector2d(Double.NaN, Double.NaN);
+    private final Vector3f lastHoverPickCameraPosition = new Vector3f(Float.NaN);
+    private final Vector3f lastHoverPickCameraRotation = new Vector3f(Float.NaN);
+    private final Matrix4f lastHoverPickProjection = new Matrix4f();
+    private boolean hoverPickPending;
 
     private              boolean         leftButtonPressed             = false;
     private              boolean         rightButtonPress              = false;
@@ -95,13 +106,15 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private volatile     boolean         isRenderingReady;
     private              boolean         isLoadingStarted;
     private              boolean         isNodesUpdateRequired;
+    private              boolean         renderMatricesDirty = true;
+    private              boolean         pausedRenderMatricesCurrent;
     private              KeyEvents       keyEvents;
     private final        ArrayList<Node> customNodeFixed               = new ArrayList<>();
     private              int             waitAfterReset                = 0;
     private              Node            lastSelectedNode;
     protected            long            currentTime;
     private              int             numFrameCalculation;
-    private              Thread          thread;
+    private final NonBlockingFrameTask frameCalculation = new NonBlockingFrameTask();
     private final        Long            updateLimit;
     private volatile     boolean         updateLimitReached;
     private final WorkspaceController discoveryWorkspace =
@@ -114,6 +127,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         this.updateLimit = updateLimit;
         renderer = new Renderer();
         loader   = new OBJFormatLoader();
+        offscreen3DRenderer = new Offscreen3DRenderer(glWindow);
     }
 
     @Override
@@ -130,6 +144,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         initDefaultScene();
         //updateNodesProperties();
         remModel.startSimulation();
+        offscreen3DRenderer.start();
     }
 
     public void initDefaultLights() {
@@ -155,20 +170,21 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         pointLight.setDirection(lightDirection);
         pointLight.setName("DefaultPointLight");
         pointLight.setSpotLight(false);
+        pointLight.setScale(0);
 
         //Spot light
-        lightIntensity = 1.0f;
-        lightPosition  = new Vector3d(25.0f, 40.0f, -10.0f);
-        lightRotation  = new Vector3d(0, 0, 0);
-        lightDirection = new Vector3d(-0.3, -1, 0.1);
-        cutOff         = 25;
-        lightColor     = new Vector3f(0.5f, 1.0f, 0.5f);
-        Light spotLight = project.createLight(null, modelSphere, modelSpotLight, lightPosition, lightRotation,
-                                              1.0);
-        spotLight.set(lightColor, lightIntensity, 0.1, 0.03, 0.0007, cutOff);
-        spotLight.setDirection(lightDirection);
-        spotLight.setName("DefaultSpotLight");
-        spotLight.setSpotLight(true);
+//        lightIntensity = 1.0f;
+//        lightPosition  = new Vector3d(25.0f, 40.0f, -10.0f);
+//        lightRotation  = new Vector3d(0, 0, 0);
+//        lightDirection = new Vector3d(-0.3, -1, 0.1);
+//        cutOff         = 25;
+//        lightColor     = new Vector3f(0.5f, 1.0f, 0.5f);
+//        Light spotLight = project.createLight(null, modelSphere, modelSpotLight, lightPosition, lightRotation,
+//                                              1.0);
+//        spotLight.set(lightColor, lightIntensity, 0.1, 0.03, 0.0007, cutOff);
+//        spotLight.setDirection(lightDirection);
+//        spotLight.setName("DefaultSpotLight");
+//        spotLight.setSpotLight(true);
 
         // Directional light
         lightIntensity = 0.0f;
@@ -182,6 +198,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         System.out.println("Simulator.initDefaultScene()");
         project.camera.movePosition(0, 0, 120);
         project.camera.updateProjectionMatrix();
+        scene.orbitCameraAroundTarget(45.0f, 0.0f, 0.0f);
 
         // Create a default scene with xyz nodes.
         project.setDimension(appSettings.getDefaultDimensionX(), appSettings.getDefaultDimensionY(),
@@ -271,21 +288,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         }
         remModel.getMousePos().x = xPos;
         remModel.getMousePos().y = yPos;
-
-        Node node = scene.getNodeFromMousePos(xPos, yPos);
-        if (node != null) {
-            if (selectedNode != null) selectedNode.setSelected(false);
-            selectedNode = node;
-            selectedNode.setSelected(true);
-            remModel.getCurrentMouseNodeIndex().set(selectedNode.getIndex());
-            remModel.setCurrentMouseNode(selectedNode);
-
-            if (isDrawing)
-                mouseDrawWall(node);
-
-            if (leftButtonPressed)
-                checkAndErase(node);
-        }
+        hoverPickPending = true;
 
         float deltaX = 0;
         float deltaY = 0;
@@ -302,8 +305,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 deltaX = (float) y;
         }
         if (rightButtonPress) {
-            project.camera.moveRotation(deltaX * Constants.MOUSE_SENSITIVITY,
-                                        deltaY * Constants.MOUSE_SENSITIVITY, 0);
+            scene.orbitCameraAroundTarget(deltaX * Constants.MOUSE_SENSITIVITY,
+                                           deltaY * Constants.MOUSE_SENSITIVITY, 0.0f);
         }
 
         lastMousePos.x = xPos;
@@ -312,20 +315,78 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         return false;
     }
 
+    /** Defers expensive ray picking to one pass per rendered frame using the latest cursor position. */
+    private void processDeferredHoverPick() {
+        if (nuklearController.isLeftMouseCaptureActive()) return;
+        Vector3f cameraPosition = project.camera.getPosition();
+        Vector3f cameraRotation = project.camera.getRotation();
+        boolean cameraChanged = !cameraPosition.equals(lastHoverPickCameraPosition)
+                || !cameraRotation.equals(lastHoverPickCameraRotation)
+                || !project.camera.getProjectionMatrix().equals(lastHoverPickProjection);
+        Vector2d mousePosition = remModel.getMousePos();
+        if (!hoverPickPending && !cameraChanged
+                && mousePosition.equals(lastHoverPickMousePos)) return;
+
+        Node node = scene.getNodeFromMousePos(mousePosition.x, mousePosition.y);
+        if (node != selectedNode) {
+            if (selectedNode != null) selectedNode.setSelected(false);
+            selectedNode = node;
+            if (selectedNode != null) {
+                selectedNode.setSelected(true);
+                remModel.getCurrentMouseNodeIndex().set(selectedNode.getIndex());
+                remModel.setCurrentMouseNode(selectedNode);
+            }
+            renderMatricesDirty = true;
+        }
+
+        PassiveObserver hoveredProbe = scene.getProbeForNode(node);
+        if (hoveredProbe == null) {
+            hoveredProbe = scene.getInterpolatedProbeFromMousePos(mousePosition.x, mousePosition.y);
+        }
+        scene.setHoveredProbe(hoveredProbe);
+        lastHoverPickMousePos.set(mousePosition);
+        lastHoverPickCameraPosition.set(cameraPosition);
+        lastHoverPickCameraRotation.set(cameraRotation);
+        lastHoverPickProjection.set(project.camera.getProjectionMatrix());
+        hoverPickPending = false;
+    }
+
     @Override
     public boolean mouseButtonCallback(long handle, int button, int action, int mods) {
+        leftButtonPressed           = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_PRESS;
+        boolean leftButtonReleased = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_RELEASE;
+
+        Node node = scene.getNodeFromMousePos(remModel.getMousePos().x,
+                                              remModel.getMousePos().y);
+        Probe probe = scene.getProbeForNode(node);
+        boolean ctrlLeftClick = button == GLFW.GLFW_MOUSE_BUTTON_1
+                && (mods & GLFW.GLFW_MOD_CONTROL) != 0;
+        if (ctrlLeftClick) {
+            if (leftButtonPressed) handleCtrlComparisonSelection(node, probe);
+            return true;
+        }
+        if (probe != null && (leftButtonPressed || leftButtonReleased)) {
+            scene.selectProbe(probe);
+            remModel.setCurrentMouseNode(node);
+            remModel.getCurrentMouseNodeIndex().set(node.getIndex());
+            return true;
+        }
+        if (leftButtonPressed || leftButtonReleased) {
+            InterpolatedProbe interpolatedProbe = scene.getInterpolatedProbeFromMousePos(
+                    remModel.getMousePos().x, remModel.getMousePos().y);
+            if (interpolatedProbe != null) {
+                scene.selectProbe(interpolatedProbe);
+                return true;
+            }
+        }
+
         if (discoveryWorkspace.state().active()) {
             if (nuklearModel.getFocusedFrame() == null)
                 discoveryViewport.button(button, action, glWindow.getWidth(), glWindow.getHeight());
             return false;
         }
-        boolean leftButtonReleased;
-        if (nuklearModel.getFocusedFrame() == null) {
-            leftButtonPressed  = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_PRESS;
-            leftButtonReleased = button == GLFW.GLFW_MOUSE_BUTTON_1 && action == GLFW.GLFW_RELEASE;
+        if (nuklearModel.getFocusedFrame() == null || scene.isNeighborhoodInspectionActive()) {
             rightButtonPress   = button == GLFW.GLFW_MOUSE_BUTTON_2 && action == GLFW.GLFW_PRESS;
-
-            Node node = scene.getNodeFromMousePos(remModel.getMousePos().x, remModel.getMousePos().y);
 
             if (node != null) {
                 if (leftButtonPressed)
@@ -366,18 +427,41 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         return false;
     }
 
+    /** Handles Ctrl-click comparison assignment without changing normal probe selection. */
+    private void handleCtrlComparisonSelection(Node node, Probe rawProbe) {
+        PassiveObserver candidate = rawProbe;
+        if (candidate == null) {
+            candidate = scene.getInterpolatedProbeFromMousePos(
+                    remModel.getMousePos().x, remModel.getMousePos().y);
+        }
+        if (candidate != null) {
+            if (!candidate.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) {
+                remModel.setCustomStatus("Only generated probes can be compared.");
+            } else if (!scene.toggleComparisonProbe(candidate)) {
+                remModel.setCustomStatus("Comparison pair is full.");
+            }
+            return;
+        }
+        if (scene.getPreviewProbeForNode(node) != null
+                || scene.getPreviewInterpolatedProbeFromMousePos(
+                        remModel.getMousePos().x, remModel.getMousePos().y) != null) {
+            remModel.setCustomStatus("Preview probes cannot be compared.");
+        }
+    }
+
     @Override
     public boolean mouseScrollCallback(long handle, double xOffset, double yOffset) {
+        if (nuklearModel.isMouseOverAnyFrame()) return false;
         if (discoveryWorkspace.state().active()) {
-            discoveryViewport.scroll(yOffset);
+            discoveryViewport.scroll(-yOffset * Constants.CAMERA_MOVE_SPEED);
             return false;
         }
+        scene.zoomCameraAroundTarget(-yOffset * Constants.CAMERA_MOVE_SPEED);
         float incCamera = keyEvents != null && keyEvents.isCtrlPressed ? 2 : 12;
-        project.camera.movePosition(
-                (float) (incCamera * xOffset * Constants.CAMERA_MOVE_SPEED),
-                0,
-                (float) (incCamera * yOffset * Constants.CAMERA_MOVE_SPEED)
-                                   );
+        if (!scene.isNeighborhoodInspectionActive()) {
+            project.camera.movePosition(
+                    (float) (incCamera * -xOffset * Constants.CAMERA_MOVE_SPEED), 0, 0);
+        }
 
         return false;
     }
@@ -530,37 +614,37 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 break;
             case GLFW.GLFW_KEY_KP_4:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(0.0f, inc, 0.0f);
+                    scene.orbitCameraAroundTarget(0.0f, inc, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_6:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(0.0f, -inc, 0.0f);
+                    scene.orbitCameraAroundTarget(0.0f, -inc, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_2:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(-inc, 0.0f, 0.0f);
+                    scene.orbitCameraAroundTarget(-inc, 0.0f, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_8:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(inc, 0.0f, 0.0f);
+                    scene.orbitCameraAroundTarget(inc, 0.0f, 0.0f);
                 }
                 break;
             case GLFW.GLFW_KEY_KP_3:
-                if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(0.0f, 0.0f, inc);
-                }
+//                if (keyEvents.isCtrlPressed) {
+//                    scene.orbitCameraAroundTarget(0.0f, 0.0f, inc);
+//                }
                 break;
             case GLFW.GLFW_KEY_KP_1:
-                if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().incRotation(0.0f, 0.0f, -inc);
-                }
+//                if (keyEvents.isCtrlPressed) {
+//                    scene.orbitCameraAroundTarget(0.0f, 0.0f, -inc);
+//                }
                 break;
             case GLFW.GLFW_KEY_KP_5:
                 if (keyEvents.isCtrlPressed) {
-                    scene.getLattice().getBaseEntity().setRotation(0, 0, 0);
+                    scene.resetCameraOrbit();
                 }
                 break;
             case GLFW.GLFW_KEY_SPACE:
@@ -608,6 +692,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
         if (isReleased) {
             switch (key) {
+                case GLFW.GLFW_KEY_ESCAPE:
+                    if (scene.isNeighborhoodInspectionActive()) {
+                        scene.exitNeighborhoodInspection();
+                        return true;
+                    }
+                    break;
                 case GLFW.GLFW_KEY_O:
                     if (keyEvents.isCtrlPressed) {
                         project.openFile();
@@ -636,6 +726,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     break;
                 case GLFW.GLFW_KEY_F4:
                     scene.toggleAnimation();
+                    renderMatricesDirty = true;
                     break;
                 case GLFW.GLFW_KEY_F5:
                     scene.updateWalls();
@@ -725,6 +816,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         if (selectedNode != null) {
             selectedNode.setSelected(true);
         }
+        renderMatricesDirty = true;
     }
 
     private void updateTerrain() {
@@ -739,76 +831,110 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         }
     }
 
-    /**
-     * Preventing calculating next frame
-     */
+    /** Waits only for shutdown or another terminal transition. */
     private void waitForNextFrameIsReady() {
+        frameCalculation.awaitComplete();
+    }
+
+    /** Publishes a completed back buffer without ever waiting for a running calculation. */
+    private boolean publishNextFrameIfReady() {
+        if (!frameCalculation.tryComplete()) return false;
+        Node.swapBuffer();
+        return true;
+    }
+
+    private void calcNextFrame(boolean singleStepUpdate) {
+        numFrameCalculation++;
+        FeasibilityPilotTelemetry.getInstance().beginUpdate();
+
         try {
-            if (thread != null) {
-                thread.join();
-            }
-        }
-        catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            System.out.println("Something's wrong");
+            frameCalculation.start(() -> {
+                try {
+                    PerformanceMonitor.start(Measurement.totalCPURenderTime);
+
+                    Object[] nodeArray = scene.getLattice().getNodeArray();
+                    Object[] entityArray = scene.getLattice().getEntityArray();
+                    if (nodeArray == null || entityArray == null) {
+                        throw new IllegalStateException(
+                                "Lattice arrays are not ready for calculation.");
+                    }
+                    int requestedThreads = appSettings.getNumThreads();
+
+                    PerformanceMonitor.start(Measurement.physics);
+
+                    if (waitAfterReset <= 0) {
+                        simulateRain();
+                        simulateOccupancies();
+                    } else {
+                        waitAfterReset--;
+                    }
+                    scene.updateProbeMeasurements(transportSystem);
+                    simulateDetection();
+
+                    int nodeWorkers = workerCount(requestedThreads, nodeArray.length);
+                    if (nodeWorkers > 0) {
+                        scene.processRemFieldEngine(nodeWorkers,
+                                Math.ceilDiv(nodeArray.length, nodeWorkers));
+                        scene.waitForAllTasksReady();
+                    }
+
+                    if (remModel.isSimulating())
+                        PerformanceMonitor.stop(Measurement.physics);
+                    else
+                        PerformanceMonitor.reset(Measurement.physics);
+
+                    PerformanceMonitor.start(Measurement.updateMatrix);
+
+                    int entityWorkers = workerCount(requestedThreads, entityArray.length);
+                    if (entityWorkers > 0) {
+                        scene.updateMatrix(entityWorkers,
+                                Math.ceilDiv(entityArray.length, entityWorkers));
+                        scene.waitForAllTasksReady();
+                    }
+
+                    samplePassiveDetectors();
+                    FeasibilityPilotTelemetry telemetry =
+                            FeasibilityPilotTelemetry.getInstance();
+                    if (telemetry.isEnabled()) {
+                        telemetry.endUpdate(DetectorExperimentController.getInstance()
+                                .getUpdatesRecorded());
+                    }
+                    PerformanceMonitor.stop(Measurement.updateMatrix);
+                    PerformanceMonitor.stop(Measurement.totalCPURenderTime);
+                } finally {
+                    if (singleStepUpdate) remModel.finishSingleStep();
+                    numFrameCalculation--;
+                    if (numFrameCalculation != 0) {
+                        System.out.println("Error: numPhysicsFrameCalculation: "
+                                + numFrameCalculation);
+                    }
+                }
+            });
+        } catch (Throwable failure) {
+            numFrameCalculation--;
+            throw failure;
         }
     }
 
-    private void calcNextFrame() {
-        //isCalcNextPhysicsReady = false;
-        numFrameCalculation++;
-        // While the GPU is rendering on the current buffer,
-        // swap the buffer to calculate physics on another buffer.
-        Node.swapBuffer();
-        FeasibilityPilotTelemetry.getInstance().beginUpdate();
+    private static int workerCount(int requestedThreads, int itemCount) {
+        if (itemCount <= 0) return 0;
+        return Math.min(Math.max(1, requestedThreads), itemCount);
+    }
 
-        //thread = new Thread(() -> {
-        thread = Thread.startVirtualThread(() -> {
-            PerformanceMonitor.start(Measurement.totalCPURenderTime);
-
-            int numThreads  = appSettings.getNumThreads();
-            int numNodes    = scene.getLattice().getEntities().size();
-            int segmentSize = numNodes > numThreads ? numNodes / numThreads + 1 : numNodes;
-
-            PerformanceMonitor.start(Measurement.physics);
-
-            if (waitAfterReset <= 0) {
-                simulateRain();
-                simulateOccupancies();
-            } else {
-                waitAfterReset--;
-            }
-            simulateDetection();
-            scene.processRemFieldEngine(numThreads, segmentSize);
-            scene.waitForAllTasksReady();
-
-            if (remModel.isSimulating())
-                PerformanceMonitor.stop(Measurement.physics);
-            else
-                PerformanceMonitor.reset(Measurement.physics);
-            PerformanceMonitor.reset(Measurement.physics);
-
-            PerformanceMonitor.start(Measurement.updateMatrix);
-            scene.updateMatrix(numThreads, segmentSize);
-            scene.waitForAllTasksReady();
-            samplePassiveDetectors();
-            FeasibilityPilotTelemetry telemetry =
-                    FeasibilityPilotTelemetry.getInstance();
-            if (telemetry.isEnabled()) {
-                telemetry.endUpdate(
-                        DetectorExperimentController.getInstance()
-                                .getUpdatesRecorded());
-            }
-            PerformanceMonitor.stop(Measurement.updateMatrix);
-
-            PerformanceMonitor.stop(Measurement.totalCPURenderTime);
-
-            //isCalcNextPhysicsReady = true;
-            numFrameCalculation--;
-            if (numFrameCalculation != 0) {
-                System.out.println("Error: numPhysicsFrameCalculation: " + numFrameCalculation);
-            }
-        });
+    /** Keeps the complete finite lattice inside the camera far plane. */
+    private void ensureCameraFarPlaneContainsLattice() {
+        double scale = Math.abs(settings.getScale()) * Constants.EP_DEFAULT_DISTANCE;
+        double halfX = Math.max(0, project.getDimensionX() - 1) * scale * 0.5;
+        double halfY = Math.max(0, project.getDimensionY() - 1) * scale * 0.5;
+        double halfZ = Math.max(0, project.getDimensionZ() - 1) * scale * 0.5;
+        double radius = Math.sqrt(halfX * halfX + halfY * halfY + halfZ * halfZ);
+        Vector3f cameraPosition = project.camera.getPosition();
+        double distanceToOrigin = Math.sqrt(cameraPosition.x * cameraPosition.x
+                + cameraPosition.y * cameraPosition.y + cameraPosition.z * cameraPosition.z);
+        double required = distanceToOrigin + radius + Math.max(1.0, scale);
+        if (Double.isFinite(required) && required > project.camera.getZ_far() * 0.95) {
+            project.camera.setZ_far((float) Math.min(Float.MAX_VALUE, required * 1.10));
+        }
     }
 
     private void resetOccupancies() {
@@ -817,8 +943,19 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         }
     }
 
+    /** Keeps the render/picking matrix buffer current without advancing simulation state. */
+    private void refreshRenderMatrices() {
+        Object[] entityArray = scene.getLattice().getEntityArray();
+        if (entityArray == null || entityArray.length == 0) return;
+        int numThreads = workerCount(appSettings.getNumThreads(), entityArray.length);
+        int segmentSize = Math.ceilDiv(entityArray.length, numThreads);
+        Node.swapBuffer();
+        scene.updateMatrix(numThreads, segmentSize, true);
+        scene.waitForAllTasksReady();
+    }
+
     private void simulateOccupancies() {
-        if (remModel.isSimulating() && !updateLimitReached) {
+        if (remModel.isSimulationUpdateActive() && !updateLimitReached) {
             GravityExperimentController controller = GravityExperimentController.getInstance();
             controller.beginSimulationUpdate();
             GravityPressureExperimentController.getInstance().beginSimulationUpdate();
@@ -851,7 +988,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private void samplePassiveDetectors() {
         DetectorExperimentController controller =
                 DetectorExperimentController.getInstance();
-        if (!remModel.isSimulating() || updateLimitReached
+        if (!remModel.isSimulationUpdateActive() || updateLimitReached
                 || !controller.isEnabled()) {
             return;
         }
@@ -886,7 +1023,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void simulateRain() {
-        if (remModel.isSimulating() && project.rainModel.isActive()) {
+        if (remModel.isSimulationUpdateActive() && project.rainModel.isActive()) {
             Vector3i index = new Vector3i();
 
             for (int i = 0; i < project.rainModel.getIterations(); i++) {
@@ -910,14 +1047,16 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private void updateNodesProperties() {
         System.out.println("Simulator.updateNodesProperties()");
+        renderMatricesDirty = true;
         renderer.cleanupNodes();
 
         if (settings.getSliceType() == SliceType.identitiesOnly) {
             for (Entity entity : scene.getLattice().getNonNodeRenderEntities()) {
                 renderer.processEntity(entity);
             }
-            return;
         }
+
+        Performance.numVisibleNodes = 0;
 
         for (Entity entity : scene.getLattice().getEntities()) {
             if (entity.getClass() == Node.class) {
@@ -963,11 +1102,42 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     };
 
                     node.setVisible(isVisible || node.isHiLighted());
-
+                    if (node.isVisible()) Performance.numVisibleNodes++;
                 }
 
             }
             renderer.processEntity(entity);
+        }
+
+        scene.invalidateRenderInstanceDataLayout();
+        createIsotropyProbe();
+    }
+
+    private void createIsotropyProbe() {
+        scene.clearProbes();
+        Object[] nodeArray = scene.getLattice().getNodeArray();
+        if (nodeArray == null || nodeArray.length == 0) return;
+        String filename = project.getCurrentFilename();
+        boolean detectGradient8 = !filename.isEmpty()
+                && "detectGradient8.qfs".equals(Path.of(filename).getFileName().toString());
+        if (detectGradient8 && project.getProbeDefinitions().stream()
+                .noneMatch(definition -> "detectGradient8-receiver".equals(definition.getId()))) {
+            project.getProbeDefinitions().add(new ProbeDefinition(
+                    "detectGradient8-receiver", new Vector3i(130, 140, 0),
+                    new Vector4f(0.2f, 0.8f, 1.0f, 1.0f)));
+        }
+        List<ProbeDefinition> generated = project.getProbeDefinitions().stream()
+                .filter(ProbeDefinition::isGenerated).toList();
+        Vector3i centerIndex = new Vector3i(project.getDimensionX() / 2,
+                                            project.getDimensionY() / 2,
+                                            project.getDimensionZ() / 2);
+        Node center = scene.getLattice().getNodeByIndex(centerIndex);
+        if (!ProbePlacement.generatedDefinitionsCompatible(center, generated,
+                project.getDimensionZ() > 1, ProbePlacement.DEFAULT_TOLERANCES)) {
+            project.replaceGeneratedProbeDefinitions(List.of());
+        }
+        for (ProbeDefinition definition : project.getProbeDefinitions()) {
+            scene.createProbe(definition, false);
         }
     }
 
@@ -1059,6 +1229,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     @Override
     public void cleanUp() {
         System.out.println("simulator.cleanUp();");
+        Throwable pendingFrameFailure = null;
+        try {
+            waitForNextFrameIsReady();
+        } catch (Throwable failure) {
+            pendingFrameFailure = failure;
+        }
         GravityExperimentController controller = GravityExperimentController.getInstance();
         GravityPressureExperimentController pressureController =
                 GravityPressureExperimentController.getInstance();
@@ -1067,10 +1243,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         controller.close();
         pressureController.close();
         detectorController.close();
+        transportSystem.closeReceiverStatusLogging();
         FeasibilityPilotTelemetry.getInstance().close();
         discoveryWorkspace.close();
         if (discoveryViewport != null) discoveryViewport.close();
         scene.stopAnimation();
+        offscreen3DRenderer.stop();
         renderer.cleanup();
         loader.cleanup();
         super.cleanUp();
@@ -1099,6 +1277,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 System.out.println("CSV: " + controller.getOutputFile());
             }
         }
+        if (pendingFrameFailure instanceof RuntimeException runtimeException)
+            throw runtimeException;
+        if (pendingFrameFailure instanceof Error error) throw error;
+        if (pendingFrameFailure != null)
+            throw new IllegalStateException("Final calcNextFrame() failed.", pendingFrameFailure);
     }
 
     @Override
@@ -1109,49 +1292,119 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             GL11.glViewport(0, 0, glWindow.getWidth(), glWindow.getHeight());
         }
 
+        // Input and Nuklear command generation must run before any 3D work. The GUI keeps
+        // processing while a calculated back buffer is not ready for publication.
+        beginGuiFrame(scene.isAnimated());
+        publishNextFrameIfReady();
+        boolean calculationPending = frameCalculation.isPending();
+
         if (discoveryWorkspace.state().active()) {
-            waitForNextFrameIsReady();
+            if (!calculationPending
+                    && scene.getLattice().applyPendingAbsorptionLayerChange()) {
+                renderMatricesDirty = true;
+            }
             PerformanceMonitor.start(Measurement.sendToGPU);
             discoveryWorkspace.phasedWorkflow().advanceGeometryTestFrame();
             discoveryViewport.render(glWindow.getWidth(), glWindow.getHeight());
             PerformanceMonitor.stop(Measurement.sendToGPU);
-            super.render(false);
+            finishGuiFrame();
             return;
         }
 
-        checkSettingsChanged();
-
-        waitForNextFrameIsReady();
+        // Scene rebuilds and other structural mutations are accepted only at a completed
+        // frame boundary. GUI interaction itself is never delayed while one is pending.
+        if (!calculationPending) {
+            checkSettingsChanged();
+            if (scene.getLattice().applyPendingAbsorptionLayerChange()) {
+                renderMatricesDirty = true;
+            }
+        }
 
         if (updateLimitReached) {
             glWindow.requestClose();
         }
 
-        if (isLoadingStarted) {
+        if (!calculationPending && isLoadingStarted) {
             // Make sure it is not doing any calculation while updating new scene.
             if (remModel.isLoadingReady()) {
                 updateNodesArray();
+                // Constructor-time child matrices predate the final root rotation. Initialize
+                // both buffers before the newly loaded lattice is rendered for the first time.
+                refreshRenderMatrices();
+                renderMatricesDirty = false;
+                boolean singleStepUpdate = remModel.consumeSingleStepRequest();
+                if (remModel.isSimulating() || singleStepUpdate) {
+                    pausedRenderMatricesCurrent = false;
+                    calcNextFrame(singleStepUpdate);
+                } else {
+                    pausedRenderMatricesCurrent = true;
+                }
                 isLoadingStarted = false;
                 System.out.println("isLoadingStarted: " + isLoadingStarted);
             }
-        } else if (!updateLimitReached) {
+        } else if (!calculationPending && !updateLimitReached) {
             waitForRenderingReady();
             resetMonitoringDeadThreads();
+
+            // Animation changes frame input only at a completed calculation boundary.
+            scene.runAnimation();
+            if (scene.isAnimated()) renderMatricesDirty = true;
+            ensureCameraFarPlaneContainsLattice();
+
+            processDeferredHoverPick();
+            for (PassiveObserver probe : scene.getProbes()) {
+                probe.updateMarker();
+            }
+            for (PassiveObserver probe : scene.getPreviewProbes()) {
+                probe.updateMarker();
+            }
+            // Ordinary probe/gradient render lists are filtered out during inspection.
+            // Do not tear them down and rebuild them while the diagnostic view is active;
+            // they are synchronized normally on the first frame after exit.
+            if (!scene.isNeighborhoodInspectionActive()) {
+                renderer.syncProbeEntities(scene.getProbeRenderEntities());
+                renderer.syncGradientArrowEntities(scene.getGradientArrowRenderEntities());
+            }
+
             // Meanwhile, start calculating the next frame while rendering.
-            calcNextFrame();
+            boolean singleStepUpdate = remModel.consumeSingleStepRequest();
+            if (remModel.isSimulating() || singleStepUpdate) {
+                if (scene.isRenderInstanceDataLayoutDirty()) refreshRenderMatrices();
+                pausedRenderMatricesCurrent = false;
+                renderMatricesDirty = false;
+                calcNextFrame(singleStepUpdate);
+            } else if (!pausedRenderMatricesCurrent || renderMatricesDirty || scene.isAnimated()) {
+                refreshRenderMatrices();
+                pausedRenderMatricesCurrent = true;
+                renderMatricesDirty = false;
+            } else {
+                PerformanceMonitor.reset(Measurement.physics);
+                PerformanceMonitor.reset(Measurement.updateMatrix);
+                PerformanceMonitor.reset(Measurement.totalCPURenderTime);
+            }
         }
+
+        // Camera-only transitions remain responsive and read the stable published matrices.
+        scene.updateCameraTransition(1.0 / 60.0);
 
         PerformanceMonitor.start(Measurement.sendToGPU);
         isRenderingReady = false;
-        if (project.terrain.isVisible())
-            renderer.processTerrain(project.terrain);
-        renderer.render(project.camera, scene);
+
+        // Submit a complete membership/camera snapshot to the independent 3D context. The
+        // display context presents its latest finished texture immediately and never waits for
+        // this request to finish.
+        long currentRenderStateVersion = renderer.stateVersion();
+        if (renderState == null || renderStateVersion != currentRenderStateVersion) {
+            renderState = renderer.snapshot();
+            renderStateVersion = currentRenderStateVersion;
+        }
+        offscreen3DRenderer.request(renderState, project.camera, scene,
+                glWindow.getWidth(), glWindow.getHeight());
+        offscreen3DRenderer.presentLatest(glWindow.getWidth(), glWindow.getHeight());
         isRenderingReady = true;
         PerformanceMonitor.stop(Measurement.sendToGPU);
 
-        scene.runAnimation();
-
-        super.render(scene.isAnimated());
+        finishGuiFrame();
 
         if (Screenshot.isTakingScreenShot()) {
             Screenshot.takeScreenShot();

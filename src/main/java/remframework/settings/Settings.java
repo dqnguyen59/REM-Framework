@@ -40,6 +40,7 @@ import java.util.Objects;
 @Setter
 public class Settings extends AbstractSettings implements ISettings {
 
+    @Getter
     public enum SliceType {
         sliceX("Visible slice X"),
         sliceY("Visible slice Y"),
@@ -78,9 +79,6 @@ public class Settings extends AbstractSettings implements ISettings {
             throw new IllegalArgumentException("Unknown rendering mode: " + label);
         }
 
-        public String getLabel() {
-            return label;
-        }
     }
 
     public enum ColorMode {
@@ -125,6 +123,35 @@ public class Settings extends AbstractSettings implements ISettings {
 
     }
 
+    public enum RenderingMethod {
+        DEFAULT_RENDERING("Default Rendering"),
+        ENHANCED_RENDERING("Enhanced Rendering");
+
+        private final String label;
+
+        RenderingMethod(String label) {
+            this.label = label;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public static String[] getValues() {
+            RenderingMethod[] methods = values();
+            String[] labels = new String[methods.length];
+            for (int i = 0; i < methods.length; i++) labels[i] = methods[i].label;
+            return labels;
+        }
+
+        public static RenderingMethod fromLabel(String label) {
+            for (RenderingMethod method : values()) {
+                if (method.label.equals(label)) return method;
+            }
+            throw new IllegalArgumentException("Unknown rendering method: " + label);
+        }
+    }
+
     private boolean isChanged;
 
     public Vector4f defaultNodeColor = new Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
@@ -147,6 +174,7 @@ public class Settings extends AbstractSettings implements ISettings {
     private ColorMode          lastColorMode          = ColorMode.normal;
     private NodeFormulaVersion nodeFormulaVersion     = NodeFormulaVersion.v_0_1;
     private NodeFormulaVersion lastNodeFormulaVersion = NodeFormulaVersion.v_0_1;
+    private RenderingMethod    renderingMethod        = RenderingMethod.ENHANCED_RENDERING;
     private int                visibleIndexX;
     private int                visibleIndexY;
     private int                visibleIndexZ;
@@ -169,6 +197,7 @@ public class Settings extends AbstractSettings implements ISettings {
         intensitySlice  = settings.intensitySlice;
         intensityAll    = settings.intensityAll;
         shininess       = settings.shininess;
+        renderingMethod = settings.renderingMethod;
     }
 
     @Override
@@ -252,6 +281,12 @@ public class Settings extends AbstractSettings implements ISettings {
         lastNodeFormulaVersion = nodeFormulaVersion;
     }
 
+    public void setRenderingMethod(RenderingMethod renderingMethod) {
+        if (renderingMethod == null) renderingMethod = RenderingMethod.DEFAULT_RENDERING;
+        if (this.renderingMethod != renderingMethod) isChanged = true;
+        this.renderingMethod = renderingMethod;
+    }
+
     public void setVisibleIndexX(int visibleIndexX) {
         if (visibleIndexX < 0)
             visibleIndexX = 0;
@@ -325,6 +360,9 @@ public class Settings extends AbstractSettings implements ISettings {
         intensitySlice = getFloat(section, "intensitySlice", 100);
         intensityAll   = getFloat(section, "intensiityAll", 100);
         shininess      = getFloat(section, "shininess", 0.5f);
+        renderingMethod = (s = getString(section, "renderingMethod", "")).isEmpty()
+                ? RenderingMethod.DEFAULT_RENDERING
+                : RenderingMethod.valueOf(s);
     }
 
     @Override
@@ -363,6 +401,7 @@ public class Settings extends AbstractSettings implements ISettings {
         put(section, "intensitySlice", intensitySlice);
         put(section, "intensiityAll", intensityAll);
         put(section, "shininess", shininess);
+        put(section, "renderingMethod", renderingMethod.toString());
     }
 
 }

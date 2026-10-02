@@ -60,8 +60,12 @@ public class RemModel {
     private String customStatus = "";
 
     private boolean isSimulating;
+    /** One-shot request consumed by the existing Simulator update loop. */
+    private volatile boolean singleStepRequested;
+    /** True only while that existing update loop is executing a paused step. */
+    private volatile boolean singleStepInProgress;
 
-    private boolean isLoadingReady = false;
+    private volatile boolean isLoadingReady = false;
 
     private boolean isWallVisible = false;
     private boolean isChanged     = false;
@@ -79,10 +83,11 @@ public class RemModel {
     private Light             selectedLight;
 
     public String getBtnSimulatingLabel() {
-        return isSimulating() ? "Stop" : "Run";
+        return isSimulating() ? "Pause" : "Run";
     }
 
     public void startSimulation() {
+        singleStepRequested = false;
         isSimulating = true;
     }
 
@@ -91,7 +96,31 @@ public class RemModel {
     }
 
     public void toggleSimulation() {
+        if (!isSimulating) singleStepRequested = false;
         isSimulating = !isSimulating;
+    }
+
+    public void requestSingleStep() {
+        if (!isSimulating && !singleStepInProgress) singleStepRequested = true;
+    }
+
+    public boolean consumeSingleStepRequest() {
+        if (isSimulating || !singleStepRequested) return false;
+        singleStepRequested = false;
+        singleStepInProgress = true;
+        return true;
+    }
+
+    public void finishSingleStep() {
+        singleStepInProgress = false;
+    }
+
+    public boolean isSimulationUpdateActive() {
+        return isSimulating || singleStepInProgress;
+    }
+
+    public boolean isSingleStepAvailable() {
+        return !isSimulating && !singleStepInProgress;
     }
 
     public void setWallVisible(boolean isWallVisible) {

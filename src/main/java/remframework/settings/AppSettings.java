@@ -122,7 +122,7 @@ public class AppSettings extends AbstractSettings implements ISettings {
         useFixedNodes = getBool("System", "useFixedNodes", true);
         useLoop       = getBool("System", "useLoop", false);
         latticeModelIdentifier = getString("System", "latticeModel", "system:cubic");
-        if (numThreads >= MAX_NUM_THREADS) numThreads = MAX_NUM_THREADS;
+        numThreads = Math.max(1, Math.min(numThreads, MAX_NUM_THREADS));
 
         setProjectFilePath(getString("System", "projectFilePath", Constants.PROJECT_FILE_PATH));
         setFontFile(getString("System", "fontFile", Constants.DEFAULT_FONT_FILE));
@@ -199,8 +199,9 @@ public class AppSettings extends AbstractSettings implements ISettings {
     }
 
     public void setNumThreads(int numThreads) {
-        if (this.numThreads != numThreads) {
-            this.numThreads = numThreads;
+        int normalizedThreads = Math.max(1, Math.min(numThreads, MAX_NUM_THREADS));
+        if (this.numThreads != normalizedThreads) {
+            this.numThreads = normalizedThreads;
             saveToFile();
         }
     }

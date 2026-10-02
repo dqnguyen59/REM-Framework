@@ -28,6 +28,7 @@ import remframework.geometry.discovery.optimization.*;
  */
 package remframework.gui.view.frames;
 
+import lombok.Getter;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.lwjgl.nuklear.*;
@@ -110,9 +111,21 @@ public abstract class AbstractFrame implements IFrame {
 
 	private Stack<int[]> stackTextColor = new Stack<>();
 
-	private final NkRect frameRect = NkRect.create();
-	private final NkRect contentRect = NkRect.create();
+    private final NkRect frameRect        = NkRect.create();
+    @Getter
+    private final NkRect resizeHandleRect = NkRect.create();
+    private final NkRect contentRect      = NkRect.create();
 	private NkVec2 pos = NkVec2.create();
+
+	/** Controls whether this frame owns custom resize interaction and its visual grip affordance. */
+	protected ResizeCapability resizeCapability = ResizeCapability.disabled();
+	private boolean customResizeCaptured;
+	private double initialResizeCursorX;
+	private double initialResizeCursorY;
+	private float initialResizeFrameX;
+	private float initialResizeFrameY;
+	private float initialResizeFrameWidth;
+	private float initialResizeFrameHeight;
 
 	public AbstractFrame(NuklearModel nuklearModel) {
 		this.nuklearModel = nuklearModel;
@@ -165,7 +178,7 @@ public abstract class AbstractFrame implements IFrame {
 	}
 
 	private void _createLayout(NkContext ctx, int x, int y, int width, int height,
-							   boolean centered, boolean fixed) {
+							   boolean centered, boolean fixed, StickToBorder stickToBorder) {
 		String title = getTitle();
 
         //System.out.println("width, height: " + lastWidth + ", " + lastHeight + ", " + width + ", " + height + ", ");
@@ -191,9 +204,38 @@ public abstract class AbstractFrame implements IFrame {
 			NkRect r = appSettings.getFrameRectMap().get(title);
 
             if (r != null) {
-				if (title.equals("Statusbar")) {
-					r.y(getWindowHeight() - r.h());
-				}
+				switch (stickToBorder) {
+                    case stickToNone -> {
+                    }
+                    case stickToBottom -> {
+						r.x(x);
+						r.y(getWindowHeight() - height);
+                    }
+                    case stickToLeft -> {
+						r.x(0);
+						r.y(y);
+                    }
+                    case stickToRight -> {
+						r.x(getWindowWidth() - width);
+						r.y(y);
+                    }
+                    case stickToTopLeft -> {
+						r.x(0);
+						r.y(nuklearModel.getMenuBarHeight() + 4);
+                    }
+                    case stickToTopRight -> {
+						r.x(getWindowWidth() - width);
+						r.y(nuklearModel.getMenuBarHeight() + 4);
+                    }
+                    case stickToBottomLeft -> {
+						r.x(0);
+						r.y(getWindowHeight() - height - Constants.STATUS_BAR_HEIGHT);
+                    }
+                    case stickToBottomRight -> {
+						r.x(getWindowWidth() - width);
+						r.y(getWindowHeight() - height - Constants.STATUS_BAR_HEIGHT);
+                    }
+                }
 				x = (int) r.x();
 				y = (int) r.y();
 				if (lastHeight == height && lastWidth == width) {
@@ -225,6 +267,7 @@ public abstract class AbstractFrame implements IFrame {
 			frameRect.h(h);
 
 			Nuklear.nk_window_get_content_region(ctx, contentRect);
+			updateResizeHandleRect(ctx);
 
 			contentRect.x(contentRect.x() - 6);
 			contentRect.w(contentRect.w() + 14);
@@ -276,6 +319,7 @@ public abstract class AbstractFrame implements IFrame {
 			if (inputBlocked) Nuklear.nk_widget_disable_begin(ctx);
 			layout(ctx, (int)contentRect.x(), (int)contentRect.y(), width, height);
 			if (inputBlocked) Nuklear.nk_widget_disable_end(ctx);
+			drawOverlay(ctx);
 
 			tabKeyPressed = false;
 			focusChanged = false;
@@ -289,16 +333,153 @@ public abstract class AbstractFrame implements IFrame {
 		lastHeight = height;
 	}
 
+	private void updateResizeHandleRect(NkContext ctx) {
+		if (resizeCapability.enabled()) {
+			resizeHandleRect.x(frameRect.x() + frameRect.w() - resizeCapability.gripSize());
+			resizeHandleRect.y(frameRect.y() + frameRect.h() - resizeCapability.gripSize());
+			resizeHandleRect.w(resizeCapability.gripSize());
+			resizeHandleRect.h(resizeCapability.gripSize());
+			return;
+		}
+		if ((windowOptions & Nuklear.NK_WINDOW_SCALABLE) == 0) {
+			resizeHandleRect.x(0).y(0).w(0).h(0);
+			return;
+		}
+		NkVec2 padding = ctx.style().window().padding();
+		NkVec2 scrollbarSize = ctx.style().window().scrollbar_size();
+		// This is Nuklear's NK_WINDOW_SCALABLE bottom-right scaler in logical UI coordinates.
+		resizeHandleRect.x(contentRect.x() + contentRect.w() + padding.x() - scrollbarSize.x());
+		resizeHandleRect.y(contentRect.y() + contentRect.h());
+		resizeHandleRect.w(scrollbarSize.x());
+		resizeHandleRect.h(scrollbarSize.y());
+	}
+
+	public final boolean isResizeCapabilityEnabled() {
+		return resizeCapability.enabled();
+	}
+
+	/** Returns whether the current cursor position is inside this rendered frame. */
+	public final boolean containsPoint(double cursorX, double cursorY) {
+		return cursorX >= frameRect.x() && cursorX <= frameRect.x() + frameRect.w()
+				&& cursorY >= frameRect.y() && cursorY <= frameRect.y() + frameRect.h();
+	}
+
+	public final boolean isCustomResizeCaptured() {
+		return customResizeCaptured;
+	}
+
+	/** Starts custom resize capture only when the cursor is in this frame's rendered grip. */
+	public final boolean beginCustomResize(double cursorX, double cursorY) {
+		if (!resizeCapability.enabled() || customResizeCaptured || !isInsideResizeHandle(cursorX, cursorY)) {
+			return false;
+		}
+		customResizeCaptured = true;
+		initialResizeCursorX = cursorX;
+		initialResizeCursorY = cursorY;
+		initialResizeFrameX = frameRect.x();
+		initialResizeFrameY = frameRect.y();
+		initialResizeFrameWidth = frameRect.w();
+		initialResizeFrameHeight = frameRect.h();
+		return true;
+	}
+
+	/** Applies the cursor delta to the captured frame without consulting the old grip or frame bounds. */
+	public final boolean updateCustomResize(double cursorX, double cursorY) {
+		if (!customResizeCaptured) return false;
+		ResizeBounds bounds = boundsFromResizeDelta(initialResizeFrameX, initialResizeFrameY,
+				initialResizeFrameWidth, initialResizeFrameHeight,
+				cursorX - initialResizeCursorX, cursorY - initialResizeCursorY,
+				resizeCapability.minimumWidth(), resizeCapability.minimumHeight(),
+				getWindowWidth(), getWindowHeight());
+		frameRect.x(bounds.x()).y(bounds.y()).w(bounds.width()).h(bounds.height());
+		windowRect.x(bounds.x()).y(bounds.y()).w(bounds.width()).h(bounds.height());
+		NkRect savedRect = appSettings.getFrameRectMap().get(getTitle());
+		if (savedRect == null) {
+			savedRect = NkRect.create();
+			appSettings.getFrameRectMap().put(getTitle(), savedRect);
+		}
+		savedRect.x(bounds.x()).y(bounds.y()).w(bounds.width()).h(bounds.height());
+		return true;
+	}
+
+	/** Ends custom resize capture on the matching left-button release, wherever the cursor is. */
+	public final boolean endCustomResize() {
+		if (!customResizeCaptured) return false;
+		customResizeCaptured = false;
+		return true;
+	}
+
+	private boolean isInsideResizeHandle(double cursorX, double cursorY) {
+		return cursorX >= resizeHandleRect.x() && cursorX <= resizeHandleRect.x() + resizeHandleRect.w()
+				&& cursorY >= resizeHandleRect.y() && cursorY <= resizeHandleRect.y() + resizeHandleRect.h();
+	}
+
+	static ResizeBounds boundsFromResizeDelta(float initialX, float initialY,
+			float initialWidth, float initialHeight, double deltaX, double deltaY,
+			float minimumWidth, float minimumHeight, float viewportWidth, float viewportHeight) {
+		float maximumWidth = Math.max(minimumWidth, viewportWidth - initialX);
+		float maximumHeight = Math.max(minimumHeight, viewportHeight - initialY);
+		float width = (float)Math.max(minimumWidth, Math.min(maximumWidth, initialWidth + deltaX));
+		float height = (float)Math.max(minimumHeight, Math.min(maximumHeight, initialHeight + deltaY));
+		return new ResizeBounds(initialX, initialY, width, height);
+	}
+
+	record ResizeBounds(float x, float y, float width, float height) {}
+
+	protected record ResizeCapability(boolean enabled, float minimumWidth, float minimumHeight, float gripSize) {
+		static ResizeCapability disabled() {
+			return new ResizeCapability(false, 0, 0, 0);
+		}
+
+		protected static ResizeCapability enabled(float minimumWidth, float minimumHeight, float gripSize) {
+			return new ResizeCapability(true, minimumWidth, minimumHeight, gripSize);
+		}
+	}
+
+	protected void drawOverlay(NkContext ctx) {
+		if (resizeCapability.enabled()) drawResizeGrip(ctx);
+		drawFrameOverlay(ctx);
+	}
+
+	/** Draws optional frame-specific overlays after the base resize affordance. */
+	protected void drawFrameOverlay(NkContext ctx) {
+	}
+
+	private void drawResizeGrip(NkContext ctx) {
+		NkRect outerBounds = NkRect.create();
+		Nuklear.nk_window_get_bounds(ctx, outerBounds);
+		NkCommandBuffer canvas = Nuklear.nk_window_get_canvas(ctx);
+		NkRect priorClip = NkRect.create().set(canvas.clip());
+		Nuklear.nk_push_scissor(canvas, outerBounds);
+		float gripSize = resizeCapability.gripSize();
+		float inset = gripSize / 6.0f;
+		float gripRight = outerBounds.x() + outerBounds.w() - inset;
+		float gripBottom = outerBounds.y() + outerBounds.h() - inset;
+		// Visual indicator for the custom resize grip; it does not handle input.
+		for (int line = 0; line < 3; line++) {
+			float offset = line * 3.0f;
+			Nuklear.nk_stroke_line(canvas,
+					gripRight - gripSize + inset + offset + 3, gripBottom,
+					gripRight + 3, gripBottom - gripSize + inset + offset,
+					1.5f, Theme.grey12);
+		}
+		Nuklear.nk_push_scissor(canvas, priorClip);
+	}
+
 	protected void createLayout(NkContext ctx, int x, int y, int width, int height) {
-		_createLayout(ctx, x, y, width, height, false, false);
+		_createLayout(ctx, x, y, width, height, false, false, StickToBorder.stickToNone);
+	}
+
+	protected void createStickyLayout(NkContext ctx, int x, int y, int width, int height, StickToBorder stickToBorder) {
+		_createLayout(ctx, x, y, width, height, false, false, stickToBorder);
 	}
 
 	protected void createLayoutCentered(NkContext ctx, int width, int height) {
-		_createLayout(ctx, 0, 0, width, height, true, false);
+		_createLayout(ctx, 0, 0, width, height, true, false, StickToBorder.stickToNone);
 	}
 
 	protected void createFixedLayout(NkContext ctx, int x, int y, int width, int height) {
-		_createLayout(ctx, x, y, width, height, false, true);
+		_createLayout(ctx, x, y, width, height, false, true, StickToBorder.stickToNone);
 	}
 
 	abstract protected void layout(NkContext ctx, int x, int y, int width, int height);

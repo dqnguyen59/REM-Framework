@@ -88,7 +88,11 @@ public class Entity {
      */
     protected Vector4f customColor;
 
-    protected boolean isVisible   = true;
+    protected boolean visible           = true;
+    /** Renderer-only filter used by the paused/live neighborhood inspector. */
+    protected boolean inspectionVisible = false;
+    /** Temporary renderer color used only while neighborhood inspection is active. */
+    protected Vector4f inspectionColor;
     protected boolean isSelected  = false;
     protected boolean isHiLighted = false;
 
@@ -104,6 +108,7 @@ public class Entity {
         this.position.set(position);
         initPosition(position);
         this.rotation.set(rotation);
+        updateRotation();
         this.scale               = scale;
         transformMatrix4fList[0] = new Matrix4f();
         transformMatrix4fList[1] = new Matrix4f();
@@ -138,7 +143,10 @@ public class Entity {
         float    intensity3     = intensity2 * intensity * absorptionFactor;
         float    alphaIntensity = settings.getAlpha();
 
-        if (customColor != null) {
+        if (inspectionColor != null) {
+            color.set(inspectionColor).mul(2.0f);
+            alpha = Math.max(0.0f, Math.min(1.0f, inspectionColor.w));
+        } else if (customColor != null) {
             color.set(customColor).mul(2.0f);
             alpha = 1.0f;
         } else if (isSelected && !(type == EntityType.ANIMATED)) {
@@ -265,6 +273,10 @@ public class Entity {
         updateRotation();
     }
 
+    public void setRotation(Vector3d rotation) {
+        setRotation(rotation.x, rotation.y, rotation.z);
+    }
+
     /**
      * Values are in degrees.
      * Range: 0..360
@@ -305,31 +317,36 @@ public class Entity {
         swapBufIndex = 1 - swapBufIndex;
     }
 
+    public static int getSwapBufferIndex() {
+        return swapBufIndex;
+    }
+
     public void updateMatrix() {
+        updateMatrix(settings.scale);
+    }
+
+    /** Updates this entity using the render scale captured for the current frame. */
+    public void updateMatrix(double renderScale) {
+//        updatePosition();
+//        updateRotation();
+//
+//        transformMatrix
+//                .identity()
+//                .translate(position)
+//                .setRotationXYZ(rotationRad.x, rotationRad.y, rotationRad.z)
+//                .scale(scale);
+//
+//        if (parent != null)
+//            parent.transformMatrix.mul(transformMatrix, transformMatrix);
+//        transformMatrix4fList[swapBufIndex].set(transformMatrix);
+
         updatePosition();
-        updateRotation();
-
-        transformMatrix
-                .identity()
-                .translate(position)
-                .setRotationXYZ(rotationRad.x, rotationRad.y, rotationRad.z)
-                .scale(scale);
-
-        if (parent != null)
-            parent.transformMatrix.mul(transformMatrix, transformMatrix);
-        transformMatrix4fList[swapBufIndex].set(transformMatrix);
-
-        updatePosition();
-        updateRotation();
-
-        transformMatrix
-                .identity()
-                .translate(position)
-                .setRotationXYZ(rotationRad.x, rotationRad.y, rotationRad.z)
-                .scale(settings.scale)
-                .scale(customScale > 0 ? customScale : scale);
-
-        if (parent != null) parent.getTransformMatrix().mul(getTransformMatrix(), getTransformMatrix());
+        if (parent == null) transformMatrix.identity();
+        else transformMatrix.set(parent.getTransformMatrix());
+        transformMatrix.translate(position);
+        if (rotationRad.x != 0.0 || rotationRad.y != 0.0 || rotationRad.z != 0.0)
+            transformMatrix.rotateXYZ(rotationRad.x, rotationRad.y, rotationRad.z);
+        transformMatrix.scale(renderScale * (customScale > 0 ? customScale : scale));
         transformMatrix4fList[swapBufIndex].set(getTransformMatrix());
         customScale = -1;
         setColor(FIXED_COLOR);
@@ -348,6 +365,30 @@ public class Entity {
      */
     public Matrix4f getTransformMatrix4f() {
         return transformMatrix4fList[1 - swapBufIndex];
+    }
+
+    /**
+     * Returns the matrix being calculated for the next published render frame.
+     * <br><br>
+     * Physics and matrix workers may write this buffer while OpenGL reads
+     * {@link #getTransformMatrix4f()} from the opposite buffer.
+     */
+    public Matrix4f getCalculatedTransformMatrix4f() {
+        return transformMatrix4fList[swapBufIndex];
+    }
+
+    /**
+     * Mirrors the newly calculated matrix into the render buffer.
+     * <br><br>
+     * This is used only by synchronous matrix refreshes, when OpenGL is not
+     * drawing, so paused and layout-rebuild frames start with two valid buffers.
+     */
+    public void synchronizeTransformMatrixBuffers() {
+        transformMatrix4fList[1 - swapBufIndex].set(transformMatrix4fList[swapBufIndex]);
+    }
+
+    public Vector3d toWorldPosition() {
+        return getTransformMatrix().transformPosition(new Vector3d());
     }
 
 }

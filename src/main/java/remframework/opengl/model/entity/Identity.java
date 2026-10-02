@@ -62,7 +62,18 @@ import remframework.helpers.ISettings;
  */
 @Getter
 @Setter
-public class Identity extends AbstractSettings implements ISettings {
+public class Identity extends AbstractSettings implements ISettings, Occupant {
+
+    /** Runtime back-reference to this Identity's single normal Occupancy. */
+    private transient Occupancy occupancy;
+
+    /** Identity Occupancies retain both excitation and transport capabilities. */
+    @Override
+    public boolean canExcite() { return true; }
+
+    /** Identity Occupancies retain both excitation and transport capabilities. */
+    @Override
+    public boolean canTransfer() { return true; }
 
     /**
      * Human-readable identifier used for debugging,

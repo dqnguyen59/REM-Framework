@@ -44,7 +44,7 @@ public class FrameStatusBar extends AbstractFrame {
     private final Project  project  = Project.getInstance();
     private final RemModel remModel = project.getRemModel();
 
-    private final float[] col = {230, 90, 60, 60, 10, 50, 40, 40, 40, 40, 40, 40, 1400};
+    private final float[] col = {230, 90, 60, 60, 60, 10, 50, 40, 40, 40, 40, 40, 40, 1400};
 
     public FrameStatusBar(NuklearModel frames) {
         super(frames);
@@ -60,14 +60,13 @@ public class FrameStatusBar extends AbstractFrame {
     public void render(long windowHandle, NkContext ctx) {
         super.render(windowHandle, ctx);
 
-        int width = getWindowWidth();
         int height = Constants.STATUS_BAR_HEIGHT;
 
         NkColor savedColor = NkColor.create().set(ctx.style().window().fixed_background().data().color());
 
         ctx.style().window().fixed_background().data().color(Constants.TRANSPARENT_BG_COLOR);
 
-        createLayout(ctx, 0, getWindowHeight() - height, width, height);
+        createStickyLayout(ctx, 0, getWindowHeight() - height, getWindowWidth(), height, StickToBorder.stickToBottom);
         ctx.style().window().fixed_background().data().color(savedColor);
     }
 
@@ -76,7 +75,7 @@ public class FrameStatusBar extends AbstractFrame {
         NkColor savedCol = NkColor.create().set(ctx.style().button().normal().data().color());
 
         int i = 0;
-        Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, 30, 13);
+        Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, 30, 14);
         Nuklear.nk_layout_row_push(ctx, col[i++] / width);
         Nuklear.nk_label(ctx, String.format(" CurrentNode.xyz: (%d, %d, %d) (%.1f);",
                                             remModel.getCurrentMouseNodeIndex().x,
@@ -95,6 +94,16 @@ public class FrameStatusBar extends AbstractFrame {
             remModel.toggleSimulation();
 
         ctx.style().button().normal().data().color(Theme.blue1);
+        Nuklear.nk_layout_row_push(ctx, col[i++] / width);
+        if (remModel.isSingleStepAvailable()) {
+            if (nk_button_label(ctx, "Step")) remModel.requestSingleStep();
+        } else {
+            Nuklear.nk_widget_disable_begin(ctx);
+            // Keep the frame's release bookkeeping in sync even while disabled.
+            nk_button_label(ctx, "Step");
+            Nuklear.nk_widget_disable_end(ctx);
+        }
+
         Nuklear.nk_layout_row_push(ctx, col[i++] / width);
         if (nk_button_label(ctx, "Reset")) {
             project.reset();
