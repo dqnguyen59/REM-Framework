@@ -1,0 +1,10 @@
+format_version = 3
+node_count = 4
+exact_degree = 2
+intended_dimension = "THREE_D"
+experiment_profile = "CLOSED_3D_VOLUME"
+symmetry_filter = "BOTH"
+maximum_configurations = 1000
+maximum_direct_cycle_nodes = 10000
+enumeration_time_millis = 30000
+generation_strategy = "DIRECT_CYCLE_CONSTRUCTION"

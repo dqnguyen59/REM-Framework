@@ -1,0 +1,4 @@
+directionId,eventType,update,receiverVelocityZ,signIsPositiveZBefore,signIsPositiveZAfter,cycleCompletedThisUpdate
+R01_1_0_0,NO_NEGATIVE_TRANSITION,,,true,true,false
+R08_1_1_0,NO_NEGATIVE_TRANSITION,,,true,true,false
+R09_1_1_1,NO_NEGATIVE_TRANSITION,,,true,true,false

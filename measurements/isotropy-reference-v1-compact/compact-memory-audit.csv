@@ -1,0 +1,12 @@
+item,bytesPerNode,totalBytes
+persistent lattice state,72,1886261256
+temporary update buffers,0,0
+boundary state,0,0
+source state,0,0
+detector state,0,0
+other overhead,0,0
+estimate 161^3,72,300476232
+estimate 237^3,72,958467816
+estimate 297^3,72,1886261256
+estimate 384^3,72,4076863488
+estimate 512^3,72,9663676416

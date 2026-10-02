@@ -1,0 +1,7 @@
+node_count = 3
+exact_degree = 2
+intended_dimension = "THREE_D"
+symmetry_filter = "SYMMETRIC_ONLY"
+maximum_configurations = 1000
+enumeration_time_millis = 180000
+generation_strategy = "EXHAUSTIVE_BACKTRACKING"

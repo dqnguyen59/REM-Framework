@@ -1,0 +1,4 @@
+directionId,sourceToReceiverGraphDistance,firstObservedNonzeroGradientUpdate,arrivalCriterion
+R01_1_0_0,120,168,exact nonzero recorded value
+R08_1_1_0,120,114,exact nonzero recorded value
+R09_1_1_1,120,85,exact nonzero recorded value

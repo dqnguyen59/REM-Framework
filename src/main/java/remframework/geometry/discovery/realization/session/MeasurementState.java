@@ -1,0 +1,19 @@
+package remframework.geometry.discovery.realization.session;
+
+/** Scientific availability state for one Stage 2 measurement. */
+public enum MeasurementState {
+    MEASURED,
+    PARTIAL_MEASUREMENT,
+    NOT_REQUESTED,
+    NOT_APPLICABLE,
+    NOT_IMPLEMENTED,
+    UNAVAILABLE_MISSING_FACE_COMPLEX,
+    UNAVAILABLE_DEGENERATE_FACE,
+    UNAVAILABLE_INVALID_NORMAL,
+    UNAVAILABLE_INVALID_CENTER,
+    UNAVAILABLE_EMPTY_SAMPLE_SET,
+    UNAVAILABLE_INCOHERENT_ORIENTATION,
+    NUMERICALLY_INVALID,
+    NUMERICALLY_INVALID_LEGACY_VALUE,
+    STALE
+}

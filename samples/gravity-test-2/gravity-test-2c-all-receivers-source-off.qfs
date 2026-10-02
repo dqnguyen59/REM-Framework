@@ -1,0 +1,838 @@
+[QuantumField]
+constantFrequency = 1.0
+constantElectricFactor = 1.0
+constantMagneticFactor = 0.8
+glSwapInterval = 2
+dimension.x = 1201
+dimension.y = 1201
+dimension.z = 1
+
+[Lights]
+numLights = 1
+
+[Lights0]
+name = DefaultPointLight
+position.x = 30.0
+position.y = 200.0
+position.z = 175.0
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+direction.x = 0.0
+direction.y = 0.0
+direction.z = 1.0
+color.x = 0.67
+color.y = 0.8
+color.z = 1.0
+intensity = 0.8
+constant = 0.3
+linear = 0.003
+exponent = 0.0
+scale = 1.0
+spotlight = false
+cutOff = 90.0
+
+[Camera]
+fieldOfFiew = 45.0
+position.x = 0.0
+position.y = 0.0
+position.z = 300.0
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+
+[Base]
+rotation.x = 0.0
+rotation.y = 0.0
+rotation.z = 0.0
+
+[Terrain]
+visible = false
+texturePath = resources/textures/terrains/
+textureFile = default2.jpg
+scale = 1.0
+depthVisibility = 1.0
+
+[QFSSettings]
+sliceType = identitiesOnly
+visibleIndexX = 600
+visibleIndexY = 600
+visibleIndexZ = 0
+
+[SlitWall]
+active = false
+direction = x
+numSlits = 2
+slitWidth = 3
+slitHeight = 20
+slitDistance = 17
+position = 0.25
+
+[TransportSystem0]
+logToConsole = false
+enableTransport = false
+
+[Oscillators]
+Size = 31
+
+[Rain]
+active = false
+force = 50.0
+iterations = 2
+
+[Detector]
+ignitorNode.x = -1
+ignitorNode.y = -1
+ignitorNode.z = -1
+detectorNode.x = -1
+detectorNode.y = -1
+detectorNode.z = -1
+detectionVelocity = 5.0E-5
+
+[Walls]
+numWalls = 0
+
+[Oscillator0]
+name = Oscillator 0
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.0
+nodeIndex.x = 600
+nodeIndex.y = 600
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator1]
+name = R020_A00
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 620
+nodeIndex.y = 600
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator2]
+name = R020_A30
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 617
+nodeIndex.y = 610
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator3]
+name = R020_A45
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 614
+nodeIndex.y = 614
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator4]
+name = R020_A60
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 610
+nodeIndex.y = 617
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator5]
+name = R020_A90
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 600
+nodeIndex.y = 620
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator6]
+name = R040_A00
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 640
+nodeIndex.y = 600
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator7]
+name = R040_A30
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 635
+nodeIndex.y = 620
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator8]
+name = R040_A45
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 628
+nodeIndex.y = 628
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator9]
+name = R040_A60
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 620
+nodeIndex.y = 635
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator10]
+name = R040_A90
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 600
+nodeIndex.y = 640
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator11]
+name = R060_A00
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 660
+nodeIndex.y = 600
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator12]
+name = R060_A30
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 652
+nodeIndex.y = 630
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator13]
+name = R060_A45
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 642
+nodeIndex.y = 642
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator14]
+name = R060_A60
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 630
+nodeIndex.y = 652
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator15]
+name = R060_A90
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 600
+nodeIndex.y = 660
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator16]
+name = R080_A00
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 680
+nodeIndex.y = 600
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator17]
+name = R080_A30
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 669
+nodeIndex.y = 640
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator18]
+name = R080_A45
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 657
+nodeIndex.y = 657
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator19]
+name = R080_A60
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 640
+nodeIndex.y = 669
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator20]
+name = R080_A90
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 600
+nodeIndex.y = 680
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator21]
+name = R100_A00
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 700
+nodeIndex.y = 600
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator22]
+name = R100_A30
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 687
+nodeIndex.y = 650
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator23]
+name = R100_A45
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 671
+nodeIndex.y = 671
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator24]
+name = R100_A60
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 650
+nodeIndex.y = 687
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator25]
+name = R100_A90
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 600
+nodeIndex.y = 700
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator26]
+name = R120_A00
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 720
+nodeIndex.y = 600
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator27]
+name = R120_A30
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 704
+nodeIndex.y = 660
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator28]
+name = R120_A45
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 685
+nodeIndex.y = 685
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator29]
+name = R120_A60
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 660
+nodeIndex.y = 704
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+
+[Oscillator30]
+name = R120_A90
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 20.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 0.01
+nodeIndex.x = 600
+nodeIndex.y = 720
+nodeIndex.z = 0
+initialTransportMomentum.x = 0
+initialTransportMomentum.y = 0
+initialTransportMomentum.z = 0
+

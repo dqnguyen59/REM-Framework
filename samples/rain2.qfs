@@ -161,6 +161,30 @@ position = 0.25
 [Oscillators]
 Size = 1
 
+[Oscillator0]
+name = Oscillator 0
+active.x = false
+active.y = false
+active.z = true
+OscillatorType.x = sin
+OscillatorType.y = sin
+OscillatorType.z = sin
+startAngle.x = 0.0
+startAngle.y = 0.0
+startAngle.z = 0.0
+angleIncrement.x = 0.0
+angleIncrement.y = 0.0
+angleIncrement.z = 4.0
+amplitude.x = 0.0
+amplitude.y = 0.0
+amplitude.z = 80.0
+nodeIndex.x = 75
+nodeIndex.y = 75
+nodeIndex.z = 0
+nodeInitPosition.x = 0.0
+nodeInitPosition.y = 0.0
+nodeInitPosition.z = 0.0
+
 [Rain]
 active = false
 force = -249.99993896484375
@@ -177,28 +201,3 @@ detectionVelocity = 5.0E-5
 
 [Walls]
 numWalls = 0
-
-[Oscillator0]
-name = Oscillator 0
-nodeIndex.x = 75
-nodeIndex.y = 75
-nodeIndex.z = 0
-nodeInitPosition.x = 0.0
-nodeInitPosition.y = 0.0
-nodeInitPosition.z = 0.0
-active.x = false
-active.y = false
-active.z = true
-OscillatorType.x = sin
-OscillatorType.y = sin
-OscillatorType.z = sin
-startAngle.x = 0.0
-startAngle.y = 0.0
-startAngle.z = 0.0
-angleIncrement.x = 0.0
-angleIncrement.y = 0.0
-angleIncrement.z = 4.0
-amplitude.x = 0.0
-amplitude.y = 0.0
-amplitude.z = 80.0
-

@@ -1,0 +1,15 @@
+package remframework.geometry.discovery;
+import remframework.geometry.discovery.*;
+import remframework.geometry.discovery.configuration.*;
+import remframework.geometry.discovery.realization.session.*;
+import remframework.geometry.discovery.viewport.*;
+import remframework.geometry.discovery.workflow.*;
+import remframework.geometry.discovery.persistence.*;
+import remframework.geometry.discovery.ui.*;
+import remframework.geometry.discovery.graph.canonical.*;
+import remframework.geometry.discovery.graph.symmetry.*;
+import remframework.geometry.discovery.optimization.*;
+import org.joml.Vector3d;
+public final class GeometricSymmetryAnalyzer {
+    public GeometricSymmetryResult analyze(Configuration g,Realization r){Vector3d c=new Vector3d();r.finalCoordinates().forEach(c::add);c.div(r.finalCoordinates().size());double meanR=r.finalCoordinates().stream().mapToDouble(p->p.distance(c)).average().orElse(0);double radial=r.finalCoordinates().stream().mapToDouble(p->{double d=p.distance(c)-meanR;return d*d;}).average().orElse(0);double meanE=g.edges().stream().mapToDouble(e->r.finalCoordinates().get(e.firstNodeId()).distance(r.finalCoordinates().get(e.secondNodeId()))).average().orElse(0);double edge=g.edges().stream().mapToDouble(e->{double d=r.finalCoordinates().get(e.firstNodeId()).distance(r.finalCoordinates().get(e.secondNodeId()))-meanE;return d*d;}).average().orElse(0);boolean symmetric=radial<=1e-8&&edge<=1e-8;var d=GeometryConfigurationDiagnostic.info(GeometryConfigurationStage.GEOMETRIC_SYMMETRY,GeometryConfigurationStatusCode.GEOMETRIC_SYMMETRY_UNKNOWN,"Geometric symmetry measured","Centroid radial variance and edge-length variance were measured; complete point-group classification is not claimed.");return new GeometricSymmetryResult(false,symmetric,radial,edge,symmetric?"Variance diagnostics are symmetry-consistent.":"Variance diagnostics are asymmetric.",GeometryConfigurationStatus.of(d));}
+}

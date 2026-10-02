@@ -1,0 +1,4 @@
+directionId,receiverCoordinate,nearestRelevantBoundary,graphDistanceSourceToBoundary,graphDistanceBoundaryToReceiver,minimumReflectionPathLength,earliestPossibleContaminatedUpdate,maximumReflectionSafeUpdate,safetyClassification,basis
+R01_1_0_0,286;166;166,332;166;166,71,46,117,117,116,CONSERVATIVE_LOWER_BOUND,Manhattan graph; occupied source boundary center +/-95; one edge/update lower bound
+R08_1_1_0,226;226;166,332;226;166,71,106,177,177,176,CONSERVATIVE_LOWER_BOUND,Manhattan graph; occupied source boundary center +/-95; one edge/update lower bound
+R09_1_1_1,206;206;206,332;206;206,71,126,197,197,196,CONSERVATIVE_LOWER_BOUND,Manhattan graph; occupied source boundary center +/-95; one edge/update lower bound

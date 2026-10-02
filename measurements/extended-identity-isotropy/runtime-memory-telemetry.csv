@@ -1,0 +1,3 @@
+event,update,testIdentifier,latticeSize,configuredUpdates,elapsedMilliseconds,updateMilliseconds,averageUpdateMilliseconds,usedHeapBytes,totalHeapBytes,maxHeapBytes,peakUsedHeapBytes,gcCount,gcTimeMilliseconds
+before-lattice-allocation,0,extended-identity-isotropy,161,180,0.033533,0.0,0.0,21906232,2130706432,25769803776,21906232,0,0
+detectors-initialized,0,extended-identity-isotropy,161,180,2.541461,0.0,0.0,21906232,2130706432,25769803776,21906232,0,0

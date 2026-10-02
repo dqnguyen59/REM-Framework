@@ -1,102 +1,259 @@
-# Quantum Field Simulator
+# REM Framework
 
-## Introduction
-This source code simulates the quantum field theory.
-Initially it was developed to simulate the double slit experiment.
-It uses a simple motion formula to simulate the light wave.
-By defining the slits in the simulator, the interference patterns can be simulated.
-Even walls/mirrors can be defined freely in 3D quantum field.
-There are also other files to simulate, for example rain drops or detecting the speed of light.
-This simulator does not approximate the real world values, but rather simulates the properties of the light wave due to a lack of CPU/GPU power.
+**REM Framework — Recursive Emergent Mechanics**
 
-I am not claiming that this is The formula for quantum field theory, but it should only be used for educational purposes to understand the concept of quantum field theory.<br/>
+REM Framework is an experimental computational research framework for investigating
+whether complex physical behavior can emerge from a small set of local mechanical
+rules.
 
-Go to website <a href="https://www.smartblackbox.org/">https://www.smartblackbox.org/</a> for more detailed information.
+The project originated as the **Quantum Field Simulator**, initially developed to
+experiment with wave propagation and the double-slit experiment. It has since
+developed into a broader research framework investigating emergent geometry,
+wave propagation, transport, interaction, and other physical phenomena.
 
-<p>The game library engine <a href="https://github.com/LWJGL/lwjgl3" target="_blank">LWJGL</a> is used to draw the field in 3D.</p>
+The central research question is:
 
-### Sample files:
-* double_slit.qfs
-* rain.qfs
-* test_speed_of_light.qfs
+> What is the simplest possible universe capable of producing the physical
+> behavior we observe?
 
-### Compilation
-* IDE: Eclipse
-* Compiler: Java 17
+REM Framework does not assume that its current mechanics describe physical
+reality. It is a computational environment for constructing hypotheses,
+running experiments, measuring emergent behavior, and identifying where those
+hypotheses succeed or fail.
 
-<p>Make sure you have Java 17 installed. JDK 17 or later is recommended.</p>
-<p>Download the project to any folder. Then from the File menu in Eclipse click on "open Projects from File System..." and import the downloaded project folder.</p>
-<p>Then click on the menu "Project"->"Update Maven Project", then click on the "Ok" button. </p>
-<p>Find the file Main.java and run.</p>
+## Core Idea
 
-### Mac users:
+The current REM model starts with a discrete lattice of connected nodes.
 
-    VM arguments "-XstartOnFirstThread" needs to be added in Eclipse.
+Each node has a position, velocity, and acceleration. A node responds only to
+the relative positions of its local neighbors.
 
-### Heap size:
+The fundamental node acceleration is:
 
-You might want to increase your heap size to appropriate value in your VM Options,
-if you are getting errors like:
+\[
+\mathbf{a}
+=
+\frac{k^2}{|N|}
+\sum_{\mathbf{n}\in N}
+(\mathbf{n}-\mathbf{p})
+\]
 
-    Process finished with exit code 137 (interrupted by signal 9:SIGKILL)
+where:
 
-Set an appropriate value in your VM Options, i.e.:
+- \(\mathbf{p}\) is the current node position;
+- \(N\) is the node's local neighborhood;
+- \(\mathbf{n}\) is the position of a neighboring node;
+- \(k\) controls the response rate.
 
-    -Xmx64g
+For the current cubic REM lattice, each interior node has six direct neighbors.
 
-The required memory depends on the size of the number nodes that is used.
+No global wave equation is imposed on the lattice. Disturbances propagate
+because displaced nodes affect their neighbors, which affect their neighbors,
+and so on.
 
-### Download executable binary files
-Go to the latest <a href="https://github.com/dqnguyen59/QuantumFieldSimulator/releases/tag/v0.1.90">release</a>.
+This recursive local interaction is the foundation from which the framework
+investigates emergent behavior.
 
-### Youtube videos
-  Youtube video tutorial: <a href="https://www.youtube.com/watch?v=TSEYb4WCsVA">https://www.youtube.com/watch?v=TSEYb4WCsVA</a>
+## Current Research Areas
 
-### CPU & GPU Performance for comparison
-* OS: Ubuntu 20.04.5 LTS
-* Processor: AMD Ryzen 9 3950x 16-core processor × 32 
-* Graphics: AMD Radeon RX6800
+### Wave Propagation
 
-| Nodes    | Visible Nodes | Width | Height | Depth | FPS |
-|----------|---------------|-------|--------|-------|-----|
-| 80631    | 6561          | 51    | 51     | 31    | 70  |
-| 22801    | 22801         | 151   | 151    | 1     | 32  |
-| 78961    | 78961         | 281   | 281    | 1     | 10  |
+Oscillating Identities can disturb the lattice and produce propagating waves.
 
-<p>
-  Use of equivalent or more powerful hardware is recommended.</br>
-  Recommended NVIDIA graphics cards: RTX2080Ti, RTX3070 or higher.
-</p>
+Experiments have demonstrated:
 
-### Formulas used
-<img src="https://raw.githubusercontent.com/dqnguyen59/QuantumFieldSimulator/main/images/qfs_formula_v1.1.png">
-<br/>
+- recursive wave propagation;
+- reflection;
+- absorption;
+- constructive interference;
+- destructive interference;
+- double-slit-like interference patterns.
 
-### Double-slit simulation
-<img src="https://raw.githubusercontent.com/dqnguyen59/QuantumFieldSimulator/main/images/double_slit.png">
-<img src="https://raw.githubusercontent.com/dqnguyen59/QuantumFieldSimulator/main/images/double_slit2.png">
-<br/>
+These behaviors emerge from local node interactions rather than from a
+separately imposed global wave equation.
 
-### Rain simulation
-<img src="https://raw.githubusercontent.com/dqnguyen59/QuantumFieldSimulator/main/images/rain.png">
-<br/>
+### Identity
 
-### Random wave simulation
-<img src="https://raw.githubusercontent.com/dqnguyen59/QuantumFieldSimulator/main/images/waves.png">
-<br/>
+An **Identity** is a persistent entity that occupies and interacts with the
+lattice.
 
-<p>
-  I have only a little knowledge of the formulas used, as shown on Wikipedia: <a href="https://en.wikipedia.org/wiki/Quantum_field_theory" target="_blank" rel="nofollow noopener noreferrer">Quantum field theory</a>, but after a lot of trials and errors, I've found that the above formula works pretty well for simulating waves and double-slit experiments.
-</p>
-<p>
-  The equation above is simply derived from the physics motion formula.
-  Have a look at the QFSNode.java source code to see how this formula is derived and used in the code.
-  Note that this is not the full quantum field formula, only the electric field is simulated.
-  Note that v is not the speed of light, but is actually the speed of the node itself.
-  The propagation of the light wave is caused by the motion of the node where each node influences the neighboring nodes.
-  The variable k determines the speed of light.
-</p>
+The original implementation occupies a single lattice node and can oscillate
+along selected spatial axes.
 
-<p>
-  Enjoy 😃
-</p>
+Current development is extending this concept to an **Extended Identity**,
+where one Identity occupies a finite region containing multiple lattice nodes.
+
+One objective is to investigate whether a spatially extended, approximately
+spherical excitation improves propagation isotropy compared with a single-node
+source.
+
+### Transport and Pressure
+
+REM Framework includes experimental transport mechanics in which local
+geometric imbalance produces an accumulated pressure associated with an
+occupied location.
+
+This provides a research mechanism for investigating whether translational
+motion and interaction can emerge from local lattice deformation.
+
+Transport and pressure remain experimental components of the framework.
+
+### Electric Charge
+
+Electric charge is an active research topic.
+
+The current working direction is to investigate whether charge-like interaction
+can emerge from deformation of the surrounding lattice rather than by directly
+programming attraction and repulsion between distant objects.
+
+This work is experimental and should not be interpreted as an established
+physical model.
+
+## Geometry Discovery
+
+REM Framework also contains an independent research system called
+**Geometry Discovery**.
+
+Geometry Discovery investigates whether canonical geometry can emerge from
+topological and geometric constraints instead of being predefined by
+coordinates.
+
+It is intentionally separated from the REM runtime mechanics.
+
+Its purpose is ultimately to investigate whether alternative spatial
+connectivity could provide better isotropy than the current cubic lattice.
+
+### Stage 1 — Topology Discovery
+
+Stage 1 operates without geometric coordinates.
+
+It supports research into:
+
+- regular graph generation;
+- fixed neighbor counts;
+- combinatorial face discovery;
+- canonical graph identification;
+- graph isomorphism;
+- automorphism and symmetry analysis;
+- manifold validation;
+- uniform face structures;
+- dual-directed topology generation;
+- deterministic configuration persistence.
+
+Known regular topologies including tetrahedral, cubic, octahedral,
+dodecahedral, and icosahedral cases can be identified by the research system.
+
+Reference recognition is used only after discovery for comparison and does not
+supply coordinates to the realization algorithm.
+
+### Stage 2 — Geometric Realization
+
+Stage 2 attempts to realize a selected coordinate-free topology geometrically.
+
+The research environment includes constraints and measurements such as:
+
+- Edge Length;
+- Face Planarity;
+- Face Angle;
+- Face Area;
+- Face Orientation;
+- Face Distance;
+- Vertex Distance;
+- Face-Center Distance;
+- Edge-Center Distance;
+- Dihedral Angle;
+- Normal Alignment;
+- Convexity;
+- Self-Intersection Avoidance.
+
+The system supports:
+
+- random spherical initialization;
+- topology-spectral initialization;
+- simultaneous relaxation;
+- sequential continuation;
+- guided relaxation;
+- manual relaxation;
+- independent constraint activation;
+- runtime constraint-strength factors;
+- geometry snapshots;
+- experiment recording and replay;
+- detailed scientific diagnostics.
+
+Failed realizations are retained as research results and classified using
+`ConfigurationStatus`.
+
+Geometry Discovery has demonstrated that the same topology and constraint set
+can settle into different stable geometric realizations depending on
+initialization and relaxation history.
+
+This makes local minima, constraint interaction, and realization trajectory
+important open research questions.
+
+### Geometry Discovery Status
+
+Geometry Discovery is currently a **research system**, not a validated
+replacement for the REM Framework lattice.
+
+Current open questions include:
+
+- robust realization from random coordinates;
+- global convexity;
+- self-intersection avoidance;
+- escape from stable noncanonical local minima;
+- constraint activation order;
+- relative constraint strengths;
+- mixed-face topology;
+- higher-genus topology;
+- systematic multi-seed reproducibility;
+- quantitative isotropy comparison between candidate geometries.
+
+The current Geometry Discovery work is being preserved as a research checkpoint
+while development returns to Extended Identity and electric-charge experiments.
+
+## Scientific Status
+
+REM Framework is experimental research software.
+
+It is important to distinguish between:
+
+1. behavior observed in simulation;
+2. mechanisms currently implemented by design;
+3. hypotheses being investigated;
+4. experimentally validated physical theory.
+
+A simulation reproducing a familiar phenomenon does not by itself demonstrate
+that the underlying mechanism describes nature.
+
+The framework is intended to make these questions testable rather than assume
+their answers.
+
+## Historical Background
+
+The project began as **Quantum Field Simulator**, primarily for experimenting
+with wave propagation and double-slit interference.
+
+Older project files, configuration names, packages, documentation, and videos
+may therefore still contain terminology associated with Quantum Field Simulator
+or QFS.
+
+These should be considered historical names.
+
+The current project name is:
+
+**REM Framework — Recursive Emergent Mechanics**
+
+## Building
+
+REM Framework is written in Java and built with Maven.
+
+### Requirements
+
+- Java 21
+- Maven
+- OpenGL-capable graphics environment
+
+Build the project with:
+
+```bash
+mvn package

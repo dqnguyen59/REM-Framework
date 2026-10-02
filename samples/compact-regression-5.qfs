@@ -1,0 +1,28 @@
+[QuantumField]
+constantFrequency = 1.0
+constantElectricFactor = 1.0
+dimension.x = 5
+dimension.y = 5
+dimension.z = 5
+
+[QFSSettings]
+nodeFormulaVersion = v_0_1
+
+[Oscillators]
+Size = 1
+
+[Oscillator0]
+name = Source
+active.x = true
+active.y = false
+active.z = false
+OscillatorType.x = sin
+angleIncrement.x = 20.0
+amplitude.x = 200.0
+nodeIndex.x = 2
+nodeIndex.y = 2
+nodeIndex.z = 2
+graphRadius = 0
+
+[Detectors]
+Size = 0

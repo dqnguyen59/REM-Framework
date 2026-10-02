@@ -1,0 +1,9 @@
+key,value
+status,BACKEND_FAILURE
+primitiveDirection,"(1,1,0)"
+receiverRelative,60;60;0
+sourceCenter,166;166;166
+sourceGraphRadius,96
+receiverGraphDistance,120
+minimumGraphDistanceToOccupiedSource,25
+failureReason,"java.lang.OutOfMemoryError: Java heap space"

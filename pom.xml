@@ -4,116 +4,191 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
 >
 
-<!--
-	Build executable JAR file:
-	$mvn clean package
-	
-	Run jar file:
-	$java -jar ../QFSLauncher/binary/QuantumFieldSimulator/QuantumFieldSimulator-vx.x.xxx-{OS}.jar
--->
-
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.smartblackbox</groupId>
-	<artifactId>QuantumFieldSimulator</artifactId>
-	<version>0.1</version>
-	<name>Duy Quoc Nguyen</name>
+	<groupId>com.rem</groupId>
+	<artifactId>REM-Framework</artifactId>
+	<version>0.2</version>
+	<name>Duy Nguyen</name>
 	<description>
-		This application simulates the quantum field theory.
-		Inititially it was developed to simulate the double slit experiment.
-		It uses a simple motion formula to simulate the light wave.
-		By defining the slits in the simulator, the interference patterns can be
-		simulated.
-		Even walls/mirrors can be defined freely in 3D quantum field.
-		There are also other files to simulate, for example rain drops or
-		detecting the speed of light.
-		This simulator does not approximate the real world values,
-		but rather simulates the properties of the light wave due to a lack of
-		CPU/GPU power.
 	</description>
 
 	<packaging>jar</packaging>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<maven.compiler.source>17</maven.compiler.source>
-		<maven.compiler.target>17</maven.compiler.target>
-		<lwjgl.version>3.3.6</lwjgl.version>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<maven.compiler.release>21</maven.compiler.release>
+		<maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+		<maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
+		<exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
+		<lombok.version>1.18.46</lombok.version>
+		<lwjgl.version>3.4.1</lwjgl.version>
+		<swt.maven.version>3.134.0</swt.maven.version> <!-- 3.132.0+ requires Java 21 -->
+		<joml.version>1.10.9</joml.version>
+		<junit.version>5.14.1</junit.version>
+		<!-- Can be overwritten via -D property during mvn invoke to specify a different demo. The package "org.lwjgl.demo."
+            is prepended automatically. -->
 	</properties>
-
 	<profiles>
 		<profile>
-			<id>lwjgl-natives-linux-x86</id>
+			<id>windows</id>
 			<activation>
 				<os>
-					<family>Linux</family>
-					<arch>x86</arch>
+					<family>Windows</family>
 				</os>
 			</activation>
 			<properties>
-				<lwjgl.natives>natives-linux</lwjgl.natives>
-				<smartblackbox.platform>Linux</smartblackbox.platform>
+				<platform>windows</platform>
 			</properties>
 		</profile>
 		<profile>
-			<id>lwjgl-natives-linux-amd64</id>
+			<id>windows-x86</id>
+			<activation>
+				<os>
+					<family>Windows</family>
+					<arch>x86</arch>
+				</os>
+			</activation>
+<!--			<dependencies>-->
+<!--				<dependency>-->
+<!--					<groupId>org.eclipse.platform</groupId>-->
+<!--					<artifactId>org.eclipse.swt.win32.win32.x86</artifactId>-->
+<!--					<version>${swt.maven.version}</version>-->
+<!--					<exclusions>-->
+<!--						<exclusion>-->
+<!--							<groupId>org.eclipse.platform</groupId>-->
+<!--							<artifactId>org.eclipse.swt</artifactId>-->
+<!--						</exclusion>-->
+<!--					</exclusions>-->
+<!--				</dependency>-->
+<!--			</dependencies>-->
+		</profile>
+		<profile>
+			<id>windows-amd64</id>
+			<activation>
+				<os>
+					<family>Windows</family>
+					<arch>amd64</arch>
+				</os>
+			</activation>
+<!--			<dependencies>-->
+<!--				<dependency>-->
+<!--					<groupId>org.eclipse.platform</groupId>-->
+<!--					<artifactId>org.eclipse.swt.win32.win32.x86_64</artifactId>-->
+<!--					<version>${swt.maven.version}</version>-->
+<!--					<exclusions>-->
+<!--						<exclusion>-->
+<!--							<groupId>org.eclipse.platform</groupId>-->
+<!--							<artifactId>org.eclipse.swt</artifactId>-->
+<!--						</exclusion>-->
+<!--					</exclusions>-->
+<!--				</dependency>-->
+<!--			</dependencies>-->
+		</profile>
+		<profile>
+			<id>linux</id>
+			<activation>
+				<os>
+					<family>Linux</family>
+				</os>
+			</activation>
+			<properties>
+				<platform>linux</platform>
+			</properties>
+		</profile>
+		<profile>
+			<id>linux-amd64</id>
 			<activation>
 				<os>
 					<family>Linux</family>
 					<arch>amd64</arch>
 				</os>
 			</activation>
-			<properties>
-				<lwjgl.natives>natives-linux</lwjgl.natives>
-				<smartblackbox.platform>Linux</smartblackbox.platform>
-			</properties>
-		</profile>
-		<profile>
-			<id>lwjgl-natives-macos-x86_64</id>
-			<activation>
-				<os>
-					<family>mac</family>
-					<arch>x86_64</arch>
-				</os>
-			</activation>
-			<properties>
-				<lwjgl.natives>natives-macos</lwjgl.natives>
-				<smartblackbox.platform>MacOS</smartblackbox.platform>
-			</properties>
 			<dependencies>
 				<dependency>
-					<groupId>org.lwjgl</groupId>
-					<artifactId>lwjgl-vulkan</artifactId>
-					<classifier>natives-macos</classifier>
+					<groupId>org.eclipse.platform</groupId>
+					<artifactId>org.eclipse.swt.gtk.linux.x86_64</artifactId>
+					<version>${swt.maven.version}</version>
+					<exclusions>
+						<exclusion>
+							<groupId>org.eclipse.platform</groupId>
+							<artifactId>org.eclipse.swt</artifactId>
+						</exclusion>
+					</exclusions>
 				</dependency>
 			</dependencies>
 		</profile>
 		<profile>
-			<id>lwjgl-natives-windows-amd64</id>
+			<id>mac-x86_64</id>
 			<activation>
 				<os>
-					<family>windows</family>
-					<arch>amd64</arch>
+					<family>Mac</family>
+					<arch>x86_64</arch>
 				</os>
 			</activation>
 			<properties>
-				<lwjgl.natives>natives-windows</lwjgl.natives>
-				<smartblackbox.platform>Windows</smartblackbox.platform>
+				<platform>macos</platform>
 			</properties>
+			<dependencies>
+<!--				<dependency>-->
+<!--					<groupId>org.eclipse.platform</groupId>-->
+<!--					<artifactId>org.eclipse.swt.cocoa.macosx.x86_64</artifactId>-->
+<!--					<version>${swt.maven.version}</version>-->
+<!--					<exclusions>-->
+<!--						<exclusion>-->
+<!--							<groupId>org.eclipse.platform</groupId>-->
+<!--							<artifactId>org.eclipse.swt</artifactId>-->
+<!--						</exclusion>-->
+<!--					</exclusions>-->
+<!--				</dependency>-->
+				<dependency>
+					<groupId>org.lwjgl</groupId>
+					<artifactId>lwjgl-vulkan</artifactId>
+					<version>${lwjgl.version}</version>
+					<classifier>natives-${platform}</classifier>
+				</dependency>
+			</dependencies>
 		</profile>
 		<profile>
-			<id>lwjgl-natives-windows-x86</id>
+			<id>mac-arm64</id>
 			<activation>
 				<os>
-					<family>windows</family>
-					<arch>x86</arch>
+					<family>Mac</family>
+					<arch>aarch64</arch>
 				</os>
 			</activation>
 			<properties>
-				<lwjgl.natives>natives-windows-x86</lwjgl.natives>
-				<smartblackbox.platform>Windows-x86</smartblackbox.platform>
+				<platform>macos-arm64</platform>
 			</properties>
+			<dependencies>
+<!--				<dependency>-->
+<!--					<groupId>org.eclipse.platform</groupId>-->
+<!--					<artifactId>org.eclipse.swt.cocoa.macosx.aarch64</artifactId>-->
+<!--					<version>${swt.maven.version}</version>-->
+<!--					<exclusions>-->
+<!--						<exclusion>-->
+<!--							<groupId>org.eclipse.platform</groupId>-->
+<!--							<artifactId>org.eclipse.swt</artifactId>-->
+<!--						</exclusion>-->
+<!--					</exclusions>-->
+<!--				</dependency>-->
+				<dependency>
+					<groupId>org.lwjgl</groupId>
+					<artifactId>lwjgl-vulkan</artifactId>
+					<version>${lwjgl.version}</version>
+					<classifier>natives-${platform}</classifier>
+				</dependency>
+			</dependencies>
 		</profile>
 	</profiles>
+	<repositories>
+		<repository>
+			<id>central-snapshots</id>
+			<url>https://central.sonatype.com/repository/maven-snapshots</url>
+			<releases><enabled>false</enabled></releases>
+			<snapshots><enabled>true</enabled></snapshots>
+		</repository>
+	</repositories>
 
 	<dependencyManagement>
 		<dependencies>
@@ -121,349 +196,145 @@
 				<groupId>org.lwjgl</groupId>
 				<artifactId>lwjgl-bom</artifactId>
 				<version>${lwjgl.version}</version>
-				<scope>import</scope>
 				<type>pom</type>
+				<scope>import</scope>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
 	<dependencies>
 		<dependency>
+			<groupId>org.joml</groupId>
+			<artifactId>joml</artifactId>
+			<version>${joml.version}</version>
+		</dependency>
+		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-assimp</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-bgfx</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-cuda</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-egl</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-glfw</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-jawt</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-jemalloc</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-libdivide</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-llvm</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-lmdb</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-lz4</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-meow</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-meshoptimizer</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-nanovg</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-nfd</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-nuklear</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-odbc</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-openal</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-opencl</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-opengl</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-opengles</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-openvr</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-openxr</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-opus</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-ovr</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-par</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-remotery</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-rpmalloc</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-shaderc</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-spvc</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-sse</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-stb</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-tinyexr</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-tinyfd</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-tootle</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-vma</artifactId>
+			<version>${lwjgl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-vulkan</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-xxhash</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-yoga</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-zstd</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-assimp</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-bgfx</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<version>${lwjgl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-glfw</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-jemalloc</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-libdivide</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-llvm</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-lmdb</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-lz4</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-meow</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-meshoptimizer</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-nanovg</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-nfd</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-nuklear</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-openal</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<version>${lwjgl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-opengl</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-opengles</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-openvr</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-opus</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<version>${lwjgl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-par</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-remotery</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-rpmalloc</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-shaderc</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-spvc</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-sse</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<version>${lwjgl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-stb</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<version>${lwjgl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-tinyexr</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<artifactId>lwjgl-bgfx</artifactId>
+			<version>${lwjgl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-tinyfd</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<artifactId>lwjgl-assimp</artifactId>
+			<version>${lwjgl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-tootle</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<artifactId>lwjgl</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-opengl</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-jemalloc</artifactId>
+			<version>${lwjgl.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-shaderc</artifactId>
+			<version>${lwjgl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-vma</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<version>${lwjgl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-xxhash</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<artifactId>lwjgl-glfw</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-yoga</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<artifactId>lwjgl-stb</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-zstd</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
+			<artifactId>lwjgl-par</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-bgfx</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-vma</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-assimp</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-shaderc</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-jemalloc</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
+		</dependency>
+		<!-- Source: https://mvnrepository.com/artifact/org.lwjgl/lwjgl-nuklear -->
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-nuklear</artifactId>
+			<version>${lwjgl.version}</version>
 		</dependency>
 
-		<!-- 3D Vector & Matrix -->
-		<!-- https://mvnrepository.com/artifact/org.joml/joml -->
 		<dependency>
-			<groupId>org.joml</groupId>
-			<artifactId>joml</artifactId>
-			<version>1.9.25</version>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-nuklear</artifactId>
+			<version>${lwjgl.version}</version>
+			<classifier>natives-${platform}</classifier>
 		</dependency>
 
 		<!-- https://mvnrepository.com/artifact/org.ini4j/ini4j -->
@@ -472,8 +343,28 @@
 			<artifactId>ini4j</artifactId>
 			<version>0.5.4</version>
 		</dependency>
+		<dependency>
+			<groupId>org.tomlj</groupId>
+			<artifactId>tomlj</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+
+		<!-- Source: https://mvnrepository.com/artifact/org.projectlombok/lombok -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<version>${lombok.version}</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
 
 	</dependencies>
+
 
 	<scm>
 		<connection>
@@ -482,7 +373,28 @@
 
 
 	<build>
+		<finalName>rem</finalName>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>${maven-compiler-plugin.version}</version>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+					</annotationProcessorPaths>
+					<release>${maven.compiler.release}</release>
+                </configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.5.4</version>
+			</plugin>
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>buildnumber-maven-plugin</artifactId>
@@ -507,51 +419,53 @@
 					<doUpdate>false</doUpdate>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>${exec-maven-plugin.version}</version>
+				<configuration>
+					<executable>java</executable>
+					<arguments>
+						<argument>--sun-misc-unsafe-memory-access=allow</argument>
+						<argument>--enable-native-access=ALL-UNNAMED</argument>
+						<argument>-classpath</argument>
+						<classpath/>
+					</arguments>
+				</configuration>
+			</plugin>
 
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-assembly-plugin</artifactId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>${maven-shade-plugin.version}</version>
 				<executions>
 					<execution>
 						<phase>package</phase>
 						<goals>
-							<goal>single</goal>
+							<goal>shade</goal>
 						</goals>
+						<configuration>
+							<createDependencyReducedPom>false</createDependencyReducedPom>
+							<filters>
+								<filter>
+									<!-- exclude files that sign a jar -->
+									<artifact>*:*</artifact>
+									<excludes>
+										<exclude>META-INF/*.SF</exclude>
+										<exclude>META-INF/*.RSA</exclude>
+										<exclude>META-INF/*.DSA</exclude>
+									</excludes>
+								</filter>
+							</filters>
+							<transformers>
+								<transformer
+										implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>remframework.Main</mainClass>
+								</transformer>
+							</transformers>
+						</configuration>
 					</execution>
 				</executions>
-				<configuration>
-					<finalName>
-						${project.artifactId}-v${project.version}.${buildNumber}-${smartblackbox.platform}
-					</finalName>
-					<appendAssemblyId>false</appendAssemblyId>
-					<descriptorRefs>
-						<descriptorRef>jar-with-dependencies</descriptorRef>
-					</descriptorRefs>
-					<archive>
-						<manifest>
-							<addClasspath>true</addClasspath>
-							<classpathPrefix>dependency/</classpathPrefix>
-							<mainClass>org.smartblackbox.Main</mainClass>
-						</manifest>
-						<manifestEntries>
-							<Title>Quantum Field Simulator</Title>
-							<Description>${project.description}</Description>
-							<Date-Time>${buildDateTime}</Date-Time>
-							<Built-By>${project.groupId}</Built-By>
-							<Author>${project.name}</Author>
-							<Contributors>${project.name}</Contributors>
-							<Version>${project.version}.${buildNumber}</Version>
-							<Website>https://www.smartblackbox.org</Website>
-							<Email>d.q.nguyen@smartblackbox.org</Email>
-						</manifestEntries>
-					</archive>
-					<outputDirectory>
-						<!-- Change the output JAR file to your own output folder! -->
-						../QFSLauncher/binary/QuantumFieldSimulator/
-					</outputDirectory>
-				</configuration>
 			</plugin>
-
 		</plugins>
 	</build>
 

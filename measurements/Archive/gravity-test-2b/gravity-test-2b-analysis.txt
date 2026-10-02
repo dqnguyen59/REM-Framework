@@ -1,0 +1,488 @@
+Numerical zero tolerance: 1e-30
+Approximately-unchanged ratio tolerance: 0.05
+
+b00_on
+  radius: 60.0
+  angle: 0.0
+  manhattan: 60
+  cycles: 81
+  cycle_updates: [17, 35, 53, 71, 89, 107, 122, 184, 201, 219, 236, 254, 272, 290, 308, 326, 344, 362, 380, 398, 416, 434, 452, 470, 488, 506, 524, 542, 560, 578, 596, 614, 632, 650, 668, 686, 704, 722, 740, 758, 776, 794, 812, 830, 848, 866, 884, 902, 920, 938, 956, 974, 992, 1010, 1028, 1047, 1065, 1083, 1100, 1117, 1135, 1154, 1172, 1191, 1210, 1228, 1245, 1261, 1279, 1297, 1316, 1334, 1353, 1370, 1388, 1405, 1423, 1442, 1460, 1478, 1496]
+  first_raw: 84
+  first_cycle: 89
+  first_acceleration: 123
+  first_pressure_increment: 123
+  final_pressure: 1.155239243159862e-21
+  pressure_slope: 8.433237597016277e-25
+  mean_increment: 7.701594954399092e-25
+  median_increment: 8.823701087377767e-25
+  min_increment: -2.5374148467770736e-28
+  max_increment: 8.856593193654684e-25
+  inward: 62
+  outward: 1316
+  near_zero: 122
+  exact_zero: 89
+  max_raw_radial: 0.025154620079432588
+  max_cycle_radial: 2.2775923137301463e-08
+  max_cycle_tangential: 0.0
+  max_acceleration_radial: 5.187426747562641e-21
+  max_momentum_radial: 8.856593193654684e-25
+  max_tangential_pressure: 0.0
+  clamped: 0
+  threshold: 0
+  final_cycle_radial: -5.3322655590993164e-12
+  final_cycle_tangential: 0.0
+
+b00_off
+  radius: 60.0
+  angle: 0.0
+  manhattan: 60
+  cycles: 83
+  cycle_updates: [17, 35, 53, 71, 89, 107, 125, 143, 161, 179, 197, 215, 233, 251, 269, 287, 305, 323, 341, 359, 377, 395, 413, 431, 449, 467, 485, 503, 521, 539, 557, 575, 593, 611, 629, 647, 665, 683, 701, 719, 737, 755, 773, 791, 809, 827, 845, 863, 881, 899, 917, 935, 953, 971, 989, 1007, 1025, 1043, 1061, 1079, 1097, 1115, 1133, 1151, 1169, 1187, 1205, 1223, 1241, 1259, 1277, 1295, 1313, 1331, 1349, 1367, 1385, 1403, 1421, 1439, 1457, 1475, 1493]
+  first_raw: 262
+  first_cycle: 269
+  first_acceleration: None
+  first_pressure_increment: None
+  final_pressure: 4.7634093644054735e-36
+  pressure_slope: -2.3677101880312038e-39
+  mean_increment: 3.175606242936986e-39
+  median_increment: 0.0
+  min_increment: -3.392688172868374e-37
+  max_increment: 1.5046839172519664e-37
+  inward: 0
+  outward: 0
+  near_zero: 1500
+  exact_zero: 269
+  max_raw_radial: 8.372380566612492e-09
+  max_cycle_radial: 1.050056819273948e-14
+  max_cycle_tangential: 0.0
+  max_acceleration_radial: 1.1026193237037208e-33
+  max_momentum_radial: 3.392688172868374e-37
+  max_tangential_pressure: 0.0
+  clamped: 0
+  threshold: 0
+  final_cycle_radial: 9.492129304788932e-15
+  final_cycle_tangential: 0.0
+
+b30_on
+  radius: 60.03332407921454
+  angle: 29.981639368849333
+  manhattan: 82
+  cycles: 81
+  cycle_updates: [17, 35, 53, 71, 89, 107, 123, 182, 199, 217, 235, 253, 271, 289, 307, 325, 343, 361, 379, 397, 415, 432, 450, 468, 486, 504, 522, 540, 558, 576, 594, 612, 630, 648, 666, 684, 702, 720, 738, 756, 774, 792, 810, 828, 846, 864, 882, 900, 918, 936, 954, 972, 990, 1008, 1026, 1045, 1063, 1081, 1099, 1117, 1135, 1153, 1170, 1188, 1206, 1224, 1242, 1261, 1279, 1297, 1315, 1333, 1351, 1368, 1386, 1404, 1422, 1440, 1458, 1476, 1494]
+  first_raw: 95
+  first_cycle: 107
+  first_acceleration: 124
+  first_pressure_increment: 124
+  final_pressure: 8.245359029239738e-22
+  pressure_slope: 5.975202163994581e-25
+  mean_increment: 5.496906019493157e-25
+  median_increment: 6.229975034980749e-25
+  min_increment: -8.140699263957902e-29
+  max_increment: 6.734387077881021e-25
+  inward: 59
+  outward: 1318
+  near_zero: 123
+  exact_zero: 107
+  max_raw_radial: 0.019945655897204217
+  max_cycle_radial: 2.040621605960853e-08
+  max_cycle_tangential: 2.7510358543393125e-09
+  max_acceleration_radial: 3.448681705824492e-21
+  max_momentum_radial: 6.734387077881021e-25
+  max_tangential_pressure: 2.5370265688075977e-22
+  clamped: 0
+  threshold: 0
+  final_cycle_radial: 9.38651420157091e-10
+  final_cycle_tangential: 3.6946888957424754e-10
+
+b30_off
+  radius: 60.03332407921454
+  angle: 29.981639368849333
+  manhattan: 82
+  cycles: 83
+  cycle_updates: [17, 35, 53, 71, 89, 107, 125, 143, 161, 179, 197, 215, 233, 251, 269, 287, 305, 323, 341, 359, 377, 395, 413, 431, 449, 467, 485, 503, 521, 539, 557, 575, 593, 611, 629, 647, 665, 683, 701, 719, 737, 755, 773, 791, 809, 827, 845, 863, 881, 899, 917, 935, 953, 971, 989, 1007, 1025, 1043, 1061, 1079, 1097, 1115, 1133, 1151, 1169, 1187, 1205, 1223, 1241, 1259, 1277, 1295, 1313, 1331, 1349, 1367, 1385, 1403, 1421, 1439, 1457, 1475, 1493]
+  first_raw: 262
+  first_cycle: 269
+  first_acceleration: None
+  first_pressure_increment: None
+  final_pressure: 1.0718157774261583e-34
+  pressure_slope: 4.51653470273998e-38
+  mean_increment: 7.145438516174392e-38
+  median_increment: 0.0
+  min_increment: -2.673113795571748e-37
+  max_increment: 3.553405244035156e-37
+  inward: 0
+  outward: 0
+  near_zero: 1500
+  exact_zero: 269
+  max_raw_radial: 7.034908347854518e-09
+  max_cycle_radial: 1.2835934073779465e-14
+  max_cycle_tangential: 1.157241739896644e-14
+  max_acceleration_radial: 1.9059093196068973e-33
+  max_momentum_radial: 3.553405244035156e-37
+  max_tangential_pressure: 1.3267000497956812e-35
+  clamped: 0
+  threshold: 0
+  final_cycle_radial: -8.691070747463962e-15
+  final_cycle_tangential: 3.009820360517349e-15
+
+b45_on
+  radius: 59.39696961966999
+  angle: 45.0
+  manhattan: 84
+  cycles: 81
+  cycle_updates: [17, 35, 53, 71, 89, 107, 123, 180, 197, 215, 233, 251, 269, 287, 305, 323, 341, 359, 376, 394, 412, 430, 448, 466, 484, 502, 520, 538, 556, 574, 592, 610, 628, 646, 664, 682, 700, 718, 736, 754, 772, 790, 808, 826, 844, 862, 880, 898, 916, 934, 952, 970, 988, 1006, 1024, 1042, 1060, 1079, 1098, 1116, 1133, 1150, 1168, 1186, 1204, 1222, 1240, 1258, 1277, 1295, 1314, 1331, 1349, 1366, 1384, 1402, 1420, 1438, 1456, 1474, 1492]
+  first_raw: 96
+  first_cycle: 107
+  first_acceleration: 124
+  first_pressure_increment: 124
+  final_pressure: 5.393324248135207e-22
+  pressure_slope: 3.933751049698252e-25
+  mean_increment: 3.5955494987568074e-25
+  median_increment: 4.1118674301864573e-25
+  min_increment: -1.7287358781097638e-28
+  max_increment: 4.1283935745639103e-25
+  inward: 57
+  outward: 1320
+  near_zero: 123
+  exact_zero: 107
+  max_raw_radial: 0.017640408307146038
+  max_cycle_radial: 1.844431266721124e-08
+  max_cycle_tangential: 0.0
+  max_acceleration_radial: 2.4055254370138758e-21
+  max_momentum_radial: 4.1283935745639103e-25
+  max_tangential_pressure: 8.924942327915773e-30
+  clamped: 0
+  threshold: 0
+  final_cycle_radial: 2.467257088898492e-10
+  final_cycle_tangential: 0.0
+
+b45_off
+  radius: 59.39696961966999
+  angle: 45.0
+  manhattan: 84
+  cycles: 83
+  cycle_updates: [17, 35, 53, 71, 89, 107, 125, 143, 161, 179, 197, 215, 233, 251, 269, 287, 305, 323, 341, 359, 377, 395, 413, 431, 449, 467, 485, 503, 521, 539, 557, 575, 593, 611, 629, 647, 665, 683, 701, 719, 737, 755, 773, 791, 809, 827, 845, 863, 881, 899, 917, 935, 953, 971, 989, 1007, 1025, 1043, 1061, 1079, 1097, 1115, 1133, 1151, 1169, 1187, 1205, 1223, 1241, 1259, 1277, 1295, 1313, 1331, 1349, 1367, 1385, 1403, 1421, 1439, 1457, 1475, 1493]
+  first_raw: 262
+  first_cycle: 269
+  first_acceleration: None
+  first_pressure_increment: None
+  final_pressure: 1.6882455481768475e-35
+  pressure_slope: 4.0524168379405244e-39
+  mean_increment: 1.1254970321178993e-38
+  median_increment: -1.5688375185789443e-51
+  min_increment: -3.49254976134117e-37
+  max_increment: 3.975787655500353e-37
+  inward: 0
+  outward: 0
+  near_zero: 1500
+  exact_zero: 269
+  max_raw_radial: 1.1728994494148174e-08
+  max_cycle_radial: 1.8357649774512312e-14
+  max_cycle_tangential: 7.850462293418876e-22
+  max_acceleration_radial: 2.3829732242006625e-33
+  max_momentum_radial: 3.975787655500353e-37
+  max_tangential_pressure: 3.587324068671532e-43
+  clamped: 0
+  threshold: 0
+  final_cycle_radial: 1.3457121155057397e-15
+  final_cycle_tangential: 0.0
+
+b60_on
+  radius: 60.03332407921454
+  angle: 60.01836063115067
+  manhattan: 82
+  cycles: 81
+  cycle_updates: [17, 35, 53, 71, 89, 107, 123, 182, 199, 217, 235, 253, 271, 289, 307, 325, 343, 361, 379, 397, 415, 432, 450, 468, 486, 504, 522, 540, 558, 576, 594, 612, 630, 648, 666, 684, 702, 720, 738, 756, 774, 792, 810, 828, 846, 864, 882, 900, 918, 936, 954, 972, 990, 1008, 1026, 1045, 1063, 1081, 1099, 1117, 1135, 1153, 1170, 1188, 1206, 1224, 1242, 1261, 1279, 1297, 1315, 1333, 1351, 1368, 1386, 1404, 1422, 1440, 1458, 1476, 1494]
+  first_raw: 95
+  first_cycle: 107
+  first_acceleration: 124
+  first_pressure_increment: 124
+  final_pressure: 8.245359029239784e-22
+  pressure_slope: 5.975202163994609e-25
+  mean_increment: 5.496906019493192e-25
+  median_increment: 6.229975034980793e-25
+  min_increment: -8.140699263957902e-29
+  max_increment: 6.734387077881113e-25
+  inward: 59
+  outward: 1318
+  near_zero: 123
+  exact_zero: 107
+  max_raw_radial: 0.019945655897204217
+  max_cycle_radial: 2.040621605960853e-08
+  max_cycle_tangential: 2.7510358543393125e-09
+  max_acceleration_radial: 3.448681705824492e-21
+  max_momentum_radial: 6.734387077881113e-25
+  max_tangential_pressure: 2.5370265688075455e-22
+  clamped: 0
+  threshold: 0
+  final_cycle_radial: 9.38651420157091e-10
+  final_cycle_tangential: 3.6946888957424754e-10
+
+b60_off
+  radius: 60.03332407921454
+  angle: 60.01836063115067
+  manhattan: 82
+  cycles: 83
+  cycle_updates: [17, 35, 53, 71, 89, 107, 125, 143, 161, 179, 197, 215, 233, 251, 269, 287, 305, 323, 341, 359, 377, 395, 413, 431, 449, 467, 485, 503, 521, 539, 557, 575, 593, 611, 629, 647, 665, 683, 701, 719, 737, 755, 773, 791, 809, 827, 845, 863, 881, 899, 917, 935, 953, 971, 989, 1007, 1025, 1043, 1061, 1079, 1097, 1115, 1133, 1151, 1169, 1187, 1205, 1223, 1241, 1259, 1277, 1295, 1313, 1331, 1349, 1367, 1385, 1403, 1421, 1439, 1457, 1475, 1493]
+  first_raw: 262
+  first_cycle: 269
+  first_acceleration: None
+  first_pressure_increment: None
+  final_pressure: 1.071815777426169e-34
+  pressure_slope: 4.516534702740055e-38
+  mean_increment: 7.145438516174459e-38
+  median_increment: 0.0
+  min_increment: -2.67311379557174e-37
+  max_increment: 3.5534052440351643e-37
+  inward: 0
+  outward: 0
+  near_zero: 1500
+  exact_zero: 269
+  max_raw_radial: 7.034908347854518e-09
+  max_cycle_radial: 1.2835934073779465e-14
+  max_cycle_tangential: 1.157241739896644e-14
+  max_acceleration_radial: 1.9059093196068973e-33
+  max_momentum_radial: 3.5534052440351643e-37
+  max_tangential_pressure: 1.326700049795324e-35
+  clamped: 0
+  threshold: 0
+  final_cycle_radial: -8.691070747463962e-15
+  final_cycle_tangential: 3.009820360517349e-15
+
+b90_on
+  radius: 60.0
+  angle: 90.0
+  manhattan: 60
+  cycles: 81
+  cycle_updates: [17, 35, 53, 71, 89, 107, 122, 184, 201, 219, 236, 254, 272, 290, 308, 326, 344, 362, 380, 398, 416, 434, 452, 470, 488, 506, 524, 542, 560, 578, 596, 614, 632, 650, 668, 686, 704, 722, 740, 758, 776, 794, 812, 830, 848, 866, 884, 902, 920, 938, 956, 974, 992, 1010, 1028, 1047, 1065, 1083, 1100, 1117, 1135, 1154, 1172, 1191, 1210, 1228, 1245, 1261, 1279, 1297, 1316, 1334, 1353, 1370, 1388, 1405, 1423, 1442, 1460, 1478, 1496]
+  first_raw: 84
+  first_cycle: 89
+  first_acceleration: 123
+  first_pressure_increment: 123
+  final_pressure: 1.155239243159975e-21
+  pressure_slope: 8.433237597017102e-25
+  mean_increment: 7.70159495439985e-25
+  median_increment: 8.823701087378634e-25
+  min_increment: -2.5374148467770736e-28
+  max_increment: 8.856593193655584e-25
+  inward: 62
+  outward: 1316
+  near_zero: 122
+  exact_zero: 89
+  max_raw_radial: 0.02515462007943281
+  max_cycle_radial: 2.2775923137302575e-08
+  max_cycle_tangential: 0.0
+  max_acceleration_radial: 5.187426747563147e-21
+  max_momentum_radial: 8.856593193655584e-25
+  max_tangential_pressure: 0.0
+  clamped: 0
+  threshold: 0
+  final_cycle_radial: -5.332265560209393e-12
+  final_cycle_tangential: 0.0
+
+b90_off
+  radius: 60.0
+  angle: 90.0
+  manhattan: 60
+  cycles: 83
+  cycle_updates: [17, 35, 53, 71, 89, 107, 125, 143, 161, 179, 197, 215, 233, 251, 269, 287, 305, 323, 341, 359, 377, 395, 413, 431, 449, 467, 485, 503, 521, 539, 557, 575, 593, 611, 629, 647, 665, 683, 701, 719, 737, 755, 773, 791, 809, 827, 845, 863, 881, 899, 917, 935, 953, 971, 989, 1007, 1025, 1043, 1061, 1079, 1097, 1115, 1133, 1151, 1169, 1187, 1205, 1223, 1241, 1259, 1277, 1295, 1313, 1331, 1349, 1367, 1385, 1403, 1421, 1439, 1457, 1475, 1493]
+  first_raw: 795
+  first_cycle: 809
+  first_acceleration: None
+  first_pressure_increment: None
+  final_pressure: 4.7634093644081944e-36
+  pressure_slope: -2.367710188029178e-39
+  mean_increment: 3.1756062429387925e-39
+  median_increment: 0.0
+  min_increment: -3.392688172868352e-37
+  max_increment: 1.5046839172519886e-37
+  inward: 0
+  outward: 0
+  near_zero: 1500
+  exact_zero: 809
+  max_raw_radial: 8.372380566612492e-09
+  max_cycle_radial: 1.050056819273948e-14
+  max_cycle_tangential: 1.11022303203669e-21
+  max_acceleration_radial: 1.1026193237037208e-33
+  max_momentum_radial: 3.392688172868352e-37
+  max_tangential_pressure: 1.3684555315672042e-48
+  clamped: 0
+  threshold: 0
+  final_cycle_radial: 9.492129304788932e-15
+  final_cycle_tangential: 0.0
+
+b00 pair phase maximum difference: 0.0
+b00 cycle schedules equal: False
+
+b00 stabilized window
+  start_update: 122
+  samples: 1379
+  mean_increment: 8.377369421028848e-25
+  pressure_slope: 8.761838498604414e-25
+  mean_abs_raw: 0.0009682093108717087
+  mean_abs_cycle: 3.959785927949057e-10
+  mean_acceleration: 6.422475039841502e-23
+  mean_momentum: 8.377369421028848e-25
+  mean_tangential_pressure: 0.0
+  pressure_accumulation: 1.1552392431598763e-21
+  first_half_slope: 8.564334354533953e-25
+  second_half_slope: 8.840546628550704e-25
+  half_slope_relative_difference: 0.031739633759655675
+  first_half_mean_cycle: 6.400584272451208e-10
+  second_half_mean_cycle: 1.522524972351983e-10
+
+b30 pair phase maximum difference: 0.0
+b30 cycle schedules equal: False
+
+b30 stabilized window
+  start_update: 182
+  samples: 1319
+  mean_increment: 6.251237784130099e-25
+  pressure_slope: 6.289651242937786e-25
+  mean_abs_raw: 0.0007653070647873289
+  mean_abs_cycle: 1.1548852136504031e-09
+  mean_acceleration: 5.106283055354099e-23
+  mean_momentum: 6.251237784130099e-25
+  mean_tangential_pressure: 1.3165380315355343e-22
+  pressure_accumulation: 8.245382637267604e-22
+  first_half_slope: 6.0664626464377e-25
+  second_half_slope: 6.51138720119328e-25
+  half_slope_relative_difference: 0.07074731534331058
+  first_half_mean_cycle: 1.4489146372180732e-09
+  second_half_mean_cycle: 8.613012892093507e-10
+
+b45 pair phase maximum difference: 0.0
+b45 cycle schedules equal: False
+
+b45 stabilized window
+  start_update: 180
+  samples: 1321
+  mean_increment: 4.082795346510067e-25
+  pressure_slope: 4.1121649700843806e-25
+  mean_abs_raw: 0.000863789948574699
+  mean_abs_cycle: 4.903895084415244e-10
+  mean_acceleration: 3.1215655266072284e-23
+  mean_momentum: 4.082795346510067e-25
+  mean_tangential_pressure: 2.156191198178478e-31
+  pressure_accumulation: 5.393372652739795e-22
+  first_half_slope: 4.0975700152227056e-25
+  second_half_slope: 4.121355556075594e-25
+  half_slope_relative_difference: 0.0057879927605016404
+  first_half_mean_cycle: 7.178494653592762e-10
+  second_half_mean_cycle: 2.6327366643590226e-10
+
+b60 pair phase maximum difference: 0.0
+b60 cycle schedules equal: False
+
+b60 stabilized window
+  start_update: 182
+  samples: 1319
+  mean_increment: 6.25123778413014e-25
+  pressure_slope: 6.289651242937819e-25
+  mean_abs_raw: 0.0007653070647873294
+  mean_abs_cycle: 1.154885213650441e-09
+  mean_acceleration: 5.106283055354156e-23
+  mean_momentum: 6.25123778413014e-25
+  mean_tangential_pressure: 1.3165380315355201e-22
+  pressure_accumulation: 8.24538263726765e-22
+  first_half_slope: 6.066462646437708e-25
+  second_half_slope: 6.5113872011933345e-25
+  half_slope_relative_difference: 0.07074731534331768
+  first_half_mean_cycle: 1.4489146372181146e-09
+  second_half_mean_cycle: 8.61301289209385e-10
+
+b90 pair phase maximum difference: 0.0
+b90 cycle schedules equal: False
+
+b90 stabilized window
+  start_update: 122
+  samples: 1379
+  mean_increment: 8.37736942102967e-25
+  pressure_slope: 8.761838498605272e-25
+  mean_abs_raw: 0.0009682093108717079
+  mean_abs_cycle: 3.959785927949525e-10
+  mean_acceleration: 6.422475039842135e-23
+  mean_momentum: 8.37736942102967e-25
+  mean_tangential_pressure: 0.0
+  pressure_accumulation: 1.1552392431599894e-21
+  first_half_slope: 8.564334354534796e-25
+  second_half_slope: 8.840546628551568e-25
+  half_slope_relative_difference: 0.031739633759654884
+  first_half_mean_cycle: 6.400584272451756e-10
+  second_half_mean_cycle: 1.5225249723523694e-10
+
+Radius-60 angular ratios
+max_raw: {'b00': 0.9999999999999956, 'b30': 0.7929221683420489, 'b45': 0.7012790593315085, 'b60': 0.7929221683420489, 'b90': 1.0000000000000044}
+stabilized_raw: {'b00': 1.0000000000000004, 'b30': 0.7904355558182968, 'b45': 0.8921520779396376, 'b60': 0.7904355558182973, 'b90': 0.9999999999999996}
+final_cycle: {'b00': 0.9999999998959095, 'b30': 176.0323842944416, 'b45': 46.270334087757305, 'b60': 176.0323842944416, 'b90': 1.0000000001040905}
+stabilized_cycle: {'b00': 0.9999999999999409, 'b30': 2.916534465913665, 'b45': 1.2384242920310826, 'b60': 2.916534465913761, 'b90': 1.000000000000059}
+stabilized_acceleration: {'b00': 0.9999999999999508, 'b30': 0.7950646789091863, 'b45': 0.48603778251259827, 'b60': 0.7950646789091952, 'b90': 1.0000000000000495}
+stabilized_momentum: {'b00': 0.9999999999999509, 'b30': 0.7462053384488398, 'b45': 0.4873600698879586, 'b60': 0.7462053384488446, 'b90': 1.000000000000049}
+stabilized_pressure_slope: {'b00': 0.9999999999999512, 'b30': 0.7178460598125946, 'b45': 0.46932672529163433, 'b60': 0.7178460598125983, 'b90': 1.000000000000049}
+final_pressure: {'b00': 0.9999999999999512, 'b30': 0.7137360575361221, 'b45': 0.46685777686904767, 'b60': 0.7137360575361261, 'b90': 1.000000000000049}
+
+Radius-60 symmetry
+b00 versus b90
+  final_pressure relative difference: 9.784599808597723e-14
+  stabilized_pressure_slope relative difference: 9.789538283000963e-14
+  stabilized_mean_increment relative difference: 9.822248539142314e-14
+  max_raw relative difference: 8.827189765691702e-15
+  final_cycle relative difference: 2.0818100104491418e-10
+  max_tangential_pressure relative difference: 0.0
+  cycle count difference: 0
+  cycle update differences: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+b30 versus b60
+  final_pressure relative difference: 5.588522996855151e-15
+  stabilized_pressure_slope relative difference: 5.110366602820362e-15
+  stabilized_mean_increment relative difference: 6.4639387757890235e-15
+  max_raw relative difference: 0.0
+  final_cycle relative difference: 0.0
+  max_tangential_pressure relative difference: 2.057209404828595e-14
+  cycle count difference: 0
+  cycle update differences: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+Tangential response
+b00 {'final_cycle_radial': -5.3322655590993164e-12, 'final_cycle_tangential': 0.0, 'cycle_tangential_to_radial': 0.0, 'max_tangential_pressure': 0.0, 'pressure_tangential_to_radial': 0.0}
+b30 {'final_cycle_radial': 9.38651420157091e-10, 'final_cycle_tangential': 3.6946888957424754e-10, 'cycle_tangential_to_radial': 0.39361671611002713, 'max_tangential_pressure': 2.5370265688075977e-22, 'pressure_tangential_to_radial': 0.30769146131912267}
+b45 {'final_cycle_radial': 2.467257088898492e-10, 'final_cycle_tangential': 0.0, 'cycle_tangential_to_radial': 0.0, 'max_tangential_pressure': 8.924942327915773e-30, 'pressure_tangential_to_radial': 1.6548128607327207e-08}
+b60 {'final_cycle_radial': 9.38651420157091e-10, 'final_cycle_tangential': 3.6946888957424754e-10, 'cycle_tangential_to_radial': 0.39361671611002713, 'max_tangential_pressure': 2.5370265688075455e-22, 'pressure_tangential_to_radial': 0.3076914613191146}
+b90 {'final_cycle_radial': -5.332265560209393e-12, 'final_cycle_tangential': 0.0, 'cycle_tangential_to_radial': 0.0, 'max_tangential_pressure': 0.0, 'pressure_tangential_to_radial': 0.0}
+
+Radius-20 versus radius-60 ratios
+raw
+  b00: r20=1.0000000000000009, r60=0.9999999999999956, approximately unchanged
+  b30: r20=0.8471877399891106, r60=0.7929221683420489, moved farther from 1
+  b45: r20=0.7611519658694306, r60=0.7012790593315085, moved farther from 1
+  b60: r20=0.8471877399891076, r60=0.7929221683420489, moved farther from 1
+  b90: r20=0.9999999999999991, r60=1.0000000000000044, approximately unchanged
+cycle
+  b00: r20=1.0000000000000016, r60=0.9999999999999756, approximately unchanged
+  b30: r20=0.48378015323767315, r60=0.8959556078843443, moved toward 1
+  b45: r20=0.2776240650442918, r60=0.8098162500822397, moved toward 1
+  b60: r20=0.4837801532376676, r60=0.8959556078843443, moved toward 1
+  b90: r20=0.9999999999999986, r60=1.0000000000000244, approximately unchanged
+acceleration
+  b00: r20=1.0000000000000029, r60=0.9999999999999513, approximately unchanged
+  b30: r20=0.35825154513983143, r60=0.6648154997937499, moved toward 1
+  b45: r20=0.05450034106757023, r60=0.4637222950943869, moved toward 1
+  b60: r20=0.35825154513982627, r60=0.6648154997937499, moved toward 1
+  b90: r20=0.999999999999997, r60=1.0000000000000488, approximately unchanged
+pressure_slope
+  b00: r20=0.9999999999999999, r60=0.9999999999999513, approximately unchanged
+  b30: r20=0.35383462015830147, r60=0.7085300390574015, moved toward 1
+  b45: r20=0.04981736892903094, r60=0.4664579889329623, moved toward 1
+  b60: r20=0.3538346201583006, r60=0.7085300390574047, moved toward 1
+  b90: r20=1.0000000000000002, r60=1.000000000000049, approximately unchanged
+final_pressure
+  b00: r20=0.9999999999999998, r60=0.9999999999999512, approximately unchanged
+  b30: r20=0.3544009473252171, r60=0.7137360575361221, moved toward 1
+  b45: r20=0.05037508163706534, r60=0.46685777686904767, moved toward 1
+  b60: r20=0.3544009473252161, r60=0.7137360575361261, moved toward 1
+  b90: r20=1.0000000000000002, r60=1.000000000000049, approximately unchanged
+
+Acceptance gates
+  all runs complete cycles: True
+  source-on cycle gradients: True
+  source-on pressure: True
+  no clamping: True
+  no thresholds: True

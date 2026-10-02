@@ -1,0 +1,2 @@
+configurationId,N,K,edgeCount,symmetry,automorphismCount,status,geometryTestStatus,diagnosticSummary
+cfg-b10320c7778b,20,3,30,HIGHLY_SYMMETRIC,120,ELIGIBLE_FOR_GEOMETRY_TEST,NOT_TESTED,"Uniform spherical topology generated"

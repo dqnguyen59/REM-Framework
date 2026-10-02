@@ -1,0 +1,45 @@
+validationItem,sourceAxis,expectedValue,observedValue,status
+projectLatticeDimensions,X,"161,161,161","161,161,161",PASS
+projectSourcePosition,X,"80,80,80","80,80,80",PASS
+projectAmplitude,X,"(200.0, 0.0, 0.0)","(200.0, 0.0, 0.0)",PASS
+projectPhaseIncrement,X,"(20.0, 0.0, 0.0)","(20.0, 0.0, 0.0)",PASS
+projectLatticeDimensions,Y,"161,161,161","161,161,161",PASS
+projectSourcePosition,Y,"80,80,80","80,80,80",PASS
+projectAmplitude,Y,"(0.0, 200.0, 0.0)","(0.0, 200.0, 0.0)",PASS
+projectPhaseIncrement,Y,"(0.0, 20.0, 0.0)","(0.0, 20.0, 0.0)",PASS
+projectLatticeDimensions,Z,"161,161,161","161,161,161",PASS
+projectSourcePosition,Z,"80,80,80","80,80,80",PASS
+projectAmplitude,Z,"(0.0, 0.0, 200.0)","(0.0, 0.0, 200.0)",PASS
+projectPhaseIncrement,Z,"(0.0, 0.0, 20.0)","(0.0, 0.0, 20.0)",PASS
+nonAxisProjectConfiguration,ALL,identical,identical,PASS
+lattice,X,161x161x161,161x161x161,PASS
+source,X,"80,80,80","80,80,80",PASS
+amplitude,X,200,200,PASS
+period,X,18,18,PASS
+updates,X,180,180,PASS
+boundaries,X,interfaces 30/130,interfaces 30/130,PASS
+safeCycles,X,3-4,3-4,PASS
+detectorCount,X,26,26,PASS
+selectedCompleteCycles,X,"3,4","3,4",PASS
+selectedDetectorCycleRows,X,52,52,PASS
+lattice,Y,161x161x161,161x161x161,PASS
+source,Y,"80,80,80","80,80,80",PASS
+amplitude,Y,200,200,PASS
+period,Y,18,18,PASS
+updates,Y,180,180,PASS
+boundaries,Y,interfaces 30/130,interfaces 30/130,PASS
+safeCycles,Y,3-4,3-4,PASS
+detectorCount,Y,26,26,PASS
+selectedCompleteCycles,Y,"3,4","3,4",PASS
+selectedDetectorCycleRows,Y,52,52,PASS
+lattice,Z,161x161x161,161x161x161,PASS
+source,Z,"80,80,80","80,80,80",PASS
+amplitude,Z,200,200,PASS
+period,Z,18,18,PASS
+updates,Z,180,180,PASS
+boundaries,Z,interfaces 30/130,interfaces 30/130,PASS
+safeCycles,Z,3-4,3-4,PASS
+detectorCount,Z,26,26,PASS
+selectedCompleteCycles,Z,"3,4","3,4",PASS
+selectedDetectorCycleRows,Z,52,52,PASS
+sharedPhaseProgression,ALL,identical,identical,PASS

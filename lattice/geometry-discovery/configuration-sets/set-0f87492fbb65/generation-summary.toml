@@ -1,0 +1,9 @@
+set_id = "set-0f87492fbb65"
+configurations_examined = 3
+unique_retained = 1
+isomorphic_duplicates_removed = 2
+symmetric_count = 1
+asymmetric_count = 0
+elapsed_milliseconds = 0
+enumeration_complete = true
+status = "ENUMERATION_COMPLETE"

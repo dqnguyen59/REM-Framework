@@ -1,0 +1,6 @@
+configurationId,N,K,edgeCount,symmetry,automorphismCount,status,geometryTestStatus,diagnosticSummary
+cfg-dee19dd1b127,8,3,12,SYMMETRIC,12,GENERATED,NOT_TESTED,"Topologically generated"
+cfg-c83f892b5931,8,3,12,HIGHLY_SYMMETRIC,48,GENERATED,NOT_TESTED,"Topologically generated"
+cfg-47ac022d2cb7,8,3,12,HIGHLY_SYMMETRIC,16,GENERATED,NOT_TESTED,"Topologically generated"
+cfg-0f6ca125d32a,8,3,12,SYMMETRIC,4,GENERATED,NOT_TESTED,"Topologically generated"
+cfg-7bca1947eecf,8,3,12,SYMMETRIC,16,GENERATED,NOT_TESTED,"Topologically generated"

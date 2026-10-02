@@ -1,0 +1,92 @@
+Matplotlib 3.11.1
+Pillow 12.3.0
+
+memory-usage.png: PASS
+  bytes: 58852
+  dimensions: 2141x1240
+  mode: RGBA
+  signature: 89 50 4E 47 0D 0A 1A 0A
+  extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+  file: measurements/gravity-test-2e-3d-pilot/charts/memory-usage.png: PNG image data, 2141 x 1240, 8-bit/color RGBA, non-interlaced
+  svg: memory-usage.svg (32702 bytes)
+
+update-time.png: PASS
+  bytes: 98991
+  dimensions: 2140x1240
+  mode: RGBA
+  signature: 89 50 4E 47 0D 0A 1A 0A
+  extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+  file: measurements/gravity-test-2e-3d-pilot/charts/update-time.png: PNG image data, 2140 x 1240, 8-bit/color RGBA, non-interlaced
+  svg: update-time.svg (34312 bytes)
+
+arrival-update.png: PASS
+  bytes: 94387
+  dimensions: 2140x1240
+  mode: RGBA
+  signature: 89 50 4E 47 0D 0A 1A 0A
+  extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+  file: measurements/gravity-test-2e-3d-pilot/charts/arrival-update.png: PNG image data, 2140 x 1240, 8-bit/color RGBA, non-interlaced
+  svg: arrival-update.svg (47150 bytes)
+
+reflection-safe-cycles.png: PASS
+  bytes: 94328
+  dimensions: 2140x1240
+  mode: RGBA
+  signature: 89 50 4E 47 0D 0A 1A 0A
+  extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+  file: measurements/gravity-test-2e-3d-pilot/charts/reflection-safe-cycles.png: PNG image data, 2140 x 1240, 8-bit/color RGBA, non-interlaced
+  svg: reflection-safe-cycles.svg (53298 bytes)
+
+radial-displacement-rms.png: PASS
+  bytes: 92404
+  dimensions: 2141x1240
+  mode: RGBA
+  signature: 89 50 4E 47 0D 0A 1A 0A
+  extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+  file: measurements/gravity-test-2e-3d-pilot/charts/radial-displacement-rms.png: PNG image data, 2141 x 1240, 8-bit/color RGBA, non-interlaced
+  svg: radial-displacement-rms.svg (45933 bytes)
+
+transverse-displacement-rms.png: PASS
+  bytes: 88917
+  dimensions: 2141x1240
+  mode: RGBA
+  signature: 89 50 4E 47 0D 0A 1A 0A
+  extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+  file: measurements/gravity-test-2e-3d-pilot/charts/transverse-displacement-rms.png: PNG image data, 2141 x 1240, 8-bit/color RGBA, non-interlaced
+  svg: transverse-displacement-rms.svg (46403 bytes)
+
+raw-radial-gradient-rms.png: PASS
+  bytes: 115537
+  dimensions: 2141x1240
+  mode: RGBA
+  signature: 89 50 4E 47 0D 0A 1A 0A
+  extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+  file: measurements/gravity-test-2e-3d-pilot/charts/raw-radial-gradient-rms.png: PNG image data, 2141 x 1240, 8-bit/color RGBA, non-interlaced
+  svg: raw-radial-gradient-rms.svg (43426 bytes)
+
+cycle-radial-gradient-rms.png: PASS
+  bytes: 101807
+  dimensions: 2141x1240
+  mode: RGBA
+  signature: 89 50 4E 47 0D 0A 1A 0A
+  extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+  file: measurements/gravity-test-2e-3d-pilot/charts/cycle-radial-gradient-rms.png: PNG image data, 2141 x 1240, 8-bit/color RGBA, non-interlaced
+  svg: cycle-radial-gradient-rms.svg (43393 bytes)
+
+axis-symmetry.png: PASS
+  bytes: 97306
+  dimensions: 2141x1240
+  mode: RGBA
+  signature: 89 50 4E 47 0D 0A 1A 0A
+  extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+  file: measurements/gravity-test-2e-3d-pilot/charts/axis-symmetry.png: PNG image data, 2141 x 1240, 8-bit/color RGBA, non-interlaced
+  svg: axis-symmetry.svg (38361 bytes)
+
+radial-loglog.png: PASS
+  bytes: 90960
+  dimensions: 2140x1241
+  mode: RGBA
+  signature: 89 50 4E 47 0D 0A 1A 0A
+  extrema: ((0, 255), (0, 255), (0, 255), (255, 255))
+  file: measurements/gravity-test-2e-3d-pilot/charts/radial-loglog.png: PNG image data, 2140 x 1241, 8-bit/color RGBA, non-interlaced
+  svg: radial-loglog.svg (36928 bytes)

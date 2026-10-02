@@ -1,0 +1,12 @@
+REM Framework Geometry Discovery topology search
+mode=SIMULATED_ANNEALING
+seed=42
+initialScore=1504.8328565784968
+bestScore=4.0817741125271910
+acceptedMutations=64
+rejectedMutations=2599
+invalidMutations=406
+duplicateTopologies=1931
+relaxationFailures=0
+elapsedMilliseconds=2146
+bestCandidate=/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/twelve-anneal-smoke/best-candidate.toml

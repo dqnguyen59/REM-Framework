@@ -1,0 +1,4 @@
+event,update,testIdentifier,latticeSize,configuredUpdates,elapsedMilliseconds,updateMilliseconds,averageUpdateMilliseconds,usedHeapBytes,totalHeapBytes,maxHeapBytes,peakUsedHeapBytes,gcCount,gcTimeMilliseconds
+before-lattice-allocation,0,gravity-test-2e-3d-pilot,161,180,0.027381,0.0,0.0,21903200,2130706432,32178700288,21903200,0,0
+detectors-initialized,0,gravity-test-2e-3d-pilot,161,180,2.385404,0.0,0.0,21903200,2130706432,32178700288,21903200,0,0
+simulation-complete,0,gravity-test-2e-3d-pilot,161,180,5213.327712,0.0,0.0,11476715024,26524778496,32178700288,11476715024,19,1308

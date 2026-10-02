@@ -1,0 +1,12 @@
+REM Framework Geometry Discovery topology search
+mode=SIMULATED_ANNEALING
+seed=4
+initialScore=2.0320508075688775
+bestScore=2.0320508075688775
+acceptedMutations=17
+rejectedMutations=66
+invalidMutations=10
+duplicateTopologies=7
+relaxationFailures=0
+elapsedMilliseconds=19
+bestCandidate=/home/dqnguyen/IdeaProjects/REM-Framework/lattice/topology-search/five-seed-smoke/run-0008/best-candidate.toml

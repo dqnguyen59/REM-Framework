@@ -1,0 +1,9 @@
+# Topology-search checkpoint (summary checkpoint; PRNG state is not restored)
+formatVersion = "0.2"
+iteration = 100
+seed = 3
+searchMode = "HILL_CLIMBING"
+scoringProfile = "GENERAL_GEOMETRY"
+currentCandidateId = 0
+bestCandidateId = 0
+bestScore = 1.4751024981789687
