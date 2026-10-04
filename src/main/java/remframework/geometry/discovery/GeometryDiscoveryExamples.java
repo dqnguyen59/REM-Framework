@@ -25,9 +25,10 @@ public final class GeometryDiscoveryExamples {
             case "line" -> line(targetDistance);
             case "square", "square-cycle" -> squareCycle(targetDistance);
             case "tetrahedron" -> tetrahedron(targetDistance);
+            case "tetrahedral-network" -> remframework.geometry.discovery.research.tetrahedral.FaceSharingTetrahedralPreview.firstLayer(targetDistance);
             case "cube", "cubic", "small-cubic" -> smallCubic(targetDistance);
             default -> throw new IllegalArgumentException("Unknown discovery model '" + name
-                    + "'. Available models: line, square, tetrahedron, cube.");
+                    + "'. Available models: line, square, tetrahedron, tetrahedral-network, cube.");
         };
     }
 

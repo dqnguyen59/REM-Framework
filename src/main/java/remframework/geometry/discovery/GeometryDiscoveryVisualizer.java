@@ -21,6 +21,10 @@ public final class GeometryDiscoveryVisualizer {
     private TopologySearchMetadata topologySearchMetadata;
     private GeometryDiscoverySession session;
     private int iterationsPerFrame = 1;
+    private List<GeometryConfigurationStatus> researchStatuses = List.of();
+    private remframework.geometry.discovery.research.tetrahedral.FaceSharingTetrahedralBuilder tetrahedralBuilder;
+    private remframework.geometry.discovery.research.tetrahedral.FaceSharingTetrahedralBuilder savedTetrahedralBuilder;
+    private remframework.geometry.discovery.research.tetrahedral.FaceSharingTetrahedralClosure.Trial closureTrial;
 
     public GeometryDiscoveryVisualizer(GeometryDiscoveryModel model,
                                        GeometryDiscoverySettings settings,
@@ -34,18 +38,25 @@ public final class GeometryDiscoveryVisualizer {
     }
 
     public void updateFrame() {
-        if (!session.isRunning()) return;
+        if (tetrahedralBuilder != null && tetrahedralBuilder.continuousLayout()) {
+            tetrahedralBuilder.updateLayout(20);
+            session=new GeometryDiscoverySession(tetrahedralBuilder.model(),GeometryDiscoverySettings.defaults(tetrahedralBuilder.baseLength()));
+            researchStatuses=tetrahedralBuilder.statuses();return;
+        }
+        if (tetrahedralBuilder != null || closureTrial != null || !session.isRunning()) return;
         for (int i = 0; i < iterationsPerFrame && !session.isFinished(); i++) session.step();
     }
 
-    public void start() { session.start(); }
+    public void start() { if (tetrahedralBuilder == null && closureTrial == null) session.start(); }
     public void pause() { session.pause(); }
-    public void singleStep() { session.step(); }
+    public void singleStep() { if (tetrahedralBuilder == null && closureTrial == null) session.step(); }
     public void reset() {
+        if (closureTrial != null) { showTetrahedralClosure(session.settings().targetDistance()); return; }
+        if (tetrahedralBuilder != null) { tetrahedralBuilder.reset(); refreshBuilder(); return; }
         session.reset();
         viewState.fitToView(session.model());
     }
-    public void runToConvergence() { session.runUntilConverged(); }
+    public void runToConvergence() { if (tetrahedralBuilder == null && closureTrial == null) session.runUntilConverged(); }
     public void fitToView() { viewState.fitToView(session.model()); }
 
     public void selectNextNode(int direction) {
@@ -81,9 +92,78 @@ public final class GeometryDiscoveryVisualizer {
     }
 
     public void updateSettings(GeometryDiscoverySettings settings) {
+        if (tetrahedralBuilder != null || closureTrial != null) return;
         session.updateSettings(settings);
     }
 
+    public remframework.geometry.discovery.research.tetrahedral.FaceSharingTetrahedralBuilder tetrahedralBuilder() {
+        return tetrahedralBuilder;
+    }
+    public void enableTetrahedralBuilder(double baseLength, int maximumNodes) {
+        enableTetrahedralBuilder(baseLength, maximumNodes, false);
+    }
+    public void enableTetrahedralBuilder(double baseLength, int maximumNodes, boolean sharingMode) {
+        closureTrial = null; savedTetrahedralBuilder = null;
+        tetrahedralBuilder = new remframework.geometry.discovery.research.tetrahedral.FaceSharingTetrahedralBuilder(baseLength, maximumNodes, sharingMode);
+        viewState.setShowConnections(true); viewState.setShowVertices(true);
+        viewState.setEdgeErrorColoring(false);
+        refreshBuilder();
+    }
+    public void enableContinuousTetrahedralLayout() {
+        if(tetrahedralBuilder!=null && tetrahedralBuilder.sharingMode()) { tetrahedralBuilder.enableContinuousLayout();refreshBuilder(); }
+    }
+    public void addTetrahedralNode() {
+        if (tetrahedralBuilder != null) { tetrahedralBuilder.cancelBatch(); tetrahedralBuilder.addNode(); refreshBuilder(); }
+    }
+    public void addTetrahedralNodes(int count) {
+        if (tetrahedralBuilder != null) { if(tetrahedralBuilder.continuousLayout()) tetrahedralBuilder.queueNodes(count); else tetrahedralBuilder.addNodes(count); refreshBuilder(); }
+    }
+    public void growTetrahedralToTotal(int total) {
+        if(tetrahedralBuilder!=null) { tetrahedralBuilder.queueToTotal(total);refreshBuilder(); }
+    }
+    public void removeTetrahedralNode() {
+        if (tetrahedralBuilder != null) { tetrahedralBuilder.removeNode(); refreshBuilder(); }
+    }
+    public void setTetrahedralBaseLength(double length) {
+        if (tetrahedralBuilder != null) { tetrahedralBuilder.setBaseLength(length); refreshBuilder(); }
+    }
+    private void refreshBuilder() {
+        session = new GeometryDiscoverySession(tetrahedralBuilder.model(),
+                GeometryDiscoverySettings.defaults(tetrahedralBuilder.baseLength()));
+        researchStatuses = tetrahedralBuilder.statuses();
+        Integer selected = viewState.selectedNodeId();
+        if (selected == null || selected >= session.model().nodes().size())
+            viewState.setSelectedNodeId(session.model().nodes().size() - 1);
+        viewState.fitToView(session.model());
+    }
+    public remframework.geometry.discovery.research.tetrahedral.FaceSharingTetrahedralClosure.Trial closureTrial() {
+        return closureTrial;
+    }
+    public void showTetrahedralClosure(double targetLength) {
+        var trial = remframework.geometry.discovery.research.tetrahedral.FaceSharingTetrahedralClosure.run(targetLength, 2000);
+        if (trial.result() == null || trial.assessment() == null) {
+            researchStatuses = trial.statuses(); return;
+        }
+        if (tetrahedralBuilder != null) savedTetrahedralBuilder = tetrahedralBuilder;
+        tetrahedralBuilder = null;
+        closureTrial = trial;
+        session = new GeometryDiscoverySession(trial.result().model(), trial.result().settings());
+        researchStatuses = trial.statuses();
+        viewState.setShowConnections(true); viewState.setShowVertices(true); viewState.setEdgeErrorColoring(false);
+        viewState.setSelectedNodeId(6);
+        viewState.fitToView(session.model());
+    }
+    public void returnToTetrahedralBuilder() {
+        double target = session.settings().targetDistance();
+        closureTrial = null;
+        if (savedTetrahedralBuilder != null) {
+            tetrahedralBuilder = savedTetrahedralBuilder; savedTetrahedralBuilder = null; refreshBuilder();
+        } else enableTetrahedralBuilder(target, 1000);
+    }
+    public List<GeometryConfigurationStatus> researchStatuses() { return researchStatuses; }
+    public void setResearchStatuses(List<GeometryConfigurationStatus> statuses) {
+        researchStatuses = List.copyOf(statuses);
+    }
     public GeometryDiscoverySession session() { return session; }
     public ViewState viewState() { return viewState; }
     public GeometryDiscoveryResult result() { return session.result(); }
