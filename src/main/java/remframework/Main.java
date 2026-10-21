@@ -39,9 +39,11 @@ public class Main {
 		Long updateLimit = null;
 		Long frameLimit = null;
 		boolean openGeometryDiscovery = false;
+        boolean diamondMechanics = false;
 		for (String argument : args) {
 			if (argument.startsWith("--")) {
-				if (argument.equals("--geometry-discovery")) {
+				if (argument.equals("--diamond-mechanics")) {diamondMechanics=true;continue;}
+                if (argument.equals("--geometry-discovery")) {
 					openGeometryDiscovery = true;
 					continue;
 				}
@@ -109,7 +111,8 @@ public class Main {
 		AppSettings.getInstance().loadFromFile(Constants.BASE_PATH + Constants.APP_SETTINGS_FILE);
 		LatticeManager.getInstance().initialize();
 
-        GLWindow glWindow = new GLWindow(Constants.TITLE);
+        if(diamondMechanics) LatticeManager.getInstance().select(LatticeManager.EXPERIMENTAL_DIAMOND_ID);
+        GLWindow glWindow = new GLWindow(diamondMechanics ? "REM Framework - Experimental Diamond Mechanics" : Constants.TITLE);
 		Engine engine = new Simulator(glWindow, updateLimit);
 		engine.setFrameLimit(frameLimit);
 
@@ -121,7 +124,19 @@ public class Main {
 				System.out.println("Loading startup project: " + startupProjectPath);
 				Project.getInstance().loadFromFile(startupProjectPath.toString());
 			}
-			engine.start();
+			if(diamondMechanics) {
+                Project.getInstance().setDimension(80,80,80,false);
+                LatticeManager.getInstance().select(LatticeManager.EXPERIMENTAL_DIAMOND_ID);
+                Project.getInstance().setConstantFrequency(.5);
+                Project.getInstance().setConstantElectricFactor(1);
+                Project.getInstance().settings.setSliceType(remframework.settings.Settings.SliceType.physicalXY);
+                Project.getInstance().settings.scale=1.0f;
+                Project.getInstance().getRemModel().stopSimulation();
+                AppSettings.getInstance().requestLatticeRebuild();
+                engine.getNuklearModel().showFrame(remframework.gui.model.NuklearModel.Frame.preferences);
+                System.out.println("Experimental diamond mechanics: Node v0.1 /4, k.5, gamma1; occupancy and transport gated.");
+            }
+            engine.start();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

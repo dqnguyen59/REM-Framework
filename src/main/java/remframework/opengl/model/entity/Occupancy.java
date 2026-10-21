@@ -536,6 +536,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     public void updateOscillation() {
+        if(remframework.opengl.model.Lattice.getInstance().isMechanicsOnly()) return;
         Vector3d o = identity.generateExcitation();
         if (o != null) {
             for (Node occupied : getOccupiedNodes()) occupied.addForce(o);

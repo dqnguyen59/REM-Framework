@@ -304,6 +304,7 @@ public class Scene {
 
     /** Reconstructs committed probe measurements through TransportSystem after lattice creation. */
     public void updateProbeMeasurements(TransportSystem transportSystem) {
+        if(lattice.isMechanicsOnly()) return;
         for (PassiveObserver probe : probes) {
             if (probe instanceof Probe rawProbe) rawProbe.updateMeasurements(transportSystem);
             else if (probe instanceof InterpolatedProbe interpolatedProbe) {
@@ -777,6 +778,7 @@ public class Scene {
 
     /** Enters a renderer-only inspection session for the currently selected passive probe. */
     public boolean enterNeighborhoodInspection() {
+        if(lattice.isMechanicsOnly()) return false;
         if (selectedProbe == null) return false;
         if ((neighborhoodInspectionActive || inspectionTransitionActive) && inspectedProbe == selectedProbe)
             return inspectionProbeMarker != null;
@@ -1131,6 +1133,7 @@ public class Scene {
     }
 
     private void setNodeWall(Node node, boolean value) {
+        if(lattice.isMechanicsOnly()) return;
         if (value) {
             node.setType(EntityType.WALL);
             addWallNode(node);
@@ -1185,6 +1188,7 @@ public class Scene {
     }
 
     public void updateWalls() {
+        if(lattice.isMechanicsOnly()) return;
         for (Vector3i nodeIndex : wallNodeIndexList) {
             Node node = lattice.getNodeByIndex(nodeIndex);
             if (node != null) {
@@ -1194,6 +1198,7 @@ public class Scene {
     }
 
     public void drawSlitWall() {
+        if(lattice.isMechanicsOnly()) return;
         clearHiLightNodes();
 
         int     p, d, iSize, jSize, ic, jc;
@@ -1549,10 +1554,8 @@ public class Scene {
 
     public void processRemFieldEngine(int numThreads, int segmentSize) {
         if (!REMModel.isSimulationUpdateActive()) return;
-        Node.FrameParameters parameters = new Node.FrameParameters(
-                settings.getNodeFormulaVersion(), project.getConstantWaveSpeed() / 6.0,
-                project.getConstantElectricFactor(), project.getConstantMagneticFactor(),
-                appSettings.getAbsorption(), appSettings.isUseFixedNodes());
+        lattice.applyPendingMechanicalPulse();
+        Node.FrameParameters parameters = lattice.frameParameters();
         int nodeCount = lattice.getNodeArray().length;
         for (int i = 0; i < numThreads; i++) {
             int start = i * segmentSize;

@@ -773,7 +773,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                         //lastSelectedNode.setFixed(false);
                         lastSelectedNode.setType(EntityType.NODE);
                         lastSelectedNode = null;
-                    } else if (remModel.isSimulating() && selectedNode != null) {
+                    } else if (remModel.isSimulating() && selectedNode != null && !scene.getLattice().isMechanicsOnly()) {
                         Vector3d p = selectedNode.getPosition();
                         selectedNode.setPosition(new Vector3d(p.x, p.y, project.rainModel.getForce()));
                         //selectedNode.setFixed(true);
@@ -782,7 +782,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     }
                     break;
                 case GLFW.GLFW_KEY_P:
-                    if (remModel.isSimulating() && selectedNode != null) {
+                    if (remModel.isSimulating() && selectedNode != null && !scene.getLattice().isMechanicsOnly()) {
                         if (selectedNode.isFixed()) {
                             ///selectedNode.setFixed(false);
                             selectedNode.setType(EntityType.NODE);
@@ -878,6 +878,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                         scene.waitForAllTasksReady();
                     }
 
+                    if(!scene.getLattice().validateMechanicalState()) return;
+                    scene.getLattice().getDisturbance().completedStep();
                     if (remModel.isSimulating())
                         PerformanceMonitor.stop(Measurement.physics);
                     else
@@ -938,6 +940,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void resetOccupancies() {
+        if(scene.getLattice().isMechanicsOnly()) return;
         for (Occupancy occupancy : project.occupancies) {
             occupancy.reset();
         }
@@ -955,6 +958,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void simulateOccupancies() {
+        if(scene.getLattice().isMechanicsOnly()) return;
         if (remModel.isSimulationUpdateActive() && !updateLimitReached) {
             GravityExperimentController controller = GravityExperimentController.getInstance();
             controller.beginSimulationUpdate();
@@ -986,6 +990,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void samplePassiveDetectors() {
+        if(scene.getLattice().isMechanicsOnly()) return;
         DetectorExperimentController controller =
                 DetectorExperimentController.getInstance();
         if (!remModel.isSimulationUpdateActive() || updateLimitReached
@@ -1004,6 +1009,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void simulateDetection() {
+        if(scene.getLattice().isMechanicsOnly()) return;
         if (nuklearModel.isFrameVisible(Frame.detector)) {
             Node node = scene.getLattice().getNodeByIndex(detectorModel.getIgnitorNode());
             if (node != null) {
@@ -1023,6 +1029,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void simulateRain() {
+        if(scene.getLattice().isMechanicsOnly()) return;
         if (remModel.isSimulationUpdateActive() && project.rainModel.isActive()) {
             Vector3i index = new Vector3i();
 
@@ -1098,6 +1105,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                                                            k == settings.getVisibleIndexZ());
                         case sliceXY -> isBoundingLine || (i == settings.getVisibleIndexX() &&
                                                            j == settings.getVisibleIndexY());
+                        case physicalXY, physicalXZ, physicalYZ -> remframework.opengl.model.PhysicalCrossSection.contains(
+                            node.getEquilibriumPosition(),scene.getLattice().getPhysicalSliceCenter(),settings.getSliceType(),settings.getPhysicalSliceThickness());
                         case identitiesOnly -> false;
                     };
 
@@ -1115,6 +1124,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private void createIsotropyProbe() {
         scene.clearProbes();
+        if(scene.getLattice().isMechanicsOnly()) return;
         Object[] nodeArray = scene.getLattice().getNodeArray();
         if (nodeArray == null || nodeArray.length == 0) return;
         String filename = project.getCurrentFilename();
@@ -1147,7 +1157,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         updateNodesProperties();
         //resetOccupancies();
         scene.update();
-        DetectorExperimentController.getInstance().resolveNodes(
+        if(!scene.getLattice().isMechanicsOnly()) DetectorExperimentController.getInstance().resolveNodes(
                 scene.getLattice());
         FeasibilityPilotTelemetry.getInstance().markLatticeInitialized();
 //        resetOccupancies();

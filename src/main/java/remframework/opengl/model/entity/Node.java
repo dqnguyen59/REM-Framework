@@ -225,6 +225,9 @@ public class Node extends Entity {
         // If set to false then the node stops updating its position
         if (!remModel.isSimulationUpdateActive()) return;
 
+        if(remframework.opengl.model.Lattice.getInstance().isMechanicsOnly()) {
+            updateNodeProperties(remframework.opengl.model.Lattice.getInstance().frameParameters());return;
+        }
         updateNodeProperties(new FrameParameters(nodeFormulaVersion,
                 project.getConstantWaveSpeed() / 6.0,
                 project.getConstantElectricFactor(), project.getConstantMagneticFactor(),

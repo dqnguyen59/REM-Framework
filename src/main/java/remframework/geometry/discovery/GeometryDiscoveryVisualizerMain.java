@@ -47,6 +47,7 @@ public final class GeometryDiscoveryVisualizerMain {
         GeometryDiscoveryVisualizer visualizer = new GeometryDiscoveryVisualizer(
                 loaded.model(), loaded.settings(),
                 loaded.sourcePath() == null ? "built-in" : loaded.sourcePath().toString());
+        if (visualizer.diamondReference()) visualizer.showDiamondReference(loaded.settings().targetDistance());
         if (loaded.sourcePath() != null)
             visualizer.setTopologySearchMetadata(
                     new TopologySearchMetadataLoader().load(loaded.sourcePath()));
@@ -71,8 +72,8 @@ public final class GeometryDiscoveryVisualizerMain {
         GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
         GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE);
         GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
-        long window = GLFW.glfwCreateWindow(860, 640,
-                "REM Framework Geometry Discovery Visualizer", MemoryUtil.NULL, MemoryUtil.NULL);
+        long window = GLFW.glfwCreateWindow(1280, 800,
+                visualizer.diamondReference()?"REM Framework - Diamond reference":"REM Framework Geometry Discovery Visualizer", MemoryUtil.NULL, MemoryUtil.NULL);
         if (window == MemoryUtil.NULL) throw new IllegalStateException("Unable to create window.");
         GLFW.glfwMakeContextCurrent(window);
         GLFW.glfwSwapInterval(1);

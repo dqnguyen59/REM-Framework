@@ -24,10 +24,11 @@ public final class GeometryDiscoveryExamples {
         return switch (name.toLowerCase(Locale.ROOT)) {
             case "line" -> line(targetDistance);
             case "square", "square-cycle" -> squareCycle(targetDistance);
+            case "diamond", "diamond-reference" -> remframework.geometry.discovery.research.diamond.DiamondReference.create(3, targetDistance);
             case "tetrahedron" -> tetrahedron(targetDistance);
             case "cube", "cubic", "small-cubic" -> smallCubic(targetDistance);
             default -> throw new IllegalArgumentException("Unknown discovery model '" + name
-                    + "'. Available models: line, square, tetrahedron, cube.");
+                    + "'. Available models: line, square, tetrahedron, cube, diamond-reference.");
         };
     }
 

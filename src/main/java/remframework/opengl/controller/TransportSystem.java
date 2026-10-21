@@ -156,6 +156,7 @@ public class TransportSystem extends AbstractSettings implements ISettings {
      * @param occupancy the occupancy to update
      */
     public void update(Occupancy occupancy) {
+        if(remframework.opengl.model.Lattice.getInstance().isMechanicsOnly()) return;
         boolean suppressTransfer = gravityPressureController.isDesignatedReceiver(occupancy);
         if (suppressTransfer) {
             gravityPressureController.beginReceiverUpdate(

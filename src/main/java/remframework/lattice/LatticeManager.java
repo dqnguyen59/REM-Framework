@@ -16,6 +16,7 @@ import java.util.Optional;
 
 public final class LatticeManager {
     public static final String SYSTEM_CUBIC_ID = "system:cubic";
+    public static final String EXPERIMENTAL_DIAMOND_ID = "research:diamond-mechanics";
     private static LatticeManager instance;
 
     private final Path latticeDirectory;
@@ -47,6 +48,8 @@ public final class LatticeManager {
                 : selected.identifier();
         List<LatticeDescriptor> next = new ArrayList<>();
         next.add(systemDescriptor());
+        next.add(new LatticeDescriptor(EXPERIMENTAL_DIAMOND_ID,"Experimental Diamond Mechanics",
+            LatticeDescriptor.SourceType.SYSTEM,null,true,List.of(),Map.of("description","Node v0.1 /4; occupancy and transport gated."),new ExperimentalDiamondLatticeModel()));
         try {
             boolean created = Files.notExists(latticeDirectory);
             Files.createDirectories(latticeDirectory);

@@ -61,6 +61,7 @@ public class FrameSettings extends AbstractFrame {
     private final StringBuffer bufShininess         = new StringBuffer();
     private final StringBuffer bufConstantFrequency = new StringBuffer();
 
+    private final StringBuffer bufPhysicalThickness = new StringBuffer();
     public FrameSettings(NuklearModel frames) {
         super(frames);
     }
@@ -75,6 +76,7 @@ public class FrameSettings extends AbstractFrame {
         super.render(windowHandle, ctx);
 
         int heightAdjust = switch (settings.getSliceType()) {
+            case physicalXY, physicalXZ, physicalYZ -> 60;
             case none, identitiesOnly -> -60;
             case sliceXZ, sliceYZ, sliceXY -> 70;
             default -> 0;
@@ -125,6 +127,13 @@ public class FrameSettings extends AbstractFrame {
             nk_spacer(ctx, spacer1, 1);
 
             switch (settings.getSliceType()) {
+                case physicalXY, physicalXZ, physicalYZ:
+                    settings.setPhysicalSliceThickness(nk_label_edit(ctx,stack," Slab thickness:",bufPhysicalThickness,
+                        settings.getPhysicalSliceThickness(),leftCol,rightCol));
+                    settings.setPhysicalSliceThickness(nk_slider(ctx,0.05,settings.getPhysicalSliceThickness(),5.0,0.05));
+                    nk_label_value(ctx," Center:","Lattice center",leftCol,rightCol);
+                    nk_label_value(ctx," Selection:","Reference positions",leftCol,rightCol);
+                    break;
                 case sliceX:
                     settings.setVisibleIndexX(
                             nk_label_edit(ctx, stack, " Slice X:", bufVisibleIndexX,
