@@ -1,0 +1,9 @@
+Actual Node v0.1 /4, k=.5 gamma=1, wavelength16,40 updates; quadrature displacement-intensity centroid.
+All26-direction baseline, domain, grid and narrower-band sets; narrower-band domain controls on all26 sampled directions. Original baseline/6 controls reused from tagged CSV; remaining runs use unchanged spectral packet runner.
+angular: spread 0.874334%; numerical1% target met.
+domain: spread 0.851542%; numerical1% target met.
+grid: spread 0.872273%; numerical1% target met.
+narrowDomain: spread 0.796835%; numerical1% target met.
+narrow: spread 0.860566%; numerical1% target met.
+Max scalar-speed sensitivity: domain 0.018703%; grid 0.007800%; bandwidth 2.003451%; narrower-packet domain 0.074812%.
+GEOMETRIC_SYMMETRY_UNKNOWN. No full isotropy acceptance: finite mixture/centroid observable, angular coverage limited to26 directions and one displacement polarization. GUI trough result remains separate. No mechanics changes. Per-run failures retained.
