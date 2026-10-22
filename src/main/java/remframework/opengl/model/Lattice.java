@@ -72,6 +72,30 @@ public class Lattice {
     private final java.util.concurrent.atomic.AtomicBoolean mechanicalPulseRequested = new java.util.concurrent.atomic.AtomicBoolean();
     private remframework.geometry.discovery.GeometryConfigurationStatus mechanicsStatus;
     private volatile boolean diamondIdentityExcitationEnabled;
+    private volatile boolean diamondPressureEnabled;
+    private volatile boolean diamondTransportEnabled;
+    public boolean isDiamondTransportEnabled() {return diamondTransportEnabled;}
+    /** Transport is experimental, default-off and implies occupancy pressure enabled. */
+    public void setDiamondTransportEnabled(boolean enabled) {
+        if(enabled && !isMechanicsOnly())throw new IllegalStateException("Select experimental diamond mechanics first");
+        diamondTransportEnabled=enabled;
+        if(enabled)diamondPressureEnabled=true;
+        disturbance.cancel();remModel.stopSimulation();
+        updateDiamondIntegrationLabel();
+    }
+    private void updateDiamondIntegrationLabel() {
+        remModel.setCustomStatus("Experimental diamond: pressure "+(diamondPressureEnabled?"on":"off")
+            +"; local transport "+(diamondTransportEnabled?"on":"off"));
+    }
+    public boolean isDiamondPressureEnabled() {return diamondPressureEnabled;}
+    /** Disabling pressure also disables experimental transport, preserving stored state. */
+    public void setDiamondPressureEnabled(boolean enabled) {
+        if(enabled && !isMechanicsOnly())throw new IllegalStateException("Select experimental diamond mechanics first");
+        diamondPressureEnabled=enabled;
+        if(!enabled)diamondTransportEnabled=false;
+        disturbance.cancel();remModel.stopSimulation();
+        updateDiamondIntegrationLabel();
+    }
     public boolean isMechanicsOnly() {return activeModel.mechanicsOnly();}
     public boolean isDiamondIdentityExcitationEnabled() {return diamondIdentityExcitationEnabled;}
     public boolean allowsIdentityExcitation() {return !isMechanicsOnly() || diamondIdentityExcitationEnabled;}
@@ -79,7 +103,7 @@ public class Lattice {
     public void setDiamondIdentityExcitationEnabled(boolean enabled) {
         if(enabled && !isMechanicsOnly())throw new IllegalStateException("Select experimental diamond mechanics first");
         diamondIdentityExcitationEnabled=enabled;
-        remModel.setCustomStatus("Experimental diamond: Identity excitation "+(enabled?"on":"off")+"; pressure and transport off");
+        updateDiamondIntegrationLabel();
         disturbance.cancel();remModel.stopSimulation();
     }
     public remframework.geometry.discovery.GeometryConfigurationStatus diamondRemIntegrationStatus() {
@@ -87,7 +111,7 @@ public class Lattice {
             remframework.geometry.discovery.GeometryConfigurationStage.GEOMETRY_REALIZATION,
             remframework.geometry.discovery.GeometryConfigurationStatusCode.GEOMETRY_TEST_NOT_STARTED,
             "Diamond pressure and transport",
-            "Pressure updates and transport disabled: opposite cubic axis slots have no physical tetrahedral mapping. Identity excitation is "+(diamondIdentityExcitationEnabled?"enabled.":"disabled.")));
+            "Four-bond distance imbalance available; experimental occupancy pressure is "+(diamondPressureEnabled?"enabled":"disabled")+"; local transport is "+(diamondTransportEnabled?"enabled":"disabled")+". Identity excitation is "+(diamondIdentityExcitationEnabled?"enabled.":"disabled.")));
     }
     public Node.FrameParameters frameParameters() {
         boolean experimental=isMechanicsOnly();
@@ -157,6 +181,8 @@ public class Lattice {
         disturbance.releaseLattice();
         mechanicalPulseRequested.set(false);
         diamondIdentityExcitationEnabled = false;
+        diamondPressureEnabled = false;
+        diamondTransportEnabled = false;
         project.occupancies.forEach(remframework.opengl.model.entity.Occupancy::detachLattice);
         remModel.setCurrentMouseNode(null);
         clearEntities();
@@ -326,6 +352,8 @@ public class Lattice {
     public Vector3d getPhysicalSliceCenter() {return physicalSliceCenter;}
     private Entity build(boolean headless) {
         disturbance.cancel();diamondIdentityExcitationEnabled=false;
+        diamondPressureEnabled=false;
+        diamondTransportEnabled=false;
         System.out.println("Lattice.build()");
         Vector3i projectDimension = new Vector3i();
         project.getDimension(projectDimension);
@@ -381,6 +409,7 @@ public class Lattice {
                     Node n = createNode(baseEntity, modelSphere, new Vector3d(definition.position()),
                                             new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
                     n.setIndex(i, j, k);
+                    n.setGeometricDistanceImbalance(latticeModel.mechanicsOnly());
 
                     n.setAbsorptionFactor(computeAbsorptionFactor(i, j, k, sizeI, sizeJ, sizeK));
 
@@ -414,7 +443,7 @@ public class Lattice {
                         remframework.geometry.discovery.GeometryConfigurationStage.GEOMETRY_REALIZATION,
                         remframework.geometry.discovery.GeometryConfigurationStatusCode.GEOMETRIC_SYMMETRY_UNKNOWN,
                         "Experimental diamond mechanics","Node v0.1 /4; fixed incomplete boundary; occupancy and transport gated. Full REM isotropy unproved."));
-                    remModel.setCustomStatus("Experimental diamond: Node v0.1 /4; occupancy and transport off");
+                    remModel.setCustomStatus("Experimental diamond: Node v0.1 /4; occupancy pressure off; transport off");
                 }
                 System.out.println("Built Lattice Model: " + descriptor.uiLabel());
             } catch (RuntimeException exception) {

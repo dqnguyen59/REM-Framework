@@ -65,6 +65,12 @@ public final class FrameAddProbes extends AbstractFrame {
     /** Opens Edit mode from the committed generated definitions, not from retained controls alone. */
     public FrameAddProbes(NuklearModel model) {
         super(model);
+        if(scene.getLattice().isMechanicsOnly()) {
+            centerIndex=new Vector3i();center=null;threeDimensional=false;
+            probesPerPlane=retained2DProbesPerShell;
+            editing=false;existingGeneratedDefinitions=List.of();
+            return;
+        }
         centerIndex = geometricCenterIndex();
         center = scene.getLattice().getNodeByIndex(centerIndex);
         threeDimensional = project.getDimensionZ() > 1;
@@ -106,6 +112,14 @@ public final class FrameAddProbes extends AbstractFrame {
 
     @Override
     protected void layout(NkContext ctx, int x, int y, int width, int height) {
+        if(scene.getLattice().isMechanicsOnly()) {
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeight*3,1);
+            Nuklear.nk_label_wrap(ctx,"Cubic probe placement is unavailable for diamond. Open Isotropy and choose Diamond transport for live Identity measurements.");
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeight,1);
+            if(nk_button_label(ctx,"Open Isotropy")) {nuklearModel.showFrame(NuklearModel.Frame.isotropy);close();}
+            if(nk_button_label(ctx,"Close"))close();
+            return;
+        }
         try (MemoryStack stack = MemoryStack.stackPush()) {
             boolean latticeContextChanged = refreshLatticeContext();
             Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);

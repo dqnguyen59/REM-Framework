@@ -52,6 +52,10 @@ class DiamondRuntimeMechanicsTest {
             assertTrue(manager.select(LatticeManager.EXPERIMENTAL_DIAMOND_ID));project.setDimension(10,10,10,false);lattice.clearEntities();lattice.buildHeadless();awaitReady(project);lattice.update();
             project.setConstantFrequency(.5);project.setConstantElectricFactor(1);project.settings.setNodeFormulaVersion(Settings.NodeFormulaVersion.v_0_2);
             assertEquals(1000,lattice.getNodeArray().length);assertTrue(lattice.isMechanicsOnly());
+            for(Object value:lattice.getNodeArray()) {
+                var node=(Node)value;assertTrue(node.isGeometricDistanceImbalance());
+                assertTrue(node.readGradientImbalance().length()<1e-12);
+            }
             assertEquals(Settings.NodeFormulaVersion.v_0_1,lattice.frameParameters().nodeFormulaVersion());assertEquals(.25/4,lattice.frameParameters().waveStep());
             var model=new ExperimentalDiamondLatticeModel();var definitions=model.nodes(new Vector3i(10));var reference=DiamondReference.create(5,1);
             var adapter=new DiamondCanonicalAdapter(reference,.5,1,DiamondCanonicalAdapter.Normalization.RESEARCH_FOUR);

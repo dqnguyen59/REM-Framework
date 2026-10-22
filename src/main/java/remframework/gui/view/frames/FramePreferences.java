@@ -131,11 +131,30 @@ public class FramePreferences extends AbstractFrame {
 
             if(selected.model()!=null && selected.model().mechanicsOnly() && lattice.isMechanicsOnly()) {
                 Nuklear.nk_layout_row_dynamic(ctx,rowHeightEdit,1);
-                Nuklear.nk_label(ctx,"Experimental Node v0.1 /4; transport off",Nuklear.NK_TEXT_LEFT);
+                Nuklear.nk_label(ctx,"Experimental Node v0.1 /4; local REM bridge",Nuklear.NK_TEXT_LEFT);
+                boolean localTransport=nk_check_label(ctx," Enable local Identity transport:",lattice.isDiamondTransportEnabled(),leftCol,rightCol);
+                if(localTransport!=lattice.isDiamondTransportEnabled())lattice.setDiamondTransportEnabled(localTransport);
+                if(nk_button_label(ctx,"Open Isotropy / transport measurements"))nuklearModel.showFrame(NuklearModel.Frame.isotropy);
+                boolean pressure=nk_check_label(ctx," Enable occupancy pressure:",lattice.isDiamondPressureEnabled(),leftCol,rightCol);
+                if(pressure!=lattice.isDiamondPressureEnabled())lattice.setDiamondPressureEnabled(pressure);
+                if(lattice.isDiamondPressureEnabled()) {
+                    var selectedOccupancy=project.getRemModel().getSelectedOccupancy();
+                    if(selectedOccupancy!=null) {
+                        String value;
+                        synchronized(selectedOccupancy) {
+                            var p=selectedOccupancy.getPressure();
+                            value=String.format(java.util.Locale.ROOT,"(%.3g, %.3g, %.3g)",p.x,p.y,p.z);
+                        }
+                        nk_label_value(ctx," Selected pressure",value,leftCol,rightCol);
+                    } else {
+                        Nuklear.nk_layout_row_dynamic(ctx,rowHeightEdit,1);
+                        Nuklear.nk_label(ctx,"Select an Identity to inspect its pressure.",Nuklear.NK_TEXT_LEFT);
+                    }
+                }
                 boolean identityExcitation=nk_check_label(ctx," Enable Identity excitation:",lattice.isDiamondIdentityExcitationEnabled(),leftCol,rightCol);
                 if(identityExcitation!=lattice.isDiamondIdentityExcitationEnabled())lattice.setDiamondIdentityExcitationEnabled(identityExcitation);
                 Nuklear.nk_layout_row_dynamic(ctx,rowHeightEdit*2,1);
-                Nuklear.nk_label_wrap(ctx,"Pauses on change. Configure an Identity, then Run. Pressure and transport remain off.");
+                Nuklear.nk_label_wrap(ctx,"Pauses on change. Configure an Identity, then Run. Local transport enables pressure. Both pause on change; configure an Identity, then Run.");
                 Nuklear.nk_layout_row_dynamic(ctx,rowHeightEdit,1);
                 Nuklear.nk_label(ctx,"Fixed incomplete boundary; k="+project.getConstantFrequency()+", gamma="+project.getConstantElectricFactor(),Nuklear.NK_TEXT_LEFT);
                 Nuklear.nk_layout_row_dynamic(ctx,rowHeightEdit,1);

@@ -19,16 +19,19 @@ public final class DiamondRuntimeReceivers {
     public DiamondRuntimeReceivers(Lattice lattice,double wavelength,double amplitude,double radiusOffset) {
         nodes=Arrays.stream(lattice.getNodeArray()).map(n->(Node)n).toArray(Node[]::new);
         radius=1.5*wavelength+4+radiusOffset;threshold=amplitude*1e-4;sensitivity=new DiamondThresholdSensitivity(26,amplitude,radius);Arrays.fill(arrivals,Double.NaN);
-        // Existing sampler expects untranslated crystal coordinates; undo runtime centering.
-        var inverse=new org.joml.Quaterniond().rotationTo(new Vector3d(1,1,1).normalize(),new Vector3d(1,0,0)).conjugate();
+        // Runtime axes are conventional crystal axes; the research sampler uses
+        // the (111)-to-X frame and an untranslated crystal origin.
+        var rotation=new org.joml.Quaterniond().rotationTo(new Vector3d(1,1,1).normalize(),new Vector3d(1,0,0));
         var minimum=new Vector3d(Double.POSITIVE_INFINITY);
-        for(var node:nodes) minimum.min(inverse.transform(new Vector3d(node.getEquilibriumPosition())));
-        var shift=new org.joml.Quaterniond().rotationTo(new Vector3d(1,1,1).normalize(),new Vector3d(1,0,0)).transform(minimum).negate();
-        var sampler=new DiamondReceiverSampling.Sampler(nodes.length,id->new Vector3d(nodes[id].getEquilibriumPosition()).add(shift),id->nodes[id].getType()!=EntityType.FIXED,1);
+        for(var node:nodes) minimum.min(node.getEquilibriumPosition());
+        var shift=new Vector3d(minimum).negate();
+        var sampler=new DiamondReceiverSampling.Sampler(nodes.length,
+            id->rotation.transform(new Vector3d(nodes[id].getEquilibriumPosition()).add(shift)),
+            id->nodes[id].getType()!=EntityType.FIXED,1);
         int id=0;
         try {
             for(var direction:DiamondDirectionalComparison.directions()) {
-                var point=new Vector3d(direction).mul(radius).add(lattice.getPhysicalSliceCenter()).add(shift);
+                var point=rotation.transform(new Vector3d(direction).mul(radius).add(lattice.getPhysicalSliceCenter()).add(shift));
                 var stencil=sampler.receiver(point,"direction "+id++);
                 for(int sample:stencil.nodes()) if(nodes[sample].getEquilibriumPosition().distance(lattice.getPhysicalSliceCenter())<=1.5*wavelength)
                     throw new IllegalArgumentException("Receiver stencil intersects the initialized packet");

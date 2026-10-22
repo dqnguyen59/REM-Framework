@@ -85,8 +85,8 @@ public final class DiamondRuntimeDisturbance {
     public void initializePending(Lattice lattice) {
         Request request=pending.getAndSet(null);if(request==null) return;
         running=false;
-        if(lattice.isDiamondIdentityExcitationEnabled()) {
-            reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Disable Identity excitation before a controlled packet measurement.");return;
+        if(lattice.isDiamondIdentityExcitationEnabled() || lattice.isDiamondPressureEnabled() || lattice.isDiamondTransportEnabled()) {
+            reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Disable Identity excitation, occupancy pressure and transport before a controlled packet measurement.");return;
         }
         var project=Project.getInstance();k=project.getConstantFrequency();gamma=project.getConstantElectricFactor();
         if(!Double.isFinite(request.geometryWavelength()) || request.geometryWavelength()<2 || !Double.isFinite(request.receiverOffset()) || request.receiverOffset()<0 || request.receiverOffset()>1 || !lattice.isMechanicsOnly() || !Double.isFinite(request.wavelength()) || request.wavelength()<2

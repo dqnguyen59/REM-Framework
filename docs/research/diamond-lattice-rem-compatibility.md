@@ -401,3 +401,106 @@ Offscreen rendering now holds the Scene monitor through apply/render/upload. Sce
 Validation: Maven build and eight focused tests passed: EntityTransformMatrixTest (1), RendererOverlaySynchronizationTest (2), DiamondRuntimeMechanicsTest (5). These are regression checks, not a native crash reproducer; repeated live resizing remains to be verified.
 
 Files changed: src/main/java/remframework/opengl/controller/Offscreen3DRenderer.java; src/main/java/remframework/opengl/model/Scene.java; docs/research/diamond-lattice-rem-compatibility.md.
+
+### Step 1: physical four-bond local distance imbalance (2026-10-22)
+
+Stable checkpoint before this step: commit daf599b, annotated tag diamond-lattice-v0.3.0, branch diamond-lattice-rem-compatibility; branch and tag pushed atomically to origin. Generated logs and local lattice/cubic-lattice.toml were excluded.
+
+Implemented an explicit experimental geometric distance measurement for diamond nodes. For center p, direct neighbor q_i, and equilibrium positions p0/q_i0:
+
+G = sum_i [(|q_i-p| - |q_i0-p0|) (q_i-p)/|q_i-p|].
+
+Each term is signed bond extension times the current physical unit bond direction. Units are length; positive contribution points toward extension. It uses direct neighbors only and never interprets storage slots as Cartesian directions. There is no averaging factor or new acceleration equation: G is an experimental measurement, not a derivation of a unique REM pressure law. Equal bulk bond expansion cancels on a regular tetrahedral neighborhood. For small center displacement u with fixed tetrahedral neighbors, G = -(4/3)u + O(|u|^2/bondLength), using sum_i n_i n_i^T=(4/3)I. This is a local linear-response property, not a proof of finite-wavelength propagation or transport isotropy.
+
+Runtime diamond construction enables the geometricDistanceImbalance flag per node. readGradientImbalance delegates to the new nonmutating readBondDistanceImbalance; measureGradientImbalance additionally updates the existing gradient cache. Cubic nodes retain the original opposite-slot measurement. Missing bonds are omitted, so boundary response must be distinguished from complete bulk response. Zero/nonfinite current or equilibrium bond lengths are explicitly rejected rather than assigning an arbitrary direction. Pressure persistence, residual transfer, the Node v0.1 integrator and disabled diamond pressure/transport gates are unchanged.
+
+Validation: Maven test lifecycle builds passed. DiamondLocalImbalanceTest: 7 passed (equilibrium, uniform expansion, signed stretch/compression, 40 arbitrary rotation/translation/slot permutations, tetrahedral small-displacement response, nonmutation/incomplete neighbors, degeneracy rejection, cubic preservation across the seven test methods). DetectorInfrastructureTest: 32 passed, 2 skipped. DiamondRuntimeMechanicsTest: 5 passed, including actual diamond-node selection and zero equilibrium imbalance. DiamondIdentityExcitationTest: 1 passed, retaining pressure/momentum and gated transport. Total 45 passed, 2 skipped, no failures/errors in these focused runs. The previously documented full-suite singleton errors have not been claimed resolved.
+
+Files changed for step 1:
+- src/main/java/remframework/opengl/model/entity/Node.java
+- src/main/java/remframework/opengl/model/Lattice.java
+- src/test/java/remframework/lattice/DiamondLocalImbalanceTest.java
+- src/test/java/remframework/lattice/DiamondRuntimeMechanicsTest.java
+- docs/research/diamond-lattice-rem-compatibility.md
+
+Step 1 is complete. Step 2 is to define and connect occupancy-local pressure using this measurement; the measurement alone does not enable Identity transport. Step 1 changes are local and are not included in the v0.3.0 stable checkpoint.
+
+### Step 2: occupancy-local pressure on experimental diamond (2026-10-22)
+
+Connected the step-1 physical bond-distance imbalance to an explicit pressure-only experimental bridge, enabled by the Preferences checkbox Enable occupancy pressure (default off; reset off on rebuild). Identity excitation remains a separate option. The Simulator now processes diamond Occupancies at the normal completed-update cadence, resolves their node bindings and invokes the pressure bridge before the existing optional Identity excitation. A selected Identity's pressure vector is shown compactly in Preferences. Toggling pressure pauses simulation and preserves pressure/momentum; no transport destination is selected. Controlled packet initialization rejects either excitation or pressure enabled.
+
+Equations per discrete simulation update:
+- g = gradientGain * G, where G is the direct-bond measurement defined in step 1.
+- a = accelerationGain * |g| * g / A, with A = |Identity amplitude|; a=0 for A=0.
+- M(next) = M + transportMomentumGain * a.
+- P(next) = P + M(next).
+
+This is an explicit experimental radial extension of the existing cubic scalar accelerationGain*sign(g)*g^2/A law: it agrees on an axis and rotates covariantly, whereas applying the nonlinear scalar function to each Cartesian component independently does not. It is not claimed to be uniquely derived from the Fundamental Node Equation. The diamond branch uses instantaneous local g (also retained in Occupancy history), avoiding cubic Z-velocity cycle averaging. No damping, momentum cap, saturation, threshold reset or transfer is used. Existing gains are reused; pressure and momentum remain persistent Occupancy fields. At zero g/amplitude existing momentum still contributes to pressure; no reset is inserted. Passive observers only record gradient history. Invalid/nonfinite inputs or candidate states are rejected before committing pressure/momentum/history. The pressure update and selected-pressure GUI read share the Occupancy monitor. Canonical cubic pressure, momentum caps, cycle measurement and residual transfer behavior are unchanged. Node acceleration/evolution is unchanged; pressure currently has no feedback force or transfer.
+
+Validation:
+- DiamondOccupancyPressureTest: 4 passed. Analytic discrete accumulation P_n=P_0+n*M_0+n(n+1)/2*momentumGain*a, persistence, zero-equilibrium/zero-amplitude cases, passive behavior and atomic rejection. Compared every update of 30-update histories over 26 directions plus 20 extra orientations, with initial pressure/momentum also rotated. Pressure covariance absolute error <1e-10; acceleration <1e-12 and momentum <1e-11. These are prescribed-deformation constitutive tests, not emergent REM isotropy measurements.
+- DiamondPressureRuntimeTest: 1 passed. Actual runtime opt-in, default-off behavior, persistent toggle state, no transfers even with zero transfer threshold, no inherited cubic momentum cap even when cap=0, packet isolation and rebuild-default reset.
+- DiamondIdentityExcitationTest: 1 passed.
+- DiamondLocalImbalanceTest: 7 passed.
+- DetectorInfrastructureTest: 32 passed, 2 skipped (cubic measurement regression).
+- DiamondRuntimeMechanicsTest: 5 passed (unchanged integrator/adapter equivalence).
+- DiamondRuntimeDisturbanceTest: 3 passed after repairing a pre-existing receiver-frame mismatch from conventional-axis alignment. Runtime sampler coordinates and target points now consistently transform to the research sampler's (111)-to-X frame. Added analytic affine-displacement interpolation checks across all 26 physical directions, error <1e-12. Removed the historical rotated-frame 27.258% assertion; current 48^3 test reports 27.088% at the same threshold, which remains an apparent-arrival diagnostic, not an isotropy acceptance result. Existing independent packet research results were not recomputed or relabeled.
+
+Maven test lifecycle build passed; focused total 53 passed, 2 skipped, no failures/errors in final runs. Initial packet regression exposed the coordinate-frame issue described above, which was fixed and rerun. The full suite was not run; previously documented singleton full-suite errors are not claimed resolved. GUI startup is checked by log; native checkbox interaction is not automated.
+
+Files changed for step 2:
+- src/main/java/remframework/opengl/controller/DiamondOccupancyPressure.java (new)
+- src/main/java/remframework/opengl/controller/TransportSystem.java
+- src/main/java/remframework/opengl/controller/Simulator.java
+- src/main/java/remframework/opengl/model/Lattice.java
+- src/main/java/remframework/gui/view/frames/FramePreferences.java
+- src/main/java/remframework/geometry/discovery/research/diamond/DiamondRuntimeDisturbance.java
+- src/main/java/remframework/geometry/discovery/research/diamond/DiamondRuntimeReceivers.java
+- src/test/java/remframework/lattice/DiamondOccupancyPressureTest.java (new)
+- src/test/java/remframework/lattice/DiamondPressureRuntimeTest.java (new)
+- src/test/java/remframework/geometry/discovery/research/diamond/DiamondRuntimeDisturbanceTest.java
+- docs/research/diamond-lattice-rem-compatibility.md
+
+Step 2 complete. Step 3 remains local neighbor selection and residual-pressure transfer on diamond bonds. Step 1/2 work remains local, outside the pushed v0.3.0 checkpoint.
+
+### Step 3: local diamond Identity transport and Isotropy live view (2026-10-22)
+
+Implemented experimental direct-neighbor transport after the step-2 Occupancy pressure update. For each eligible direct neighbor q_i, define n_i=(q_i-p)/|q_i-p| and score s_i=P dot n_i. If the unique largest score reaches positive transfer threshold T, move the Occupancy relation one graph edge and retain P_residual=P-T*n_i. Persistent momentum is unchanged. Both the pressure and transport phases run under the Occupancy monitor. The existing cubic transport path and its behavior are unchanged.
+
+No global destination, storage-axis mapping, opposite-direction fallback, damping, pressure/momentum clamp or global path search is introduced. The graph relation makes at most one edge transition per discrete update; excess pressure is retained for subsequent local updates. Fixed/wall source nodes cannot transfer; fixed/wall destinations are excluded before ranking. Nonfinite/collapsed eligible bonds, pressure or invalid thresholds are rejected before transfer. TransportSystem validates the enabled threshold before pressure accumulation. Numerically equal best directions (within 32 ULP of the compared projection scale) wait with pressure retained. This avoids an arbitrary slot-order preference but can stall exactly symmetric driving, including some crystal-axis cases. It is an explicit unresolved behavior to expose in later combined/directional tests, not an isotropy success. Multiple Occupancies on a Node remain permitted, consistent with the existing model; no exclusion or collision rule was invented.
+
+Enable local Identity transport in Preferences is default-off/reset-off on rebuild and automatically enables occupancy pressure. Disabling pressure disables transport without resetting the stored pressure/momentum; disabling transport alone leaves pressure accumulation available. The existing global Transport System enable switch is respected. Controlled packet measurements reject enabled transport/excitation/pressure to keep their scope separate. Current residual-transfer rules apply only to the experimental diamond branch.
+
+Reused FrameIsotropy with a default Diamond transport view for diamond mode and retained the old probe tabs. Live diagnostics show controls, selected Identity/node, last source imbalance, pressure/residual, persistent momentum, updates/transfers, result reason, last hop, pressure consumed on the last update, cumulative hop displacement/path and mean accumulated hop displacement per transport update. A measurement reset changes counters only, preserving pressure, momentum and location. Measurements are bounded per-Occupancy counters/vectors and do not retain old Node references. Native layout uses a scrollable group, full-width vector labels and wrapped result text. Preferences offers a direct Open Isotropy / transport measurements button; the view links back to Preferences and Identities. Directional spread explicitly reads Not measured. These live diagnostics do not implement the later matched directional-run/convergence assessment.
+
+Validation: Maven test lifecycle builds passed. Focused final runs: DiamondIdentityTransportTest 5; DiamondOccupancyPressureTest 4; DiamondLocalImbalanceTest 7; DiamondTransportRuntimeTest 1; DiamondPressureRuntimeTest 1; DiamondIdentityExcitationTest 1; FrameIsotropyLayoutTest 6; OccupancyHistoryTest 3; OccupancyHistoryLifecycleTest 3; DetectorInfrastructureTest 32 passed/2 skipped; DiamondRuntimeDisturbanceTest 3; DiamondRuntimeMechanicsTest 5. Unique total 71 passed, 2 skipped, zero failures/errors. Transport unit coverage includes exact residual accounting, momentum/cache preservation, defensive measurement snapshots/reset, 46 rotations with slot permutations, blocked/tied/subthreshold cases, two successive local transitions and invalid-state rejection. Runtime test checks opt-in defaults, implied pressure, actual movement to a direct neighbor, a deformation-driven transfer with no seeded pressure/momentum, global disable, residual preservation, measurement publication/reset, packet isolation and rebuild flags. No full-suite pass or physical isotropy proof is claimed; native GUI interaction is not automated.
+
+Files changed for step 3:
+- src/main/java/remframework/opengl/controller/DiamondIdentityTransport.java (new)
+- src/main/java/remframework/opengl/controller/TransportSystem.java
+- src/main/java/remframework/opengl/model/entity/Occupancy.java
+- src/main/java/remframework/opengl/model/Lattice.java
+- src/main/java/remframework/gui/view/frames/FramePreferences.java
+- src/main/java/remframework/gui/view/frames/FrameIsotropy.java
+- src/main/java/remframework/geometry/discovery/research/diamond/DiamondRuntimeDisturbance.java
+- src/test/java/remframework/lattice/DiamondIdentityTransportTest.java (new)
+- src/test/java/remframework/lattice/DiamondTransportRuntimeTest.java (new)
+- docs/research/diamond-lattice-rem-compatibility.md
+
+Step 3 complete as an experimental local transport implementation. Next is combined-behavior validation, followed by matched directional experiments and convergence. Steps 1–3 remain local, outside pushed tag diamond-lattice-v0.3.0.
+
+### Isotropy transport view visibility and diamond probe hang (2026-10-22)
+
+User reported missing transport content and UI Not Responding after Probe measurements > Add Probes. Captured thread dump transport-hang-21632.log: the main/UI thread was RUNNABLE inside ProbePlacement.boundary -> bounds -> activeProbeSpace -> FrameAddProbes constructor. The cubic directional traversal can cycle indefinitely on diamond storage slots. This was a confirmed CPU loop, not memory exhaustion or a blocked graphics upload.
+
+Simplified the diamond Isotropy view to draw directly in its scrollable parent window, removing the nested content-height-dependent group. The view resets scroll to the top on initial diamond display/mode changes. Probe measurements in diamond mode now explains the unavailable cubic placement path and links back to transport measurements rather than exposing Add Probes. FrameAddProbes separately guards constructor and layout before topology calculations in diamond mode, covering other menu entry points and lattice changes while open. ProbePlacement rejects geometric diamond nodes at public placement/description/compatibility/active-space paths; a defensive visited-node set makes malformed cubic boundary cycles fail explicitly instead of looping.
+
+Validation: Maven build/test lifecycle passed; 20 tests passed, 0 failures/errors/skips: ProbePlacementTest 11, ProbePlacementCompatibilityTest 2, FrameIsotropyLayoutTest 6, DiamondTransportRuntimeTest 1. New tests cover cyclic diamond rejection, malformed cubic cycle termination and prompt construction of the Add Probes dialog in actual diamond runtime. Application restarted. Computer-use screenshot verification confirmed the actual Isotropy transport view displays controls and selected Identity metrics (including current node, pressure, momentum and transfer counters), with parent scrolling available. User interaction occurred during the later UI check, so a live Probe measurements click was not completed; safe probe rejection is covered by the automated tests. No mechanics, pressure or transport equations changed.
+
+Files changed for this correction:
+- src/main/java/remframework/gui/view/frames/FrameIsotropy.java
+- src/main/java/remframework/gui/view/frames/dialogs/FrameAddProbes.java
+- src/main/java/remframework/opengl/model/ProbePlacement.java
+- src/test/java/remframework/opengl/model/ProbePlacementCompatibilityTest.java (new)
+- src/test/java/remframework/lattice/DiamondTransportRuntimeTest.java
+- docs/research/diamond-lattice-rem-compatibility.md

@@ -958,7 +958,18 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void simulateOccupancies() {
-        if(scene.getLattice().isMechanicsOnly()) return;
+        if(scene.getLattice().isMechanicsOnly()) {
+            if (!remModel.isSimulationUpdateActive() || updateLimitReached) return;
+            for (Occupancy occupancy : project.occupancies) {
+                if (!occupancy.isOccupied()) continue;
+                Node node=scene.getLattice().getNodeByIndex(occupancy.getNodeIndex());
+                if (node == null) continue;
+                occupancy.setNode(node);
+                transportSystem.update(occupancy);
+                occupancy.update();
+            }
+            return;
+        }
         if (remModel.isSimulationUpdateActive() && !updateLimitReached) {
             GravityExperimentController controller = GravityExperimentController.getInstance();
             controller.beginSimulationUpdate();
