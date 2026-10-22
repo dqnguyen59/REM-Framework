@@ -71,7 +71,24 @@ public class Lattice {
     private volatile LatticeModel activeModel = SystemCubicLatticeModel.create(false);
     private final java.util.concurrent.atomic.AtomicBoolean mechanicalPulseRequested = new java.util.concurrent.atomic.AtomicBoolean();
     private remframework.geometry.discovery.GeometryConfigurationStatus mechanicsStatus;
+    private volatile boolean diamondIdentityExcitationEnabled;
     public boolean isMechanicsOnly() {return activeModel.mechanicsOnly();}
+    public boolean isDiamondIdentityExcitationEnabled() {return diamondIdentityExcitationEnabled;}
+    public boolean allowsIdentityExcitation() {return !isMechanicsOnly() || diamondIdentityExcitationEnabled;}
+    /** Explicit excitation-only bridge; never enables the cubic pressure/transport path. */
+    public void setDiamondIdentityExcitationEnabled(boolean enabled) {
+        if(enabled && !isMechanicsOnly())throw new IllegalStateException("Select experimental diamond mechanics first");
+        diamondIdentityExcitationEnabled=enabled;
+        remModel.setCustomStatus("Experimental diamond: Identity excitation "+(enabled?"on":"off")+"; pressure and transport off");
+        disturbance.cancel();remModel.stopSimulation();
+    }
+    public remframework.geometry.discovery.GeometryConfigurationStatus diamondRemIntegrationStatus() {
+        return remframework.geometry.discovery.GeometryConfigurationStatus.of(remframework.geometry.discovery.GeometryConfigurationDiagnostic.info(
+            remframework.geometry.discovery.GeometryConfigurationStage.GEOMETRY_REALIZATION,
+            remframework.geometry.discovery.GeometryConfigurationStatusCode.GEOMETRY_TEST_NOT_STARTED,
+            "Diamond pressure and transport",
+            "Pressure updates and transport disabled: opposite cubic axis slots have no physical tetrahedral mapping. Identity excitation is "+(diamondIdentityExcitationEnabled?"enabled.":"disabled.")));
+    }
     public Node.FrameParameters frameParameters() {
         boolean experimental=isMechanicsOnly();
         return new Node.FrameParameters(experimental ? remframework.settings.Settings.NodeFormulaVersion.v_0_1 : project.settings.getNodeFormulaVersion(),
@@ -133,6 +150,21 @@ public class Lattice {
             nonNodeRenderEntities.add(entity);
         }
         return entity;
+    }
+
+    /** Called at an idle frame boundary before replacement allocation. */
+    public synchronized void releaseForReplacement() {
+        disturbance.releaseLattice();
+        mechanicalPulseRequested.set(false);
+        diamondIdentityExcitationEnabled = false;
+        project.occupancies.forEach(remframework.opengl.model.entity.Occupancy::detachLattice);
+        remModel.setCurrentMouseNode(null);
+        clearEntities();
+        nodeMatrix = null;
+        nodeArray = new Object[0];
+        entityArray = new Object[0];
+        baseEntity = null;
+        modelSphere = null;
     }
 
     public synchronized void clearEntities() {
@@ -285,6 +317,7 @@ public class Lattice {
     }
 
     public void reportDiamondSizeFailure(remframework.lattice.DiamondMemoryBudget.Estimate estimate) {
+        System.err.println("Diamond build rejected ["+estimate.code()+"]: "+estimate.error());
         mechanicsStatus=remframework.geometry.discovery.GeometryConfigurationStatus.of(remframework.geometry.discovery.GeometryConfigurationDiagnostic.stop(
             remframework.geometry.discovery.GeometryConfigurationStage.GEOMETRY_REALIZATION, estimate.code(), "Diamond dimension request", estimate.error()));
         remModel.setCustomStatus(estimate.error());
@@ -292,7 +325,7 @@ public class Lattice {
     private final Vector3d physicalSliceCenter = new Vector3d();
     public Vector3d getPhysicalSliceCenter() {return physicalSliceCenter;}
     private Entity build(boolean headless) {
-        disturbance.cancel();
+        disturbance.cancel();diamondIdentityExcitationEnabled=false;
         System.out.println("Lattice.build()");
         Vector3i projectDimension = new Vector3i();
         project.getDimension(projectDimension);

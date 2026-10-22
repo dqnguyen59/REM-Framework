@@ -12,14 +12,21 @@ public final class DiamondMemoryBudget {
                            GeometryConfigurationStatusCode code) {
         public boolean allowed() {return error == null;}
     }
-    public record MemoryAvailability(long heapMaximumBytes,long heapUsedBytes,long freeSystemBytes) {
+    public record MemoryAvailability(long heapMaximumBytes,long heapUsedBytes,long freeSystemBytes,
+                                     long reusableCommittedBytes) {
+        public MemoryAvailability(long maximum,long used,long freeSystem) {
+            this(maximum,used,freeSystem,0);
+        }
         public long heapHeadroomBytes() {return Math.max(0,heapMaximumBytes-heapUsedBytes);}
         public long budgetBytes() {
-            long available=freeSystemBytes>0 ? Math.min(heapHeadroomBytes(),freeSystemBytes) : heapHeadroomBytes();
+            // Reclaimed heap may remain committed to Java instead of returning to the OS.
+            // Cap the combined capacity at heap headroom; retain the 25% reserve.
+            long reusable=Math.min(heapHeadroomBytes(),Math.max(0,reusableCommittedBytes));
+            long available=freeSystemBytes>0 ? reusable+Math.min(heapHeadroomBytes()-reusable,freeSystemBytes) : heapHeadroomBytes();
             return available/4*3;
         }
         public String limitingResource() {
-            return freeSystemBytes>0 && freeSystemBytes<heapHeadroomBytes() ? "free system RAM" : "Java heap headroom";
+            return freeSystemBytes>0 && freeSystemBytes<Math.max(0,heapHeadroomBytes()-reusableCommittedBytes) ? "free system RAM" : "Java heap headroom";
         }
     }
     public static MemoryAvailability memoryAvailability() {
@@ -27,7 +34,7 @@ public final class DiamondMemoryBudget {
         long systemFree=-1;
         if(ManagementFactory.getOperatingSystemMXBean() instanceof com.sun.management.OperatingSystemMXBean os)
             systemFree=os.getFreeMemorySize();
-        return new MemoryAvailability(runtime.maxMemory(),runtime.totalMemory()-runtime.freeMemory(),systemFree);
+        return new MemoryAvailability(runtime.maxMemory(),runtime.totalMemory()-runtime.freeMemory(),systemFree,runtime.freeMemory());
     }
     public static long availableBudget() {return memoryAvailability().budgetBytes();}
     public static Estimate estimate(Vector3i size) {return estimate(size, availableBudget());}
@@ -42,7 +49,7 @@ public final class DiamondMemoryBudget {
         long required = nodes * ESTIMATED_BYTES_PER_NODE;
         if (required > budgetBytes)
             return new Estimate(nodes, required, budgetBytes,
-                String.format("Estimated peak %.0f MiB exceeds available budget %.0f MiB. Reduce dimensions or increase the JVM heap (-Xmx).", required / 1048576.0, budgetBytes / 1048576.0), GeometryConfigurationStatusCode.RESOURCE_LIMIT_REACHED);
+                String.format("Conservative build estimate: %.0f MiB.\nAvailable safe build budget: %.0f MiB.\nThis estimate is not current memory usage.\nThe budget includes reusable Java heap and currently free system RAM.\nReduce dimensions or free memory before retrying.", required / 1048576.0, budgetBytes / 1048576.0), GeometryConfigurationStatusCode.RESOURCE_LIMIT_REACHED);
         return new Estimate(nodes, required, budgetBytes, null, null);
     }
 }

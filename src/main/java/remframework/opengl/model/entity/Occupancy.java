@@ -383,6 +383,13 @@ public class Occupancy extends AbstractSettings implements ISettings {
         return getOccupant() != null && nodeIndex != null;// && node != null;
     }
 
+    /** Detaches the old graph, preserving the index, pressure and momentum. */
+    public void detachLattice() {
+        node = null;
+        invalidateOccupiedRegion();
+        if (identity != null) identity.setEntity(null);
+    }
+
     public void setNode(Node node) {
         if (this.node != node) invalidateOccupiedRegion();
         this.node = node;
@@ -536,7 +543,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     public void updateOscillation() {
-        if(remframework.opengl.model.Lattice.getInstance().isMechanicsOnly()) return;
+        if(!remframework.opengl.model.Lattice.getInstance().allowsIdentityExcitation()) return;
         Vector3d o = identity.generateExcitation();
         if (o != null) {
             for (Node occupied : getOccupiedNodes()) occupied.addForce(o);

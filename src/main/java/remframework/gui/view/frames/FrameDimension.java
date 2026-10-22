@@ -81,15 +81,16 @@ public class FrameDimension extends AbstractFrame {
             nk_label_value(ctx, " #Nodes", "" + ((long)dimension.x * dimension.y * dimension.z), leftCol, rightCol);
 
 		if (remframework.opengl.model.Lattice.getInstance().isMechanicsOnly()) {
-                var estimate=remframework.lattice.DiamondMemoryBudget.estimate(dimension);
-                nk_label_value(ctx,"Peak estimate",String.format("%.0f MiB / %.0f MiB",estimate.requiredBytes()/1048576.0,estimate.budgetBytes()/1048576.0),leftCol,rightCol);
+                var estimate=remframework.lattice.DiamondMemoryBudget.estimate(dimension,Long.MAX_VALUE);
+                nk_label_value(ctx,"Peak estimate",String.format("%.0f MiB",estimate.requiredBytes()/1048576.0),leftCol,rightCol);
+                nk_label_value(ctx,"Memory check","After old lattice is released",leftCol,rightCol);
             }
             nk_spacer(ctx, spacer1 , 1);
 		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 3);
 		Nuklear.nk_label(ctx, "", Nuklear.NK_TEXT_CENTERED);
 		if (nk_button_label(ctx, "Update")) {
 			if (remframework.opengl.model.Lattice.getInstance().isMechanicsOnly()) {
-                    var estimate=remframework.lattice.DiamondMemoryBudget.estimate(dimension);
+                    var estimate=remframework.lattice.DiamondMemoryBudget.estimate(dimension,Long.MAX_VALUE);
                     if (estimate.allowed()) update();
                     else {
                         remframework.opengl.model.Lattice.getInstance().reportDiamondSizeFailure(estimate);

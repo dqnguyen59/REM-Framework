@@ -336,3 +336,68 @@ Runtime GUI trough experiment unchanged; application reopened atscale1.0. Report
 Preview launch follow-up: the graphical application did not reopen. GLFW window creation failed (GLWindow.init:87); simulation audit itself completed successfully. Report remains available as a text artifact. Do not claim a successful GUI restart.
 Viewer recovery: GLFW reported invalid saved window size0x0. Restored ignored local qfs.ini Window width/height to1280x900 before retrying startup; this is local display configuration only, no scientific/source change.
 Viewer recovery outcome: Java window reopened and responding after local window-size repair; preview scale remains1.0.
+
+### v0.2.0 pushed, then first REM integration step
+
+Created annotated tag diamond-lattice-v0.2.0 at commit0eaf2d4 and atomically pushed branch diamond-lattice-rem-compatibility plus tag to origin. That immutable snapshot contains the completed26-direction packet controls. Subsequent excitation work below is local and uncommitted, outside the tag.
+
+First integration step: opt-in Identity excitation through the existing Identity.generateExcitation -> Occupancy.updateOscillation -> Node.addForce -> existing Node v0.1 update. No Fundamental Node Equation, forcing scale, pressure update, residual-pressure transfer, or cubic behavior changed. Lattice.java adds a runtime-only diamondIdentityExcitationEnabled flag, allowsIdentityExcitation(), explicit setter that pauses simulation/cancels packet recordings, and diamondRemIntegrationStatus() explaining pressure/transport readiness via ConfigurationStatus. Flag defaults OFF and resets OFF on rebuild. Occupancy.java changes only the diamond excitation gate to use this permission. FramePreferences.java exposes Enable Identity excitation and explains that changing it pauses; configure an existing Identity and press Run. TransportSystem gate remains active.
+
+Why transport remains gated: Node.measureGradientImbalance pairs six cubic slots and TransportSystem.moveNode chooses cubic +/-axis slots. Diamond slots are storage labels, so unblocking that code would silently invent physical direction and pressure rules. Pressure remains Occupancy-local; neither pressure nor transport momentum nor identity location changes in this stage. Future geometry-based mapping must be explicit and checked against existing cubic behavior before enabling pressure/transport. This is not full REM integration yet.
+
+DiamondRuntimeDisturbance.java rejects controlled packet initialization with INVALID_PARAMETERS while Identity excitation is enabled, preserving measurement isolation rather than silently mixing sources. Added DiamondIdentityExcitationTest.java: default gate, unchanged oscillator phase while disabled, opt-in force and propagation through actual Node updates, fixed boundaries, unchanged pressure/momentum/node identity with TransportSystem still gated, packet rejection, disabling, and rebuild reset. Tests:1 integration +5 existing ExtendedIdentity +3 existing controlled packet regressions passed (9 total); compilation passed. Files changed: Lattice.java, Occupancy.java, FramePreferences.java, DiamondRuntimeDisturbance.java, new src/test/java/remframework/lattice/DiamondIdentityExcitationTest.java, and this log. No new equations; existing oscillator waveform and Node forcing path reused. Source coefficients unchanged. Application restarted scale1.0 with excitation opt-in OFF.
+
+### Diamond model selection feedback and retained renderer
+
+Fixed FramePreferences.java and LatticeManager.java to preflight dimension-dependent diamond selection before requesting a rebuild. Invalid odd/small dimensions or insufficient estimated memory reject selection, retain the current model, expose INVALID_PARAMETERS/RESOURCE_LIMIT_REACHED via lastSelectionStatus ConfigurationStatus, and display an error dialog with the reason. Rejected selection no longer unconditionally requests a rebuild of the retained model. Simulator.java also preflights diamond rebuilds before clearing the current renderer and displays a build-error dialog, covering startup/programmatic changes and changed memory availability. Lattice.java now logs the existing structured build rejection reason. Diamond-only excitation controls are hidden until a diamond model is actually active. Added DiamondLatticeSelectionTest.java: reject invalid dimensions and budget without changing model/settings, allow valid retry, preserve cubic odd/single-plane support. Eleven tests passed: selection1, manager7, budget2, excitation1. Compilation passed. No lattice topology, memory policy, mechanical/pressure equations changed. This follows a report that selecting Experimental Diamond Mechanics appeared to do nothing; inspection confirmed early build rejection previously occurred after renderer clearing with only custom-status feedback. No specific user dimension/memory rejection is assumed without its runtime diagnostic. Files changed this step: FramePreferences.java, LatticeManager.java, Simulator.java, Lattice.java, new DiamondLatticeSelectionTest.java, this research log. Earlier excitation integration changes remain local. Viewer restarted scale1.0.
+
+### Readable memory dialog and measured usage explanation
+
+Changed FrameConfirmDialog.java: viewport-sized confirmation dialog, native wrapped labels in a clipped scrollable message group, confirmation buttons outside the scrolling body. Long errors no longer use single-line labels. Changed DiamondMemoryBudget.java rejection wording to multiline conservative build estimate versus safe budget, explicitly distinct from current usage; removed generic heap-increase advice because physical RAM can be limiting. Estimate policy remains8192 bytes/node and75% of minimum headroom/free RAM; no resource guard loosened. Added this research-log entry. Compilation and three budget/selection tests passed before the final display-spacing reduction; compile rechecked at restart. No scientific or mechanics equations changed.
+
+Measured running simulator PID18552 via Get-Process and jcmd GC.heap_info: working set4973 MiB/private5460 MiB; Java heap committed4972544 KiB (~4.74 GiB), used1566781 KiB (~1.49 GiB), max reserved11157504 KiB (~10.64 GiB). Used heap is not an exact live-object measurement and may include garbage. Committed heap can include unused memory held by the JVM; resident process memory also includes native/graphics allocations. The4000 MiB message is a conservative512000-node build estimate, not measured diamond usage. Loaded cubic graph, rendering/node objects, temporary allocations and heap retention contribute to process usage; no leak diagnosis claimed. Safe budget fluctuates with RAM/headroom. GUI restarted scale1.0.
+
+### Release loaded lattice before replacement (2026-10-21)
+
+Model selection validates dimensions/index capacity before discarding anything. At a completed physics frame, replacement stops simulation and the offscreen renderer, clears renderer snapshots, scene/probe/highlight references, lattice arrays/root, occupancy graph caches and Identity display entities, and receiver interpolation bindings. Occupancy index, pressure and momentum are preserved during detachment and node bindings are resolved after rebuilding. A best-effort GC request precedes a fresh memory check. If insufficient, the graph stays empty and paused; the dialog instructs reducing dimensions or selecting another model.
+
+Budget calculation: 75% of min(maximum heap minus used heap, free system RAM plus unused committed heap). This credits reusable JVM space instead of requiring the OS to receive reclaimed pages first, retaining the existing reserve and 8192-byte-per-node estimate. Committed space is a capacity estimate, not a guarantee of resident physical pages; GC timing and other programs can still affect allocation. No mechanical equation changed.
+
+Validation: Maven build via test lifecycle and five focused tests passed (DiamondMemoryBudgetTest: 3; DiamondLatticeSelectionTest: 1; DiamondIdentityExcitationTest: 1). Added coverage for committed-space reuse/capping, graph array/root cleanup and pressure/momentum preservation. Application restarted; startup log shows rendering without exceptions. A live repeated model-switch UI test was not performed.
+
+Files changed for this task:
+- src/main/java/remframework/lattice/LatticeManager.java
+- src/main/java/remframework/lattice/DiamondMemoryBudget.java
+- src/main/java/remframework/opengl/controller/Simulator.java
+- src/main/java/remframework/opengl/controller/Offscreen3DRenderer.java
+- src/main/java/remframework/opengl/model/Lattice.java
+- src/main/java/remframework/opengl/model/Scene.java
+- src/main/java/remframework/opengl/model/entity/Occupancy.java
+- src/main/java/remframework/geometry/discovery/research/diamond/DiamondRuntimeDisturbance.java
+- src/test/java/remframework/lattice/DiamondMemoryBudgetTest.java
+- src/test/java/remframework/lattice/DiamondIdentityExcitationTest.java
+- docs/research/diamond-lattice-rem-compatibility.md
+
+### Dimension dialog replacement preflight (2026-10-21)
+
+Removed the remaining pre-release memory gate in FrameDimension. Update still validates even dimensions and Java index capacity before altering the project; available memory is checked by Simulator after releasing the old graph. The dialog shows the requested peak estimate and states that the memory check follows release, rather than presenting the occupied budget as a replacement limit. No equations changed.
+
+Changed files: src/main/java/remframework/gui/view/frames/FrameDimension.java; docs/research/diamond-lattice-rem-compatibility.md. Maven test lifecycle build and the same five focused replacement tests passed. Native dialog interaction was not automated.
+
+### Conventional runtime diamond axes (2026-10-21)
+
+The runtime ExperimentalDiamondLatticeModel now leaves conventional crystal X/Y/Z aligned with the cubic runtime axes. Removed the rotation that aligned the (111) bond to +X. Position equation is p=(quarter-cell coordinate minus center)/sqrt(3), so nearest-neighbor lengths remain 1 and topology, boundary rule and Node mechanics are unchanged. Existing display-root/camera transforms still apply equally. A Z excitation is normal to the conventional XY slab; the two storage Z indices still represent a finite crystal basis thickness, not a single mathematical plane.
+
+The separate DiamondReference research orientation and historical measurements remain unchanged. Runtime/reference equivalence tests explicitly transform between the two coordinate frames, including displacement and velocity. Five DiamondRuntimeMechanicsTest tests passed, covering conventional axis steps, reference topology/coordinates, equal bonds and runtime/adapter mechanical equivalence. Build passed through Maven test lifecycle. No claim of isotropy follows from visual alignment.
+
+Files changed: src/main/java/remframework/lattice/ExperimentalDiamondLatticeModel.java; src/test/java/remframework/lattice/DiamondRuntimeMechanicsTest.java; docs/research/diamond-lattice-rem-compatibility.md.
+
+### Native rendering-buffer lifetime during resize (2026-10-21)
+
+Crash hs_err_pid27060.log reports EXCEPTION_ACCESS_VIOLATION in nvoglv64.dll on rem-3d-renderer during GL15C.nglBufferData, called from EntityRenderer.renderInstanced. This is a native upload failure, not a reported Java OutOfMemoryError. Code inspection found that Scene.ensureInstanceDataBuffers could memFree the previous packed buffers during layout replacement while the independent renderer was uploading them. This is a concrete lifetime race consistent with the stack, although the driver crash has not been deterministically reproduced.
+
+Offscreen rendering now holds the Scene monitor through apply/render/upload. Scene.updateMatrix (the allocation/layout-replacement entry point) uses that same monitor, so native client memory cannot be freed during upload. Scene.releaseLattice also uses the monitor and explicitly frees and clears packed buffers and prepared entity references before replacement memory measurement. Existing worker completion boundaries are retained. No mechanics equations changed.
+
+Validation: Maven build and eight focused tests passed: EntityTransformMatrixTest (1), RendererOverlaySynchronizationTest (2), DiamondRuntimeMechanicsTest (5). These are regression checks, not a native crash reproducer; repeated live resizing remains to be verified.
+
+Files changed: src/main/java/remframework/opengl/controller/Offscreen3DRenderer.java; src/main/java/remframework/opengl/model/Scene.java; docs/research/diamond-lattice-rem-compatibility.md.

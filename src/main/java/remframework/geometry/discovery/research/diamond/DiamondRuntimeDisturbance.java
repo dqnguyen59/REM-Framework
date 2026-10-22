@@ -62,6 +62,12 @@ public final class DiamondRuntimeDisturbance {
         pending.set(new Request(wavelength,amplitude,receiverOffset,geometryWavelength));
     }
     public void cancel() {pending.set(null);running=false;retainedResults=receivers!=null;summary="Experiment cancelled (lattice/pulse changed)";}
+    /** Releases interpolation bindings to the graph being replaced. */
+    public void releaseLattice() {
+        cancel();
+        receivers = null;
+        outerReceivers = null;
+    }
     public static double displacement(double radius,Request request) {
         double sigma=request.geometryWavelength()/2, support=request.supportRadius();
         if(radius>=support) return 0;
@@ -79,6 +85,9 @@ public final class DiamondRuntimeDisturbance {
     public void initializePending(Lattice lattice) {
         Request request=pending.getAndSet(null);if(request==null) return;
         running=false;
+        if(lattice.isDiamondIdentityExcitationEnabled()) {
+            reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Disable Identity excitation before a controlled packet measurement.");return;
+        }
         var project=Project.getInstance();k=project.getConstantFrequency();gamma=project.getConstantElectricFactor();
         if(!Double.isFinite(request.geometryWavelength()) || request.geometryWavelength()<2 || !Double.isFinite(request.receiverOffset()) || request.receiverOffset()<0 || request.receiverOffset()>1 || !lattice.isMechanicsOnly() || !Double.isFinite(request.wavelength()) || request.wavelength()<2
             || !Double.isFinite(request.amplitude()) || request.amplitude()<=0 || request.amplitude()>.01

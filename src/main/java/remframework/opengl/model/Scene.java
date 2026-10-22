@@ -205,11 +205,33 @@ public class Scene {
         lattice  = Lattice.getInstance();
     }
 
+    /** Removes scene bindings before releasing the lattice graph. */
+    public synchronized void releaseLattice() {
+        clearProbes();
+        clearPreviewProbes();
+        hiLightedNodes.clear();
+        firstHiLightedNode = null;
+        inspectionProbeMarker = null;
+        for (FloatBuffer[] buffers : instanceDataBuffers.values()) {
+            MemoryUtil.memFree(buffers[0]);
+            MemoryUtil.memFree(buffers[1]);
+        }
+        instanceDataBuffers.clear();
+        instanceDataEntityCounts.clear();
+        instanceDataBuffersByEntity = new FloatBuffer[0][];
+        instanceDataSlotsByEntity = new int[0];
+        preparedInstanceEntities = null;
+        preparedBaseEntityIndex = -1;
+        instanceDataLayoutDirty = true;
+        lattice.releaseForReplacement();
+    }
+
     public void build() {
         System.out.println("Scene.build()");
         clearProbes();
         clearPreviewProbes();
         Entity baseEntity = lattice.build();
+        if (baseEntity == null) return;
         // Draw xyz arrows on entity baseField.
         Vector3i dimension = new Vector3i();
         project.getDimension(dimension);
@@ -1495,7 +1517,7 @@ public class Scene {
      * is not drawing. Both transform and packed-instance buffers are initialized so a
      * paused refresh or visibility-layout rebuild cannot expose an uninitialized frame.
      */
-    public void updateMatrix(int numThreads, int segmentSize, boolean synchronizeBothBuffers) {
+    public synchronized void updateMatrix(int numThreads, int segmentSize, boolean synchronizeBothBuffers) {
         ensureInstanceDataBuffers();
         double renderScale = settings.getScale();
         Entity baseEntity = lattice.getBaseEntity();

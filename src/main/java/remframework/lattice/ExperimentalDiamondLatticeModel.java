@@ -2,7 +2,7 @@ package remframework.lattice;
 import java.util.*;
 import org.joml.Vector3d;
 import org.joml.Vector3i;
-import remframework.geometry.discovery.research.diamond.DiamondReference;
+
 /** Explicit experimental mechanics bridge; indices are storage addresses, not physical directions. */
 public final class ExperimentalDiamondLatticeModel implements LatticeModel {
 
@@ -11,7 +11,7 @@ public final class ExperimentalDiamondLatticeModel implements LatticeModel {
     @Override public List<NodeDefinition> nodes(Vector3i requested) {
         var size=dimensions(requested);
         int cx=size.x/2,cy=size.y/2,cz=size.z/2,count=size.x*size.y*size.z;
-        var rotation=new org.joml.Quaterniond().rotationTo(new Vector3d(1,1,1).normalize(),new Vector3d(1,0,0));
+        // Conventional crystal axes coincide with the cubic runtime X/Y/Z axes.
         var center=new Vector3d(2*(cx-1)+1.5,2*(cy-1)+1.5,2*(cz-1)+1.5);
         // Generate definitions on demand: avoid constructing a second discovery graph and retaining all definitions.
         return Collections.unmodifiableList(new AbstractList<>() {
@@ -32,7 +32,7 @@ public final class ExperimentalDiamondLatticeModel implements LatticeModel {
                 }
                 Arrays.sort(ids,0,neighbors);var links=new LinkedHashMap<Integer,String>();
                 for(int slot=0;slot<neighbors;slot++)links.put(slot,Integer.toString(ids[slot]));
-                var position=rotation.transform(new Vector3d(sx,sy,sz).sub(center).div(Math.sqrt(3)));
+                var position=new Vector3d(sx,sy,sz).sub(center).div(Math.sqrt(3));
                 return new NodeDefinition(Integer.toString(id),new Vector3i(2*x+(b>>2),2*y+((b>>1)&1),2*z+(b&1)),position,Map.copyOf(links));
             }
         });

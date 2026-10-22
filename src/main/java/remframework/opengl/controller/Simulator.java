@@ -1159,6 +1159,10 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         scene.update();
         if(!scene.getLattice().isMechanicsOnly()) DetectorExperimentController.getInstance().resolveNodes(
                 scene.getLattice());
+        for (Occupancy occupancy : project.occupancies) {
+            Node node = scene.getLattice().getNodeByIndex(occupancy.getNodeIndex());
+            if (node != null) occupancy.setNode(node);
+        }
         FeasibilityPilotTelemetry.getInstance().markLatticeInitialized();
 //        resetOccupancies();
         nuklearModel.closeFrame(Frame.progress);
@@ -1178,6 +1182,18 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             System.out.println("simulator.projectChanged: " + project.isChanged());
             System.out.println("simulator.appSettingsChanged: " + appSettings.isChanged());
 
+            var selectedModel=remframework.lattice.LatticeManager.getInstance().selected();
+            if(selectedModel.model()!=null && selectedModel.model().mechanicsOnly()) {
+                var requestedSize=new org.joml.Vector3i();project.getDimension(requestedSize);
+                var estimate=remframework.lattice.DiamondMemoryBudget.estimate(requestedSize,Long.MAX_VALUE);
+                if(!estimate.allowed()) {
+                    scene.getLattice().reportDiamondSizeFailure(estimate);
+                    remModel.stopSimulation();remModel.setLoadingReady(true);
+                    nuklearModel.closeFrame(Frame.progress);
+                    nuklearModel.showErrorDialog("Cannot Build Diamond Lattice",estimate.error());
+                    return;
+                }
+            }
             setCustomTitle(project.getCurrentFilename());
             nuklearModel.showFrame(Frame.progress);
             try {
@@ -1192,8 +1208,27 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             isLoadingStarted = true;
             System.out.println("isLoadingStarted: " + isLoadingStarted);
             remModel.setLoadingReady(false);
-            // Build the Lattice 3D Matrices of Nodes
-            scene.getLattice().clearEntities();
+            // This runs at a completed frame boundary, with no pending physics workers.
+            remModel.stopSimulation();
+            renderer.cleanupNodes();
+            offscreen3DRenderer.stop();
+            renderState = null;
+            scene.releaseLattice();
+            System.gc(); // Best effort; capacity is measured again below.
+            offscreen3DRenderer.start();
+            if(selectedModel.model()!=null && selectedModel.model().mechanicsOnly()) {
+                var requestedSize=new org.joml.Vector3i();project.getDimension(requestedSize);
+                var estimate=remframework.lattice.DiamondMemoryBudget.estimate(requestedSize);
+                if(!estimate.allowed()) {
+                    scene.getLattice().reportDiamondSizeFailure(estimate);
+                    remModel.setLoadingReady(true);
+                    isLoadingStarted=false;
+                    nuklearModel.closeFrame(Frame.progress);
+                    nuklearModel.showErrorDialog("Cannot Build Diamond Lattice",estimate.error()
+                        +"\nPrevious lattice released. Reduce dimensions or choose another model and retry.");
+                    return;
+                }
+            }
             scene.build();
             resetOccupancies();
             waitAfterReset = 0;

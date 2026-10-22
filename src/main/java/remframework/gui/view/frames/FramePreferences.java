@@ -94,18 +94,20 @@ public class FramePreferences extends AbstractFrame {
                 LatticeDescriptor candidate = descriptors.get(java.util.Arrays.asList(labels).indexOf(chosen));
                 boolean wasSimulating = project.getRemModel().isSimulating();
                 project.getRemModel().setSimulating(false);
-                if (latticeManager.select(candidate.identifier())) {
+                var requestedDimensions=new org.joml.Vector3i();project.getDimension(requestedDimensions);
+                if (latticeManager.select(candidate.identifier(),requestedDimensions)) {
                     project.getRemModel().setCustomStatus("Loading " + candidate.displayName());
                     appSettings.requestLatticeRebuild();
                     System.out.println("Runtime Lattice Model change: " + candidate.uiLabel()
                             + (wasSimulating ? " (simulation paused)" : ""));
                 } else {
-                    nuklearModel.showErrorDialog("Invalid Lattice Model",
+                    project.getRemModel().setCustomStatus(latticeManager.lastWarning());
+                    nuklearModel.showErrorDialog("Cannot Load Lattice Model",
                             latticeManager.lastWarning() + "\n\n"
                                     + candidate.messages().stream()
                                     .map(m -> m.severity() + ": " + m.message())
                                     .reduce((a, b) -> a + "\n" + b).orElse(""));
-                    appSettings.requestLatticeRebuild();
+                    if(!latticeManager.selected().identifier().equals(selected.identifier()))appSettings.requestLatticeRebuild();
                 }
             }
             Nuklear.nk_layout_row_dynamic(ctx, rowHeightEdit, 1);
@@ -127,9 +129,13 @@ public class FramePreferences extends AbstractFrame {
 
             nk_spacer(ctx, spacer1, 1);
 
-            if(selected.model()!=null && selected.model().mechanicsOnly()) {
+            if(selected.model()!=null && selected.model().mechanicsOnly() && lattice.isMechanicsOnly()) {
                 Nuklear.nk_layout_row_dynamic(ctx,rowHeightEdit,1);
-                Nuklear.nk_label(ctx,"Experimental Node v0.1 /4; occupancy and transport off",Nuklear.NK_TEXT_LEFT);
+                Nuklear.nk_label(ctx,"Experimental Node v0.1 /4; transport off",Nuklear.NK_TEXT_LEFT);
+                boolean identityExcitation=nk_check_label(ctx," Enable Identity excitation:",lattice.isDiamondIdentityExcitationEnabled(),leftCol,rightCol);
+                if(identityExcitation!=lattice.isDiamondIdentityExcitationEnabled())lattice.setDiamondIdentityExcitationEnabled(identityExcitation);
+                Nuklear.nk_layout_row_dynamic(ctx,rowHeightEdit*2,1);
+                Nuklear.nk_label_wrap(ctx,"Pauses on change. Configure an Identity, then Run. Pressure and transport remain off.");
                 Nuklear.nk_layout_row_dynamic(ctx,rowHeightEdit,1);
                 Nuklear.nk_label(ctx,"Fixed incomplete boundary; k="+project.getConstantFrequency()+", gamma="+project.getConstantElectricFactor(),Nuklear.NK_TEXT_LEFT);
                 Nuklear.nk_layout_row_dynamic(ctx,rowHeightEdit,1);
