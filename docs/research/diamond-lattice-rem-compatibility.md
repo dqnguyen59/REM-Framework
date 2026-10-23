@@ -1,5 +1,7 @@
 # Diamond lattice mechanics compatibility
 
+Memory implementation and capacity comparison (2026-10-23): [optimization report](optimize-memory-2026-10-23.md).
+
 Latest XY configuration experiment (2026-10-23): [screening, repeatability and robustness results](diamond-xy-configuration-sweep-2026-10-23.md). No tested configuration met the 1% criterion.
 
 Independent Geometry Discovery experiment; cubic runtime and accepted REM mechanics unchanged.

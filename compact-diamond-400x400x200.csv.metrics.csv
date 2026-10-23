@@ -1,0 +1,2 @@
+x,y,z,nodes,primitive_payload_bytes,live_heap_delta_bytes,build_ms,steps,evolution_ms
+400,400,200,32000000,3584000000,3641094520,2304.9383,5,11513.4099

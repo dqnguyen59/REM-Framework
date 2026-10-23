@@ -6,7 +6,9 @@ import remframework.geometry.discovery.*;
 
 /** Conservative peak-build estimate, including graph temporaries and runtime/render objects. */
 public final class DiamondMemoryBudget {
-    public static final long ESTIMATED_BYTES_PER_NODE = 8192;
+    // Measured optimized Node runtime: ~1060 live bytes/node, ~1620 build-peak
+    // bytes/node at 64^3. Retain margin for visible matrices, direct buffers and probes.
+    public static final long ESTIMATED_BYTES_PER_NODE = 3072;
     private DiamondMemoryBudget() { }
     public record Estimate(long nodes, long requiredBytes, long budgetBytes, String error,
                            GeometryConfigurationStatusCode code) {

@@ -25,9 +25,13 @@ public final class DiamondRuntimeReceivers {
         var minimum=new Vector3d(Double.POSITIVE_INFINITY);
         for(var node:nodes) minimum.min(node.getEquilibriumPosition());
         var shift=new Vector3d(minimum).negate();
+        var dimensions=new org.joml.Vector3i();for(var node:nodes)dimensions.max(node.getIndex());dimensions.add(1,1,1);
+        var topology=new remframework.lattice.DiamondTopology(dimensions.x,dimensions.y,dimensions.z);
+        int[] byId=new int[nodes.length];for(int i=0;i<nodes.length;i++)byId[topology.idAtIndex(nodes[i].getIndex())]=i;
         var sampler=new DiamondReceiverSampling.Sampler(nodes.length,
             id->rotation.transform(new Vector3d(nodes[id].getEquilibriumPosition()).add(shift)),
-            id->nodes[id].getType()!=EntityType.FIXED,1);
+            id->nodes[id].getType()!=EntityType.FIXED,1,
+            (x,y,z)->{int id=topology.siteId(x,y,z);return id<0?-1:byId[id];});
         int id=0;
         try {
             for(var direction:DiamondDirectionalComparison.directions()) {

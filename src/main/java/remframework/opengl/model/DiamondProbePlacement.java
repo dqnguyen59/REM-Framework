@@ -36,10 +36,15 @@ public final class DiamondProbePlacement {
             nodes[i]=n;minimum.min(n.getEquilibriumPosition());center.add(n.getEquilibriumPosition());
         }
         center.div(nodes.length);
+        var dimensions=new org.joml.Vector3i();for(var n:nodes)dimensions.max(n.getIndex());dimensions.add(1,1,1);
+        var topology=new remframework.lattice.DiamondTopology(dimensions.x,dimensions.y,dimensions.z);
+        if(topology.size()!=nodes.length)throw new IllegalArgumentException("Complete regular diamond node array required");
+        int[] byId=new int[nodes.length];for(int i=0;i<nodes.length;i++)byId[topology.idAtIndex(nodes[i].getIndex())]=i;
         Quaterniond rotation=new Quaterniond().rotationTo(new Vector3d(1,1,1).normalize(),new Vector3d(1,0,0));
         var sampler=new DiamondReceiverSampling.Sampler(nodes.length,
             id->rotation.transform(new Vector3d(nodes[id].getEquilibriumPosition()).sub(minimum)),
-            id->(xyOnly || !nodes[id].isFixed()) && !nodes[id].isWall(),1);
+            id->(xyOnly || !nodes[id].isFixed()) && !nodes[id].isWall(),1,
+            (x,y,z)->{int id=topology.siteId(x,y,z);return id<0?-1:byId[id];});
         List<ProbeDefinition> definitions=new ArrayList<>();
         for(int shell=0;shell<shells;shell++) {
             int radius=firstRadius+shell*spacing;int ray=0;

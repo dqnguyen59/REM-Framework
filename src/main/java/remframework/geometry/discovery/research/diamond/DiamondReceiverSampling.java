@@ -11,14 +11,20 @@ public final class DiamondReceiverSampling {
         return new Sampler(model.nodes().size(),id->model.nodes().get(id).position(),id->model.nodes().get(id).neighborIds().size()==4,length).receiver(point,name);
     }
     public static final class Sampler {
-        private final Map<Site,Integer> lookup=new HashMap<>();
+        @FunctionalInterface public interface SiteResolver {int id(int x,int y,int z);}
+        private final Map<Site,Integer> lookup;
+        private final SiteResolver direct;
         private final java.util.function.IntFunction<Vector3d> positions;
         private final java.util.function.IntPredicate interior;
         private final double length;
         private final Quaterniond inverse=new Quaterniond().rotationTo(new Vector3d(1,1,1).normalize(),new Vector3d(1,0,0)).conjugate();
         public Sampler(int count,java.util.function.IntFunction<Vector3d> positions,java.util.function.IntPredicate interior,double length) {
+            this(count,positions,interior,length,null);
+        }
+        public Sampler(int count,java.util.function.IntFunction<Vector3d> positions,java.util.function.IntPredicate interior,double length,SiteResolver direct) {
+            this.direct=direct;lookup=direct==null?new HashMap<>():null;
             this.positions=positions;this.interior=interior;this.length=length;
-            for(int id=0;id<count;id++) {
+            if(direct==null)for(int id=0;id<count;id++) {
                 var q=inverse.transform(new Vector3d(positions.apply(id))).mul(java.lang.Math.sqrt(3)/length);
                 lookup.put(new Site((int)java.lang.Math.round(q.x),(int)java.lang.Math.round(q.y),(int)java.lang.Math.round(q.z)),id);
             }
@@ -34,8 +40,9 @@ public final class DiamondReceiverSampling {
                 double w=.5*(a==0?1-frac[0]:frac[0])*(b==0?1-frac[1]:frac[1])*(c==0?1-frac[2]:frac[2]);
                 if(w<1e-14) continue;
                 int u=floor[0]+a,v=floor[1]+b,t=floor[2]+c;
-                Integer id=lookup.get(new Site(2*(v+t)+sub,2*(u+t)+sub,2*(u+v)+sub));
-                if(id==null || !interior.test(id)) throw new IllegalArgumentException("Receiver stencil reaches boundary: "+name);
+                Integer id=direct==null?lookup.get(new Site(2*(v+t)+sub,2*(u+t)+sub,2*(u+v)+sub)):
+                    Integer.valueOf(direct.id(2*(v+t)+sub,2*(u+t)+sub,2*(u+v)+sub));
+                if(id==null || id<0 || !interior.test(id)) throw new IllegalArgumentException("Receiver stencil reaches boundary: "+name);
                 weights.merge(id,w,Double::sum);
             }
         }

@@ -1467,6 +1467,7 @@ public class Scene {
                     node.updatePosition();
                     node.setCustomScale(-1);
                     node.setCustomColor(null);
+                    if(synchronizeBothBuffers)node.releaseRenderMatrices();
                     continue;
                 }
                 entity.updateMatrix(renderScale);

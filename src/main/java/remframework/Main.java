@@ -35,14 +35,26 @@ import java.nio.file.Path;
 public class Main {
 
     public static void main(String[] args) {
+        if(args.length==1 && args[0].startsWith("--compact-diamond=")) {
+            try{remframework.geometry.discovery.research.diamond.CompactDiamondExperiment.main(args[0].substring("--compact-diamond=".length()).split(","));}
+            catch(Exception error){throw new IllegalStateException("Compact diamond experiment failed",error);}return;
+        }
 		Path startupProjectPath = null;
 		Long updateLimit = null;
 		Long frameLimit = null;
 		boolean openGeometryDiscovery = false;
         boolean diamondMechanics = false;
+        var diamondDimensions=new org.joml.Vector3i(80,80,64);
 		for (String argument : args) {
 			if (argument.startsWith("--")) {
 				if (argument.equals("--diamond-mechanics")) {diamondMechanics=true;continue;}
+                if(argument.startsWith("--diamond-size=")) {
+                    String[] values=argument.substring("--diamond-size=".length()).split("x");
+                    if(values.length!=3)throw new IllegalArgumentException("Use --diamond-size=400x400x4");
+                    diamondDimensions.set(Integer.parseInt(values[0]),Integer.parseInt(values[1]),Integer.parseInt(values[2]));
+                    if(!remframework.lattice.ExperimentalDiamondLatticeModel.validDimensions(diamondDimensions))throw new IllegalArgumentException("Diamond dimensions must be even and >=2");
+                    diamondMechanics=true;continue;
+                }
                 if (argument.equals("--geometry-discovery")) {
 					openGeometryDiscovery = true;
 					continue;
@@ -125,7 +137,7 @@ public class Main {
 				Project.getInstance().loadFromFile(startupProjectPath.toString());
 			}
 			if(diamondMechanics) {
-                Project.getInstance().setDimension(80,80,64,false);
+                Project.getInstance().setDimension(diamondDimensions.x,diamondDimensions.y,diamondDimensions.z,false);
                 LatticeManager.getInstance().select(LatticeManager.EXPERIMENTAL_DIAMOND_ID);
                 Project.getInstance().setConstantFrequency(.5);
                 Project.getInstance().setConstantElectricFactor(1);

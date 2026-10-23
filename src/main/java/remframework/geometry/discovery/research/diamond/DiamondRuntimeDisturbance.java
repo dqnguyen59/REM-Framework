@@ -130,7 +130,7 @@ public final class DiamondRuntimeDisturbance {
             for(Object value:nodes) {
                 Node n=(Node)value;var p=n.getEquilibriumPosition();double radius=Math.hypot(p.x-center.x,p.y-center.y);
                 n.setPosition(new Vector3d(p));n.updatePosition();n.getVelocity().zero();n.getAcceleration().zero();n.getForce().zero();
-                n.getEField().v.zero();n.getEField().a.zero();n.getBField().v.zero();n.getBField().a.zero();
+                n.resetAuxiliaryFieldMotion();
                 if(!n.isFixed()){n.setPosition(new Vector3d(p).add(displacement(radius,request),0,0));n.updatePosition();}
             }
             receivers=null;outerReceivers=null;pairedMeasurements=List.of();troughMeasurements=List.of();
@@ -185,7 +185,7 @@ public final class DiamondRuntimeDisturbance {
         }
         for(Object value:nodes) {Node n=(Node)value;
             n.setPosition(new Vector3d(n.getEquilibriumPosition()));n.updatePosition();n.getVelocity().zero();n.getAcceleration().zero();n.getForce().zero();
-            n.getEField().v.zero();n.getEField().a.zero();n.getBField().v.zero();n.getBField().a.zero();
+            n.resetAuxiliaryFieldMotion();
             if(n.getType()!=EntityType.FIXED) {
                 double offset=displacement(n.getEquilibriumPosition().distance(center),request);
                 n.setPosition(new Vector3d(n.getEquilibriumPosition()).add(offset,0,0));n.updatePosition();

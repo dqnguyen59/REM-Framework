@@ -61,12 +61,12 @@ public class Node extends Entity {
 
     private Vector3d fixedPos;
 
-    private final Vector3d[] deltaPositions    = new Vector3d[6];
-    private final Vector3d[] deltaAcceleration = new Vector3d[6];
-    private final Vector3d[] deltaVelocity     = new Vector3d[6];
-    private final double[]   flow             = new double[6];
-    private final double[]   previousFlow     = new double[6];
-    private final double[] deltaFlow         = new double[6];
+    private Vector3d[] deltaPositions;
+    private Vector3d[] deltaAcceleration;
+    private Vector3d[] deltaVelocity;
+    private double[] flow;
+    private double[] previousFlow;
+    private double[] deltaFlow;
     private final Vector3d gradientImbalance = new Vector3d();
     /** Experimental graph measurement; cubic nodes retain opposite-slot differences. */
     private boolean geometricDistanceImbalance;
@@ -80,9 +80,10 @@ public class Node extends Entity {
      * Magnetic Field
      */
     private AVP bField;
+    private double auxiliaryInitialX,auxiliaryInitialY,auxiliaryInitialZ;
 
     private final Vector3d ef           = new Vector3d();
-    private final Vector3d mf           = new Vector3d();
+    private Vector3d mf;
     private       Vector3d force        = new Vector3d();
     private       Vector3d acceleration = new Vector3d();
     private       Vector3d velocity     = new Vector3d();
@@ -92,16 +93,18 @@ public class Node extends Entity {
     public Node(Entity parent, ObjFileModel model, Vector3d position, Vector3d rotation, double scale) {
         super(parent, model, position, rotation, scale, EntityType.NODE);
 
-        for (int i = 0; i < deltaPositions.length; i++) {
-            deltaPositions[i] = new Vector3d();
-        }
-        for (int i = 0; i < deltaAcceleration.length; i++) {
-            deltaAcceleration[i] = new Vector3d();
-        }
-        for (int i = 0; i < deltaVelocity.length; i++) {
-            deltaVelocity[i] = new Vector3d();
-        }
     }
+
+    private static Vector3d[] vectorCache() {
+        Vector3d[] values=new Vector3d[6];for(int i=0;i<6;i++)values[i]=new Vector3d();return values;
+    }
+    public synchronized Vector3d[] getDeltaPositions(){if(deltaPositions==null)deltaPositions=vectorCache();return deltaPositions;}
+    public synchronized Vector3d[] getDeltaAcceleration(){if(deltaAcceleration==null)deltaAcceleration=vectorCache();return deltaAcceleration;}
+    public synchronized Vector3d[] getDeltaVelocity(){if(deltaVelocity==null)deltaVelocity=vectorCache();return deltaVelocity;}
+    public synchronized double[] getFlow(){if(flow==null)flow=new double[6];return flow;}
+    public synchronized double[] getPreviousFlow(){if(previousFlow==null)previousFlow=new double[6];return previousFlow;}
+    public synchronized double[] getDeltaFlow(){if(deltaFlow==null)deltaFlow=new double[6];return deltaFlow;}
+    public Vector3d getMf(){if(mf==null)mf=new Vector3d();return mf;}
 
     public void setIndex(Vector3i index) {
         this.index = index;
@@ -125,12 +128,18 @@ public class Node extends Entity {
         return String.format("(%d, %d, %d)", index.x, index.y, index.z);
     }
 
-    public AVP getEField() {
-        return eField = eField == null ? new AVP() : eField;
+    public synchronized AVP getEField() {
+        if(eField==null){eField=new AVP();eField.p.set(fixedPos==null?position:fixedPos);eField.pBuf.set(auxiliaryInitialX,auxiliaryInitialY,auxiliaryInitialZ);}return eField;
     }
 
-    public AVP getBField() {
-        return bField = bField == null ? new AVP() : bField;
+    public synchronized AVP getBField() {
+        if(bField==null){bField=new AVP();bField.p.set(auxiliaryInitialX,auxiliaryInitialY,auxiliaryInitialZ);bField.pBuf.set(bField.p);}return bField;
+    }
+
+    /** Clears optional fields without allocating them for mechanical-only nodes. */
+    public void resetAuxiliaryFieldMotion() {
+        if(eField!=null){eField.v.zero();eField.a.zero();}
+        if(bField!=null){bField.v.zero();bField.a.zero();}
     }
 
     public void addForce(Vector3d force) {
@@ -143,18 +152,17 @@ public class Node extends Entity {
         super.setPosition(position);
         if (fixedPos == null) fixedPos = new Vector3d();
         fixedPos.set(position);
-        getEField().p.set(position);
+        if(eField!=null)eField.p.set(position);
     }
 
     @Override
     public void initPosition(Vector3d position) {
         super.setPosition(position);
+        auxiliaryInitialX=position.x;auxiliaryInitialY=position.y;auxiliaryInitialZ=position.z;
         if (fixedPos == null) fixedPos = new Vector3d();
         fixedPos.set(position);
-        getEField().p.set(position);
-        getEField().pBuf.set(position);
-        getBField().p.set(position);
-        getBField().pBuf.set(position);
+        if(eField!=null){eField.p.set(position);eField.pBuf.set(position);}
+        if(bField!=null){bField.p.set(position);bField.pBuf.set(position);}
     }
 
     public void setNeighbor(Neighbor neighbor, Node node) {
@@ -181,6 +189,8 @@ public class Node extends Entity {
     public Vector3d measureGradientImbalance() {
         if (geometricDistanceImbalance)
             return gradientImbalance.set(readBondDistanceImbalance());
+
+        getDeltaPositions();getFlow();
 
         for (int i = 0; i < neighbors.length; i++) {
             if (neighbors[i] != null) {
@@ -283,11 +293,11 @@ public class Node extends Entity {
     }
 
     private Vector3d getNeighborEFieldPosition(int index) {
-        return neighbors[index] == null ? ZERO : neighbors[index].eField.p;
+        return neighbors[index] == null ? ZERO : neighbors[index].getEField().p;
     }
 
     private Vector3d getNeighborBFieldPosition(int index) {
-        return neighbors[index] == null ? ZERO : neighbors[index].bField.p;
+        return neighbors[index] == null ? ZERO : neighbors[index].getBField().p;
     }
 
     /**
@@ -389,6 +399,7 @@ public class Node extends Entity {
     }
 
     private void updateNodeProperties_v0_2(FrameParameters parameters) {
+        getMf();
         boolean isFixed = type == EntityType.FIXED;
         boolean isWall  = type == EntityType.WALL;
         double  cws     = parameters.waveStep();
@@ -471,6 +482,7 @@ public class Node extends Entity {
     }
 
     private void updateNodeProperties_v0_3(FrameParameters parameters) {
+        getMf();getEField();getBField();
         boolean isFixed = type == EntityType.FIXED;
         double  cws     = parameters.waveStep();
         double  gamma   = parameters.electricFactor();

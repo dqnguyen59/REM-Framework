@@ -391,8 +391,10 @@ public class Lattice {
         nodeMatrix = new Node[sizeK][sizeJ][sizeI];
         List<LatticeModel.NodeDefinition> definitions = latticeModel.nodes(projectDimension);
         physicalSliceCenter.zero();
-        for(var definition:definitions) physicalSliceCenter.add(definition.position());
-        if(!definitions.isEmpty()) physicalSliceCenter.div(definitions.size());
+        if(!(latticeModel instanceof remframework.lattice.ExperimentalDiamondLatticeModel)) {
+            for(var definition:definitions) physicalSliceCenter.add(definition.position());
+            if(!definitions.isEmpty()) physicalSliceCenter.div(definitions.size());
+        }
         int NumNodes = definitions.size();
 
         remModel.setLoadingReady(false);
@@ -402,6 +404,22 @@ public class Lattice {
             int countNode = 0;
             Map<String, Node> nodesById = new HashMap<>();
             try {
+                if(latticeModel instanceof remframework.lattice.ExperimentalDiamondLatticeModel) {
+                    var topology=new remframework.lattice.DiamondTopology(sizeI,sizeJ,sizeK);
+                    Node[] byId=new Node[topology.size()];int[] links=new int[4];var index=new Vector3i();var position=new Vector3d();
+                    for(int id=0;id<byId.length;id++) {
+                        topology.index(id,index);topology.position(id,position);
+                        Node n=createNode(baseEntity,modelSphere,position,new Vector3d(),Constants.EP_DEFAULT_DISTANCE);
+                        n.setIndex(index.x,index.y,index.z);n.setGeometricDistanceImbalance(true);
+                        n.setAbsorptionFactor(computeAbsorptionFactor(index.x,index.y,index.z,sizeI,sizeJ,sizeK));
+                        n.setOverrideModelMaterial(true);n.getMaterial().setDiffuseColor(new Vector4f(1));n.getMaterial().setAmbientColor(new Vector4f(1));
+                        if(topology.neighbors(id,links)<4)n.setType(EntityType.FIXED);
+                        n.setXFixed(index.x==0||index.x==sizeI-1);n.setYFixed(index.y==0||index.y==sizeJ-1);n.setZFixed(index.z==0||index.z==sizeK-1);
+                        nodeMatrix[index.z][index.y][index.x]=n;byId[id]=n;
+                        remModel.setProgress(100.0*(id+1)/byId.length);
+                    }
+                    for(int id=0;id<byId.length;id++){int degree=topology.neighbors(id,links);for(int slot=0;slot<degree;slot++)byId[id].setNeighbor(Neighbor.values()[slot],byId[links[slot]]);}
+                } else {
                 for (LatticeModel.NodeDefinition definition : definitions) {
                     int i = definition.index().x;
                     int j = definition.index().y;
@@ -437,6 +455,7 @@ public class Lattice {
                         node.setNeighbor(Neighbor.values()[neighbor.getKey()],
                                 nodesById.get(neighbor.getValue()));
                     }
+                }
                 }
                 if(isMechanicsOnly()) {
                     mechanicsStatus=remframework.geometry.discovery.GeometryConfigurationStatus.of(remframework.geometry.discovery.GeometryConfigurationDiagnostic.info(

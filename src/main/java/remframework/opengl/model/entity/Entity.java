@@ -73,8 +73,8 @@ public class Entity {
     protected Vector3d   rotation              = new Vector3d();
     protected Vector3d   rotationRad           = new Vector3d();
     protected double     scale;
-    private   Matrix4d   transformMatrix       = new Matrix4d();
-    protected Matrix4f[] transformMatrix4fList = new Matrix4f[2];
+    private Matrix4d transformMatrix;
+    protected Matrix4f[] transformMatrix4fList;
 
     /**
      * Custom scale must be set before calling updateMatrix().
@@ -110,15 +110,16 @@ public class Entity {
         this.rotation.set(rotation);
         updateRotation();
         this.scale               = scale;
-        transformMatrix4fList[0] = new Matrix4f();
-        transformMatrix4fList[1] = new Matrix4f();
 
         if (model != null)
             material = new Material(model.getMaterial());
         else
             material = new Material();
 
-        updateMatrix();
+        if(!(this instanceof Node)) {
+            transformMatrix=new Matrix4d();transformMatrix4fList=new Matrix4f[]{new Matrix4f(),new Matrix4f()};
+            updateMatrix();
+        }
     }
 
     public boolean isNode() {
@@ -327,6 +328,8 @@ public class Entity {
 
     /** Updates this entity using the render scale captured for the current frame. */
     public void updateMatrix(double renderScale) {
+        boolean first=transformMatrix==null;
+        if(first){transformMatrix=new Matrix4d();transformMatrix4fList=new Matrix4f[]{new Matrix4f(),new Matrix4f()};}
 //        updatePosition();
 //        updateRotation();
 //
@@ -348,6 +351,7 @@ public class Entity {
             transformMatrix.rotateXYZ(rotationRad.x, rotationRad.y, rotationRad.z);
         transformMatrix.scale(renderScale * (customScale > 0 ? customScale : scale));
         transformMatrix4fList[swapBufIndex].set(getTransformMatrix());
+        if(first)transformMatrix4fList[1-swapBufIndex].set(transformMatrix4fList[swapBufIndex]);
         customScale = -1;
         setColor(FIXED_COLOR);
     }
@@ -364,6 +368,7 @@ public class Entity {
      * @return the processed matrix buffer
      */
     public Matrix4f getTransformMatrix4f() {
+        if(transformMatrix==null)updateMatrix();
         return transformMatrix4fList[1 - swapBufIndex];
     }
 
@@ -374,6 +379,7 @@ public class Entity {
      * {@link #getTransformMatrix4f()} from the opposite buffer.
      */
     public Matrix4f getCalculatedTransformMatrix4f() {
+        if(transformMatrix==null)updateMatrix();
         return transformMatrix4fList[swapBufIndex];
     }
 
@@ -384,11 +390,20 @@ public class Entity {
      * drawing, so paused and layout-rebuild frames start with two valid buffers.
      */
     public void synchronizeTransformMatrixBuffers() {
+        if(transformMatrix==null)updateMatrix();
         transformMatrix4fList[1 - swapBufIndex].set(transformMatrix4fList[swapBufIndex]);
     }
 
     public Vector3d toWorldPosition() {
         return getTransformMatrix().transformPosition(new Vector3d());
     }
+
+    public Matrix4d getTransformMatrix(){
+        if(transformMatrix==null){transformMatrix=new Matrix4d();transformMatrix4fList=new Matrix4f[]{new Matrix4f(),new Matrix4f()};updateMatrix();synchronizeTransformMatrixBuffers();}
+        return transformMatrix;
+    }
+
+    /** Releases render-only matrices when a node leaves the visible slice. */
+    public void releaseRenderMatrices(){transformMatrix=null;transformMatrix4fList=null;}
 
 }
