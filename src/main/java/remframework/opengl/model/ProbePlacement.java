@@ -149,6 +149,7 @@ public final class ProbePlacement {
         if (tolerances == null) throw new IllegalArgumentException("Placement tolerances are required.");
         if (detectorType == null) throw new IllegalArgumentException("Probe detector type is required.");
         if (center == null) return invalid("The lattice center is unavailable.");
+        if (center.isGeometricDistanceImbalance()) return invalid("Cubic probe placement is unavailable for diamond.");
         if (firstShellRadius < 1) return invalid("First Shell Radius must be at least 1.");
         if (shellDistance < 1) return invalid("Shell Distance must be at least 1.");
         if (numberOfShells < 1) return invalid("Number Of Shells must be at least 1.");
@@ -388,7 +389,7 @@ public final class ProbePlacement {
 
     /** Describes stored generated probes using their actual index offsets from the center. */
     public static List<ProbeReport> describe(Node center, List<ProbeDefinition> definitions) {
-        if (center == null || definitions.isEmpty()) return List.of();
+        if (center == null || center.isGeometricDistanceImbalance() || definitions.isEmpty()) return List.of();
         List<ProbeReport> reports = new ArrayList<>();
         for (ProbeDefinition definition : definitions) {
             ProbeDefinition.Placement placement = definition.getPlacement();
@@ -439,6 +440,7 @@ public final class ProbePlacement {
                                           boolean threeDimensional,
                                           PlacementTolerances tolerances) {
         if (center == null || largestRequestedRadius < 1 || tolerances == null) return "";
+        if (center.isGeometricDistanceImbalance()) return "Cubic probe placement is unavailable for diamond.";
         int signX = (region & 1) == 0 ? 1 : -1;
         int signY = (region & 2) == 0 ? 1 : -1;
         int signZ = (region & 4) == 0 ? 1 : -1;
@@ -452,7 +454,7 @@ public final class ProbePlacement {
                                                          boolean threeDimensional,
                                                          PlacementTolerances tolerances) {
         if (definitions.isEmpty()) return true;
-        if (center == null || tolerances == null) return false;
+        if (center == null || center.isGeometricDistanceImbalance() || tolerances == null) return false;
         List<ProbeDefinition.Placement> placements = definitions.stream()
                 .map(ProbeDefinition::getPlacement).toList();
         if (placements.stream().anyMatch(java.util.Objects::isNull)) return false;
@@ -808,6 +810,7 @@ public final class ProbePlacement {
     }
 
     private static IndexBounds bounds(Node center) {
+        if(center.isGeometricDistanceImbalance()) throw new IllegalArgumentException("Cubic probe placement is unavailable for diamond.");
         return new IndexBounds(boundary(center, Neighbor.LEFT).getIndex().x,
                                boundary(center, Neighbor.RIGHT).getIndex().x,
                                boundary(center, Neighbor.BOTTOM).getIndex().y,
@@ -818,7 +821,11 @@ public final class ProbePlacement {
 
     private static Node boundary(Node center, Neighbor direction) {
         Node node = center;
-        while (node.getNeighbor(direction) != null) node = node.getNeighbor(direction);
+        Set<Node> visited=Collections.newSetFromMap(new IdentityHashMap<>());
+        while (node.getNeighbor(direction) != null) {
+            if(!visited.add(node)) throw new IllegalArgumentException("Cyclic neighbor chain is not a cubic probe axis");
+            node=node.getNeighbor(direction);
+        }
         return node;
     }
 

@@ -48,11 +48,17 @@ public final class FrameIsotropy extends AbstractFrame {
     private int selectedArrivalShell = -1;
     private double positionThresholdExponent = -12.0;
     private double gradientThresholdExponent = -12.0;
+    private double speedSpreadTolerance = ProbeArrivalMeasurement.DEFAULT_SPEED_SPREAD_TOLERANCE_PERCENT;
+    private final StringBuffer toleranceBuffer = new StringBuffer();
+    private double controlledWavelength=8;
+    private final StringBuffer wavelengthBuffer=new StringBuffer();
     private boolean inspectorPositionedForSession;
+    private boolean diamondViewInitialized;
 
     public FrameIsotropy(NuklearModel model) {
         super(model);
         resizeCapability = ResizeCapability.enabled(MIN_WIDTH, MIN_HEIGHT, 12);
+        windowOptions &= ~Nuklear.NK_WINDOW_NO_SCROLLBAR;
     }
 
     @Override
@@ -97,6 +103,18 @@ public final class FrameIsotropy extends AbstractFrame {
 
     @Override
     protected void layout(NkContext ctx, int x, int y, int width, int height) {
+        if(project.scene.getLattice().isMechanicsOnly()) {
+            if(!diamondViewInitialized) {
+                selectedTab=4;diamondViewInitialized=true;
+                Nuklear.nk_window_set_scroll(ctx,0,0);
+            }
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),2);
+            if(nk_button_label(ctx,"Diamond transport")) {selectedTab=4;Nuklear.nk_window_set_scroll(ctx,0,0);}
+            if(nk_button_label(ctx,"Probe measurements")) {selectedTab=0;Nuklear.nk_window_set_scroll(ctx,0,0);}
+            if(selectedTab==4) diamondTransportSection(ctx);
+            else diamondProbeSection(ctx);
+            return;
+        } else if(diamondViewInitialized) {diamondViewInitialized=false;selectedTab=0;}
         Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 2);
         boolean hasGeneratedProbes = project.getProbeDefinitions().stream()
                 .anyMatch(ProbeDefinition::isGenerated);
@@ -437,6 +455,11 @@ public final class FrameIsotropy extends AbstractFrame {
 
     private void arrivalSection(NkContext ctx) {
         section(ctx, "Propagation arrival by probe shell");
+        if(project.scene.getLattice().isMechanicsOnly()) {
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*3,1);
+            Nuklear.nk_label_wrap(ctx,"Bulk runs stop before reflections. Thin XY slabs include fixed surface effects and record 200 updates; only in-plane response is assessed. Arrival thresholds/interpolation need convergence checks; this is not an isotropy proof.");
+            if(project.scene.getLattice().isDiamondTransportEnabled())return;
+        }
         List<Integer> shells = ProbeArrivalMeasurement.availableShells(project.scene.getProbes());
         if (shells.isEmpty()) {
             Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 1);
@@ -445,6 +468,13 @@ public final class FrameIsotropy extends AbstractFrame {
             return;
         }
         if (!shells.contains(selectedArrivalShell)) selectedArrivalShell = shells.getFirst();
+        if(project.scene.getLattice().isMechanicsOnly()) {
+            final int shellIndex=selectedArrivalShell;
+            boolean planar=project.scene.getProbes().stream().anyMatch(p->p.getDefinition().getPlacement()!=null
+                && p.getDefinition().getPlacement().measurementSpace().equals("Diamond physical XY")
+                && p.getDefinition().getPlacement().targets().stream().anyMatch(t->t.shell()==shellIndex));
+            scalar(ctx,"Direction coverage",planar?"XY only: 8 axes/diagonal directions":"XYZ: 26 directions");
+        }
 
         Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
         Nuklear.nk_label(ctx, "Shell", Nuklear.NK_TEXT_LEFT);
@@ -469,9 +499,33 @@ public final class FrameIsotropy extends AbstractFrame {
                 ctx, -18.0, gradientThresholdExponent, 0.0, 1.0));
 
         ProbeArrivalMeasurement measurement = project.scene.getProbeArrivalMeasurement();
+        if(project.scene.getLattice().isMechanicsOnly()) {
+            try(MemoryStack stack=MemoryStack.stackPush()) {
+                double entered=nk_label_edit(ctx,stack,"Speed spread tolerance (%)",toleranceBuffer,speedSpreadTolerance);
+                if(Double.isFinite(entered) && entered>0) speedSpreadTolerance=entered;
+                double wavelength=nk_label_edit(ctx,stack,"Packet wavelength (bond lengths)",wavelengthBuffer,controlledWavelength);
+                if(Double.isFinite(wavelength) && wavelength>=2)controlledWavelength=wavelength;
+            }
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*2,1);
+            Nuklear.nk_label_wrap(ctx,"Tolerance defaults to 1%. Detection thresholds above set arrival sensitivity; they are not the acceptance tolerance.");
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+            if(Nuklear.nk_button_label(ctx,"Run controlled centered packet (amplitude 0.001)")) {
+                project.scene.getLattice().getDisturbance().requestProbeRun(controlledWavelength,selectedArrivalShell,
+                    Math.pow(10,positionThresholdExponent),Math.pow(10,gradientThresholdExponent));
+                project.getRemModel().startSimulation();
+            }
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*3,1);
+            Nuklear.nk_label_wrap(ctx,String.format(Locale.ROOT,"Source support: %.1f bonds. Suggested shell radii: %.1f / %.1f. Regenerate probes after changing wavelength. Full 3D tests need space in X, Y and Z; a thin slab tests different boundary conditions.",1.5*controlledWavelength,1.5*controlledWavelength+4,1.5*controlledWavelength+8));
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+            if(Nuklear.nk_button_label(ctx,"Change lattice dimensions..."))nuklearModel.showFrame(NuklearModel.Frame.dimension);
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*3,1);
+            Nuklear.nk_label_wrap(ctx,project.scene.getLattice().getDisturbance().summary());
+        }
         Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
         if (Nuklear.nk_button_label(ctx, "Start / Reset Measurement")) {
-            measurement.start(List.copyOf(project.scene.getProbes()), selectedArrivalShell,
+            if(project.scene.getLattice().isMechanicsOnly())
+                project.scene.requestDiamondProbeArrival(selectedArrivalShell,Math.pow(10.0,positionThresholdExponent),Math.pow(10.0,gradientThresholdExponent));
+            else measurement.start(List.copyOf(project.scene.getProbes()), selectedArrivalShell,
                     Math.pow(10.0, positionThresholdExponent),
                     Math.pow(10.0, gradientThresholdExponent));
         }
@@ -481,6 +535,15 @@ public final class FrameIsotropy extends AbstractFrame {
         scalar(ctx, "Time unit", "simulation updates since Start");
         scalar(ctx, "Status", arrivalStatus(snapshot));
         scalar(ctx, "Elapsed updates", Long.toString(snapshot.elapsedUpdates()));
+        if(project.scene.getLattice().isMechanicsOnly()) {
+            double positionSpread=ProbeArrivalMeasurement.equalRadiusApparentSpread(snapshot.results(),false);
+            double gradientSpread=ProbeArrivalMeasurement.equalRadiusApparentSpread(snapshot.results(),true);
+            scalar(ctx,"Apparent position-speed spread",Double.isFinite(positionSpread)?String.format(Locale.ROOT,"%.3f%%",positionSpread):"Incomplete");
+            scalar(ctx,"Apparent gradient-speed spread",Double.isFinite(gradientSpread)?String.format(Locale.ROOT,"%.3f%%",gradientSpread):"Incomplete");
+            scalar(ctx,"Position tolerance check",ProbeArrivalMeasurement.toleranceResult(positionSpread,speedSpreadTolerance));
+            scalar(ctx,"Gradient tolerance check",ProbeArrivalMeasurement.toleranceResult(gradientSpread,speedSpreadTolerance));
+            scalar(ctx,"Isotropy verdict","Inconclusive — convergence checks pending");
+        }
         Nuklear.nk_layout_row_dynamic(ctx, 42, 1);
         Nuklear.nk_label_wrap(ctx,
                 "Position: first n with |x(n) - x(0)| >= threshold. Gradient: first n with "
@@ -705,6 +768,114 @@ public final class FrameIsotropy extends AbstractFrame {
         };
     }
 
+    private int diamondProbeTab;
+    private void diamondProbeSection(NkContext ctx) {
+        var scene=project.scene;
+        section(ctx,"Diamond physical probe sampling");
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+        if(nk_button_label(ctx,"Add / replace diamond probe shells..."))nuklearModel.showFrame(NuklearModel.Frame.addProbes);
+        scalar(ctx,"Probe installation",scene.getDiamondProbeStatus());
+        var probes=scene.getProbes().stream().filter(p->p.getDetectorType()==remframework.opengl.model.ProbeDetectorType.DIAMOND_INTERPOLATED).toList();
+        scalar(ctx,"Passive probes",Integer.toString(probes.size()));
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*2,1);
+        Nuklear.nk_label_wrap(ctx,"Physical coordinates and raw bond imbalance; probes exert no force or pressure. Histories contain per-update samples, not cubic phase averages.");
+        if(scene.getLattice().isDiamondTransportEnabled()) {
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*2,1);
+            Nuklear.nk_label_wrap(ctx,"Disable transport for mechanical isotropy measurements.");
+            if(nk_button_label(ctx,"Pause and disable Identity transport"))scene.getLattice().setDiamondTransportEnabled(false);
+        }
+        if(probes.isEmpty())return;
+        var selected=scene.getSelectedProbe();
+        if(selected==null || !probes.contains(selected)) {scene.selectProbe(probes.getFirst());selected=probes.getFirst();}
+        try(MemoryStack stack=MemoryStack.stackPush()) {
+            String[] ids=probes.stream().map(PassiveObserver::getId).toArray(String[]::new);
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+            String id=nk_combo_options(ctx,stack,ids,selected.getId());
+            for(var probe:probes)if(probe.getId().equals(id)){scene.selectProbe(probe);selected=probe;break;}
+        }
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),3);
+        if(nk_button_label(ctx,"Live / history"))diamondProbeTab=0;
+        if(nk_button_label(ctx,"Compare"))diamondProbeTab=1;
+        if(nk_button_label(ctx,"Propagation arrival"))diamondProbeTab=2;
+        if(diamondProbeTab==2) {arrivalSection(ctx);return;}
+        if(diamondProbeTab==1) {
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),2);
+            if(nk_button_label(ctx,"Toggle selected in A / B"))scene.toggleComparisonProbe(selected);
+            Nuklear.nk_label(ctx,"Assigns the next empty slot",Nuklear.NK_TEXT_LEFT);
+            comparisonSection(ctx);return;
+        }
+        var target=selected.getDefinition().getPlacement().targets().getFirst();
+        scalar(ctx,"Shell / radius",(target.shell()+1)+" / "+target.requestedRadius()+" bond lengths");
+        diamondVector(ctx,"Requested physical direction",target.requestedDirection());
+        diamondVector(ctx,"Equilibrium target",target.requestedCoordinate());
+        var observation=selected.getObservation();
+        diamondVector(ctx,"Displacement",new Vector3d(observation.position()).sub(target.requestedCoordinate()));
+        diamondVector(ctx,"Velocity",observation.velocity());
+        diamondVector(ctx,"Raw local imbalance",observation.gradientImbalance());
+        if(nk_button_label(ctx,"Open selected probe history"))nuklearModel.showFrame(NuklearModel.Frame.occupancyHistory);
+    }
+    private void diamondTransportSection(NkContext ctx) {
+        var lattice=project.scene.getLattice();
+        var transport=remframework.opengl.controller.TransportSystem.getInstance();
+        section(ctx,"Local Identity transport — live diagnostics");
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),2);
+        if(nk_button_label(ctx,"Preferences / enable transport"))nuklearModel.showFrame(NuklearModel.Frame.preferences);
+        if(nk_button_label(ctx,"Add / edit Identities"))nuklearModel.showFrame(NuklearModel.Frame.identity);
+        scalar(ctx,"Occupancy pressure",lattice.isDiamondPressureEnabled()?"Enabled":"Disabled");
+        scalar(ctx,"Diamond transport",lattice.isDiamondTransportEnabled()?"Enabled":"Disabled");
+        scalar(ctx,"Transport System switch",transport.isEnableTransport()?"Enabled":"Disabled");
+        scalar(ctx,"Transfer threshold",format(transport.getTransferThreshold()));
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*2,1);
+        Nuklear.nk_label_wrap(ctx,"Enable local Identity transport in Preferences. Select an Identity below, then Run. Equal best directions wait; fixed nodes and walls are excluded.");
+        for(Occupancy candidate:project.occupancies) {
+            if(candidate.getIdentity()==null)continue;
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+            if(nk_button_label(ctx,"Select "+candidate.getIdentity().getName()))
+                project.getRemModel().setSelectedOccupancy(candidate);
+        }
+        Occupancy selected=project.getRemModel().getSelectedOccupancy();
+        if(selected==null || selected.getIdentity()==null) {
+            scalar(ctx,"Selected Identity","None — add one in Identities");
+        } else {
+            synchronized(selected) {
+                section(ctx,selected.getIdentity().getName());
+                var m=selected.diamondTransportMeasurement();
+                if(selected.getNode()!=null)diamondVector(ctx,"Current node index",selected.getNodeIndex());
+                diamondVector(ctx,"Last source imbalance",selected.getGradientImbalance());
+                diamondVector(ctx,"Pressure / residual after update",selected.getPressure());
+                diamondVector(ctx,"Persistent momentum",selected.getTransportMomentum());
+                scalar(ctx,"Transport updates / transfers",m.updates()+" / "+m.transfers());
+                Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*2,1);
+                Nuklear.nk_label_wrap(ctx,"Result: "+m.status());
+                diamondVector(ctx,"Last hop",m.lastHop());
+                diamondVector(ctx,"Pressure consumed on last update",m.consumedPressure());
+                diamondVector(ctx,"Accumulated hop displacement",m.displacement());
+                scalar(ctx,"Travelled path length",format(m.pathLength()));
+                scalar(ctx,"Mean hop displacement / update",m.updates()==0?"Not measured":format(m.displacement().length()/m.updates()));
+                Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+                if(nk_button_label(ctx,"Reset selected measurements (preserves pressure)"))selected.resetDiamondTransportMeasurement();
+            }
+        }
+        section(ctx,"Isotropy assessment");
+        section(ctx,"Directional spread: not measured");
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*2,1);
+        Nuklear.nk_label_wrap(ctx,"A moving Identity is a transport diagnostic. The 1% isotropy criterion requires equivalent directional experiments and boundary/sampling checks in later steps.");
+    }
+
+    private static void diamondVector(NkContext ctx, String label, Vector3d value) {
+        section(ctx,label);
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),3);
+        Nuklear.nk_label(ctx,format(value.x),Nuklear.NK_TEXT_RIGHT);
+        Nuklear.nk_label(ctx,format(value.y),Nuklear.NK_TEXT_RIGHT);
+        Nuklear.nk_label(ctx,format(value.z),Nuklear.NK_TEXT_RIGHT);
+    }
+    private static void diamondVector(NkContext ctx, String label, org.joml.Vector3i value) {
+        section(ctx,label);
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),3);
+        Nuklear.nk_label(ctx,Integer.toString(value.x),Nuklear.NK_TEXT_RIGHT);
+        Nuklear.nk_label(ctx,Integer.toString(value.y),Nuklear.NK_TEXT_RIGHT);
+        Nuklear.nk_label(ctx,Integer.toString(value.z),Nuklear.NK_TEXT_RIGHT);
+    }
     private static int rowHeightFor(NkContext ctx) {
         return INSPECTOR_ROW_HEIGHT;
     }

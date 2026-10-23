@@ -68,6 +68,83 @@ public class Lattice {
     private volatile int numEdgeAbsorptionLayers = 30;
     private volatile boolean absorptionFactorsDirty;
 
+    private volatile LatticeModel activeModel = SystemCubicLatticeModel.create(false);
+    private final java.util.concurrent.atomic.AtomicBoolean mechanicalPulseRequested = new java.util.concurrent.atomic.AtomicBoolean();
+    private remframework.geometry.discovery.GeometryConfigurationStatus mechanicsStatus;
+    private volatile boolean diamondIdentityExcitationEnabled;
+    private volatile boolean diamondPressureEnabled;
+    private volatile boolean diamondTransportEnabled;
+    public boolean isDiamondTransportEnabled() {return diamondTransportEnabled;}
+    /** Transport is experimental, default-off and implies occupancy pressure enabled. */
+    public void setDiamondTransportEnabled(boolean enabled) {
+        if(enabled && !isMechanicsOnly())throw new IllegalStateException("Select experimental diamond mechanics first");
+        diamondTransportEnabled=enabled;
+        if(enabled)diamondPressureEnabled=true;
+        disturbance.cancel();remModel.stopSimulation();
+        updateDiamondIntegrationLabel();
+    }
+    private void updateDiamondIntegrationLabel() {
+        remModel.setCustomStatus("Experimental diamond: pressure "+(diamondPressureEnabled?"on":"off")
+            +"; local transport "+(diamondTransportEnabled?"on":"off"));
+    }
+    public boolean isDiamondPressureEnabled() {return diamondPressureEnabled;}
+    /** Disabling pressure also disables experimental transport, preserving stored state. */
+    public void setDiamondPressureEnabled(boolean enabled) {
+        if(enabled && !isMechanicsOnly())throw new IllegalStateException("Select experimental diamond mechanics first");
+        diamondPressureEnabled=enabled;
+        if(!enabled)diamondTransportEnabled=false;
+        disturbance.cancel();remModel.stopSimulation();
+        updateDiamondIntegrationLabel();
+    }
+    public boolean isMechanicsOnly() {return activeModel.mechanicsOnly();}
+    public boolean isDiamondIdentityExcitationEnabled() {return diamondIdentityExcitationEnabled;}
+    public boolean allowsIdentityExcitation() {return !isMechanicsOnly() || diamondIdentityExcitationEnabled;}
+    /** Explicit excitation-only bridge; never enables the cubic pressure/transport path. */
+    public void setDiamondIdentityExcitationEnabled(boolean enabled) {
+        if(enabled && !isMechanicsOnly())throw new IllegalStateException("Select experimental diamond mechanics first");
+        diamondIdentityExcitationEnabled=enabled;
+        updateDiamondIntegrationLabel();
+        disturbance.cancel();remModel.stopSimulation();
+    }
+    public remframework.geometry.discovery.GeometryConfigurationStatus diamondRemIntegrationStatus() {
+        return remframework.geometry.discovery.GeometryConfigurationStatus.of(remframework.geometry.discovery.GeometryConfigurationDiagnostic.info(
+            remframework.geometry.discovery.GeometryConfigurationStage.GEOMETRY_REALIZATION,
+            remframework.geometry.discovery.GeometryConfigurationStatusCode.GEOMETRY_TEST_NOT_STARTED,
+            "Diamond pressure and transport",
+            "Four-bond distance imbalance available; experimental occupancy pressure is "+(diamondPressureEnabled?"enabled":"disabled")+"; local transport is "+(diamondTransportEnabled?"enabled":"disabled")+". Identity excitation is "+(diamondIdentityExcitationEnabled?"enabled.":"disabled.")));
+    }
+    public Node.FrameParameters frameParameters() {
+        boolean experimental=isMechanicsOnly();
+        return new Node.FrameParameters(experimental ? remframework.settings.Settings.NodeFormulaVersion.v_0_1 : project.settings.getNodeFormulaVersion(),
+            project.getConstantWaveSpeed()/activeModel.mechanicalDivisor(),project.getConstantElectricFactor(),
+            experimental ? 0 : project.getConstantMagneticFactor(),experimental ? 0 : appSettings.getAbsorption(),
+            experimental || appSettings.isUseFixedNodes());
+    }
+    /** Reports experimental numerical failure before publishing a bad physics frame. */
+    public boolean validateMechanicalState() {
+        if(!isMechanicsOnly() || nodeArray==null) return true;
+        for(Object value:nodeArray) {Node node=(Node)value;
+            if(!node.getPosition().isFinite() || !node.getVelocity().isFinite() || !node.getAcceleration().isFinite()) {
+                mechanicsStatus=remframework.geometry.discovery.GeometryConfigurationStatus.of(remframework.geometry.discovery.GeometryConfigurationDiagnostic.stop(
+                    remframework.geometry.discovery.GeometryConfigurationStage.GEOMETRY_REALIZATION,
+                    remframework.geometry.discovery.GeometryConfigurationStatusCode.NUMERICAL_FAILURE,"Experimental runtime mechanics","Nonfinite state at storage index "+node.getIndex()+"; simulation stopped."));
+                remModel.stopSimulation();remModel.setCustomStatus("NUMERICAL_FAILURE: experimental diamond stopped");return false;
+            }
+        }
+        return true;
+    }
+    private final remframework.geometry.discovery.research.diamond.DiamondRuntimeDisturbance disturbance = new remframework.geometry.discovery.research.diamond.DiamondRuntimeDisturbance();
+    public remframework.geometry.discovery.research.diamond.DiamondRuntimeDisturbance getDisturbance() {return disturbance;}
+    public void requestMechanicalPulse() {disturbance.cancel();mechanicalPulseRequested.set(true);}
+    /** Called by the physics calculation thread before starting any Node workers. */
+    public void applyPendingMechanicalPulse() {
+        disturbance.initializePending(this);
+        if(!isMechanicsOnly() || !mechanicalPulseRequested.getAndSet(false) || nodeArray==null) return;
+        Node source=null;double closest=Double.POSITIVE_INFINITY;
+        for(Object value:nodeArray) {Node n=(Node)value;if(n.getType()==EntityType.FIXED) continue;
+            double distance=n.getPosition().lengthSquared();if(distance<closest) {closest=distance;source=n;}}
+        if(source!=null) {source.setPosition(new Vector3d(source.getPosition()).add(.05,0,0));source.updatePosition();}
+    }
     private static Lattice latticeInstance;
 
     public static Lattice getInstance() {
@@ -97,6 +174,23 @@ public class Lattice {
             nonNodeRenderEntities.add(entity);
         }
         return entity;
+    }
+
+    /** Called at an idle frame boundary before replacement allocation. */
+    public synchronized void releaseForReplacement() {
+        disturbance.releaseLattice();
+        mechanicalPulseRequested.set(false);
+        diamondIdentityExcitationEnabled = false;
+        diamondPressureEnabled = false;
+        diamondTransportEnabled = false;
+        project.occupancies.forEach(remframework.opengl.model.entity.Occupancy::detachLattice);
+        remModel.setCurrentMouseNode(null);
+        clearEntities();
+        nodeMatrix = null;
+        nodeArray = new Object[0];
+        entityArray = new Object[0];
+        baseEntity = null;
+        modelSphere = null;
     }
 
     public synchronized void clearEntities() {
@@ -248,13 +342,30 @@ public class Lattice {
         return build(true);
     }
 
+    public void reportDiamondSizeFailure(remframework.lattice.DiamondMemoryBudget.Estimate estimate) {
+        System.err.println("Diamond build rejected ["+estimate.code()+"]: "+estimate.error());
+        mechanicsStatus=remframework.geometry.discovery.GeometryConfigurationStatus.of(remframework.geometry.discovery.GeometryConfigurationDiagnostic.stop(
+            remframework.geometry.discovery.GeometryConfigurationStage.GEOMETRY_REALIZATION, estimate.code(), "Diamond dimension request", estimate.error()));
+        remModel.setCustomStatus(estimate.error());
+    }
+    private final Vector3d physicalSliceCenter = new Vector3d();
+    public Vector3d getPhysicalSliceCenter() {return physicalSliceCenter;}
     private Entity build(boolean headless) {
+        disturbance.cancel();diamondIdentityExcitationEnabled=false;
+        diamondPressureEnabled=false;
+        diamondTransportEnabled=false;
         System.out.println("Lattice.build()");
         Vector3i projectDimension = new Vector3i();
         project.getDimension(projectDimension);
         LatticeDescriptor descriptor = LatticeManager.getInstance().selected();
-        LatticeModel latticeModel = descriptor.sourceType() == LatticeDescriptor.SourceType.SYSTEM
+        LatticeModel latticeModel = LatticeManager.SYSTEM_CUBIC_ID.equals(descriptor.identifier())
                 ? SystemCubicLatticeModel.create(appSettings.isUseLoop()) : descriptor.model();
+        if(latticeModel.mechanicsOnly()) {
+            var estimate=remframework.lattice.DiamondMemoryBudget.estimate(projectDimension);
+            if(!estimate.allowed()) {reportDiamondSizeFailure(estimate);remModel.stopSimulation();remModel.setLoadingReady(true);return baseEntity;}
+        }
+        activeModel=latticeModel;
+        if(!isMechanicsOnly()) mechanicalPulseRequested.set(false);
         Vector3i dimension = latticeModel.dimensions(projectDimension);
         if (!dimension.equals(projectDimension))
             project.setDimension(dimension.x, dimension.y, dimension.z, false);
@@ -279,6 +390,9 @@ public class Lattice {
 
         nodeMatrix = new Node[sizeK][sizeJ][sizeI];
         List<LatticeModel.NodeDefinition> definitions = latticeModel.nodes(projectDimension);
+        physicalSliceCenter.zero();
+        for(var definition:definitions) physicalSliceCenter.add(definition.position());
+        if(!definitions.isEmpty()) physicalSliceCenter.div(definitions.size());
         int NumNodes = definitions.size();
 
         remModel.setLoadingReady(false);
@@ -295,6 +409,7 @@ public class Lattice {
                     Node n = createNode(baseEntity, modelSphere, new Vector3d(definition.position()),
                                             new Vector3d(0, 0, 0), Constants.EP_DEFAULT_DISTANCE);
                     n.setIndex(i, j, k);
+                    n.setGeometricDistanceImbalance(latticeModel.mechanicsOnly());
 
                     n.setAbsorptionFactor(computeAbsorptionFactor(i, j, k, sizeI, sizeJ, sizeK));
 
@@ -308,7 +423,7 @@ public class Lattice {
                     boolean isEdgeY = (sizeJ > 1 && (j == 0 || j == sizeJ - 1));
                     boolean isEdgeZ = (sizeK > 1 && (k == 0 || k == sizeK - 1));
 
-                    if (isEdgeX || isEdgeY || isEdgeZ) n.setType(EntityType.FIXED);
+                    if (latticeModel.fixedBoundary(definition,dimension)) n.setType(EntityType.FIXED);
                     n.setXFixed(isEdgeX);
                     n.setYFixed(isEdgeY);
                     n.setZFixed(isEdgeZ);
@@ -323,8 +438,18 @@ public class Lattice {
                                 nodesById.get(neighbor.getValue()));
                     }
                 }
+                if(isMechanicsOnly()) {
+                    mechanicsStatus=remframework.geometry.discovery.GeometryConfigurationStatus.of(remframework.geometry.discovery.GeometryConfigurationDiagnostic.info(
+                        remframework.geometry.discovery.GeometryConfigurationStage.GEOMETRY_REALIZATION,
+                        remframework.geometry.discovery.GeometryConfigurationStatusCode.GEOMETRIC_SYMMETRY_UNKNOWN,
+                        "Experimental diamond mechanics","Node v0.1 /4; fixed incomplete boundary; occupancy and transport gated. Full REM isotropy unproved."));
+                    remModel.setCustomStatus("Experimental diamond: Node v0.1 /4; occupancy pressure off; transport off");
+                }
                 System.out.println("Built Lattice Model: " + descriptor.uiLabel());
             } catch (RuntimeException exception) {
+                mechanicsStatus=remframework.geometry.discovery.GeometryConfigurationStatus.of(remframework.geometry.discovery.GeometryConfigurationDiagnostic.stop(
+                    remframework.geometry.discovery.GeometryConfigurationStage.GEOMETRY_REALIZATION,
+                    remframework.geometry.discovery.GeometryConfigurationStatusCode.NUMERICAL_FAILURE,"Runtime lattice construction",exception.getMessage()));
                 System.err.println("Lattice construction failed for " + descriptor.uiLabel()
                         + ": " + exception.getMessage());
                 remModel.setCustomStatus("Lattice construction failed: " + exception.getMessage());

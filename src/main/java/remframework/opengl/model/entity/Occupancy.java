@@ -97,6 +97,41 @@ public class Occupancy extends AbstractSettings implements ISettings {
      * transport threshold, causing a node transfer.
      */
     private final Vector3d pressure = new Vector3d();
+    private long diamondTransportUpdates, diamondTransportTransfers;
+    private double diamondTransportPathLength;
+    private final Vector3d diamondTransportDisplacement = new Vector3d();
+    private final Vector3d diamondTransportLastHop = new Vector3d();
+    private final Vector3d diamondTransportConsumedPressure = new Vector3d();
+    private String diamondTransportStatus = "No transport updates recorded";
+
+    public record DiamondTransportMeasurement(long updates, long transfers, double pathLength,
+            Vector3d displacement, Vector3d lastHop, Vector3d consumedPressure, String status) { }
+
+    /** Records bounded, per-Occupancy diagnostics without retaining old Nodes. */
+    public synchronized void recordDiamondTransport(Vector3d hop, Vector3d consumed, String status) {
+        diamondTransportUpdates++;
+        diamondTransportStatus=status;
+        diamondTransportLastHop.zero();diamondTransportConsumedPressure.zero();
+        if(hop!=null) {
+            diamondTransportTransfers++;
+            diamondTransportPathLength+=hop.length();
+            diamondTransportDisplacement.add(hop);
+            diamondTransportLastHop.set(hop);diamondTransportConsumedPressure.set(consumed);
+        }
+    }
+
+    public synchronized DiamondTransportMeasurement diamondTransportMeasurement() {
+        return new DiamondTransportMeasurement(diamondTransportUpdates,diamondTransportTransfers,
+            diamondTransportPathLength,new Vector3d(diamondTransportDisplacement),
+            new Vector3d(diamondTransportLastHop),new Vector3d(diamondTransportConsumedPressure),diamondTransportStatus);
+    }
+
+    /** Resets only measurements, leaving pressure, momentum and location intact. */
+    public synchronized void resetDiamondTransportMeasurement() {
+        diamondTransportUpdates=0;diamondTransportTransfers=0;diamondTransportPathLength=0;
+        diamondTransportDisplacement.zero();diamondTransportLastHop.zero();diamondTransportConsumedPressure.zero();
+        diamondTransportStatus="No transport updates recorded";
+    }
 
 
     /**
@@ -383,6 +418,14 @@ public class Occupancy extends AbstractSettings implements ISettings {
         return getOccupant() != null && nodeIndex != null;// && node != null;
     }
 
+    /** Detaches the old graph, preserving the index, pressure and momentum. */
+    public void detachLattice() {
+        resetDiamondTransportMeasurement();
+        node = null;
+        invalidateOccupiedRegion();
+        if (identity != null) identity.setEntity(null);
+    }
+
     public void setNode(Node node) {
         if (this.node != node) invalidateOccupiedRegion();
         this.node = node;
@@ -391,6 +434,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
 
     @Override
     public synchronized void reset() {
+        resetDiamondTransportMeasurement();
         System.out.println("Occupancy.reset()");
         if (identity == null) {
             resetMeasurementState();
@@ -536,6 +580,7 @@ public class Occupancy extends AbstractSettings implements ISettings {
     }
 
     public void updateOscillation() {
+        if(!remframework.opengl.model.Lattice.getInstance().allowsIdentityExcitation()) return;
         Vector3d o = identity.generateExcitation();
         if (o != null) {
             for (Node occupied : getOccupiedNodes()) occupied.addForce(o);

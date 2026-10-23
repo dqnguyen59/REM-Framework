@@ -50,6 +50,7 @@ public class Settings extends AbstractSettings implements ISettings {
         sliceXY("Visible slice XY"),
         none("All nodes"),
         identitiesOnly("Identities only"),
+        physicalXY("Physical center XY"), physicalXZ("Physical center XZ"), physicalYZ("Physical center YZ"),
         ;
 
         private static String[] strEnums;
@@ -260,6 +261,12 @@ public class Settings extends AbstractSettings implements ISettings {
         }
     }
 
+    private double physicalSliceThickness = 1.0;
+    public double getPhysicalSliceThickness() {return physicalSliceThickness;}
+    public void setPhysicalSliceThickness(double thickness) {
+        if (!Double.isFinite(thickness) || thickness <= 0) return;
+        if (physicalSliceThickness != thickness) {physicalSliceThickness=thickness;isChanged=true;}
+    }
     public void setSliceType(SliceType sliceType) {
         if (lastSliceType != sliceType)
             isChanged = true;
@@ -352,6 +359,7 @@ public class Settings extends AbstractSettings implements ISettings {
                                                                                       s);
         setSliceType((s = getString(section, "sliceType", "")).isEmpty() ? SliceType.sliceZ
                                                                          : SliceType.valueOf(s));
+        setPhysicalSliceThickness(getFloat(section,"physicalSliceThickness",1));
         visibleIndexX  = getInt(section, "visibleIndexX", 15);
         visibleIndexY  = getInt(section, "visibleIndexY", 15);
         visibleIndexZ  = getInt(section, "visibleIndexZ", 15);
@@ -393,6 +401,7 @@ public class Settings extends AbstractSettings implements ISettings {
         put(section, "depthFadingOffset", depthVisibility);
         put(section, "colorMode", colorMode.toString());
         put(section, "sliceType", sliceType.toString());
+        put(section,"physicalSliceThickness",physicalSliceThickness);
         put(section, "visibleIndexX", visibleIndexX);
         put(section, "visibleIndexY", visibleIndexY);
         put(section, "visibleIndexZ", visibleIndexZ);

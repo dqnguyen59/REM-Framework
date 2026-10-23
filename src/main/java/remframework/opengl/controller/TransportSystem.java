@@ -31,7 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
 /**
- * REM-FIELD Transport System.
+ * REM Framework Transport System.
  *
  * <p>
  * The TransportSystem is responsible for evolving the transport state of every
@@ -156,6 +156,27 @@ public class TransportSystem extends AbstractSettings implements ISettings {
      * @param occupancy the occupancy to update
      */
     public void update(Occupancy occupancy) {
+        if(remframework.opengl.model.Lattice.getInstance().isMechanicsOnly()) {
+            synchronized (occupancy) {
+                if(occupancy.getNode()!=null && occupancy.getOccupant()!=null
+                        && !occupancy.getOccupant().canExcite() && !occupancy.getOccupant().canTransfer()) {
+                    Vector3d raw=occupancy.getNode().readGradientImbalance();
+                    occupancy.saveGradientToHistory(raw);
+                    occupancy.getGradientImbalance().set(raw);
+                    return; // Passive diamond sampling is independent of Identity pressure gains/options.
+                }
+                if (remframework.opengl.model.Lattice.getInstance().isDiamondTransportEnabled() && enableTransport
+                        && (!(transferThreshold > 0) || !Double.isFinite(transferThreshold)))
+                    throw new IllegalArgumentException("Diamond transfer threshold must be finite and positive");
+                if (remframework.opengl.model.Lattice.getInstance().isDiamondPressureEnabled())
+                    DiamondOccupancyPressure.update(occupancy, gradientGain, accelerationGain, transportMomentumGain);
+                if (remframework.opengl.model.Lattice.getInstance().isDiamondTransportEnabled()) {
+                    if (enableTransport) DiamondIdentityTransport.update(occupancy, transferThreshold);
+                    else occupancy.recordDiamondTransport(null,null,"Transport disabled in Transport System settings");
+                }
+            }
+            return;
+        }
         boolean suppressTransfer = gravityPressureController.isDesignatedReceiver(occupancy);
         if (suppressTransfer) {
             gravityPressureController.beginReceiverUpdate(

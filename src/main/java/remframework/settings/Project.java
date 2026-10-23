@@ -107,10 +107,17 @@ public class Project extends AbstractSettings implements ISettings {
     public void replaceGeneratedProbeDefinitions(List<ProbeDefinition> generatedDefinitions) {
         List<ProbeDefinition> replacement = new ArrayList<>();
         for (ProbeDefinition definition : probeDefinitions) {
-            if (!definition.isGenerated()) replacement.add(definition);
+            if (!definition.isGenerated() || definition.getDetectorType()==remframework.opengl.model.ProbeDetectorType.DIAMOND_INTERPOLATED) replacement.add(definition);
         }
         replacement.addAll(generatedDefinitions);
         probeDefinitions = replacement;
+    }
+
+    /** Replaces diamond shells without discarding cubic probe definitions. */
+    public void replaceDiamondProbeDefinitions(List<ProbeDefinition> definitions) {
+        var replacement=new ArrayList<>(probeDefinitions.stream()
+            .filter(d->d.getDetectorType()!=remframework.opengl.model.ProbeDetectorType.DIAMOND_INTERPOLATED).toList());
+        replacement.addAll(definitions);probeDefinitions=replacement;
     }
 
     public Project(Project project) {

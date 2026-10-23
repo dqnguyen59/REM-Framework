@@ -1,0 +1,4 @@
+Actual Node v0.1 /4, k=.5 gamma=1; wavelength16, width8, 40 updates. Paired quadrature displacement-intensity centroid. 26 directions,28cells; domain32 and Fourier half-grid5 controls on directions0,1,4.
+Spread (max-min)/mean: 0.874334%. Max domain vector change: 0.018705%. Max grid vector change: 0.007541%.
+1% numerical target: met; validation pending. GEOMETRIC_SYMMETRY_UNKNOWN.
+Finite bandwidth, displacement weighting and three-direction-only controls remain. Not energy speed, trough speed, a monochromatic limit, or full REM isotropy certification. Failures retained in CSV.

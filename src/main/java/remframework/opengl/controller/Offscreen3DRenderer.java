@@ -110,6 +110,7 @@ final class Offscreen3DRenderer {
 
     void stop() {
         running = false;
+        pendingRequest.set(null);
         synchronized (wake) {
             wake.notifyAll();
         }
@@ -134,6 +135,7 @@ final class Offscreen3DRenderer {
         compositorVao = 0;
         compositorProgram = 0;
         compositorSamplerLocation = -1;
+        publishedFrame = PublishedFrame.EMPTY;
     }
 
     void throwIfFailed() {
@@ -222,8 +224,12 @@ final class Offscreen3DRenderer {
                 GL11.glEnable(GL11.GL_DEPTH_TEST);
                 GL11.glClearColor(0f, 0f, 0f, 0f);
                 GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-                renderer.apply(request.state());
-                renderer.render(request.camera(), request.scene());
+                // Scene owns native instance buffers. A layout rebuild must not free
+                // them until glBufferData has finished reading their client memory.
+                synchronized (request.scene()) {
+                    renderer.apply(request.state());
+                    renderer.render(request.camera(), request.scene());
+                }
                 GL11.glFlush();
                 GL11.glFinish();
                 publishedFrame = new PublishedFrame(writeIndex, textures[writeIndex], currentWidth, currentHeight);
@@ -234,6 +240,11 @@ final class Offscreen3DRenderer {
         } finally {
             try {
                 if (renderer != null) renderer.cleanup();
+                for (int index = 0; index < 2; index++) {
+                    if (framebuffers[index] != 0) GL30.glDeleteFramebuffers(framebuffers[index]);
+                    if (depthBuffers[index] != 0) GL30.glDeleteRenderbuffers(depthBuffers[index]);
+                    if (textures[index] != 0) GL11.glDeleteTextures(textures[index]);
+                }
             } finally {
                 GLFW.glfwMakeContextCurrent(MemoryUtil.NULL);
                 GL.setCapabilities(null);

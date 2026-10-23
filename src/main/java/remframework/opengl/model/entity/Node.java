@@ -68,6 +68,8 @@ public class Node extends Entity {
     private final double[]   previousFlow     = new double[6];
     private final double[] deltaFlow         = new double[6];
     private final Vector3d gradientImbalance = new Vector3d();
+    /** Experimental graph measurement; cubic nodes retain opposite-slot differences. */
+    private boolean geometricDistanceImbalance;
 
     /**
      * Electric Field
@@ -171,11 +173,14 @@ public class Node extends Entity {
     }
 
     /**
-     * flow[i] = ∆d + ∆v²
+     * Measures neighbor-distance imbalance. Experimental diamond nodes use physical
+     * bond extension vectors; cubic nodes retain opposite-slot length differences.
      *
      * @return gradientImbalance = (flow[LEFT] - flow[RIGHT], flow[BOTTOM] - flow[TOP], flow[BACK] - flow[FRONT])
      */
     public Vector3d measureGradientImbalance() {
+        if (geometricDistanceImbalance)
+            return gradientImbalance.set(readBondDistanceImbalance());
 
         for (int i = 0; i < neighbors.length; i++) {
             if (neighbors[i] != null) {
@@ -199,10 +204,11 @@ public class Node extends Entity {
      * Reads the current neighbor-distance imbalance without changing any Node
      * field, cache, or transport state.
      *
-     * @return a new vector containing right-left, top-bottom and front-back
-     *         neighbor-distance differences
+     * @return a new physical bond-extension vector for experimental diamond nodes,
+     *         or right-left, top-bottom and front-back differences for cubic nodes
      */
     public Vector3d readGradientImbalance() {
+        if (geometricDistanceImbalance) return readBondDistanceImbalance();
         return new Vector3d(
                 neighborDistance(NEIGHBOR_RIGHT) - neighborDistance(NEIGHBOR_LEFT),
                 neighborDistance(NEIGHBOR_TOP) - neighborDistance(NEIGHBOR_BOTTOM),
@@ -212,6 +218,33 @@ public class Node extends Entity {
     private double neighborDistance(int neighborIndex) {
         Node neighbor = neighbors[neighborIndex];
         return neighbor == null ? 0.0 : neighbor.position.distance(position);
+    }
+
+    /**
+     * Experimental local distance imbalance: sum of (length - restLength) times
+     * the current unit direction to each direct neighbor. Units are length.
+     * Rest lengths come from equilibrium positions, not storage-slot labels.
+     * <br><br>
+     * Missing bonds contribute nothing; incomplete boundary neighborhoods are not
+     * equivalent to the four-bond bulk. This measurement enables no pressure or transport.
+     * Reading leaves all Node fields unchanged. Collapsed/nonfinite bonds are rejected
+     * because their physical direction is undefined.
+     *
+     * @return a new vector pointing toward net bond extension
+     */
+    public Vector3d readBondDistanceImbalance() {
+        Vector3d result = new Vector3d();
+        for (Node neighbor : neighbors) {
+            if (neighbor == null) continue;
+            Vector3d bond = new Vector3d(neighbor.position).sub(position);
+            double length = bond.length();
+            double restLength = neighbor.equilibriumPosition.distance(equilibriumPosition);
+            if (!(length > 0) || !Double.isFinite(length)
+                    || !(restLength > 0) || !Double.isFinite(restLength))
+                throw new IllegalStateException("Distance imbalance requires finite, nonzero current and equilibrium bonds");
+            result.fma((length - restLength) / length, bond);
+        }
+        return result;
     }
 
     /** Immutable mechanical inputs shared by every node in one simulation update. */
@@ -225,6 +258,9 @@ public class Node extends Entity {
         // If set to false then the node stops updating its position
         if (!remModel.isSimulationUpdateActive()) return;
 
+        if(remframework.opengl.model.Lattice.getInstance().isMechanicsOnly()) {
+            updateNodeProperties(remframework.opengl.model.Lattice.getInstance().frameParameters());return;
+        }
         updateNodeProperties(new FrameParameters(nodeFormulaVersion,
                 project.getConstantWaveSpeed() / 6.0,
                 project.getConstantElectricFactor(), project.getConstantMagneticFactor(),

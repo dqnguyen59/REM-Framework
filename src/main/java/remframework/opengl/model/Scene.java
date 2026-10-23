@@ -205,11 +205,36 @@ public class Scene {
         lattice  = Lattice.getInstance();
     }
 
+    /** Removes scene bindings before releasing the lattice graph. */
+    public synchronized void releaseLattice() {
+        pendingDiamondProbes.set(null);
+        pendingDiamondArrival.set(null);
+        diamondProbeStatus="Lattice replaced; generate diamond shells";
+        clearProbes();
+        clearPreviewProbes();
+        hiLightedNodes.clear();
+        firstHiLightedNode = null;
+        inspectionProbeMarker = null;
+        for (FloatBuffer[] buffers : instanceDataBuffers.values()) {
+            MemoryUtil.memFree(buffers[0]);
+            MemoryUtil.memFree(buffers[1]);
+        }
+        instanceDataBuffers.clear();
+        instanceDataEntityCounts.clear();
+        instanceDataBuffersByEntity = new FloatBuffer[0][];
+        instanceDataSlotsByEntity = new int[0];
+        preparedInstanceEntities = null;
+        preparedBaseEntityIndex = -1;
+        instanceDataLayoutDirty = true;
+        lattice.releaseForReplacement();
+    }
+
     public void build() {
         System.out.println("Scene.build()");
         clearProbes();
         clearPreviewProbes();
         Entity baseEntity = lattice.build();
+        if (baseEntity == null) return;
         // Draw xyz arrows on entity baseField.
         Vector3i dimension = new Vector3i();
         project.getDimension(dimension);
@@ -302,6 +327,40 @@ public class Scene {
         probes.add(probe);
     }
 
+    private record PendingDiamondProbes(Object[] nodes,List<ProbeDefinition> definitions) { }
+    private final java.util.concurrent.atomic.AtomicReference<PendingDiamondProbes> pendingDiamondProbes=new java.util.concurrent.atomic.AtomicReference<>();
+    private volatile String diamondProbeStatus="No diamond shells applied";
+    private record PendingDiamondArrival(int shell,double position,double gradient) { }
+    private final java.util.concurrent.atomic.AtomicReference<PendingDiamondArrival> pendingDiamondArrival=new java.util.concurrent.atomic.AtomicReference<>();
+    public String getDiamondProbeStatus() {return diamondProbeStatus;}
+    public void requestDiamondProbeArrival(int shell,double position,double gradient) {
+        project.getRemModel().stopSimulation();
+        pendingDiamondArrival.set(new PendingDiamondArrival(shell,position,gradient));
+    }
+    /** Captures baselines only at the same completed-frame boundary as probe installation. */
+    public void applyPendingDiamondProbeArrival() {
+        var pending=pendingDiamondArrival.getAndSet(null);if(pending==null)return;
+        if(lattice.isMechanicsOnly() && !lattice.isDiamondTransportEnabled())
+            probeArrivalMeasurement.start(List.copyOf(probes),pending.shell(),pending.position(),pending.gradient());
+    }
+    public void requestDiamondProbes(Object[] nodes,List<ProbeDefinition> definitions) {
+        project.getRemModel().stopSimulation();
+        pendingDiamondProbes.set(new PendingDiamondProbes(nodes,List.copyOf(definitions)));
+        diamondProbeStatus="Waiting for completed simulation frame";
+    }
+    /** Called on the display thread only after physics workers finish. */
+    public void applyPendingDiamondProbes() {
+        var pending=pendingDiamondProbes.getAndSet(null);if(pending==null)return;
+        if(!lattice.isMechanicsOnly() || lattice.getNodeArray()!=pending.nodes()) {
+            diamondProbeStatus="Lattice changed; regenerate diamond probes";return;
+        }
+        if(replaceGeneratedProbeDefinitions(pending.definitions())) {
+            project.replaceDiamondProbeDefinitions(pending.definitions());
+            diamondProbeStatus="Applied "+pending.definitions().size()+" diamond probes";
+            if(!probes.isEmpty())selectProbe(probes.getFirst());
+        } else diamondProbeStatus="Probe binding is no longer valid; regenerate shells";
+    }
+
     /** Reconstructs committed probe measurements through TransportSystem after lattice creation. */
     public void updateProbeMeasurements(TransportSystem transportSystem) {
         for (PassiveObserver probe : probes) {
@@ -310,7 +369,8 @@ public class Scene {
                 interpolatedProbe.updateMeasurements(transportSystem);
             }
         }
-        probeArrivalMeasurement.sample();
+        if(lattice.isMechanicsOnly() && lattice.isDiamondTransportEnabled())probeArrivalMeasurement.clear();
+        else probeArrivalMeasurement.sample();
     }
 
     /** Reconstructs a renderer-only passive observer without adding a project Identity Occupancy. */
@@ -324,6 +384,8 @@ public class Scene {
 
     private PassiveObserver buildProbe(ProbeDefinition definition, boolean preview) {
         if (lattice.getNodeArray() == null) return null;
+        boolean diamond=definition.getDetectorType()==ProbeDetectorType.DIAMOND_INTERPOLATED;
+        if(diamond!=lattice.isMechanicsOnly())return null;
         if (definition.getDetectorType() == ProbeDetectorType.RAW_NODE) {
             Node node = lattice.getNodeByIndex(definition.getNodeIndex());
             if (node == null) return null;
@@ -340,6 +402,15 @@ public class Scene {
         }
         PassiveObserver.Observation observation = ProbeInterpolation.interpolate(
                 sourceNodes, definition.getInterpolationSources());
+        if(diamond) {
+            Vector3d represented=new Vector3d();
+            for(int i=0;i<sourceNodes.size();i++) {
+                Node n=sourceNodes.get(i);
+                if(n.isWall() || (n.isFixed() && !definition.getPlacement().measurementSpace().equals("Diamond physical XY")))return null;
+                represented.fma(definition.getInterpolationSources().get(i).weight(),n.getEquilibriumPosition());
+            }
+            if(represented.distance(definition.getPlacement().targets().getFirst().requestedCoordinate())>1e-8)return null;
+        }
         double sourceScale = sourceNodes.getFirst().getScale();
         Entity marker = createProbeMarker(
                 definition, observation.position(), sourceScale, preview);
@@ -777,6 +848,7 @@ public class Scene {
 
     /** Enters a renderer-only inspection session for the currently selected passive probe. */
     public boolean enterNeighborhoodInspection() {
+        if(lattice.isMechanicsOnly()) return false;
         if (selectedProbe == null) return false;
         if ((neighborhoodInspectionActive || inspectionTransitionActive) && inspectedProbe == selectedProbe)
             return inspectionProbeMarker != null;
@@ -812,7 +884,7 @@ public class Scene {
             case INTERPOLATED_2D -> {
                 return 40;
             }
-            case INTERPOLATED_3D -> {
+            case INTERPOLATED_3D, DIAMOND_INTERPOLATED -> {
                 return 60;
             }
         }
@@ -1131,6 +1203,7 @@ public class Scene {
     }
 
     private void setNodeWall(Node node, boolean value) {
+        if(lattice.isMechanicsOnly()) return;
         if (value) {
             node.setType(EntityType.WALL);
             addWallNode(node);
@@ -1185,6 +1258,7 @@ public class Scene {
     }
 
     public void updateWalls() {
+        if(lattice.isMechanicsOnly()) return;
         for (Vector3i nodeIndex : wallNodeIndexList) {
             Node node = lattice.getNodeByIndex(nodeIndex);
             if (node != null) {
@@ -1194,6 +1268,7 @@ public class Scene {
     }
 
     public void drawSlitWall() {
+        if(lattice.isMechanicsOnly()) return;
         clearHiLightNodes();
 
         int     p, d, iSize, jSize, ic, jc;
@@ -1490,7 +1565,7 @@ public class Scene {
      * is not drawing. Both transform and packed-instance buffers are initialized so a
      * paused refresh or visibility-layout rebuild cannot expose an uninitialized frame.
      */
-    public void updateMatrix(int numThreads, int segmentSize, boolean synchronizeBothBuffers) {
+    public synchronized void updateMatrix(int numThreads, int segmentSize, boolean synchronizeBothBuffers) {
         ensureInstanceDataBuffers();
         double renderScale = settings.getScale();
         Entity baseEntity = lattice.getBaseEntity();
@@ -1549,10 +1624,8 @@ public class Scene {
 
     public void processRemFieldEngine(int numThreads, int segmentSize) {
         if (!REMModel.isSimulationUpdateActive()) return;
-        Node.FrameParameters parameters = new Node.FrameParameters(
-                settings.getNodeFormulaVersion(), project.getConstantWaveSpeed() / 6.0,
-                project.getConstantElectricFactor(), project.getConstantMagneticFactor(),
-                appSettings.getAbsorption(), appSettings.isUseFixedNodes());
+        lattice.applyPendingMechanicalPulse();
+        Node.FrameParameters parameters = lattice.frameParameters();
         int nodeCount = lattice.getNodeArray().length;
         for (int i = 0; i < numThreads; i++) {
             int start = i * segmentSize;

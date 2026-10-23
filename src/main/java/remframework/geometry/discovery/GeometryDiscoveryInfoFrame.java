@@ -40,8 +40,40 @@ final class GeometryDiscoveryInfoFrame extends AbstractFrame {
         createLayout(context, 10, 10, 455, Math.max(500, getWindowHeight() - 20));
     }
 
+    private void layoutDiamond(NkContext context) {
+        label(context,visualizer.diamondMotionActive()?"Diamond disturbance preview":"Diamond reference - fixed positions");
+        Nuklear.nk_layout_row_dynamic(context,rowHeightEdit,2);
+        if(Nuklear.nk_button_label(context,"Equation preview")) visualizer.startDiamondMotion();
+        if(Nuklear.nk_button_label(context,"Return to reference")) visualizer.showDiamondReference(visualizer.session().settings().targetDistance());
+        Nuklear.nk_layout_row_dynamic(context,rowHeightEdit,1);
+        if(Nuklear.nk_button_label(context,"Node v0.1 preview (/4)")) visualizer.startDiamondCanonicalMotion();
+        if(visualizer.diamondMotionActive()) {
+            label(context,"Motion magnified 1000x; calculation unchanged");
+            label(context,"Update: "+visualizer.diamondMotionSteps()+" / 200");
+            label(context,visualizer.diamondCanonicalActive()?"Node v0.1; research /4; k=0.5, gamma=1":"Equation model; k=0.5, dt=0.1");
+            Nuklear.nk_layout_row_dynamic(context,rowHeightEdit,1);
+            if(Nuklear.nk_button_label(context,"Pause / Resume")) visualizer.toggleDiamondMotion();
+        }
+        Nuklear.nk_layout_row_dynamic(context,rowHeightEdit,1);
+        double current=visualizer.session().settings().targetDistance();
+        double length=Nuklear.nk_propertyd(context,"Connection length",1e-6,current,1e6,.5,.1f);
+        if(Double.compare(length,current)!=0) visualizer.showDiamondReference(length);
+        var model=visualizer.session().model();var metrics=visualizer.result().metrics();
+        label(context,"Nodes: "+model.nodes().size()+"  Connections: "+model.connections().size());
+        if(!visualizer.diamondMotionActive()) label(context,String.format(java.util.Locale.ROOT,"Length min/max: %.6g / %.6g",metrics.minimumConnectedNeighborDistance(),metrics.maximumConnectedNeighborDistance()));
+        label(context,"Interior degree: 4; boundary degree: fewer");
+        label(context,"Mechanical isotropy untested; research preview");
+        Nuklear.nk_layout_row_dynamic(context,rowHeightEdit,3);
+        if(Nuklear.nk_button_label(context,"Fit View")) visualizer.fitToView();
+        if(Nuklear.nk_button_label(context,"Labels")) visualizer.viewState().setShowNodeLabels(!visualizer.viewState().showNodeLabels());
+        if(Nuklear.nk_button_label(context,"Lines")) visualizer.viewState().setShowConnections(!visualizer.viewState().showConnections());
+    }
+
     @Override
     protected void layout(NkContext context, int x, int y, int width, int height) {
+        if(visualizer.diamondReference()) { layoutDiamond(context);return; }
+        Nuklear.nk_layout_row_dynamic(context,rowHeightEdit,1);
+        if(Nuklear.nk_button_label(context,"Diamond reference")) { visualizer.showDiamondReference(visualizer.session().settings().targetDistance());return; }
         GeometryDiscoveryResult result = visualizer.result();
         GeometryDiscoveryMetrics metrics = result.metrics();
         label(context, "Model: " + result.model().name());

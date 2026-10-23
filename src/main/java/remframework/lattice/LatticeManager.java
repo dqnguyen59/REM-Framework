@@ -16,6 +16,7 @@ import java.util.Optional;
 
 public final class LatticeManager {
     public static final String SYSTEM_CUBIC_ID = "system:cubic";
+    public static final String EXPERIMENTAL_DIAMOND_ID = "research:diamond-mechanics";
     private static LatticeManager instance;
 
     private final Path latticeDirectory;
@@ -47,6 +48,8 @@ public final class LatticeManager {
                 : selected.identifier();
         List<LatticeDescriptor> next = new ArrayList<>();
         next.add(systemDescriptor());
+        next.add(new LatticeDescriptor(EXPERIMENTAL_DIAMOND_ID,"Experimental Diamond Mechanics",
+            LatticeDescriptor.SourceType.SYSTEM,null,true,List.of(),Map.of("description","Node v0.1 /4; occupancy and transport gated."),new ExperimentalDiamondLatticeModel()));
         try {
             boolean created = Files.notExists(latticeDirectory);
             Files.createDirectories(latticeDirectory);
@@ -91,6 +94,25 @@ public final class LatticeManager {
         System.out.println("Selected Lattice Model: " + selected.uiLabel());
     }
 
+    private remframework.geometry.discovery.GeometryConfigurationStatus lastSelectionStatus;
+    public synchronized remframework.geometry.discovery.GeometryConfigurationStatus lastSelectionStatus() {return lastSelectionStatus;}
+    /** Preflight dimension-dependent models before the caller clears the current renderer. */
+    public synchronized boolean select(String identifier,org.joml.Vector3i dimensions) {
+        // Check replacement memory only after releasing the loaded graph.
+        return select(identifier,dimensions,Long.MAX_VALUE);
+    }
+    synchronized boolean select(String identifier,org.joml.Vector3i dimensions,long budgetBytes) {
+        if(EXPERIMENTAL_DIAMOND_ID.equals(identifier)) {
+            var estimate=DiamondMemoryBudget.estimate(dimensions,budgetBytes);
+            if(!estimate.allowed()) {
+                lastSelectionStatus=remframework.geometry.discovery.GeometryConfigurationStatus.of(remframework.geometry.discovery.GeometryConfigurationDiagnostic.stop(
+                    remframework.geometry.discovery.GeometryConfigurationStage.GEOMETRY_REALIZATION,estimate.code(),"Diamond model selection",estimate.error()));
+                warn("Cannot load Experimental Diamond Mechanics: "+estimate.error()+" Current model retained.");
+                return false;
+            }
+        }
+        return select(identifier);
+    }
     public synchronized boolean select(String identifier) {
         Optional<LatticeDescriptor> descriptor = find(identifier);
         if (descriptor.isEmpty()) {
@@ -103,6 +125,7 @@ public final class LatticeManager {
             return false;
         }
         selected = descriptor.get();
+        lastSelectionStatus=null;
         settings.setLatticeModelIdentifier(identifier);
         lastWarning = "";
         System.out.println("Selected Lattice Model: " + selected.uiLabel());

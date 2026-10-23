@@ -127,7 +127,9 @@ public final class ProbeDefinition {
         }
         if (nodeIndex != null) throw new IllegalArgumentException("Interpolated probe cannot reference one raw node.");
         int requiredSources = detectorType == ProbeDetectorType.INTERPOLATED_2D ? 4 : 8;
-        if (interpolationSources.size() != requiredSources) {
+        if (detectorType == ProbeDetectorType.DIAMOND_INTERPOLATED
+                ? interpolationSources.isEmpty() || interpolationSources.size() > 16
+                : interpolationSources.size() != requiredSources) {
             throw new IllegalArgumentException("Interpolated probe requires " + requiredSources + " sources.");
         }
         if (placement == null || placement.targets().size() != 1) {

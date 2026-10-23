@@ -37,8 +37,8 @@ import remframework.gui.model.NuklearModel;
 
 public class FrameConfirmDialog extends FrameDialog {
 
-	private int width = 500;
-	private int height = 300;
+	private int width = 600;
+	private int height = 360;
 	private DialogDefaultModel dlgModel;
 
 	public FrameConfirmDialog(NuklearModel frames) {
@@ -55,24 +55,28 @@ public class FrameConfirmDialog extends FrameDialog {
 	public void render(long windowHandle, NkContext ctx) {
 		super.render(windowHandle, ctx);
 
-		createLayoutCentered(ctx, width, height);
+		createLayoutCentered(ctx, Math.min(width, Math.max(240, getWindowWidth()-32)),
+                Math.min(height, Math.max(180, getWindowHeight()-80)));
 	}
 
 	@Override
 	protected void layout(NkContext ctx, int x, int y, int width, int height) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-    		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
-    		
-    		String[] lines = dlgModel.getMessage().split("\n");
-    		
-    		Nuklear.nk_label(ctx, "", Nuklear.NK_TEXT_LEFT);
-    		for (String line : lines) {
-        		Nuklear.nk_label(ctx, line, Nuklear.NK_TEXT_CENTERED);
-			}
-    		Nuklear.nk_label(ctx, "", Nuklear.NK_TEXT_LEFT);
+            // A clipped, scrollable message area keeps all confirmation buttons visible.
+            Nuklear.nk_layout_row_dynamic(ctx, Math.max(rowHeight*2,height-rowHeight*5), 1);
+            if(Nuklear.nk_group_begin(ctx,"Dialog message",0)) {
+                int charactersPerLine=Math.max(1,(width-80)/rowHeight);
+                for(String line:dlgModel.getMessage().split("\n",-1)) {
+                    // Conservative height allows native font-based wrapping; long messages scroll.
+                    int rows=Math.max(1,(line.length()+charactersPerLine-1)/charactersPerLine);
+                    Nuklear.nk_layout_row_dynamic(ctx,rows*rowHeight,1);
+                    Nuklear.nk_label_wrap(ctx,line);
+                }
+                Nuklear.nk_group_end(ctx);
+            }
 
-    		ConfirmState[] confirmStates = dlgModel.getConfirmStates();
-    		
+            ConfirmState[] confirmStates = dlgModel.getConfirmStates();
+
     		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, confirmStates.length + 2);
     		Nuklear.nk_label(ctx, "", Nuklear.NK_TEXT_CENTERED);
 
@@ -86,7 +90,7 @@ public class FrameConfirmDialog extends FrameDialog {
     		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
     		Nuklear.nk_label(ctx, "", Nuklear.NK_TEXT_CENTERED);
         }
-		
+
 	}
 
 }

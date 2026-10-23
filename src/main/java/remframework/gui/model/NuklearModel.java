@@ -211,7 +211,8 @@ public class NuklearModel {
 		case occupancyHistory:
 			return new FrameOccupancyHistory(this);
 		case addProbes:
-			return new FrameAddProbes(this);
+			return remframework.settings.Project.getInstance().scene.getLattice().isMechanicsOnly()
+                    ? new remframework.gui.view.frames.dialogs.FrameAddDiamondProbes(this) : new FrameAddProbes(this);
 		case preferences:
 			return new FramePreferences(this);
 		case terrainSettings:

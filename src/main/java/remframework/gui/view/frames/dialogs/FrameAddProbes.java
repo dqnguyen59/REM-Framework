@@ -65,15 +65,21 @@ public final class FrameAddProbes extends AbstractFrame {
     /** Opens Edit mode from the committed generated definitions, not from retained controls alone. */
     public FrameAddProbes(NuklearModel model) {
         super(model);
+        if(scene.getLattice().isMechanicsOnly()) {
+            centerIndex=new Vector3i();center=null;threeDimensional=false;
+            probesPerPlane=retained2DProbesPerShell;
+            editing=false;existingGeneratedDefinitions=List.of();
+            return;
+        }
         centerIndex = geometricCenterIndex();
         center = scene.getLattice().getNodeByIndex(centerIndex);
         threeDimensional = project.getDimensionZ() > 1;
         probesPerPlane = threeDimensional ? retained3DProbesPerPlanePerShell
                                           : retained2DProbesPerShell;
         activeProbeSpace = calculateActiveProbeSpace();
-        editing = project.getProbeDefinitions().stream().anyMatch(ProbeDefinition::isGenerated);
+        editing = project.getProbeDefinitions().stream().anyMatch(d->d.isGenerated() && d.getDetectorType()!=ProbeDetectorType.DIAMOND_INTERPOLATED);
         existingGeneratedDefinitions = project.getProbeDefinitions().stream()
-                .filter(ProbeDefinition::isGenerated).map(definition -> definition.withId(definition.getId()))
+                .filter(d->d.isGenerated() && d.getDetectorType()!=ProbeDetectorType.DIAMOND_INTERPOLATED).map(definition -> definition.withId(definition.getId()))
                 .toList();
         if (editing) {
             interpolatedBinding = existingGeneratedDefinitions.getFirst().getDetectorType()
@@ -106,6 +112,14 @@ public final class FrameAddProbes extends AbstractFrame {
 
     @Override
     protected void layout(NkContext ctx, int x, int y, int width, int height) {
+        if(scene.getLattice().isMechanicsOnly()) {
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeight*3,1);
+            Nuklear.nk_label_wrap(ctx,"Cubic probe placement is unavailable for diamond. Open Isotropy and choose Diamond transport for live Identity measurements.");
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeight,1);
+            if(nk_button_label(ctx,"Open Isotropy")) {nuklearModel.showFrame(NuklearModel.Frame.isotropy);close();}
+            if(nk_button_label(ctx,"Close"))close();
+            return;
+        }
         try (MemoryStack stack = MemoryStack.stackPush()) {
             boolean latticeContextChanged = refreshLatticeContext();
             Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
@@ -351,7 +365,7 @@ public final class FrameAddProbes extends AbstractFrame {
 
     private void removeStaleGeneratedProbes(boolean effectiveSpaceChanged) {
         List<ProbeDefinition> generated = project.getProbeDefinitions().stream()
-                .filter(ProbeDefinition::isGenerated).toList();
+                .filter(d->d.isGenerated() && d.getDetectorType()!=ProbeDetectorType.DIAMOND_INTERPOLATED).toList();
         if (generated.isEmpty()) return;
         List<ProbePlacement.ProbeReport> reports = ProbePlacement.describe(center, generated);
         int targetCount = generated.stream().filter(definition -> definition.getPlacement() != null)

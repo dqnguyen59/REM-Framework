@@ -773,7 +773,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                         //lastSelectedNode.setFixed(false);
                         lastSelectedNode.setType(EntityType.NODE);
                         lastSelectedNode = null;
-                    } else if (remModel.isSimulating() && selectedNode != null) {
+                    } else if (remModel.isSimulating() && selectedNode != null && !scene.getLattice().isMechanicsOnly()) {
                         Vector3d p = selectedNode.getPosition();
                         selectedNode.setPosition(new Vector3d(p.x, p.y, project.rainModel.getForce()));
                         //selectedNode.setFixed(true);
@@ -782,7 +782,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     }
                     break;
                 case GLFW.GLFW_KEY_P:
-                    if (remModel.isSimulating() && selectedNode != null) {
+                    if (remModel.isSimulating() && selectedNode != null && !scene.getLattice().isMechanicsOnly()) {
                         if (selectedNode.isFixed()) {
                             ///selectedNode.setFixed(false);
                             selectedNode.setType(EntityType.NODE);
@@ -878,6 +878,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                         scene.waitForAllTasksReady();
                     }
 
+                    if(!scene.getLattice().validateMechanicalState()) return;
+                    scene.getLattice().getDisturbance().completedStep();
                     if (remModel.isSimulating())
                         PerformanceMonitor.stop(Measurement.physics);
                     else
@@ -938,6 +940,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void resetOccupancies() {
+        if(scene.getLattice().isMechanicsOnly()) return;
         for (Occupancy occupancy : project.occupancies) {
             occupancy.reset();
         }
@@ -955,6 +958,18 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void simulateOccupancies() {
+        if(scene.getLattice().isMechanicsOnly()) {
+            if (!remModel.isSimulationUpdateActive() || updateLimitReached) return;
+            for (Occupancy occupancy : project.occupancies) {
+                if (!occupancy.isOccupied()) continue;
+                Node node=scene.getLattice().getNodeByIndex(occupancy.getNodeIndex());
+                if (node == null) continue;
+                occupancy.setNode(node);
+                transportSystem.update(occupancy);
+                occupancy.update();
+            }
+            return;
+        }
         if (remModel.isSimulationUpdateActive() && !updateLimitReached) {
             GravityExperimentController controller = GravityExperimentController.getInstance();
             controller.beginSimulationUpdate();
@@ -986,6 +1001,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void samplePassiveDetectors() {
+        if(scene.getLattice().isMechanicsOnly()) return;
         DetectorExperimentController controller =
                 DetectorExperimentController.getInstance();
         if (!remModel.isSimulationUpdateActive() || updateLimitReached
@@ -1004,6 +1020,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void simulateDetection() {
+        if(scene.getLattice().isMechanicsOnly()) return;
         if (nuklearModel.isFrameVisible(Frame.detector)) {
             Node node = scene.getLattice().getNodeByIndex(detectorModel.getIgnitorNode());
             if (node != null) {
@@ -1023,6 +1040,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     }
 
     private void simulateRain() {
+        if(scene.getLattice().isMechanicsOnly()) return;
         if (remModel.isSimulationUpdateActive() && project.rainModel.isActive()) {
             Vector3i index = new Vector3i();
 
@@ -1098,6 +1116,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                                                            k == settings.getVisibleIndexZ());
                         case sliceXY -> isBoundingLine || (i == settings.getVisibleIndexX() &&
                                                            j == settings.getVisibleIndexY());
+                        case physicalXY, physicalXZ, physicalYZ -> remframework.opengl.model.PhysicalCrossSection.contains(
+                            node.getEquilibriumPosition(),scene.getLattice().getPhysicalSliceCenter(),settings.getSliceType(),settings.getPhysicalSliceThickness());
                         case identitiesOnly -> false;
                     };
 
@@ -1115,6 +1135,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private void createIsotropyProbe() {
         scene.clearProbes();
+        if(scene.getLattice().isMechanicsOnly()) {
+            for(var definition:project.getProbeDefinitions())
+                if(definition.getDetectorType()==remframework.opengl.model.ProbeDetectorType.DIAMOND_INTERPOLATED)
+                    scene.createProbe(definition,false);
+            return;
+        }
         Object[] nodeArray = scene.getLattice().getNodeArray();
         if (nodeArray == null || nodeArray.length == 0) return;
         String filename = project.getCurrentFilename();
@@ -1127,7 +1153,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     new Vector4f(0.2f, 0.8f, 1.0f, 1.0f)));
         }
         List<ProbeDefinition> generated = project.getProbeDefinitions().stream()
-                .filter(ProbeDefinition::isGenerated).toList();
+                .filter(d->d.isGenerated() && d.getDetectorType()!=remframework.opengl.model.ProbeDetectorType.DIAMOND_INTERPOLATED).toList();
         Vector3i centerIndex = new Vector3i(project.getDimensionX() / 2,
                                             project.getDimensionY() / 2,
                                             project.getDimensionZ() / 2);
@@ -1147,8 +1173,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         updateNodesProperties();
         //resetOccupancies();
         scene.update();
-        DetectorExperimentController.getInstance().resolveNodes(
+        if(!scene.getLattice().isMechanicsOnly()) DetectorExperimentController.getInstance().resolveNodes(
                 scene.getLattice());
+        for (Occupancy occupancy : project.occupancies) {
+            Node node = scene.getLattice().getNodeByIndex(occupancy.getNodeIndex());
+            if (node != null) occupancy.setNode(node);
+        }
         FeasibilityPilotTelemetry.getInstance().markLatticeInitialized();
 //        resetOccupancies();
         nuklearModel.closeFrame(Frame.progress);
@@ -1168,6 +1198,18 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             System.out.println("simulator.projectChanged: " + project.isChanged());
             System.out.println("simulator.appSettingsChanged: " + appSettings.isChanged());
 
+            var selectedModel=remframework.lattice.LatticeManager.getInstance().selected();
+            if(selectedModel.model()!=null && selectedModel.model().mechanicsOnly()) {
+                var requestedSize=new org.joml.Vector3i();project.getDimension(requestedSize);
+                var estimate=remframework.lattice.DiamondMemoryBudget.estimate(requestedSize,Long.MAX_VALUE);
+                if(!estimate.allowed()) {
+                    scene.getLattice().reportDiamondSizeFailure(estimate);
+                    remModel.stopSimulation();remModel.setLoadingReady(true);
+                    nuklearModel.closeFrame(Frame.progress);
+                    nuklearModel.showErrorDialog("Cannot Build Diamond Lattice",estimate.error());
+                    return;
+                }
+            }
             setCustomTitle(project.getCurrentFilename());
             nuklearModel.showFrame(Frame.progress);
             try {
@@ -1182,8 +1224,27 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             isLoadingStarted = true;
             System.out.println("isLoadingStarted: " + isLoadingStarted);
             remModel.setLoadingReady(false);
-            // Build the Lattice 3D Matrices of Nodes
-            scene.getLattice().clearEntities();
+            // This runs at a completed frame boundary, with no pending physics workers.
+            remModel.stopSimulation();
+            renderer.cleanupNodes();
+            offscreen3DRenderer.stop();
+            renderState = null;
+            scene.releaseLattice();
+            System.gc(); // Best effort; capacity is measured again below.
+            offscreen3DRenderer.start();
+            if(selectedModel.model()!=null && selectedModel.model().mechanicsOnly()) {
+                var requestedSize=new org.joml.Vector3i();project.getDimension(requestedSize);
+                var estimate=remframework.lattice.DiamondMemoryBudget.estimate(requestedSize);
+                if(!estimate.allowed()) {
+                    scene.getLattice().reportDiamondSizeFailure(estimate);
+                    remModel.setLoadingReady(true);
+                    isLoadingStarted=false;
+                    nuklearModel.closeFrame(Frame.progress);
+                    nuklearModel.showErrorDialog("Cannot Build Diamond Lattice",estimate.error()
+                        +"\nPrevious lattice released. Reduce dimensions or choose another model and retry.");
+                    return;
+                }
+            }
             scene.build();
             resetOccupancies();
             waitAfterReset = 0;
@@ -1315,6 +1376,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         // frame boundary. GUI interaction itself is never delayed while one is pending.
         if (!calculationPending) {
             checkSettingsChanged();
+            scene.applyPendingDiamondProbes();
+            scene.applyPendingDiamondProbeArrival();
             if (scene.getLattice().applyPendingAbsorptionLayerChange()) {
                 renderMatricesDirty = true;
             }
