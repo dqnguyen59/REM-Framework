@@ -125,7 +125,7 @@ public class Main {
 				Project.getInstance().loadFromFile(startupProjectPath.toString());
 			}
 			if(diamondMechanics) {
-                Project.getInstance().setDimension(80,80,80,false);
+                Project.getInstance().setDimension(80,80,64,false);
                 LatticeManager.getInstance().select(LatticeManager.EXPERIMENTAL_DIAMOND_ID);
                 Project.getInstance().setConstantFrequency(.5);
                 Project.getInstance().setConstantElectricFactor(1);

@@ -158,6 +158,13 @@ public class TransportSystem extends AbstractSettings implements ISettings {
     public void update(Occupancy occupancy) {
         if(remframework.opengl.model.Lattice.getInstance().isMechanicsOnly()) {
             synchronized (occupancy) {
+                if(occupancy.getNode()!=null && occupancy.getOccupant()!=null
+                        && !occupancy.getOccupant().canExcite() && !occupancy.getOccupant().canTransfer()) {
+                    Vector3d raw=occupancy.getNode().readGradientImbalance();
+                    occupancy.saveGradientToHistory(raw);
+                    occupancy.getGradientImbalance().set(raw);
+                    return; // Passive diamond sampling is independent of Identity pressure gains/options.
+                }
                 if (remframework.opengl.model.Lattice.getInstance().isDiamondTransportEnabled() && enableTransport
                         && (!(transferThreshold > 0) || !Double.isFinite(transferThreshold)))
                     throw new IllegalArgumentException("Diamond transfer threshold must be finite and positive");

@@ -1,5 +1,7 @@
 # Diamond lattice mechanics compatibility
 
+Latest XY configuration experiment (2026-10-23): [screening, repeatability and robustness results](diamond-xy-configuration-sweep-2026-10-23.md). No tested configuration met the 1% criterion.
+
 Independent Geometry Discovery experiment; cubic runtime and accepted REM mechanics unchanged.
 
 DiamondReference supplies fixed diamond positions. Cell side = 4*L/sqrt(3); interior degree 4, open boundary degree lower. DiamondMechanics reuses DynamicElasticNode with movable interiors and fixed incomplete boundary nodes.
@@ -229,6 +231,65 @@ Exact source/artifact changes for this integration:
 - src/main/java/remframework/Main.java
 - src/test/java/remframework/lattice/DiamondRuntimeMechanicsTest.java (new)
 - preview-diamond-mechanics.cmd (new)
+- docs/research/diamond-lattice-rem-compatibility.md
+
+### Diamond passive probe sampling (2026-10-22)
+
+#### Configurable tolerance and controlled propagation follow-up
+
+#### Configurable wavelength and larger domain follow-up
+
+#### XY-first scope and 400 x 400 target (supersedes the proposed 88^3 startup below)
+
+User chose a thin XY slab with different boundary effects. Diamond Probes now defaults to XY-only: 8 equal-radius directions (±X, ±Y and four XY diagonals), with a checkbox to restore 26 XYZ directions. The plane is recorded in probe metadata and shown in arrival coverage. Changing the checkbox invalidates any pending preview. XY interpolation explicitly allows fixed surface samples; bulk XYZ still rejects them. Both paths preserve affine interpolation and sample both FCC sublattices.
+
+When an XY controlled run has insufficient physical Z depth for the bulk source, a separate slab path applies the same compact packet profile as a function of XY radius to movable nodes through the thickness. Existing fixed surfaces remain fixed. The slab path records 200 updates, freezes results and pauses. This is a finite diagnostic recording interval, NOT a reflection-free cutoff; the UI and run summary explicitly include surface effects and exclude a bulk-isotropy conclusion. Bulk source/reflection logic remains unchanged. No damping, saturation, transport cap or mechanics equation changed.
+
+Added a 400 x 400 x 4 slab preset in Dimensions. The actual 400 x 400 x 4 build was attempted and rejected by the existing guard: conservative peak 5000 MiB, available safe budget 4311 MiB. It was not loaded or tested physically at that size. About 1 GiB additional free system RAM would bridge that observed admission gap, subject to other memory changes. The proposed 88^3 startup was likewise rejected (5324 versus 4471 MiB). Final startup is 80 x 80 x 64, retaining a working-size domain; user can apply the requested preset after freeing memory. No guard was bypassed or lowered.
+
+Validation: final 13 tests passed (DiamondProbeSamplingTest 6 including XY geometry, FrameIsotropyLayoutTest 6, DiamondProbePropagationTest 1 at 64 x 64 x 4). A separate 4-test DiamondRuntimeDisturbanceTest bulk regression passed. Thin-slab test asserts the explicitly labelled surface effects and 200-update stop, and measured all 8 directions at radii16/20 at thresholds1e-6/1e-7/1e-8. Position spreads were 2.548/11.730/14.571% at radius16 and 4.211/5.468/9.916% at radius20; no 1% conclusion. CSV diamond-probe-propagation-xy-8.0-results.csv contains this 64x64x4 run. Earlier XY bulk test passed separately. The 400x400 admission failure is not counted as a passing run.
+
+Files changed for XY-first support: src/main/java/remframework/opengl/model/DiamondProbePlacement.java; src/main/java/remframework/opengl/model/Scene.java; src/main/java/remframework/gui/view/frames/dialogs/FrameAddDiamondProbes.java; src/main/java/remframework/gui/view/frames/FrameIsotropy.java; src/main/java/remframework/gui/view/frames/FrameDimension.java; src/main/java/remframework/geometry/discovery/research/diamond/DiamondRuntimeDisturbance.java; src/main/java/remframework/Main.java; src/test/java/remframework/lattice/DiamondProbeSamplingTest.java; src/test/java/remframework/lattice/DiamondProbePropagationTest.java; this document; generated XY CSV. Wavelength changes listed below remain part of the same uncommitted work.
+
+Controlled probe packets now accept a wavelength >=2 bond lengths (default 8); amplitude remains 0.001. The existing source equation is unchanged, with sigma=lambda/2 and support R=1.5*lambda. The panel displays support and recommended receiver radii R+4/R+8, and links to the existing dimension dialog. Existing shells are never silently relocated; regenerate them when needed. The original three-argument requestProbeRun remains a wavelength-8 compatibility overload. Invalid/nonfinite wavelengths are rejected. The source-support rejection message now reports the actual configured support/radii.
+
+Diamond mechanics startup dimensions increased from 80^3 to 88^3 (681472 nodes, conservative peak estimate 5324 MiB versus 4000 MiB for 80^3). Existing memory-budget enforcement remains active. The dimension dialog explains that all three physical directions need space and that probes must be rebuilt after resizing. 80 in Z is not a universal requirement: the prior 64^3 experiment worked for lambda8 and radii16/20. Z=10 has physical half-depth about (2*10-1)/(2*sqrt(3))=5.48 bond lengths, so it cannot contain the lambda8 source of radius12 or the 16/20 shells. It is a slab experiment with different boundary effects, not a substitute for the bulk 26-direction test.
+
+Validation: build and 16 focused tests passed (DiamondRuntimeDisturbanceTest 4, DiamondProbeSamplingTest 5, FrameIsotropyLayoutTest 6, DiamondProbePropagationTest 1). The actual 64^3 propagation test also ran at configurable wavelength4. Some high-threshold arrivals were incomplete; complete position-speed spreads ranged from 5.195% to 18.486%, so no 1% acceptance is claimed. Data: diamond-probe-propagation-4.0-results.csv. Changed files in this follow-up: Main.java; geometry/discovery/research/diamond/DiamondRuntimeDisturbance.java; gui/view/frames/FrameIsotropy.java; gui/view/frames/FrameDimension.java (all under src/main/java/remframework); src/test/java/remframework/geometry/discovery/research/diamond/DiamondRuntimeDisturbanceTest.java; src/test/java/remframework/lattice/DiamondProbePropagationTest.java; this document; generated wavelength4 CSV.
+
+Propagation arrival now has a positive finite speed-spread tolerance in percent, default 1.0, editable for the current Isotropy window session. Position and gradient diagnostics independently show Within tolerance (single run), Above tolerance or Incomplete. Equality passes. The overall verdict remains inconclusive until convergence is checked; changing this tolerance does not change detection thresholds or mechanics.
+
+A controlled-run button uses wavelength 8, amplitude 0.001, X-polarized compact radial displacement (support radius 12), k/gamma from the current project. It rejects enabled Identity excitation, occupancy pressure or transport; requires a complete diamond shell outside source support; resets node displacement/velocity/acceleration; captures the actual passive-probe baseline before evolution; computes a conservative graph-causal reflection cutoff including all selected interpolation source nodes; and pauses/freezes recording at that cutoff. Source profile is A*exp(-r^2/(2*sigma^2))*cos(2*pi*r/lambda)*(1-r^2/R^2)^2 for r<R, zero outside, sigma=4 and R=12. Probe-dialog defaults are now radii 16 and 20 to keep receivers outside this source. Previous 8/12 shells must be regenerated for this controlled run.
+
+Executed the actual canonical Node runtime on a 64^3 experimental diamond lattice, k=0.5, gamma=1, pressure/transport/excitation off. All 26 directions arrived for both fields at both radii for thresholds 1e-6, 1e-7 and 1e-8. Recording cutoff was 67 updates. Position/gradient speed spreads (%): radius 16: threshold 1e-6 -> 10.775/7.988; 1e-7 -> 27.074/24.385; 1e-8 -> 25.266/42.975. Radius 20: 1e-6 -> 4.181/4.926; 1e-7 -> 12.594/9.956; 1e-8 -> 19.580/20.804. Raw report: diamond-probe-propagation-results.csv. No case meets 1%; threshold and radius sensitivity are substantial. These integer first-arrival diagnostics do not establish physical anisotropy or convergence and differ from earlier centroid/group-speed experiments. Temporal/interpolation convergence is not established.
+
+Changed files for this follow-up: src/main/java/remframework/opengl/model/ProbeArrivalMeasurement.java; src/main/java/remframework/gui/view/frames/FrameIsotropy.java; src/main/java/remframework/gui/view/frames/dialogs/FrameAddDiamondProbes.java; src/main/java/remframework/geometry/discovery/research/diamond/DiamondRuntimeDisturbance.java; src/test/java/remframework/lattice/DiamondProbeSamplingTest.java; src/test/java/remframework/lattice/DiamondProbePropagationTest.java (new); docs/research/diamond-lattice-rem-compatibility.md; diamond-probe-propagation-results.csv (generated results). Focused build/tests: 5 sampling/tolerance, 4 arrival, 6 layout, 1 controlled propagation, 1 passive runtime tests passed. Existing packet regression is also run separately.
+
+The preceding stable work was committed as 3539f3b, tagged diamond-lattice-v0.4.0 and pushed with the branch. The following probe implementation is a separate local change.
+
+Diamond mode now has its own Add Probes dialog, alongside the existing cubic placement path. It generates 26 physical directions per equal-radius shell. Targets are x*=center+r*n, with normalized n from nonzero triples in {-1,0,1}. Each sampled field is f(x*)=sum(w_i*f_i): trilinear interpolation on each FCC sublattice, averaged across the two sublattices. Merged weights are nonnegative and sum to one, with at most 16 source nodes. Constant and affine fields are reproduced. Fixed/wall stencils and targets outside the supported domain are rejected rather than extrapolated.
+
+Stencil generation runs in the background. Installation and arrival-baseline capture wait for a completed simulation frame; stale lattice arrays are rejected. Diamond and cubic definitions are retained separately in the session. Passive probes record displacement, velocity and raw local neighbor-distance imbalance even when occupancy pressure and Identity transport are disabled. Sampling does not apply forces or modify occupancy pressure or momentum.
+
+Isotropy exposes live/history, comparison and propagation-arrival views for diamond probes. For a complete equal-radius shell, the apparent arrival-speed spread is 100*(max(1/t)-min(1/t))/mean(1/t), since the common radius cancels. Missing arrivals produce an incomplete result, not zero spread. This threshold-based diagnostic is not a phase/group-speed measurement or proof of isotropy. A controlled source, reflection-free recording window, threshold checks and convergence remain necessary; transport must be disabled for this arrival measurement.
+
+Validation: Maven test lifecycle compiled the project. Focused runs passed 48 tests with no failures/errors: DiamondProbeSamplingTest 4; DiamondProbeRuntimeTest 1; ProbeInterpolationTest 3; InterpolatedProbeTest 2; ProbeComparisonTest 4; ProbeArrivalMeasurementTest 4; FrameIsotropyLayoutTest 6; ProbePlacementTest 11; ProbePlacementCompatibilityTest 2; DiamondTransportRuntimeTest 1; DiamondPressureRuntimeTest 1; DiamondIdentityExcitationTest 1; DiamondRuntimeDisturbanceTest 3; DiamondRuntimeMechanicsTest 5. Native UI verification after restart generated and applied 52 probes and displayed live samples with the application responsive. No directional propagation experiment or physical isotropy verdict was obtained in this change.
+
+Files changed for passive diamond probes:
+- src/main/java/remframework/gui/model/NuklearModel.java
+- src/main/java/remframework/gui/view/frames/FrameIsotropy.java
+- src/main/java/remframework/gui/view/frames/dialogs/FrameAddProbes.java
+- src/main/java/remframework/gui/view/frames/dialogs/FrameAddDiamondProbes.java (new)
+- src/main/java/remframework/opengl/controller/Simulator.java
+- src/main/java/remframework/opengl/controller/TransportSystem.java
+- src/main/java/remframework/opengl/model/DiamondProbePlacement.java (new)
+- src/main/java/remframework/opengl/model/ProbeArrivalMeasurement.java
+- src/main/java/remframework/opengl/model/ProbeDefinition.java
+- src/main/java/remframework/opengl/model/ProbeDetectorType.java
+- src/main/java/remframework/opengl/model/Scene.java
+- src/main/java/remframework/settings/Project.java
+- src/test/java/remframework/lattice/DiamondProbeRuntimeTest.java (new)
+- src/test/java/remframework/lattice/DiamondProbeSamplingTest.java (new)
 - docs/research/diamond-lattice-rem-compatibility.md
 
 The generated lattice/cubic-lattice.toml template is refreshed by existing test/startup behavior; no cubic scientific settings were manually changed. Run preview-diamond-mechanics.cmd or remframework.Main --diamond-mechanics. In normal launch, select Experimental Diamond Mechanics (5 cells) in Preferences, then Pulse + Run; ordinary selection retains project k/gamma values. The old tetrahedral visualizer was closed for the user-requested restart. Next: reproduce the controlled long-wave propagation audit through this main scene path before considering occupancy/transport research.

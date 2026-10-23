@@ -18,6 +18,15 @@ import java.util.Locale;
 public final class ProbeArrivalMeasurement {
     public static final double DEFAULT_POSITION_THRESHOLD = 1.0e-12;
     public static final double DEFAULT_GRADIENT_THRESHOLD = 1.0e-12;
+    public static final double DEFAULT_SPEED_SPREAD_TOLERANCE_PERCENT = 1.0;
+
+    /** A single-run tolerance check; convergence is assessed separately. */
+    public static String toleranceResult(double spread, double tolerancePercent) {
+        if (!Double.isFinite(tolerancePercent) || tolerancePercent <= 0)
+            throw new IllegalArgumentException("Tolerance must be finite and positive");
+        if (!Double.isFinite(spread) || spread < 0) return "Incomplete";
+        return spread <= tolerancePercent ? "Within tolerance (single run)" : "Above tolerance";
+    }
 
     /** Immutable chart/table result for one physical passive probe. */
     public record Result(int ordinal, String probeId, String representedRays,
@@ -155,6 +164,9 @@ public final class ProbeArrivalMeasurement {
                 running, elapsedUpdates, results);
     }
 
+    /** Freezes a recording at its causal cutoff, preserving incomplete arrivals. */
+    public synchronized void finish() { running = false; }
+
     public synchronized void clear() {
         trackedProbes = List.of();
         shell = -1;
@@ -233,5 +245,18 @@ public final class ProbeArrivalMeasurement {
             throw new IllegalArgumentException(String.format(Locale.ROOT,
                     "%s threshold must be finite and positive: %s", name, threshold));
         }
+    }
+
+    /** Equal-radius first-arrival diagnostic; NaN means incomplete, not zero spread. */
+    public static double equalRadiusApparentSpread(List<Result> results, boolean gradient) {
+        if(results.size()<2)return Double.NaN;
+        double min=Double.POSITIVE_INFINITY,max=0,sum=0;
+        for(Result result:results) {
+            long arrival=gradient?result.gradientArrivalUpdate():result.positionArrivalUpdate();
+            if(arrival<=0)return Double.NaN;
+            double inverse=1.0/arrival;
+            min=Math.min(min,inverse);max=Math.max(max,inverse);sum+=inverse;
+        }
+        return 100*(max-min)/(sum/results.size());
     }
 }

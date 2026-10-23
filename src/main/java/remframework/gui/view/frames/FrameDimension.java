@@ -46,7 +46,7 @@ public class FrameDimension extends AbstractFrame {
 	private StringBuffer dimensionZ = new StringBuffer();
 
 	private int width = 400;
-	private int height = 280;
+	private int height = 450;
 	private double leftCol = 0.3;
 	private double rightCol = 0.7;
 
@@ -84,6 +84,12 @@ public class FrameDimension extends AbstractFrame {
                 var estimate=remframework.lattice.DiamondMemoryBudget.estimate(dimension,Long.MAX_VALUE);
                 nk_label_value(ctx,"Peak estimate",String.format("%.0f MiB",estimate.requiredBytes()/1048576.0),leftCol,rightCol);
                 nk_label_value(ctx,"Memory check","After old lattice is released",leftCol,rightCol);
+                Nuklear.nk_layout_row_dynamic(ctx,rowHeight*3,1);
+                Nuklear.nk_label_wrap(ctx,"For full 3D isotropy, keep room for all 26 directions in X, Y and Z. Z=10 is a thin slab, not the bulk 3D experiment. Rebuild probes after resizing.");
+                Nuklear.nk_layout_row_dynamic(ctx,rowHeight,1);
+                if(nk_button_label(ctx,"400 x 400 XY slab preset (Z=4)")) {
+                    dimension.set(400,400,4);dimensionx.setLength(0);dimensionY.setLength(0);dimensionZ.setLength(0);
+                }
             }
             nk_spacer(ctx, spacer1 , 1);
 		Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 3);

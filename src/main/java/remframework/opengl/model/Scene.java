@@ -207,6 +207,9 @@ public class Scene {
 
     /** Removes scene bindings before releasing the lattice graph. */
     public synchronized void releaseLattice() {
+        pendingDiamondProbes.set(null);
+        pendingDiamondArrival.set(null);
+        diamondProbeStatus="Lattice replaced; generate diamond shells";
         clearProbes();
         clearPreviewProbes();
         hiLightedNodes.clear();
@@ -324,16 +327,50 @@ public class Scene {
         probes.add(probe);
     }
 
+    private record PendingDiamondProbes(Object[] nodes,List<ProbeDefinition> definitions) { }
+    private final java.util.concurrent.atomic.AtomicReference<PendingDiamondProbes> pendingDiamondProbes=new java.util.concurrent.atomic.AtomicReference<>();
+    private volatile String diamondProbeStatus="No diamond shells applied";
+    private record PendingDiamondArrival(int shell,double position,double gradient) { }
+    private final java.util.concurrent.atomic.AtomicReference<PendingDiamondArrival> pendingDiamondArrival=new java.util.concurrent.atomic.AtomicReference<>();
+    public String getDiamondProbeStatus() {return diamondProbeStatus;}
+    public void requestDiamondProbeArrival(int shell,double position,double gradient) {
+        project.getRemModel().stopSimulation();
+        pendingDiamondArrival.set(new PendingDiamondArrival(shell,position,gradient));
+    }
+    /** Captures baselines only at the same completed-frame boundary as probe installation. */
+    public void applyPendingDiamondProbeArrival() {
+        var pending=pendingDiamondArrival.getAndSet(null);if(pending==null)return;
+        if(lattice.isMechanicsOnly() && !lattice.isDiamondTransportEnabled())
+            probeArrivalMeasurement.start(List.copyOf(probes),pending.shell(),pending.position(),pending.gradient());
+    }
+    public void requestDiamondProbes(Object[] nodes,List<ProbeDefinition> definitions) {
+        project.getRemModel().stopSimulation();
+        pendingDiamondProbes.set(new PendingDiamondProbes(nodes,List.copyOf(definitions)));
+        diamondProbeStatus="Waiting for completed simulation frame";
+    }
+    /** Called on the display thread only after physics workers finish. */
+    public void applyPendingDiamondProbes() {
+        var pending=pendingDiamondProbes.getAndSet(null);if(pending==null)return;
+        if(!lattice.isMechanicsOnly() || lattice.getNodeArray()!=pending.nodes()) {
+            diamondProbeStatus="Lattice changed; regenerate diamond probes";return;
+        }
+        if(replaceGeneratedProbeDefinitions(pending.definitions())) {
+            project.replaceDiamondProbeDefinitions(pending.definitions());
+            diamondProbeStatus="Applied "+pending.definitions().size()+" diamond probes";
+            if(!probes.isEmpty())selectProbe(probes.getFirst());
+        } else diamondProbeStatus="Probe binding is no longer valid; regenerate shells";
+    }
+
     /** Reconstructs committed probe measurements through TransportSystem after lattice creation. */
     public void updateProbeMeasurements(TransportSystem transportSystem) {
-        if(lattice.isMechanicsOnly()) return;
         for (PassiveObserver probe : probes) {
             if (probe instanceof Probe rawProbe) rawProbe.updateMeasurements(transportSystem);
             else if (probe instanceof InterpolatedProbe interpolatedProbe) {
                 interpolatedProbe.updateMeasurements(transportSystem);
             }
         }
-        probeArrivalMeasurement.sample();
+        if(lattice.isMechanicsOnly() && lattice.isDiamondTransportEnabled())probeArrivalMeasurement.clear();
+        else probeArrivalMeasurement.sample();
     }
 
     /** Reconstructs a renderer-only passive observer without adding a project Identity Occupancy. */
@@ -347,6 +384,8 @@ public class Scene {
 
     private PassiveObserver buildProbe(ProbeDefinition definition, boolean preview) {
         if (lattice.getNodeArray() == null) return null;
+        boolean diamond=definition.getDetectorType()==ProbeDetectorType.DIAMOND_INTERPOLATED;
+        if(diamond!=lattice.isMechanicsOnly())return null;
         if (definition.getDetectorType() == ProbeDetectorType.RAW_NODE) {
             Node node = lattice.getNodeByIndex(definition.getNodeIndex());
             if (node == null) return null;
@@ -363,6 +402,15 @@ public class Scene {
         }
         PassiveObserver.Observation observation = ProbeInterpolation.interpolate(
                 sourceNodes, definition.getInterpolationSources());
+        if(diamond) {
+            Vector3d represented=new Vector3d();
+            for(int i=0;i<sourceNodes.size();i++) {
+                Node n=sourceNodes.get(i);
+                if(n.isWall() || (n.isFixed() && !definition.getPlacement().measurementSpace().equals("Diamond physical XY")))return null;
+                represented.fma(definition.getInterpolationSources().get(i).weight(),n.getEquilibriumPosition());
+            }
+            if(represented.distance(definition.getPlacement().targets().getFirst().requestedCoordinate())>1e-8)return null;
+        }
         double sourceScale = sourceNodes.getFirst().getScale();
         Entity marker = createProbeMarker(
                 definition, observation.position(), sourceScale, preview);
@@ -836,7 +884,7 @@ public class Scene {
             case INTERPOLATED_2D -> {
                 return 40;
             }
-            case INTERPOLATED_3D -> {
+            case INTERPOLATED_3D, DIAMOND_INTERPOLATED -> {
                 return 60;
             }
         }

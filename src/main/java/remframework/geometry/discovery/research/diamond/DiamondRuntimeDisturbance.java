@@ -11,7 +11,11 @@ import remframework.settings.Project;
 
 /** Controlled initial condition only; evolution uses the unchanged runtime Node integrator. */
 public final class DiamondRuntimeDisturbance {
-    public record Request(double wavelength,double amplitude,double receiverOffset,double geometryWavelength) {
+    public record Request(double wavelength,double amplitude,double receiverOffset,double geometryWavelength,
+                          int probeShell,double positionThreshold,double gradientThreshold) {
+        public Request(double wavelength,double amplitude,double receiverOffset,double geometryWavelength) {
+            this(wavelength,amplitude,receiverOffset,geometryWavelength,-1,1e-12,1e-12);
+        }
         public Request(double wavelength,double amplitude,double receiverOffset) {this(wavelength,amplitude,receiverOffset,wavelength);}
         public double supportRadius() {return 1.5*geometryWavelength;}
         public Request(double wavelength,double amplitude) {this(wavelength,amplitude,0);}
@@ -26,6 +30,21 @@ public final class DiamondRuntimeDisturbance {
     public String resultsLabel() {return retainedResults?"Previous run (retained)":running?"Current run":"Completed run";}
     private DiamondRuntimeReceivers receivers,outerReceivers;
     private int outerSafeSteps;
+    private boolean controlledProbeRun;
+    private boolean slabProbeRun;
+    /** Controlled probe experiment: fixed source, all directions in the chosen shell. */
+    public void requestProbeRun(int shell,double positionThreshold,double gradientThreshold) {
+        requestProbeRun(8,shell,positionThreshold,gradientThreshold);
+    }
+    /** Source support scales with wavelength; amplitude remains in the linear regime. */
+    public void requestProbeRun(double wavelength,int shell,double positionThreshold,double gradientThreshold) {
+        if(!Double.isFinite(wavelength) || wavelength<2)
+            throw new IllegalArgumentException("Wavelength must be finite and at least 2 bond lengths");
+        if(shell<0 || !Double.isFinite(positionThreshold) || positionThreshold<=0
+            || !Double.isFinite(gradientThreshold) || gradientThreshold<=0)
+            throw new IllegalArgumentException("Valid shell and positive finite thresholds required");
+        pending.set(new Request(wavelength,.001,0,wavelength,shell,positionThreshold,gradientThreshold));
+    }
     private volatile String troughSummary="Candidate trough experiment not started";
     private volatile List<DiamondTwoRadiusSpeed.Measurement> troughMeasurements=List.of();
     public String troughSummary() {return troughSummary;}
@@ -85,6 +104,9 @@ public final class DiamondRuntimeDisturbance {
     public void initializePending(Lattice lattice) {
         Request request=pending.getAndSet(null);if(request==null) return;
         running=false;
+        controlledProbeRun=false;
+        slabProbeRun=false;
+        if(request.probeShell()>=0)Project.getInstance().scene.getProbeArrivalMeasurement().clear();
         if(lattice.isDiamondIdentityExcitationEnabled() || lattice.isDiamondPressureEnabled() || lattice.isDiamondTransportEnabled()) {
             reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Disable Identity excitation, occupancy pressure and transport before a controlled packet measurement.");return;
         }
@@ -95,6 +117,28 @@ public final class DiamondRuntimeDisturbance {
             reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Use wavelength >= 2 (long-wave comparison >= 8), amplitude (0, 0.01], receiver offset [0, 1], and 0 < gamma*k^2 <= 1 in diamond mechanics.");return;
         }
         var nodes=lattice.getNodeArray();var center=lattice.getPhysicalSliceCenter();double support=request.supportRadius();
+        var planarProbes=project.scene.getProbes().stream().filter(p->p.getDefinition()!=null
+            && p.getDefinition().getPlacement()!=null
+            && p.getDefinition().getPlacement().measurementSpace().equals("Diamond physical XY")
+            && p.getDefinition().getPlacement().targets().stream().anyMatch(t->t.shell()==request.probeShell())).toList();
+        double halfDepth=0;for(Object value:nodes)halfDepth=Math.max(halfDepth,Math.abs(((Node)value).getEquilibriumPosition().z-center.z));
+        if(request.probeShell()>=0 && planarProbes.size()==8 && halfDepth<=support+1) {
+            if(planarProbes.stream().anyMatch(p->p.getDefinition().getPlacement().targets().getFirst().requestedRadius()<=support+1)) {
+                reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"XY receivers must be outside source support "+support);return;
+            }
+            // Explicit thin-slab experiment: existing fixed surfaces remain part of the response.
+            for(Object value:nodes) {
+                Node n=(Node)value;var p=n.getEquilibriumPosition();double radius=Math.hypot(p.x-center.x,p.y-center.y);
+                n.setPosition(new Vector3d(p));n.updatePosition();n.getVelocity().zero();n.getAcceleration().zero();n.getForce().zero();
+                n.getEField().v.zero();n.getEField().a.zero();n.getBField().v.zero();n.getBField().a.zero();
+                if(!n.isFixed()){n.setPosition(new Vector3d(p).add(displacement(radius,request),0,0));n.updatePosition();}
+            }
+            receivers=null;outerReceivers=null;pairedMeasurements=List.of();troughMeasurements=List.of();
+            steps=0;safeSteps=200;running=true;retainedResults=false;controlledProbeRun=true;slabProbeRun=true;
+            project.scene.updateProbeMeasurements(remframework.opengl.controller.TransportSystem.getInstance());
+            project.scene.getProbeArrivalMeasurement().start(planarProbes,request.probeShell(),request.positionThreshold(),request.gradientThreshold());
+            report(GeometryConfigurationStatusCode.GENERATED,"XY thin slab: wavelength "+request.wavelength()+"; 200-update recording; fixed surface effects INCLUDED. Not a reflection-free bulk test.");return;
+        }
         for(Object value:nodes) {Node n=(Node)value;
             if(n.getType()==EntityType.FIXED && n.getEquilibriumPosition().distance(center)<=support+1) {
                 reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Domain too small for wavelength "+request.wavelength()+". Increase dimensions; source radius is "+support+" bond lengths.");return;
@@ -122,6 +166,23 @@ public final class DiamondRuntimeDisturbance {
             });
         } else twoRadiusSummary="Outer receivers unavailable; increase dimensions. "+outerReceivers.failure();
         if(safeSteps<1) {reject(GeometryConfigurationStatusCode.NO_REALIZATION_FOUND_WITHIN_SEARCH_LIMITS,"No reflection-free receiver window; increase dimensions.");return;}
+        var selectedProbes=project.scene.getProbes().stream().filter(p->p.getDefinition()!=null
+            && p.getDefinition().getDetectorType()==remframework.opengl.model.ProbeDetectorType.DIAMOND_INTERPOLATED
+            && p.getDefinition().getPlacement().targets().stream().anyMatch(t->t.shell()==request.probeShell())).toList();
+        if(request.probeShell()>=0) {
+            project.scene.getProbeArrivalMeasurement().clear();
+            boolean planar=selectedProbes.size()==8 && selectedProbes.stream().allMatch(p->p.getDefinition().getPlacement().measurementSpace().equals("Diamond physical XY"));
+            if((selectedProbes.size()!=26 && !planar) || selectedProbes.stream().anyMatch(p->p.getDefinition().getPlacement().targets().stream()
+                .anyMatch(t->t.requestedRadius()<=support+1))) {
+                reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Apply a complete 8-direction XY or 26-direction XYZ shell outside source support "+support+". Recommended first radius "+(support+4)+", then "+(support+8)+".");return;
+            }
+            var probeNodes=selectedProbes.stream().flatMap(p->p.getOccupancies().stream()).map(Occupancy::getNode).distinct().toList();
+            int probeSafe=DiamondReflectionWindow.safeSteps(sources,boundaries,probeNodes,node->{
+                var neighbors=new ArrayList<Node>(4);for(Neighbor slot:Neighbor.values()){Node other=node.getNeighbor(slot);if(other!=null)neighbors.add(other);}return neighbors;
+            });
+            safeSteps=Math.min(safeSteps,probeSafe);
+            if(safeSteps<1) {reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"No reflection-free probe window; increase dimensions.");return;}
+        }
         for(Object value:nodes) {Node n=(Node)value;
             n.setPosition(new Vector3d(n.getEquilibriumPosition()));n.updatePosition();n.getVelocity().zero();n.getAcceleration().zero();n.getForce().zero();
             n.getEField().v.zero();n.getEField().a.zero();n.getBField().v.zero();n.getBField().a.zero();
@@ -131,6 +192,11 @@ public final class DiamondRuntimeDisturbance {
             }
         }
         steps=0;retainedResults=false;running=true;
+        if(request.probeShell()>=0) {
+            project.scene.updateProbeMeasurements(remframework.opengl.controller.TransportSystem.getInstance());
+            project.scene.getProbeArrivalMeasurement().start(selectedProbes,request.probeShell(),request.positionThreshold(),request.gradientThreshold());
+            controlledProbeRun=true;
+        }
         report(GeometryConfigurationStatusCode.GENERATED,"Wavelength "+request.wavelength()+"; amplitude "+request.amplitude()+"; steps 0/"+safeSteps+". X-polarized radial packet; no isotropy measurement yet.");
     }
     /** Called once after all Node workers finish, independent of rendered FPS. */
@@ -143,6 +209,10 @@ public final class DiamondRuntimeDisturbance {
         if(receivers!=null) receivers.sample(steps);
         if(outerReceivers!=null && outerReceivers.failure()==null && steps<=outerSafeSteps)outerReceivers.sample(steps);
         if(steps>=safeSteps) {running=false;project.getRemModel().stopSimulation();
+            if(controlledProbeRun)project.scene.getProbeArrivalMeasurement().finish();
+            if(slabProbeRun) {
+                report(GeometryConfigurationStatusCode.GEOMETRIC_SYMMETRY_UNKNOWN,"Paused XY slab at 200 updates. Fixed surface effects INCLUDED; in-plane diagnostic only, bulk isotropy not assessed.");return;
+            }
             if(outerReceivers!=null && outerReceivers.failure()==null) {
                 var inner=receivers.recordedSignals();var outer=outerReceivers.recordedSignals();var paired=new ArrayList<DiamondTwoRadiusSpeed.Measurement>();
                 for(int p=0;p<26;p++){int count=Math.min(inner[p].length,outer[p].length);paired.add(DiamondTwoRadiusSpeed.measure(Arrays.copyOf(inner[p],count),Arrays.copyOf(outer[p],count),4));}

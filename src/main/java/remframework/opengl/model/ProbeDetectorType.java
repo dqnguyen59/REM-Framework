@@ -4,5 +4,6 @@ package remframework.opengl.model;
 public enum ProbeDetectorType {
     RAW_NODE,
     INTERPOLATED_2D,
-    INTERPOLATED_3D
+    INTERPOLATED_3D,
+    DIAMOND_INTERPOLATED
 }

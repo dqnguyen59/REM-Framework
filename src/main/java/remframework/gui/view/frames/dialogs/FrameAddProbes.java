@@ -77,9 +77,9 @@ public final class FrameAddProbes extends AbstractFrame {
         probesPerPlane = threeDimensional ? retained3DProbesPerPlanePerShell
                                           : retained2DProbesPerShell;
         activeProbeSpace = calculateActiveProbeSpace();
-        editing = project.getProbeDefinitions().stream().anyMatch(ProbeDefinition::isGenerated);
+        editing = project.getProbeDefinitions().stream().anyMatch(d->d.isGenerated() && d.getDetectorType()!=ProbeDetectorType.DIAMOND_INTERPOLATED);
         existingGeneratedDefinitions = project.getProbeDefinitions().stream()
-                .filter(ProbeDefinition::isGenerated).map(definition -> definition.withId(definition.getId()))
+                .filter(d->d.isGenerated() && d.getDetectorType()!=ProbeDetectorType.DIAMOND_INTERPOLATED).map(definition -> definition.withId(definition.getId()))
                 .toList();
         if (editing) {
             interpolatedBinding = existingGeneratedDefinitions.getFirst().getDetectorType()
@@ -365,7 +365,7 @@ public final class FrameAddProbes extends AbstractFrame {
 
     private void removeStaleGeneratedProbes(boolean effectiveSpaceChanged) {
         List<ProbeDefinition> generated = project.getProbeDefinitions().stream()
-                .filter(ProbeDefinition::isGenerated).toList();
+                .filter(d->d.isGenerated() && d.getDetectorType()!=ProbeDetectorType.DIAMOND_INTERPOLATED).toList();
         if (generated.isEmpty()) return;
         List<ProbePlacement.ProbeReport> reports = ProbePlacement.describe(center, generated);
         int targetCount = generated.stream().filter(definition -> definition.getPlacement() != null)

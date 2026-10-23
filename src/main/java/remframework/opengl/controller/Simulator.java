@@ -1135,7 +1135,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
 
     private void createIsotropyProbe() {
         scene.clearProbes();
-        if(scene.getLattice().isMechanicsOnly()) return;
+        if(scene.getLattice().isMechanicsOnly()) {
+            for(var definition:project.getProbeDefinitions())
+                if(definition.getDetectorType()==remframework.opengl.model.ProbeDetectorType.DIAMOND_INTERPOLATED)
+                    scene.createProbe(definition,false);
+            return;
+        }
         Object[] nodeArray = scene.getLattice().getNodeArray();
         if (nodeArray == null || nodeArray.length == 0) return;
         String filename = project.getCurrentFilename();
@@ -1148,7 +1153,7 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                     new Vector4f(0.2f, 0.8f, 1.0f, 1.0f)));
         }
         List<ProbeDefinition> generated = project.getProbeDefinitions().stream()
-                .filter(ProbeDefinition::isGenerated).toList();
+                .filter(d->d.isGenerated() && d.getDetectorType()!=remframework.opengl.model.ProbeDetectorType.DIAMOND_INTERPOLATED).toList();
         Vector3i centerIndex = new Vector3i(project.getDimensionX() / 2,
                                             project.getDimensionY() / 2,
                                             project.getDimensionZ() / 2);
@@ -1371,6 +1376,8 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         // frame boundary. GUI interaction itself is never delayed while one is pending.
         if (!calculationPending) {
             checkSettingsChanged();
+            scene.applyPendingDiamondProbes();
+            scene.applyPendingDiamondProbeArrival();
             if (scene.getLattice().applyPendingAbsorptionLayerChange()) {
                 renderMatricesDirty = true;
             }
