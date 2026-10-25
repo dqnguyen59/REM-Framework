@@ -103,7 +103,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
     private              boolean         leftButtonPressed             = false;
     private              boolean         rightButtonPress              = false;
     private              boolean         isDrawing;
-    private volatile     boolean         isRenderingReady;
     private              boolean         isLoadingStarted;
     private              boolean         isNodesUpdateRequired;
     private              boolean         renderMatricesDirty = true;
@@ -201,8 +200,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         scene.orbitCameraAroundTarget(45.0f, 0.0f, 0.0f);
 
         // Create a default scene with xyz nodes.
-        project.setDimension(appSettings.getDefaultDimensionX(), appSettings.getDefaultDimensionY(),
-                             appSettings.getDefaultDimensionZ());
+        var startupSize = appSettings.startupDimensions(
+                remframework.lattice.LatticeManager.getInstance().selected().model().mechanicsOnly());
+        project.setDimension(startupSize.x, startupSize.y, startupSize.z);
         // The scene is (re)build when settings has been changed and reset, see checksettingsChanged().
         project.reset();
     }
@@ -824,13 +824,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             project.terrain.updateTransformationMatrix();
     }
 
-    private void waitForRenderingReady() {
-        while (!isRenderingReady) {
-            System.out.println("waitForRenderingReady()");
-            Utils.sleepMS(1);
-        }
-    }
-
     /** Waits only for shutdown or another terminal transition. */
     private void waitForNextFrameIsReady() {
         frameCalculation.awaitComplete();
@@ -1205,7 +1198,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 if(!estimate.allowed()) {
                     scene.getLattice().reportDiamondSizeFailure(estimate);
                     remModel.stopSimulation();remModel.setLoadingReady(true);
-                    nuklearModel.closeFrame(Frame.progress);
                     nuklearModel.showErrorDialog("Cannot Build Diamond Lattice",estimate.error());
                     return;
                 }
@@ -1391,6 +1383,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
             // Make sure it is not doing any calculation while updating new scene.
             if (remModel.isLoadingReady()) {
                 updateNodesArray();
+                var loadedSize = new org.joml.Vector3i();
+                project.getDimension(loadedSize);
+                if (scene.getLattice().getNodeArray() != null
+                        && scene.getLattice().getNodeArray().length > 0)
+                    appSettings.rememberDimensions(loadedSize);
                 // Constructor-time child matrices predate the final root rotation. Initialize
                 // both buffers before the newly loaded lattice is rendered for the first time.
                 refreshRenderMatrices();
@@ -1405,8 +1402,11 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                 isLoadingStarted = false;
                 System.out.println("isLoadingStarted: " + isLoadingStarted);
             }
-        } else if (!calculationPending && !updateLimitReached) {
-            waitForRenderingReady();
+        } else if (!calculationPending && !updateLimitReached
+                && scene.getLattice().getNodeArray() != null
+                && scene.getLattice().getNodeArray().length > 0) {
+            // An initially rejected build has no lattice. Keep presenting the GUI so
+            // dimensions can be corrected, without starting physics or matrix updates.
             resetMonitoringDeadThreads();
 
             // Animation changes frame input only at a completed calculation boundary.
@@ -1451,7 +1451,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         scene.updateCameraTransition(1.0 / 60.0);
 
         PerformanceMonitor.start(Measurement.sendToGPU);
-        isRenderingReady = false;
 
         // Submit a complete membership/camera snapshot to the independent 3D context. The
         // display context presents its latest finished texture immediately and never waits for
@@ -1464,7 +1463,6 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         offscreen3DRenderer.request(renderState, project.camera, scene,
                 glWindow.getWidth(), glWindow.getHeight());
         offscreen3DRenderer.presentLatest(glWindow.getWidth(), glWindow.getHeight());
-        isRenderingReady = true;
         PerformanceMonitor.stop(Measurement.sendToGPU);
 
         finishGuiFrame();

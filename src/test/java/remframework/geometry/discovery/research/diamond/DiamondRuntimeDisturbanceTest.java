@@ -9,6 +9,17 @@ import remframework.settings.*;
 import remframework.geometry.discovery.GeometryConfigurationStatusCode;
 import static org.junit.jupiter.api.Assertions.*;
 class DiamondRuntimeDisturbanceTest {
+    @Test void probeRunAcceptsConfiguredLargeAndSmallAmplitudes() {
+        var experiment = new DiamondRuntimeDisturbance();
+        for (double amplitude : new double[]{.001, 10, 25}) {
+            assertDoesNotThrow(() -> experiment.requestProbeRun(8, amplitude, 0, 1e-7, 1e-7));
+            var request = new DiamondRuntimeDisturbance.Request(8, amplitude);
+            assertEquals(amplitude, DiamondRuntimeDisturbance.displacement(0, request));
+        }
+        for (double invalid : new double[]{0, -1, Double.NaN, Double.POSITIVE_INFINITY})
+            assertThrows(IllegalArgumentException.class, () -> experiment.requestProbeRun(8, invalid, 0, 1e-7, 1e-7));
+        experiment.cancel();
+    }
     @Test void probeWavelengthIsConfigurableAndValidated() {
         var experiment=new DiamondRuntimeDisturbance();
         for(double wavelength:new double[]{2,4,6,8,12,16}) {

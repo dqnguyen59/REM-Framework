@@ -11,12 +11,18 @@ public final class DiamondRuntimeReceivers {
     private final List<Probe> probes=new ArrayList<>();
     private final double[] arrivals=new double[26], previous=new double[26];
     private final double radius, threshold;
+    private final DiamondExcitationAxis excitationAxis;
     private String failure;
     private final DiamondThresholdSensitivity sensitivity;
     public List<DiamondThresholdSensitivity.Comparison> thresholdComparisons() {return sensitivity.compare();}
     public double[][] recordedSignals() {return sensitivity.recordedSignals();}
     public DiamondRuntimeReceivers(Lattice lattice,double wavelength,double amplitude) {this(lattice,wavelength,amplitude,0);}
     public DiamondRuntimeReceivers(Lattice lattice,double wavelength,double amplitude,double radiusOffset) {
+        this(lattice,wavelength,amplitude,radiusOffset,DiamondExcitationAxis.X);
+    }
+    public DiamondRuntimeReceivers(Lattice lattice,double wavelength,double amplitude,double radiusOffset,DiamondExcitationAxis excitationAxis) {
+        this.excitationAxis=java.util.Objects.requireNonNull(excitationAxis);
+        if(excitationAxis==DiamondExcitationAxis.AUTO)throw new IllegalArgumentException("Resolved receiver polarization required");
         nodes=Arrays.stream(lattice.getNodeArray()).map(n->(Node)n).toArray(Node[]::new);
         radius=1.5*wavelength+4+radiusOffset;threshold=amplitude*1e-4;sensitivity=new DiamondThresholdSensitivity(26,amplitude,radius);Arrays.fill(arrivals,Double.NaN);
         // Runtime axes are conventional crystal axes; the research sampler uses
@@ -52,7 +58,7 @@ public final class DiamondRuntimeReceivers {
             var stencil=probes.get(p).stencil();double displacement=0;
             for(int i=0;i<stencil.nodes().size();i++) {
                 var node=nodes[stencil.nodes().get(i)];
-                displacement+=stencil.weights().get(i)*(node.getPosBuff().x-node.getEquilibriumPosition().x);
+                displacement+=stencil.weights().get(i)*(excitationAxis.component(node.getPosBuff())-excitationAxis.component(node.getEquilibriumPosition()));
             }
             signal[p]=displacement;
             double value=Math.abs(displacement);

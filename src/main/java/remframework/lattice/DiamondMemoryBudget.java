@@ -39,7 +39,18 @@ public final class DiamondMemoryBudget {
         return new MemoryAvailability(runtime.maxMemory(),runtime.totalMemory()-runtime.freeMemory(),systemFree,runtime.freeMemory());
     }
     public static long availableBudget() {return memoryAvailability().budgetBytes();}
-    public static Estimate estimate(Vector3i size) {return estimate(size, availableBudget());}
+    public static Estimate estimate(Vector3i size) {
+        var memory = memoryAvailability();
+        var result = estimate(size, memory.budgetBytes());
+        if (result.allowed() || result.code() != GeometryConfigurationStatusCode.RESOURCE_LIMIT_REACHED)
+            return result;
+        return new Estimate(result.nodes(), result.requiredBytes(), result.budgetBytes(),
+                result.error() + String.format(
+                    "\nLimiting resource: %s. Java heap ceiling: %.0f MiB; heap used: %.0f MiB; free system RAM: %.0f MiB."
+                    + "\nThe safe budget retains a 25%% reserve. For a higher Java heap ceiling, edit maximumHeapPercent in run-settings.json and restart using run.bat.",
+                    memory.limitingResource(), memory.heapMaximumBytes()/1048576.0,
+                    memory.heapUsedBytes()/1048576.0, memory.freeSystemBytes()/1048576.0), result.code());
+    }
     public static Estimate estimate(Vector3i size, long budgetBytes) {
         if (!ExperimentalDiamondLatticeModel.validDimensions(size))
             return new Estimate(0, 0, budgetBytes, "Diamond dimensions must be even values of at least 2.", GeometryConfigurationStatusCode.INVALID_PARAMETERS);

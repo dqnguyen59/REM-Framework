@@ -24,9 +24,25 @@ public final class DiamondProbePlacement {
         return create(values,firstRadius,spacing,shells,false);
     }
     public static List<ProbeDefinition> create(Object[] values,int firstRadius,int spacing,int shells,boolean xyOnly) {
+        return create(values,firstRadius,spacing,shells,xyOnly,8);
+    }
+    public static boolean validXYDirectionCount(int count) {
+        return count==8 || count==16 || count==32 || count==64;
+    }
+    public static List<Vector3d> xyDirections(int count) {
+        if(!validXYDirectionCount(count))throw new IllegalArgumentException("Choose 8, 16, 32 or 64 XY directions");
+        var directions=new ArrayList<Vector3d>(count);
+        for(int ray=0;ray<count;ray++) {
+            double angle=2*Math.PI*ray/count;
+            directions.add(new Vector3d(Math.cos(angle),Math.sin(angle),0));
+        }
+        return List.copyOf(directions);
+    }
+    public static List<ProbeDefinition> create(Object[] values,int firstRadius,int spacing,int shells,boolean xyOnly,int xyDirectionCount) {
+        var directions=xyOnly?xyDirections(xyDirectionCount):DiamondDirectionalComparison.directions();
         if(values==null || values.length==0)throw new IllegalArgumentException("Load a diamond lattice first");
-        if(firstRadius<1 || spacing<1 || shells<1 || shells>4096/26)
-            throw new IllegalArgumentException("Positive radius/spacing and 1..157 shells required (4096 probe budget)");
+        if(firstRadius<1 || spacing<1 || shells<1 || shells>4096/directions.size())
+            throw new IllegalArgumentException("Positive radius/spacing and at most "+(4096/directions.size())+" shells required (4096 probe budget)");
         long largest=firstRadius+(long)(shells-1)*spacing;
         if(largest>Integer.MAX_VALUE)throw new IllegalArgumentException("Requested radius overflows integer capacity");
         Node[] nodes=new Node[values.length];Vector3d minimum=new Vector3d(Double.POSITIVE_INFINITY),center=new Vector3d();
@@ -48,8 +64,7 @@ public final class DiamondProbePlacement {
         List<ProbeDefinition> definitions=new ArrayList<>();
         for(int shell=0;shell<shells;shell++) {
             int radius=firstRadius+shell*spacing;int ray=0;
-            for(Vector3d direction:DiamondDirectionalComparison.directions()) {
-                if(xyOnly && direction.z!=0)continue;
+            for(Vector3d direction:directions) {
                 Vector3d target=new Vector3d(direction).mul(radius).add(center);
                 var receiver=sampler.receiver(rotation.transform(new Vector3d(target).sub(minimum)),"shell "+(shell+1)+", direction "+(ray+1));
                 List<ProbeDefinition.InterpolationSource> sources=new ArrayList<>();

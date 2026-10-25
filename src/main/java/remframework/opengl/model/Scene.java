@@ -71,10 +71,22 @@ public class Scene {
     private final ProbeComparison comparison = new ProbeComparison();
     private final ProbeArrivalMeasurement probeArrivalMeasurement =
             new ProbeArrivalMeasurement();
+    private final ProbeShellArrivalReport probeShellArrivalReport=new ProbeShellArrivalReport();
+    public void startDiamondProbeMeasurements(List<? extends PassiveObserver> selected,int shell,double position,double gradient) {
+        probeArrivalMeasurement.start(selected,shell,position,gradient);
+        probeShellArrivalReport.start(selected,position,gradient);
+    }
+    public void clearProbeArrivalMeasurements(){probeArrivalMeasurement.clear();probeShellArrivalReport.clear();}
+    public void finishProbeArrivalMeasurements(){probeArrivalMeasurement.finish();probeShellArrivalReport.finish();}
     private final Map<PassiveObserver, Entity> gradientArrowEntities = new IdentityHashMap<>();
     private ObjFileModel gradientArrowModel;
     private boolean showGradientArrows = true;
     private double gradientArrowScaleExponent = 70.0;
+    private ProbeArrowQuantity probeArrowQuantity = ProbeArrowQuantity.CYCLE_IMBALANCE;
+
+    public void setProbeArrowQuantity(ProbeArrowQuantity quantity) {
+        probeArrowQuantity = java.util.Objects.requireNonNull(quantity);
+    }
     private boolean showCalibrationArrow;
     private CalibrationDirection calibrationDirection = CalibrationDirection.NEGATIVE_X;
     private Entity calibrationArrow;
@@ -341,7 +353,7 @@ public class Scene {
     public void applyPendingDiamondProbeArrival() {
         var pending=pendingDiamondArrival.getAndSet(null);if(pending==null)return;
         if(lattice.isMechanicsOnly() && !lattice.isDiamondTransportEnabled())
-            probeArrivalMeasurement.start(List.copyOf(probes),pending.shell(),pending.position(),pending.gradient());
+            startDiamondProbeMeasurements(List.copyOf(probes),pending.shell(),pending.position(),pending.gradient());
     }
     public void requestDiamondProbes(Object[] nodes,List<ProbeDefinition> definitions) {
         project.getRemModel().stopSimulation();
@@ -369,8 +381,8 @@ public class Scene {
                 interpolatedProbe.updateMeasurements(transportSystem);
             }
         }
-        if(lattice.isMechanicsOnly() && lattice.isDiamondTransportEnabled())probeArrivalMeasurement.clear();
-        else probeArrivalMeasurement.sample();
+        if(lattice.isMechanicsOnly() && lattice.isDiamondTransportEnabled())clearProbeArrivalMeasurements();
+        else {probeArrivalMeasurement.sample();probeShellArrivalReport.sample();}
     }
 
     /** Reconstructs a renderer-only passive observer without adding a project Identity Occupancy. */
@@ -516,10 +528,13 @@ public class Scene {
                     && probe.getId().startsWith(ProbeDefinition.GENERATED_ID_PREFIX)) continue;
             Entity arrow = gradientArrowEntities.computeIfAbsent(probe, this::createGradientArrow);
             Vector3d anchor = probe.getMarker().getPosition();
-            Vector3d localArrowVector = new Vector3d(probe.getStableGradientImbalance())
-                    .mul(getGradientArrowScale());
+            Vector3d localArrowVector = probeArrowQuantity.read(probe, new Vector3d());
+            double visualLength = GradientArrowGeometry.probeVisualLength(
+                    localArrowVector.length(), getGradientArrowScale());
+            // Normalize only the renderer's copy; preserve raw passive observations.
+            if (visualLength > 0) localArrowVector.normalize();
             updateArrowFromLocalVector(arrow, anchor, localArrowVector,
-                    localArrowVector.length(),
+                    visualLength,
                     new Vector4f(probe.getMarker().getMaterial().getAmbientColor()));
             if (!arrow.isVisible()) continue;
             visible.add(arrow);
@@ -609,7 +624,7 @@ public class Scene {
 
     /** Atomically replaces generated probe markers while preserving manually created receivers. */
     public boolean replaceGeneratedProbeDefinitions(List<ProbeDefinition> definitions) {
-        probeArrivalMeasurement.clear();
+        clearProbeArrivalMeasurements();
         clearInspectionState();
         if (neighborhoodInspectionActive) exitNeighborhoodInspection();
         hideGradientArrows();
@@ -646,7 +661,7 @@ public class Scene {
 
     /** Removes all probe markers and restores the ordinary lattice render state. */
     public void clearProbes() {
-        probeArrivalMeasurement.clear();
+        clearProbeArrivalMeasurements();
         clearInspectionState();
         if (neighborhoodInspectionActive) exitNeighborhoodInspection();
         clearCalibrationArrow();

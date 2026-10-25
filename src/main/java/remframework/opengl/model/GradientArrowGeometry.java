@@ -8,6 +8,16 @@ public final class GradientArrowGeometry {
     /** The verified arrow mesh axis runs from local z=0 to local z=13. */
     public static final double MESH_LENGTH = 13.0;
     public static final double CALIBRATION_LENGTH = 10.0;
+    /** Display-only limit; measured gradients are never clamped. */
+    public static final double MAX_PROBE_ARROW_LENGTH = 6.0;
+
+    public static double probeVisualLength(double magnitude, double gain) {
+        if (!Double.isFinite(magnitude) || magnitude <= 0
+                || !Double.isFinite(gain) || gain <= 0) return 0;
+        // Compare before multiplying so extreme finite signals cannot overflow.
+        if (magnitude >= MAX_PROBE_ARROW_LENGTH / gain) return MAX_PROBE_ARROW_LENGTH;
+        return magnitude * gain;
+    }
 
     private GradientArrowGeometry() {
     }

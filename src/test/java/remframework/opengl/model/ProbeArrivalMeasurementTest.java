@@ -16,6 +16,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProbeArrivalMeasurementTest {
+    @Test void interpolatesOnlyConsecutiveBracketedThresholdCrossings() {
+        assertEquals(100.375,ProbeArrivalMeasurement.thresholdCrossing(100,101,.2,1,.5),1e-12);
+        assertEquals(.25,ProbeArrivalMeasurement.thresholdCrossing(0,1,0,2,.5),1e-12);
+        assertTrue(Double.isNaN(ProbeArrivalMeasurement.thresholdCrossing(100,102,.2,1,.5)));
+        assertTrue(Double.isNaN(ProbeArrivalMeasurement.thresholdCrossing(100,101,.2,.4,.5)));
+    }
 
     @Test
     void recordsFirstPositionAndGradientChangesAndCombinesTheirArrival() {
@@ -32,6 +38,7 @@ class ProbeArrivalMeasurementTest {
         measurement.sample();
         ProbeArrivalMeasurement.Result first = measurement.snapshot().results().getFirst();
         assertEquals(1, first.positionArrivalUpdate());
+        assertEquals(.5,first.positionEstimatedArrival(),1e-12);
         assertEquals(-1, first.gradientArrivalUpdate());
         assertEquals(-1, first.combinedArrivalUpdate());
 
@@ -43,6 +50,7 @@ class ProbeArrivalMeasurementTest {
         ProbeArrivalMeasurement.Result result = complete.results().getFirst();
         assertEquals(1, result.positionArrivalUpdate());
         assertEquals(2, result.gradientArrivalUpdate());
+        assertEquals(1.5,result.gradientEstimatedArrival(),1e-12);
         assertEquals(2, result.combinedArrivalUpdate());
         assertTrue(complete.complete());
         assertFalse(complete.running());

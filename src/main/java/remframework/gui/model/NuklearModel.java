@@ -289,10 +289,13 @@ public class NuklearModel {
 	}
 	
 	public void closeFrame(Frame frame) {
-		AbstractFrame instance = framesMap.get(frame);
+		AbstractFrame instance = framesMap.remove(frame);
+		if (instance == null) return;
 		if (instance.isDialog()) dialogActiveCount--;
-		addFrame2Remove(instance);
-		framesMap.remove(frame);
+		// A frame can be closed before the next render installs its queued addition.
+		frames2Add.remove(instance);
+		if (visibleFrames.contains(instance)) addFrame2Remove(instance);
+		if (focusedFrame == instance) focusedFrame = null;
 	}
 
 	public void toggleFrame(Frame frame) {

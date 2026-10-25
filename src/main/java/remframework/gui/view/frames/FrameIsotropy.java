@@ -15,6 +15,7 @@ import remframework.opengl.model.PassiveObserver;
 import remframework.opengl.model.InterpolatedProbe;
 import remframework.opengl.model.Probe;
 import remframework.opengl.model.ProbeArrivalMeasurement;
+import remframework.opengl.model.ProbeShellArrivalReport;
 import remframework.opengl.model.ProbeDefinition;
 import remframework.opengl.model.ProbeDetectorType;
 import remframework.opengl.model.ProbeComparison;
@@ -52,6 +53,13 @@ public final class FrameIsotropy extends AbstractFrame {
     private final StringBuffer toleranceBuffer = new StringBuffer();
     private double controlledWavelength=8;
     private final StringBuffer wavelengthBuffer=new StringBuffer();
+    private final StringBuffer maximumUpdatesBuffer=new StringBuffer();
+    private final StringBuffer amplitudeBuffer=new StringBuffer();
+    private String shellReportExportStatus="";
+    private boolean showShellArrivalTimes;
+    private boolean showRawThresholdReport;
+    private boolean showReversalTiming;
+    private boolean showCycleTiming = true;
     private boolean inspectorPositionedForSession;
     private boolean diamondViewInitialized;
 
@@ -171,10 +179,18 @@ public final class FrameIsotropy extends AbstractFrame {
             return;
         }
 
-        section(ctx, "Gradient visualization");
-        project.scene.setShowGradientArrows(nk_check_label(ctx, "Show gradient imbalance arrows",
+        section(ctx, "Probe arrows");
+        project.scene.setShowGradientArrows(nk_check_label(ctx, "Show probe arrows",
                                                             project.scene.isShowGradientArrows(), 0.7, 0.3));
-        scalar(ctx, "Gradient arrow scale exponent",
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),2);
+        Nuklear.nk_label(ctx,"Arrow quantity",Nuklear.NK_TEXT_LEFT);
+        try(var stack=org.lwjgl.system.MemoryStack.stackPush()) {
+            var quantities=remframework.opengl.model.ProbeArrowQuantity.values();
+            var options=java.util.Arrays.stream(quantities).map(remframework.opengl.model.ProbeArrowQuantity::label).toArray(String[]::new);
+            var selected=nk_combo_options(ctx,stack,options,project.scene.getProbeArrowQuantity().label());
+            for(var quantity:quantities)if(quantity.label().equals(selected))project.scene.setProbeArrowQuantity(quantity);
+        }
+        scalar(ctx, "Arrow scale exponent",
                Integer.toString((int) project.scene.getGradientArrowScaleExponent()));
         project.scene.setGradientArrowScaleExponent(
                 Math.rint(nk_slider(ctx, 0.0, project.scene.getGradientArrowScaleExponent(), 120.0, 1)));
@@ -186,6 +202,9 @@ public final class FrameIsotropy extends AbstractFrame {
         if (probe == null) {
             scalar(ctx, "Probe", "None");
         } else {
+            var arrowVector=project.scene.getProbeArrowQuantity().read(probe,new Vector3d());
+            scalar(ctx,"Arrow vector (local XYZ)",String.format(Locale.ROOT,"%.5g, %.5g, %.5g",arrowVector.x,arrowVector.y,arrowVector.z));
+            scalar(ctx,"Arrow vector magnitude",format(arrowVector.length()));
             Nuklear.nk_layout_row_begin(ctx, Nuklear.NK_DYNAMIC, rowHeightFor(ctx), 3);
             Nuklear.nk_layout_row_push(ctx, 0.62f);
             Nuklear.nk_label(ctx, "Probe", Nuklear.NK_TEXT_LEFT);
@@ -457,7 +476,7 @@ public final class FrameIsotropy extends AbstractFrame {
         section(ctx, "Propagation arrival by probe shell");
         if(project.scene.getLattice().isMechanicsOnly()) {
             Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*3,1);
-            Nuklear.nk_label_wrap(ctx,"Bulk runs stop before reflections. Thin XY slabs include fixed surface effects and record 200 updates; only in-plane response is assessed. Arrival thresholds/interpolation need convergence checks; this is not an isotropy proof.");
+            Nuklear.nk_label_wrap(ctx,"Bulk runs stop before reflections. Thin XY slabs include fixed surface effects and use the configurable maximum updates below; only in-plane response is assessed. Arrival thresholds/interpolation need convergence checks; this is not an isotropy proof.");
             if(project.scene.getLattice().isDiamondTransportEnabled())return;
         }
         List<Integer> shells = ProbeArrivalMeasurement.availableShells(project.scene.getProbes());
@@ -473,7 +492,9 @@ public final class FrameIsotropy extends AbstractFrame {
             boolean planar=project.scene.getProbes().stream().anyMatch(p->p.getDefinition().getPlacement()!=null
                 && p.getDefinition().getPlacement().measurementSpace().equals("Diamond physical XY")
                 && p.getDefinition().getPlacement().targets().stream().anyMatch(t->t.shell()==shellIndex));
-            scalar(ctx,"Direction coverage",planar?"XY only: 8 axes/diagonal directions":"XYZ: 26 directions");
+            long directionCount=project.scene.getProbes().stream().filter(p->p.getDefinition().getPlacement()!=null
+                && p.getDefinition().getPlacement().targets().stream().anyMatch(t->t.shell()==shellIndex)).count();
+            scalar(ctx,"Direction coverage",planar?"XY only: "+directionCount+" directions":"XYZ: 26 directions");
         }
 
         Nuklear.nk_layout_row_dynamic(ctx, rowHeightFor(ctx), 2);
@@ -501,17 +522,28 @@ public final class FrameIsotropy extends AbstractFrame {
         ProbeArrivalMeasurement measurement = project.scene.getProbeArrivalMeasurement();
         if(project.scene.getLattice().isMechanicsOnly()) {
             try(MemoryStack stack=MemoryStack.stackPush()) {
+                Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),2);
+                Nuklear.nk_label(ctx,"Excitation axis",Nuklear.NK_TEXT_LEFT);
+                var axes=remframework.geometry.discovery.research.diamond.DiamondExcitationAxis.values();
+                var selectedAxis=nk_combo_options(ctx,stack,new String[]{"X","Y","Z"},appSettings.getDiamondProbeExcitationAxis().name());
+                for(var axis:axes)if(axis.name().equals(selectedAxis))appSettings.setDiamondProbeExcitationAxis(axis);
                 double entered=nk_label_edit(ctx,stack,"Speed spread tolerance (%)",toleranceBuffer,speedSpreadTolerance);
                 if(Double.isFinite(entered) && entered>0) speedSpreadTolerance=entered;
                 double wavelength=nk_label_edit(ctx,stack,"Packet wavelength (bond lengths)",wavelengthBuffer,controlledWavelength);
                 if(Double.isFinite(wavelength) && wavelength>=2)controlledWavelength=wavelength;
+                double amplitude=nk_label_edit(ctx,stack,"Initial peak amplitude (bond lengths)",amplitudeBuffer,appSettings.getDiamondProbeAmplitude());
+                if(Double.isFinite(amplitude) && amplitude>0)appSettings.setDiamondProbeAmplitude(amplitude);
+                double maximumUpdates=nk_label_edit(ctx,stack,"Maximum updates (XY slab; next run)",maximumUpdatesBuffer,appSettings.getDiamondProbeMaximumUpdates());
+                if(Double.isFinite(maximumUpdates) && maximumUpdates>=1 && maximumUpdates<=Integer.MAX_VALUE
+                        && maximumUpdates==Math.rint(maximumUpdates))
+                    appSettings.setDiamondProbeMaximumUpdates((int)maximumUpdates);
             }
             Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*2,1);
-            Nuklear.nk_label_wrap(ctx,"Tolerance defaults to 1%. Detection thresholds above set arrival sensitivity; they are not the acceptance tolerance.");
+            Nuklear.nk_label_wrap(ctx,"Choose X, Y or Z displacement polarization. Your choice is retained when lattice dimensions change. The packet envelope stays radial; signed cycle/reversal diagnostics currently measure Z.");
             Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
-            if(Nuklear.nk_button_label(ctx,"Run controlled centered packet (amplitude 0.001)")) {
-                project.scene.getLattice().getDisturbance().requestProbeRun(controlledWavelength,selectedArrivalShell,
-                    Math.pow(10,positionThresholdExponent),Math.pow(10,gradientThresholdExponent));
+            if(Nuklear.nk_button_label(ctx,"Run controlled centered packet")) {
+                project.scene.getLattice().getDisturbance().requestProbeRun(controlledWavelength,appSettings.getDiamondProbeAmplitude(),selectedArrivalShell,
+                    Math.pow(10,positionThresholdExponent),Math.pow(10,gradientThresholdExponent),appSettings.getDiamondProbeExcitationAxis());
                 project.getRemModel().startSimulation();
             }
             Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*3,1);
@@ -529,9 +561,13 @@ public final class FrameIsotropy extends AbstractFrame {
                     Math.pow(10.0, positionThresholdExponent),
                     Math.pow(10.0, gradientThresholdExponent));
         }
-        if (Nuklear.nk_button_label(ctx, "Clear")) measurement.clear();
+        if (Nuklear.nk_button_label(ctx, "Clear")) project.scene.clearProbeArrivalMeasurements();
 
-        ProbeArrivalMeasurement.Snapshot snapshot = measurement.snapshot();
+        var shellRows=project.scene.getProbeShellArrivalReport().rows();
+        if(project.scene.getLattice().isMechanicsOnly())drawShellReport(ctx,shellRows);
+        final int displayedShell=selectedArrivalShell;
+        ProbeArrivalMeasurement.Snapshot snapshot = shellRows.stream().filter(r->r.shell()==displayedShell)
+            .map(ProbeShellArrivalReport.Row::snapshot).findFirst().orElseGet(measurement::snapshot);
         scalar(ctx, "Time unit", "simulation updates since Start");
         scalar(ctx, "Status", arrivalStatus(snapshot));
         scalar(ctx, "Elapsed updates", Long.toString(snapshot.elapsedUpdates()));
@@ -557,7 +593,7 @@ public final class FrameIsotropy extends AbstractFrame {
         }
 
         section(ctx, "Arrival chart — Y: arrival update | X: probe P1 ... PN");
-        scalar(ctx, "Legend", "Position = cyan | Gradient = yellow | Combined = red");
+        scalar(ctx, "Legend", "Position = cyan | Gradient = yellow");
         drawArrivalChart(ctx, snapshot);
 
         section(ctx, "Exact arrival updates");
@@ -584,16 +620,261 @@ public final class FrameIsotropy extends AbstractFrame {
             Nuklear.nk_layout_row_push(ctx, 0.31f);
             Nuklear.nk_label(ctx, result.representedRays(), Nuklear.NK_TEXT_LEFT);
             Nuklear.nk_layout_row_push(ctx, 0.14f);
-            Nuklear.nk_label(ctx, arrivalValue(result.positionArrivalUpdate()), Nuklear.NK_TEXT_RIGHT);
+            Nuklear.nk_label(ctx, arrivalValue(result.positionEstimatedArrival()), Nuklear.NK_TEXT_RIGHT);
             Nuklear.nk_layout_row_push(ctx, 0.14f);
-            Nuklear.nk_label(ctx, arrivalValue(result.gradientArrivalUpdate()), Nuklear.NK_TEXT_RIGHT);
+            Nuklear.nk_label(ctx, arrivalValue(result.gradientEstimatedArrival()), Nuklear.NK_TEXT_RIGHT);
             Nuklear.nk_layout_row_push(ctx, 0.14f);
-            Nuklear.nk_label(ctx, arrivalValue(result.combinedArrivalUpdate()), Nuklear.NK_TEXT_RIGHT);
+            Nuklear.nk_label(ctx, arrivalValue(result.combinedEstimatedArrival()), Nuklear.NK_TEXT_RIGHT);
             Nuklear.nk_layout_row_end(ctx);
         }
     }
 
-    /** Draws three first-change line series with numeric probe and update axes. */
+    private void drawShellReport(NkContext ctx,List<ProbeShellArrivalReport.Row> rows) {
+        section(ctx,"All-shell report — same run and thresholds");
+        var report=project.scene.getProbeShellArrivalReport();
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+        report.setRecordTraces(nk_check_label(ctx,"Record diagnostic traces (next run)",report.isRecordTraces(),.8,.2));
+        scalar(ctx,"Full-cycle noise deadband (next run)",String.format(Locale.ROOT,"%.3g per signal",report.getCycleDeadband()));
+        report.setCycleDeadband(Math.pow(10,Math.rint(nk_slider(ctx,-15,Math.log10(report.getCycleDeadband()),-1,1))));
+        if(rows.isEmpty()) {
+            scalar(ctx,"Recording","Run a controlled packet to collect every applied shell.");return;
+        }
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+        showCycleTiming=nk_check_label(ctx,"Show full-cycle completion arrivals",showCycleTiming,.8,.2);
+        if(showCycleTiming) {
+            section(ctx,"First qualified full cycle per probe");
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*3,1);
+            Nuklear.nk_label_wrap(ctx,"Each probe independently measures rising zero -> falling zero -> rising zero in signed Z velocity and imbalance. Arrival is the update confirming the final crossing beyond the noise deadband. Start/end/period estimates are exported. Different probes may qualify different oscillations.");
+            var cycles=report.cycleRows();
+            for(var shell:rows)for(String signal:new String[]{"velocity_z","imbalance_z"}) {
+                var selected=cycles.stream().filter(c->c.shell()==shell.shell()&&c.result().signal().equals(signal)).toList();
+                var complete=selected.stream().map(c->c.result().cycle()).filter(remframework.opengl.model.ProbeCycleMeasurement.Result::complete).toList();
+                String value=complete.size()+"/"+selected.size()+" complete";
+                if(!selected.isEmpty()&&complete.size()==selected.size()) {
+                    long min=complete.stream().mapToLong(remframework.opengl.model.ProbeCycleMeasurement.Result::arrivalUpdate).min().orElseThrow();
+                    long max=complete.stream().mapToLong(remframework.opengl.model.ProbeCycleMeasurement.Result::arrivalUpdate).max().orElseThrow();
+                    double period=complete.stream().mapToDouble(remframework.opengl.model.ProbeCycleMeasurement.Result::periodUpdates).average().orElseThrow();
+                    value+=String.format(Locale.ROOT,"; arrival %d-%d (range %d); mean period %.3f",min,max,max-min,period);
+                }
+                scalar(ctx,"S"+(shell.shell()+1)+" "+signal,value);
+            }
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+            if(Nuklear.nk_button_label(ctx,"Export full-cycle arrival report CSV")) {
+                try {
+                    var directory=java.nio.file.Path.of(remframework.helpers.Constants.BASE_PATH,"measurements","diamond-shells");
+                    java.nio.file.Files.createDirectories(directory);
+                    var file=directory.resolve("shell-cycles-"+System.currentTimeMillis()+".csv");
+                    try(var writer=java.nio.file.Files.newBufferedWriter(file)){report.writeCycles(writer);}
+                    shellReportExportStatus="Saved "+file;
+                } catch(java.io.IOException error){shellReportExportStatus="Export failed: "+error.getMessage();}
+            }
+        }
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+        showRawThresholdReport=nk_check_label(ctx,"Show raw absolute-threshold report",showRawThresholdReport,.8,.2);
+        if(showRawThresholdReport || !report.hasTraces()) {
+        showShellArrivalTimes=nk_check_label(ctx,"Show arrival times instead of spread",showShellArrivalTimes,.8,.2);
+        scalar(ctx,"Legend",showShellArrivalTimes?"Position = cyan | Gradient = yellow; bars = min/max arrival":"Position = cyan | Gradient = yellow; dashed grey = tolerance");
+        drawShellDistanceChart(ctx,rows);
+        for(boolean gradient:new boolean[]{false,true}) {
+            if(!showShellArrivalTimes) {
+                var trend=ProbeShellArrivalReport.spreadTrend(rows,gradient);
+                scalar(ctx,gradient?"Gradient spread slope":"Position spread slope",trend.valid()
+                    ?String.format(Locale.ROOT,"%+.6g pp/bond (%d shells)",trend.slope(),trend.shells())
+                    :"Need at least two complete shells at different radii");
+                continue;
+            }
+            var fit=ProbeShellArrivalReport.fit(rows,gradient);
+            scalar(ctx,gradient?"Gradient slope / speed":"Position slope / speed",fit.valid()
+                ?String.format(Locale.ROOT,"%.6g updates/bond; %.6g bonds/update (%d shells)",fit.slope(),fit.speed(),fit.shells())
+                :"Need at least two complete shells with increasing arrival time");
+        }
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*2,1);
+        Nuklear.nk_label_wrap(ctx,showShellArrivalTimes?"Fit: mean arrival = initial delay + slope * radius. Speed = 1/slope. Only complete shells are fitted.":"Fit: spread (%) = intercept + slope * radius. Negative slope means spread decreases overall; positive means increases. pp = percentage points. A trend does not imply every shell decreases.");
+        for(var row:rows)for(boolean gradient:new boolean[]{false,true}) {
+            var t=gradient?row.gradient():row.position();
+            scalar(ctx,String.format(Locale.ROOT,"S%d r=%.3g %s",row.shell()+1,row.radius(),gradient?"gradient":"position"),
+                t.detected()==0?"No arrivals (0/"+t.total()+")":String.format(Locale.ROOT,"%d/%d; %d-%d; diff %d; mean %.2f; spread %s",t.detected(),t.total(),t.minimum(),t.maximum(),t.difference(),t.mean(),
+                t.complete()?String.format(Locale.ROOT,"%.3f%%",t.spreadPercent()):"incomplete"));
+        }
+        }
+        Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+        if(Nuklear.nk_button_label(ctx,"Export all-shell report CSV")) {
+            try {
+                var directory=java.nio.file.Path.of(remframework.helpers.Constants.BASE_PATH,"measurements","diamond-shells");
+                java.nio.file.Files.createDirectories(directory);
+                var file=directory.resolve("shell-report-"+System.currentTimeMillis()+".csv");
+                java.nio.file.Files.writeString(file,ProbeShellArrivalReport.csv(rows));
+                shellReportExportStatus="Saved "+file;
+            } catch(java.io.IOException error){shellReportExportStatus="Export failed: "+error.getMessage();}
+        }
+        if(report.hasTraces()) {
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+            showReversalTiming=nk_check_label(ctx,"Show signed Z reversal timing",showReversalTiming,.8,.2);
+            if(showReversalTiming) {
+                section(ctx,"Signed Z reversals within each shell");
+                Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*3,1);
+                Nuklear.nk_label_wrap(ctx,"Current velocity, current imbalance and cycle-summary imbalance are recorded separately. Noise deadband: 1% of each shell/channel's maximum absolute signal. Ranges require every probe to match the same reversal. Cycle-summary changes use whole updates.");
+                var reversals=report.reversalRows();
+                if(reversals.isEmpty())scalar(ctx,"Reversals","Available after recording finishes.");
+                for(var row:reversals) {
+                    var complete=row.result().events().stream().filter(remframework.opengl.model.ProbeReversalAnalysis.Event::complete).toList();
+                    var worst=complete.stream().max(java.util.Comparator.comparingDouble(remframework.opengl.model.ProbeReversalAnalysis.Event::range));
+                    scalar(ctx,String.format(Locale.ROOT,"S%d %s",row.shell()+1,row.signal()),worst.isPresent()
+                        ?String.format(Locale.ROOT,"largest range %.4f updates at ref %.3f; matched %d/%d events",worst.get().range(),worst.get().referenceUpdate(),complete.size(),row.result().events().size())
+                        :row.result().events().isEmpty()?row.result().status():"No reversal matched by every probe");
+                }
+                if(!reversals.isEmpty()) {
+                    Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+                    if(Nuklear.nk_button_label(ctx,"Export signed Z reversal report CSV")) {
+                        try {
+                            var directory=java.nio.file.Path.of(remframework.helpers.Constants.BASE_PATH,"measurements","diamond-shells");
+                            java.nio.file.Files.createDirectories(directory);
+                            var file=directory.resolve("shell-reversals-"+System.currentTimeMillis()+".csv");
+                            try(var writer=java.nio.file.Files.newBufferedWriter(file)){report.writeReversals(writer);}
+                            shellReportExportStatus="Saved "+file;
+                        } catch(java.io.IOException error){shellReportExportStatus="Export failed: "+error.getMessage();}
+                    }
+                }
+            }
+            var peaks=report.peakRows();
+            if(peaks.isEmpty())scalar(ctx,"Matched peaks","Available after the recording finishes.");
+            else {
+                section(ctx,"Matched peak timing and amplitude");
+                Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*3,1);
+                Nuklear.nk_label_wrap(ctx,"Half-peak timing uses the rising crossing at 50% of each probe's peak in one shared lobe. This avoids absolute-threshold lobe jumps. Ambiguous crossings remain unavailable. Lobe selection is threshold-anchored; this is not a front-speed measurement.");
+                drawHalfPeakRangeChart(ctx,peaks);
+                for(var peak:peaks) {
+                    var result=peak.result();
+                    scalar(ctx,String.format(Locale.ROOT,"S%d %s peak",peak.shell()+1,peak.gradient()?"gradient":"position"),
+                        result.complete()?String.format(Locale.ROOT,"half-peak %s; peak %.3f updates; amplitude %.5g-%.5g",
+                            result.halfPeakComplete()?String.format(Locale.ROOT,"%.3f updates",result.halfPeakTimingRange()):"unavailable",
+                            result.timingRange(),result.minimumAmplitude(),result.maximumAmplitude()):result.status());
+                }
+                Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+                if(Nuklear.nk_button_label(ctx,"Export matched-peak report CSV")) {
+                    try {
+                        var directory=java.nio.file.Path.of(remframework.helpers.Constants.BASE_PATH,"measurements","diamond-shells");
+                        java.nio.file.Files.createDirectories(directory);
+                        var file=directory.resolve("shell-peaks-"+System.currentTimeMillis()+".csv");
+                        try(var writer=java.nio.file.Files.newBufferedWriter(file)){report.writePeaks(writer);}
+                        shellReportExportStatus="Saved "+file;
+                    } catch(java.io.IOException error){shellReportExportStatus="Export failed: "+error.getMessage();}
+                }
+            }
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx),1);
+            if(Nuklear.nk_button_label(ctx,"Export diagnostic traces CSV")) {
+                try {
+                    var directory=java.nio.file.Path.of(remframework.helpers.Constants.BASE_PATH,"measurements","diamond-shells");
+                    java.nio.file.Files.createDirectories(directory);
+                    var file=directory.resolve("shell-traces-"+System.currentTimeMillis()+".csv");
+                    try(var writer=java.nio.file.Files.newBufferedWriter(file)){report.writeTraces(writer);}
+                    shellReportExportStatus="Saved "+file;
+                } catch(java.io.IOException error){shellReportExportStatus="Export failed: "+error.getMessage();}
+            }
+        }
+        if(!shellReportExportStatus.isEmpty()) {
+            Nuklear.nk_layout_row_dynamic(ctx,rowHeightFor(ctx)*2,1);
+            Nuklear.nk_label_wrap(ctx,shellReportExportStatus);
+        }
+    }
+
+    private void drawHalfPeakRangeChart(NkContext ctx,List<ProbeShellArrivalReport.PeakRow> rows) {
+        section(ctx,"X: radius (bonds) | Y: half-peak timing range (updates)");
+        scalar(ctx,"Legend","Position = cyan | Gradient = yellow; gaps = unavailable");
+        Nuklear.nk_layout_row_dynamic(ctx,240,1);
+        NkRect bounds=NkRect.create();
+        if(Nuklear.nk_widget(bounds,ctx)==Nuklear.NK_WIDGET_INVALID)return;
+        NkRect plot=NkRect.create().set(bounds.x()+52,bounds.y()+10,Math.max(1,bounds.w()-64),Math.max(1,bounds.h()-42));
+        var canvas=Nuklear.nk_window_get_canvas(ctx);var prior=NkRect.create().set(canvas.clip());
+        Nuklear.nk_push_scissor(canvas,intersect(bounds,prior,NkRect.create()));
+        Nuklear.nk_fill_rect(canvas,bounds,0,Theme.colorChart);
+        double xmin=rows.stream().mapToDouble(ProbeShellArrivalReport.PeakRow::radius).min().orElse(0);
+        double xmax=rows.stream().mapToDouble(ProbeShellArrivalReport.PeakRow::radius).max().orElse(1);
+        if(xmax<=xmin)xmax=xmin+1;
+        double ymax=Math.max(1,rows.stream().filter(r->r.result().halfPeakComplete()).mapToDouble(r->r.result().halfPeakTimingRange()).max().orElse(1))*1.1;
+        NkRect label=NkRect.create();
+        for(int i=0;i<=4;i++) {
+            float y=plot.y()+plot.h()-i*plot.h()/4;
+            Nuklear.nk_stroke_line(canvas,plot.x(),y,plot.x()+plot.w(),y,1,Theme.grey05);
+            label.set(bounds.x()+2,y-8,48,16);
+            Nuklear.nk_draw_text(canvas,label,String.format(Locale.ROOT,"%.2f",ymax*i/4),nuklearModel.getDefaultFont(),Theme.colorChart,Theme.grey12);
+            float x=plot.x()+i*plot.w()/4;
+            label.set(x-16,plot.y()+plot.h()+6,40,16);
+            Nuklear.nk_draw_text(canvas,label,String.format(Locale.ROOT,"%.0f",xmin+(xmax-xmin)*i/4),nuklearModel.getDefaultFont(),Theme.colorChart,Theme.grey12);
+        }
+        for(boolean gradient:new boolean[]{false,true}) {
+            var color=gradient?Theme.yellow:Theme.blue4;
+            boolean previous=false;float px=0,py=0;
+            for(var row:rows) {
+                if(row.gradient()!=gradient)continue;
+                if(!row.result().halfPeakComplete()){previous=false;continue;}
+                float x=plot.x()+(float)((row.radius()-xmin)/(xmax-xmin))*plot.w();
+                float y=plot.y()+plot.h()-(float)(row.result().halfPeakTimingRange()/ymax)*plot.h();
+                if(previous)Nuklear.nk_stroke_line(canvas,px,py,x,y,2,color);
+                label.set(x-3,y-3,6,6);Nuklear.nk_fill_circle(canvas,label,color);
+                previous=true;px=x;py=y;
+            }
+        }
+        Nuklear.nk_push_scissor(canvas,prior);
+    }
+
+    private void drawShellDistanceChart(NkContext ctx,List<ProbeShellArrivalReport.Row> rows) {
+        section(ctx,showShellArrivalTimes?"X: radius (bonds) | Y: arrival update":"X: radius (bonds) | Y: directional speed spread (%)");
+        Nuklear.nk_layout_row_dynamic(ctx,260,1);
+        NkRect bounds=NkRect.create();
+        if(Nuklear.nk_widget(bounds,ctx)==Nuklear.NK_WIDGET_INVALID)return;
+        NkRect plot=NkRect.create().set(bounds.x()+52,bounds.y()+10,Math.max(1,bounds.w()-64),Math.max(1,bounds.h()-42));
+        var canvas=Nuklear.nk_window_get_canvas(ctx);
+        var prior=NkRect.create().set(canvas.clip());
+        Nuklear.nk_push_scissor(canvas,intersect(bounds,prior,NkRect.create()));
+        Nuklear.nk_fill_rect(canvas,bounds,0,Theme.colorChart);
+        double xmin=rows.stream().mapToDouble(ProbeShellArrivalReport.Row::radius).min().orElse(0);
+        double xmax=rows.stream().mapToDouble(ProbeShellArrivalReport.Row::radius).max().orElse(1);
+        if(xmax<=xmin){xmin=Math.max(0,xmin-1);xmax+=1;}
+        double ymax=showShellArrivalTimes?1:speedSpreadTolerance;
+        for(var row:rows)for(var t:List.of(row.position(),row.gradient())) {
+            if(showShellArrivalTimes)ymax=Math.max(ymax,t.maximum());
+            else if(t.complete() && Double.isFinite(t.spreadPercent()))ymax=Math.max(ymax,t.spreadPercent());
+        }
+        ymax*=1.05;
+        var label=NkRect.create();
+        for(int i=0;i<=4;i++) {
+            float y=plot.y()+plot.h()*(1-i/4f),x=plot.x()+plot.w()*i/4f;
+            Nuklear.nk_stroke_line(canvas,plot.x(),y,plot.x()+plot.w(),y,1,Theme.grey05);
+            label.set(bounds.x(),y-8,48,16);
+            Nuklear.nk_draw_text(canvas,label,String.format(Locale.ROOT,showShellArrivalTimes?"%.0f":"%.2f",ymax*i/4),nuklearModel.getDefaultFont(),Theme.colorChart,Theme.grey12);
+            label.set(x-20,plot.y()+plot.h()+6,42,16);
+            Nuklear.nk_draw_text(canvas,label,String.format(Locale.ROOT,"%.0f",xmin+(xmax-xmin)*i/4),nuklearModel.getDefaultFont(),Theme.colorChart,Theme.grey12);
+        }
+        if(!showShellArrivalTimes) {
+            float y=plot.y()+plot.h()-(float)(speedSpreadTolerance/ymax)*plot.h();
+            for(float x=plot.x();x<plot.x()+plot.w();x+=10)
+                Nuklear.nk_stroke_line(canvas,x,y,Math.min(x+5,plot.x()+plot.w()),y,1,Theme.grey12);
+        }
+        for(boolean gradient:new boolean[]{false,true}) {
+            var color=gradient?Theme.yellow:Theme.blue4;
+            boolean previous=false;float px=0,py=0;
+            for(var row:rows) {
+                var t=gradient?row.gradient():row.position();
+                if(!t.complete() || (!showShellArrivalTimes && !Double.isFinite(t.spreadPercent()))){previous=false;continue;}
+                float x=plot.x()+(float)((row.radius()-xmin)/(xmax-xmin))*plot.w();
+                float y=plot.y()+plot.h()-(float)((showShellArrivalTimes?t.mean():t.spreadPercent())/ymax)*plot.h();
+                float low=plot.y()+plot.h()-(float)(t.minimum()/ymax)*plot.h();
+                float high=plot.y()+plot.h()-(float)(t.maximum()/ymax)*plot.h();
+                if(showShellArrivalTimes) {
+                    Nuklear.nk_stroke_line(canvas,x,low,x,high,2,color);
+                    Nuklear.nk_stroke_line(canvas,x-3,low,x+3,low,1,color);
+                    Nuklear.nk_stroke_line(canvas,x-3,high,x+3,high,1,color);
+                }
+                if(previous)Nuklear.nk_stroke_line(canvas,px,py,x,y,2,color);
+                label.set(x-3,y-3,6,6);Nuklear.nk_fill_circle(canvas,label,color);
+                previous=true;px=x;py=y;
+            }
+        }
+        Nuklear.nk_push_scissor(canvas,prior);
+    }
+
+    /** Draws measured first-change series with numeric probe and update axes. */
     private void drawArrivalChart(NkContext ctx, ProbeArrivalMeasurement.Snapshot snapshot) {
         Nuklear.nk_layout_row_dynamic(ctx, 280, 1);
         NkRect bounds = NkRect.create();
@@ -634,7 +915,6 @@ public final class FrameIsotropy extends AbstractFrame {
 
         drawArrivalSeries(canvas, plot, snapshot, yRange, 0, Theme.blue4);
         drawArrivalSeries(canvas, plot, snapshot, yRange, 1, Theme.yellow);
-        drawArrivalSeries(canvas, plot, snapshot, yRange, 2, Theme.red);
         Nuklear.nk_push_scissor(canvas, priorClip);
     }
 
@@ -647,8 +927,8 @@ public final class FrameIsotropy extends AbstractFrame {
         NkRect marker = NkRect.create();
         int count = snapshot.results().size();
         for (int index = 0; index < count; index++) {
-            long arrival = arrivalValue(snapshot.results().get(index), series);
-            if (arrival < 0) {
+            double arrival = arrivalValue(snapshot.results().get(index), series);
+            if (!Double.isFinite(arrival) || arrival < 0) {
                 hasPrevious = false;
                 continue;
             }
@@ -665,11 +945,11 @@ public final class FrameIsotropy extends AbstractFrame {
         }
     }
 
-    private static long arrivalValue(ProbeArrivalMeasurement.Result result, int series) {
+    private static double arrivalValue(ProbeArrivalMeasurement.Result result, int series) {
         return switch (series) {
-            case 0 -> result.positionArrivalUpdate();
-            case 1 -> result.gradientArrivalUpdate();
-            default -> result.combinedArrivalUpdate();
+            case 0 -> result.positionEstimatedArrival();
+            case 1 -> result.gradientEstimatedArrival();
+            default -> result.combinedEstimatedArrival();
         };
     }
 
@@ -717,7 +997,7 @@ public final class FrameIsotropy extends AbstractFrame {
         return plot.x() + plot.w() * probeIndex / (probeCount - 1.0f);
     }
 
-    private static float arrivalY(NkRect plot, long arrival, ArrivalAxisRange range) {
+    private static float arrivalY(NkRect plot, double arrival, ArrivalAxisRange range) {
         double normalized = (arrival - range.minimum())
                 / (double) (range.maximum() - range.minimum());
         return (float) (plot.y() + plot.h() * (1.0 - normalized));
@@ -739,6 +1019,9 @@ public final class FrameIsotropy extends AbstractFrame {
 
     private static String arrivalValue(long update) {
         return update < 0 ? "Waiting" : Long.toString(update);
+    }
+    private static String arrivalValue(double update) {
+        return Double.isFinite(update)?String.format(Locale.ROOT,"%.3f",update):"Unavailable";
     }
 
     private static void section(NkContext ctx, String label) {

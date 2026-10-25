@@ -19,7 +19,8 @@ public final class FrameAddDiamondProbes extends AbstractFrame {
     private record Preview(List<ProbeDefinition> definitions,String error) { }
     private CompletableFuture<Preview> task;
     private Object[] sampledNodes;
-    private int sampledFirst,sampledSpacing,sampledShells;
+    private int sampledFirst,sampledSpacing,sampledShells,sampledDirections;
+    private final StringBuffer directionsBuffer=new StringBuffer();
     private boolean xyOnly=true,sampledXY;
     private String status="Generate equal-radius shells in 26 physical directions.";
     public FrameAddDiamondProbes(NuklearModel model) {
@@ -35,14 +36,18 @@ public final class FrameAddDiamondProbes extends AbstractFrame {
             Nuklear.nk_layout_row_dynamic(ctx,rowHeight*2,1);
             Nuklear.nk_label_wrap(ctx,"Select the diamond lattice before creating diamond probes.");return;
         }
-        xyOnly=nk_check_label(ctx,"XY plane only (8 directions)",xyOnly,.8,.2);
+        xyOnly=nk_check_label(ctx,"XY plane only",xyOnly,.8,.2);
         try(MemoryStack stack=MemoryStack.stackPush()) {
+            if(xyOnly) {
+                int count=nk_label_edit(ctx,stack,"XY directions (8, 16, 32, 64)",directionsBuffer,appSettings.getDiamondProbeXYDirections(),.65,.35);
+                if(DiamondProbePlacement.validXYDirectionCount(count))appSettings.setDiamondProbeXYDirections(count);
+            }
             first=nk_label_edit(ctx,stack,"First radius (bond lengths)",firstBuffer,first,.65,.35);
             spacing=nk_label_edit(ctx,stack,"Shell spacing",spacingBuffer,spacing,.65,.35);
             shells=nk_label_edit(ctx,stack,"Shell count",shellBuffer,shells,.65,.35);
         }
         Nuklear.nk_layout_row_dynamic(ctx,rowHeight*3,1);
-        Nuklear.nk_label_wrap(ctx,(xyOnly?"8 XY directions: axes and diagonals. Fixed surface samples are included for thin slabs. ":"26 XYZ directions; fixed stencils rejected. ")+"Passive interpolation uses both diamond sublattices. Cubic probes are kept separately.");
+        Nuklear.nk_label_wrap(ctx,(xyOnly?appSettings.getDiamondProbeXYDirections()+" equally spaced XY directions. Fixed surface samples are included for thin slabs. ":"26 XYZ directions; fixed stencils rejected. ")+"Passive interpolation uses both diamond sublattices. Cubic probes are kept separately.");
         Nuklear.nk_layout_row_dynamic(ctx,rowHeight,1);
         if(nk_button_label(ctx,"Generate diamond shells") && (task==null || task.isDone())) {
             if(!project.getRemModel().isLoadingReady() || lattice.getNodeArray()==null)status="Wait until lattice loading completes.";
@@ -50,16 +55,18 @@ public final class FrameAddDiamondProbes extends AbstractFrame {
                 project.getRemModel().stopSimulation();
                 sampledNodes=lattice.getNodeArray();sampledFirst=first;sampledSpacing=spacing;sampledShells=shells;
                 Object[] nodes=sampledNodes;int f=first,g=spacing,n=shells;sampledXY=xyOnly;boolean planar=xyOnly;
+                sampledDirections=appSettings.getDiamondProbeXYDirections();int directionCount=sampledDirections;
                 status="Building interpolation stencils in the background...";
                 task=CompletableFuture.supplyAsync(()-> {
-                    try {return new Preview(DiamondProbePlacement.create(nodes,f,g,n,planar),null);}
+                    try {return new Preview(DiamondProbePlacement.create(nodes,f,g,n,planar,directionCount),null);}
                     catch(RuntimeException error) {return new Preview(List.of(),error.getMessage());}
                 });
             }
         }
         Preview preview=task!=null && task.isDone() && !task.isCancelled()
             ? task.isCompletedExceptionally()?new Preview(List.of(),"Shell generation failed; reduce dimensions or free memory."):task.getNow(null):null;
-        boolean current=sampledNodes==lattice.getNodeArray() && sampledFirst==first && sampledSpacing==spacing && sampledShells==shells && sampledXY==xyOnly;
+        boolean current=sampledNodes==lattice.getNodeArray() && sampledFirst==first && sampledSpacing==spacing && sampledShells==shells && sampledXY==xyOnly
+            && (!xyOnly || sampledDirections==appSettings.getDiamondProbeXYDirections());
         Nuklear.nk_layout_row_dynamic(ctx,rowHeight*3,1);
         Nuklear.nk_label_wrap(ctx,preview==null?status:!current?"Lattice or shell settings changed; regenerate.":preview.error()!=null?preview.error():"Ready: "+preview.definitions().size()+" passive diamond probes. Apply replaces diamond shells only.");
         Nuklear.nk_layout_row_dynamic(ctx,rowHeight,1);

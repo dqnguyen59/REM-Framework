@@ -10,6 +10,28 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** Cardinal calibration against the native +Z arrow mesh and Scene.createArrows axes. */
 class GradientArrowGeometryTest {
+    @Test void bothRotationSensesAndNearReversalsFollowTheInputVectorWithoutAnimation() {
+        var scene=new Scene();var lattice=scene.getLattice();
+        var base=lattice.createEntity(null,null,new Vector3d(),new Vector3d(),1);
+        var arrow=lattice.createEntity(base,null,new Vector3d(),new Vector3d(),1);
+        // Exercise every quadrant and near-pole vectors in both turning directions.
+        for(int sign:new int[]{-1,1})for(int step=0;step<=360;step++) {
+            double angle=Math.toRadians(sign*step);
+            var direction=new Vector3d(.001*Math.cos(3*angle),Math.sin(angle),Math.cos(angle)).normalize();
+            scene.updateArrowFromLocalVector(arrow,new Vector3d(),direction,1,new Vector4f(1));
+            var tip=new Vector3d(0,0,GradientArrowGeometry.MESH_LENGTH).mulPosition(arrow.getTransformMatrix());
+            assertEquals(direction.x,tip.x,1e-10);assertEquals(direction.y,tip.y,1e-10);assertEquals(direction.z,tip.z,1e-10);
+        }
+    }
+    @Test
+    void probeArrowLengthIsBoundedWithoutChangingSmallSignalGain() {
+        assertEquals(.01, GradientArrowGeometry.probeVisualLength(1e-9, 1e7), 1e-12);
+        assertEquals(6, GradientArrowGeometry.probeVisualLength(50, 1e7));
+        assertEquals(6, GradientArrowGeometry.probeVisualLength(Double.MAX_VALUE, Double.MAX_VALUE));
+        assertEquals(0, GradientArrowGeometry.probeVisualLength(0, 1e7));
+        assertEquals(0, GradientArrowGeometry.probeVisualLength(Double.NaN, 1e7));
+        assertEquals(0, GradientArrowGeometry.probeVisualLength(Double.POSITIVE_INFINITY, 1e7));
+    }
     @Test
     void minusXCalibrationArrowMatchesParentedMeshEndpoint() {
         assertCardinalEndpoint("-X", new Vector3d(-1, 0, 0));

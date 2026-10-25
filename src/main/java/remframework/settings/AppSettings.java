@@ -47,6 +47,10 @@ public class AppSettings extends AbstractSettings implements ISettings {
     private boolean useLoop;
     private boolean isChanged;
     private String latticeModelIdentifier = "system:cubic";
+    private int diamondProbeMaximumUpdates = 200;
+    private double diamondProbeAmplitude = 10.0;
+    private int diamondProbeXYDirections = 32;
+    private remframework.geometry.discovery.research.diamond.DiamondExcitationAxis diamondProbeExcitationAxis = remframework.geometry.discovery.research.diamond.DiamondExcitationAxis.Z;
 
     private String projectFilePath = Constants.PROJECT_FILE_PATH;
 
@@ -122,6 +126,15 @@ public class AppSettings extends AbstractSettings implements ISettings {
         useFixedNodes = getBool("System", "useFixedNodes", true);
         useLoop       = getBool("System", "useLoop", false);
         latticeModelIdentifier = getString("System", "latticeModel", "system:cubic");
+        diamondProbeMaximumUpdates = Math.max(1, getInt("DiamondProbe", "maximumUpdates", 200));
+        int savedDirections=getInt("DiamondProbe", "xyDirections", 32);
+        diamondProbeXYDirections=remframework.opengl.model.DiamondProbePlacement.validXYDirectionCount(savedDirections)?savedDirections:32;
+        double savedAmplitude = getDouble("DiamondProbe", "amplitude", 10.0);
+        diamondProbeAmplitude = Double.isFinite(savedAmplitude) && savedAmplitude > 0 ? savedAmplitude : 10.0;
+        try { diamondProbeExcitationAxis=remframework.geometry.discovery.research.diamond.DiamondExcitationAxis.valueOf(getString("DiamondProbe","excitationAxis","Z")); }
+        catch(IllegalArgumentException error){diamondProbeExcitationAxis=remframework.geometry.discovery.research.diamond.DiamondExcitationAxis.Z;}
+        if(diamondProbeExcitationAxis==remframework.geometry.discovery.research.diamond.DiamondExcitationAxis.AUTO)
+            diamondProbeExcitationAxis=remframework.geometry.discovery.research.diamond.DiamondExcitationAxis.Z;
         numThreads = Math.max(1, Math.min(numThreads, MAX_NUM_THREADS));
 
         setProjectFilePath(getString("System", "projectFilePath", Constants.PROJECT_FILE_PATH));
@@ -136,8 +149,8 @@ public class AppSettings extends AbstractSettings implements ISettings {
         setMaximized(getInt("Window", "maximized", 0));
         setAntiAliasing(getInt("OpenGL", "antiAliasing", 1));
         setDefaultDimensionX(getInt("DefaultDimension", "x", Constants.DEFAULT_DIMENSION_X));
-        setDefaultDimensionY(getInt("DefaultDimension", "x", Constants.DEFAULT_DIMENSION_Y));
-        setDefaultDimensionZ(getInt("DefaultDimension", "x", Constants.DEFAULT_DIMENSION_Z));
+        setDefaultDimensionY(getInt("DefaultDimension", "y", Constants.DEFAULT_DIMENSION_Y));
+        setDefaultDimensionZ(getInt("DefaultDimension", "z", Constants.DEFAULT_DIMENSION_Z));
 
         String  sFrame       = "Frame";
         Section frameSection = ini.get(sFrame);
@@ -175,6 +188,10 @@ public class AppSettings extends AbstractSettings implements ISettings {
         put("System", "useFixedNodes", useFixedNodes);
         put("System", "useLoop", useLoop);
         put("System", "latticeModel", latticeModelIdentifier);
+        put("DiamondProbe", "maximumUpdates", diamondProbeMaximumUpdates);
+        put("DiamondProbe", "amplitude", diamondProbeAmplitude);
+        put("DiamondProbe", "xyDirections", diamondProbeXYDirections);
+        put("DiamondProbe", "excitationAxis", diamondProbeExcitationAxis.name());
         put("System", "projectFilePath", projectFilePath);
         put("System", "fontFile", fontFile);
         put("System", "fontFileBold", fontFileBold);
@@ -186,6 +203,9 @@ public class AppSettings extends AbstractSettings implements ISettings {
         put("Window", "height", windowHeight);
         put("Window", "maximized", maximized);
         put("OpenGL", "antiAliasing", antiAliasing);
+        put("DefaultDimension", "x", defaultDimensionX);
+        put("DefaultDimension", "y", defaultDimensionY);
+        put("DefaultDimension", "z", defaultDimensionZ);
 
         String sFrame = "Frame";
         for (Map.Entry<String, NkRect> entry : frameRectMap.entrySet()) {
@@ -195,6 +215,56 @@ public class AppSettings extends AbstractSettings implements ISettings {
             // Persist a safe key so frame layout cannot corrupt the settings file.
             put(sFrame, key.replace(':', '_'),
                     value.x() + "," + value.y() + "," + value.w() + "," + value.h());
+        }
+    }
+
+    /** Returns saved startup dimensions, with a safe fallback for legacy diamond settings. */
+    public org.joml.Vector3i startupDimensions(boolean diamond) {
+        var dimensions = new org.joml.Vector3i(defaultDimensionX, defaultDimensionY, defaultDimensionZ);
+        if (diamond && !remframework.lattice.ExperimentalDiamondLatticeModel.validDimensions(dimensions))
+            return new org.joml.Vector3i(80, 80, 64);
+        return dimensions;
+    }
+
+    /** Remembers a successfully loaded size for the next argument-free launch. */
+    public void rememberDimensions(org.joml.Vector3i dimensions) {
+        defaultDimensionX = dimensions.x;
+        defaultDimensionY = dimensions.y;
+        defaultDimensionZ = dimensions.z;
+        if (!getCurrentFilename().isEmpty()) saveToFile();
+    }
+
+    public void setDiamondProbeMaximumUpdates(int updates) {
+        if (updates < 1) throw new IllegalArgumentException("Maximum updates must be positive");
+        if (diamondProbeMaximumUpdates != updates) {
+            diamondProbeMaximumUpdates = updates;
+            if (!getCurrentFilename().isEmpty()) saveToFile();
+        }
+    }
+
+    public void setDiamondProbeAmplitude(double amplitude) {
+        if (!Double.isFinite(amplitude) || amplitude <= 0)
+            throw new IllegalArgumentException("Amplitude must be positive and finite");
+        if (diamondProbeAmplitude != amplitude) {
+            diamondProbeAmplitude = amplitude;
+            if (!getCurrentFilename().isEmpty()) saveToFile();
+        }
+    }
+    public void setDiamondProbeXYDirections(int count) {
+        if(!remframework.opengl.model.DiamondProbePlacement.validXYDirectionCount(count))
+            throw new IllegalArgumentException("Choose 8, 16, 32 or 64 XY directions");
+        if(diamondProbeXYDirections!=count) {
+            diamondProbeXYDirections=count;
+            if(!getCurrentFilename().isEmpty())saveToFile();
+        }
+    }
+    public void setDiamondProbeExcitationAxis(remframework.geometry.discovery.research.diamond.DiamondExcitationAxis axis) {
+        java.util.Objects.requireNonNull(axis);
+        if(axis==remframework.geometry.discovery.research.diamond.DiamondExcitationAxis.AUTO)
+            throw new IllegalArgumentException("Choose an explicit X, Y or Z excitation axis");
+        if(diamondProbeExcitationAxis!=axis) {
+            diamondProbeExcitationAxis=axis;
+            if(!getCurrentFilename().isEmpty())saveToFile();
         }
     }
 

@@ -124,6 +124,7 @@ public class Main {
 		LatticeManager.getInstance().initialize();
 
         if(diamondMechanics) LatticeManager.getInstance().select(LatticeManager.EXPERIMENTAL_DIAMOND_ID);
+        boolean savedDiamond = LatticeManager.getInstance().selected().model().mechanicsOnly();
         GLWindow glWindow = new GLWindow(diamondMechanics ? "REM Framework - Experimental Diamond Mechanics" : Constants.TITLE);
 		Engine engine = new Simulator(glWindow, updateLimit);
 		engine.setFrameLimit(frameLimit);
@@ -136,9 +137,9 @@ public class Main {
 				System.out.println("Loading startup project: " + startupProjectPath);
 				Project.getInstance().loadFromFile(startupProjectPath.toString());
 			}
-			if(diamondMechanics) {
-                Project.getInstance().setDimension(diamondDimensions.x,diamondDimensions.y,diamondDimensions.z,false);
-                LatticeManager.getInstance().select(LatticeManager.EXPERIMENTAL_DIAMOND_ID);
+            if (savedDiamond && startupProjectPath == null) {
+                if (diamondMechanics)
+                    Project.getInstance().setDimension(diamondDimensions.x,diamondDimensions.y,diamondDimensions.z,false);
                 Project.getInstance().setConstantFrequency(.5);
                 Project.getInstance().setConstantElectricFactor(1);
                 Project.getInstance().settings.setSliceType(remframework.settings.Settings.SliceType.physicalXY);
