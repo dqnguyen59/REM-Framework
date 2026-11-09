@@ -1,8 +1,8 @@
 # Diamond measurement analysis
 
 Run these offline helpers from the repository root after building `target/rem.jar`.
-Measurement data and saved presets are local artifacts, excluded from Git. Transfer
-the input directories separately before running these historical audit commands.
+Saved presets are included in Git. Measurement data is excluded; transfer the input
+data directories separately before running these historical audit commands.
 They investigate the experimental diamond model; they do not change the canonical
 Node 0.1 mechanics. Java helpers use the application's existing dependencies.
 Python analysis requires NumPy; the tail plot requires ReportLab. The JavaScript

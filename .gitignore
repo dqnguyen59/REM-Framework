@@ -25,7 +25,11 @@ geometry-discovery-new-draft.properties
 /*.log
 
 # Local research data and screenshots are excluded from source checkpoints.
-/measurements/diamond-shells/
+/measurements/diamond-shells/*
+!/measurements/diamond-shells/presets/
+/measurements/diamond-shells/presets/*
+!/measurements/diamond-shells/presets/*.ini
+!/measurements/diamond-shells/presets/*.properties
 /diamond-memory-audit.csv
 /diamond-probe-propagation-8.0-results.csv
 /diamond-xy-configuration-sweep.csv

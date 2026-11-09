@@ -287,6 +287,22 @@ JVM per test class, use:
 mvn clean package -DreuseForks=false
 ```
 
-Measurement files and saved experiment presets are local artifacts excluded from
-the current source checkpoint. Transfer them separately when moving an experiment
-to another machine.
+### Experiment Presets
+
+Small saved configurations are included in
+[`measurements/diamond-shells/presets/`](measurements/diamond-shells/presets/).
+Measurement CSVs, trace archives and screenshots remain excluded from Git.
+
+In the Isotropy window, **Load saved experiment** restores
+`measurements/diamond-shells/presets/last-experiment.ini`. Other saved `.ini`
+configurations can be copied to that filename before loading. Loading a preset
+restores its configuration, not an evolved simulation state or measurement results.
+
+The transverse survey separately reads `transverse-identity.properties` from the
+same directory. Named period-4, period-6, period-8 and two-cycle configurations are
+included; copy the desired `.properties` file to `transverse-identity.properties`
+before starting the survey. These configure the survey and do not replace the
+full application `.ini` preset.
+
+When changing lattice dimensions, explicitly recenter the source indices and
+check pulse completeness and the boundary cutoff again.
