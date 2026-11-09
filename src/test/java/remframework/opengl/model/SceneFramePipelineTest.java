@@ -141,6 +141,39 @@ class SceneFramePipelineTest {
                 node -> node.parameters == nodes[0].parameters));
     }
 
+    @Test void faintContextPacksTheActualPositionAndTagsItForTheTransparentPass() {
+        var base=new Entity(null,null,new Vector3d(),new Vector3d(),1,EntityType.ENTITY);
+        var model=new ObjFileModel(0,0);
+        var node=new Node(base,model,new Vector3d(4,5,6),new Vector3d(),1);
+        node.setOutsidePhysicalSlab(true);node.setVisible(true);
+        lattice.setBaseEntity(base);lattice.setEntityArray(new Object[]{base,node});scene.invalidateRenderInstanceDataLayout();
+        updateMatricesSynchronously(true);
+        var packed=scene.getRenderInstanceData(model);assertPackedTranslation(packed,4,5,6);assertEquals(2,packed.get(29));
+        node.setSurveyHighlightColor(new org.joml.Vector4f(.5f,.05f,.4f,1));
+        updateMatricesSynchronously(true);packed=scene.getRenderInstanceData(model);
+        assertEquals(1,packed.get(29));assertEquals(1,packed.get(24-4),1e-6);
+    }
+
+    @Test void connectionEndpointsUsePublishedPositionsColorsAndVisibility() {
+        var base=new Entity(null,null,new Vector3d(),new Vector3d(),1,EntityType.ENTITY);
+        var model=new ObjFileModel(0,0);
+        var node=new Node(base,model,new Vector3d(4,5,6),new Vector3d(),1);
+        node.setSurveyHighlightColor(new org.joml.Vector4f(.5f,.05f,.4f,.6f));node.setVisible(true);
+        lattice.setBaseEntity(base);lattice.setEntityArray(new Object[]{base,node});scene.invalidateRenderInstanceDataLayout();
+        updateMatricesSynchronously(true);
+        var vertex=FloatBuffer.allocate(7);assertTrue(scene.appendConnectionVertex(node,vertex,.25));
+        assertEquals(4,vertex.get(0),1e-6);assertEquals(5,vertex.get(1),1e-6);assertEquals(6,vertex.get(2),1e-6);
+        assertEquals(1,vertex.get(3),1e-6);assertEquals(.1,vertex.get(4),1e-6);assertEquals(.8,vertex.get(5),1e-6);
+        assertEquals(.15,vertex.get(6),1e-6);
+        node.setPosition(40,50,60);vertex.clear();assertTrue(scene.appendConnectionVertex(node,vertex,.25));
+        assertEquals(4,vertex.get(0),1e-6,"Unpublished physics coordinates must not move bond endpoints");
+        node.setVisible(false);vertex.clear();assertFalse(scene.appendConnectionVertex(node,vertex,.25));assertEquals(0,vertex.position());
+        node.setVisible(true);node.setOutsidePhysicalSlab(true);node.setSurveyHighlightColor(null);
+        updateMatricesSynchronously(true);vertex.clear();assertTrue(scene.appendConnectionVertex(node,vertex,.25));
+        var packed=scene.getRenderInstanceData(model);
+        assertEquals(packed.get(12),vertex.get(0),1e-6);assertEquals(Math.min(1,Math.max(0,packed.get(23)))*.25,vertex.get(6),1e-6);
+    }
+
     @Test
     void workerFailureIsPropagatedToTheFrameCoordinator() {
         project.getRemModel().startSimulation();

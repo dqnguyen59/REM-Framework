@@ -292,6 +292,17 @@ public class FrameIdentities extends AbstractFrame {
             Nuklear.nk_layout_row_dynamic(ctx, spacer1, 1);
             Nuklear.nk_layout_row_dynamic(ctx, 450, 1);
             if (Nuklear.nk_group_begin(ctx, "Scrollable", 0)) {
+                Identity identity = remModel.getSelectedOccupancy().getIdentity();
+                Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
+                identity.setXyzOrbit(Nuklear.nk_check_label(ctx, "XYZ orbit (coupled rotations)", identity.isXyzOrbit()));
+                if (identity.isXyzOrbit()) {
+                    Nuklear.nk_layout_row_dynamic(ctx, rowHeight, 1);
+                    identity.setEqualAreaOrbit(Nuklear.nk_check_label(ctx, "Equal-area spherical orbit", identity.isEqualAreaOrbit()));
+                    Nuklear.nk_layout_row_dynamic(ctx, rowHeight * 3, 1);
+                    Nuklear.nk_label_wrap(ctx, identity.isEqualAreaOrbit()
+                            ? "Equal-area sweep: X + Y set longitude; Z sweeps height up and down. Use equal amplitudes for constant magnitude. Coverage depends on the chosen increments; tested periods: 32 / 512 / 8192."
+                            : "Orbit uses all three angle increments and start angles. Equal amplitudes give constant magnitude; Active and waveform controls apply only to separate-axis mode.");
+                }
                 layoutOscillatorX(ctx, stack);
                 layoutOscillatorY(ctx, stack);
                 layoutOscillatorZ(ctx, stack);

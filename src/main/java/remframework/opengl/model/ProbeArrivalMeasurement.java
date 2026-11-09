@@ -84,6 +84,7 @@ public final class ProbeArrivalMeasurement {
         private int traceSize;
         private boolean traceTruncated;
         private long lastTraceUpdate;
+        private ProbeSweepMeasurement sweep;
         private ProbeCycleMeasurement velocityCycle;
         private ProbeCycleMeasurement imbalanceCycle;
 
@@ -112,6 +113,20 @@ public final class ProbeArrivalMeasurement {
             results.add(new CycleResult(tracked.probe.getId(), "imbalance_z", tracked.imbalanceCycle.snapshot()));
         }
         return List.copyOf(results);
+    }
+
+    public record SweepResult(String probeId, ProbeSweepMeasurement.Result measurement) {}
+    public synchronized void enableSweep(int period,int cycles,Vector3d sourceCenter) {
+        for(var tracked:trackedProbes) tracked.sweep=new ProbeSweepMeasurement(period,cycles,
+            new Vector3d(tracked.baselinePosition).sub(sourceCenter));
+    }
+    public synchronized List<SweepResult> sweepResults() {
+        return trackedProbes.stream().filter(t->t.sweep!=null)
+            .map(t->new SweepResult(t.probe.getId(),t.sweep.snapshot())).toList();
+    }
+    public synchronized void enableSharedSweep(int period,int cycles,Vector3d sourceCenter,long start) {
+        for(var tracked:trackedProbes) tracked.sweep=new ProbeSweepMeasurement(period,cycles,
+                readPosition(tracked.probe,new Vector3d()).sub(sourceCenter),start);
     }
 
     /** Optional bounded diagnostics, enabled before the first update of a new measurement. */
@@ -239,7 +254,7 @@ public final class ProbeArrivalMeasurement {
 
     /** Samples once after all committed probes have completed one measurement update. */
     public synchronized void sample() {
-        if (!running && !traceRecording && !cyclesRunning) return;
+        if (!running && !traceRecording && !cyclesRunning && trackedProbes.stream().noneMatch(t->t.sweep!=null && !t.sweep.snapshot().complete())) return;
         boolean detecting = running;
         boolean allArrived = true;
         long largestElapsed = elapsedUpdates;
@@ -271,6 +286,11 @@ public final class ProbeArrivalMeasurement {
                     tracked.trace[offset + 4] = tracked.currentGradient.z;
                     tracked.trace[offset + 5] = ProbeArrowQuantity.CYCLE_IMBALANCE.read(tracked.probe, tracked.traceVector).z;
                 } else tracked.traceTruncated = true;
+            }
+            if(tracked.sweep!=null) {
+                boolean detected=(tracked.positionArrivalUpdate>=0 || positionChange>=positionThreshold)
+                    && (tracked.gradientArrivalUpdate>=0 || gradientChange>=gradientThreshold);
+                tracked.sweep.sample(probeElapsed,detected,tracked.traceVector.set(tracked.currentGradient).sub(tracked.baselineGradient));
             }
             if (!detecting) continue;
             tracked.maximumPositionChange = Math.max(tracked.maximumPositionChange, positionChange);
@@ -314,7 +334,7 @@ public final class ProbeArrivalMeasurement {
     /** Freezes a recording at its causal cutoff, preserving incomplete arrivals. */
     public synchronized void finish() {
         running = false; traceRecording = false; cyclesRunning = false;
-        for (var tracked : trackedProbes) { tracked.velocityCycle.finish(); tracked.imbalanceCycle.finish(); }
+        for (var tracked : trackedProbes) { tracked.velocityCycle.finish(); tracked.imbalanceCycle.finish(); if(tracked.sweep!=null)tracked.sweep.finish(); }
     }
 
     public synchronized void clear() {

@@ -1114,7 +1114,9 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
                         case identitiesOnly -> false;
                     };
 
-                    node.setVisible(isVisible || node.isHiLighted());
+                    node.setOutsidePhysicalSlab(settings.isPhysicalSlab()&&!isVisible);
+                    node.setVisible(isVisible || node.isHiLighted() || node.getSurveyHighlightColor()!=null
+                        ||(node.isOutsidePhysicalSlab()&&settings.isShowOutsideSlab()&&settings.getOutsideSlabOpacity()>0));
                     if (node.isVisible()) Performance.numVisibleNodes++;
                 }
 
@@ -1367,9 +1369,12 @@ public class Simulator extends Engine implements IMouseAndKeyboardEvents {
         // Scene rebuilds and other structural mutations are accepted only at a completed
         // frame boundary. GUI interaction itself is never delayed while one is pending.
         if (!calculationPending) {
+            scene.applyPendingExperimentPreset();
             checkSettingsChanged();
             scene.applyPendingDiamondProbes();
             scene.applyPendingDiamondProbeArrival();
+            scene.applyPendingIdentityOrbitSpread();
+            scene.getTransverseIdentitySurvey().advance(scene);
             if (scene.getLattice().applyPendingAbsorptionLayerChange()) {
                 renderMatricesDirty = true;
             }

@@ -62,6 +62,7 @@ public class FrameSettings extends AbstractFrame {
     private final StringBuffer bufConstantFrequency = new StringBuffer();
 
     private final StringBuffer bufPhysicalThickness = new StringBuffer();
+    private boolean surveyDisplayPage;
     public FrameSettings(NuklearModel frames) {
         super(frames);
     }
@@ -76,7 +77,7 @@ public class FrameSettings extends AbstractFrame {
         super.render(windowHandle, ctx);
 
         int heightAdjust = switch (settings.getSliceType()) {
-            case physicalXY, physicalXZ, physicalYZ -> 60;
+            case physicalXY, physicalXZ, physicalYZ -> settings.isShowOutsideSlab()?150:90;
             case none, identitiesOnly -> -60;
             case sliceXZ, sliceYZ, sliceXY -> 70;
             default -> 0;
@@ -92,6 +93,9 @@ public class FrameSettings extends AbstractFrame {
 
     @Override
     protected void layout(NkContext ctx, int x, int y, int width, int height) {
+        Nuklear.nk_layout_row_dynamic(ctx,26,1);
+        if(Nuklear.nk_button_label(ctx,surveyDisplayPage?"Back to general settings":"Probe / path display"))surveyDisplayPage=!surveyDisplayPage;
+        if(surveyDisplayPage){surveyDisplaySettings(ctx);return;}
         try (MemoryStack stack = MemoryStack.stackPush()) {
 
             float leftCol  = 0.6f;
@@ -131,6 +135,11 @@ public class FrameSettings extends AbstractFrame {
                     settings.setPhysicalSliceThickness(nk_label_edit(ctx,stack," Slab thickness:",bufPhysicalThickness,
                         settings.getPhysicalSliceThickness(),leftCol,rightCol));
                     settings.setPhysicalSliceThickness(nk_slider(ctx,0.05,settings.getPhysicalSliceThickness(),5.0,0.05));
+                    settings.setShowOutsideSlab(nk_check_label(ctx," Show other layers transparently",settings.isShowOutsideSlab(),leftCol,rightCol));
+                    if(settings.isShowOutsideSlab()) {
+                        nk_label_value(ctx," Other-layer opacity:",String.format(java.util.Locale.ROOT,"%.0f%%",100*settings.getOutsideSlabOpacity()),leftCol,rightCol);
+                        settings.setOutsideSlabOpacity(nk_slider(ctx,0,settings.getOutsideSlabOpacity(),1,.01));
+                    }
                     nk_label_value(ctx," Center:","Lattice center",leftCol,rightCol);
                     nk_label_value(ctx," Selection:","Reference positions",leftCol,rightCol);
                     break;
@@ -264,6 +273,27 @@ public class FrameSettings extends AbstractFrame {
 
             Nuklear.nk_layout_row_end(ctx);
         }
+    }
+
+    private void surveyDisplaySettings(NkContext ctx) {
+        Nuklear.nk_layout_row_dynamic(ctx,48,1);
+        Nuklear.nk_label_wrap(ctx,"Opacity: 0 hides overlays; 100% is opaque. Changes save automatically.");
+        double probes=surveyOpacity(ctx,"Other probes",appSettings.getSurveyProbeOpacity());
+        double highlights=surveyOpacity(ctx,"Highlighted nodes / probes",appSettings.getSurveyHighlightOpacity());
+        double source=surveyOpacity(ctx,"Source node (yellow)",appSettings.getSurveySourceOpacity());
+        double lines=surveyOpacity(ctx,"Selected path lines",appSettings.getSurveyLineOpacity());
+        appSettings.setSurveyDisplayOpacity(probes,highlights,source,lines);
+        boolean connections=nk_check_label(ctx,"Show connected-node lines",appSettings.isShowLatticeConnections(),.8,.2);
+        double connectionOpacity=surveyOpacity(ctx,"Connection opacity",appSettings.getLatticeConnectionOpacity());
+        appSettings.setLatticeConnectionDisplay(connections,connectionOpacity);
+        Nuklear.nk_layout_row_dynamic(ctx,60,1);
+        Nuklear.nk_label_wrap(ctx,"Connections join visible neighboring nodes and blend their endpoint colors. Slab visibility applies; enable other layers in general settings to see their connections too.");
+    }
+
+    private double surveyOpacity(NkContext ctx,String label,double value) {
+        Nuklear.nk_layout_row_dynamic(ctx,24,1);
+        Nuklear.nk_label(ctx,label+String.format(java.util.Locale.ROOT," : %.0f%%",100*value),Nuklear.NK_TEXT_LEFT);
+        return nk_slider(ctx,0,value,1,.01);
     }
 
 }

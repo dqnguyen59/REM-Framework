@@ -12,8 +12,15 @@ import remframework.settings.Project;
 /** Controlled initial condition only; evolution uses the unchanged runtime Node integrator. */
 public final class DiamondRuntimeDisturbance {
     public record Request(double wavelength,double amplitude,double receiverOffset,double geometryWavelength,
-                          int probeShell,double positionThreshold,double gradientThreshold,DiamondExcitationAxis excitationAxis) {
+                          int probeShell,double positionThreshold,double gradientThreshold,DiamondExcitationAxis excitationAxis,DiamondSphericalSweep sphericalSweep,DiamondRotatingOrbit orbit) {
+        public Request(double w,double a,double o,double g,int shell,double pt,double gt,DiamondExcitationAxis axis,DiamondSphericalSweep sweep) {
+            this(w,a,o,g,shell,pt,gt,axis,sweep,null);
+        }
         public Request { java.util.Objects.requireNonNull(excitationAxis); }
+        public Request(double wavelength,double amplitude,double receiverOffset,double geometryWavelength,
+                       int probeShell,double positionThreshold,double gradientThreshold,DiamondExcitationAxis axis) {
+            this(wavelength,amplitude,receiverOffset,geometryWavelength,probeShell,positionThreshold,gradientThreshold,axis,null);
+        }
         public Request(double wavelength,double amplitude,double receiverOffset,double geometryWavelength,
                        int probeShell,double positionThreshold,double gradientThreshold) {
             this(wavelength,amplitude,receiverOffset,geometryWavelength,probeShell,positionThreshold,gradientThreshold,DiamondExcitationAxis.AUTO);
@@ -31,6 +38,29 @@ public final class DiamondRuntimeDisturbance {
     private volatile boolean running;
     private volatile int steps, safeSteps;
     private double k,gamma;
+    private record DrivenNode(Node node,double weight) {}
+    private List<DrivenNode> drivenNodes=List.of();
+    private volatile DiamondSphericalSweep activeSweep;
+    private double sweepAmplitude;
+    private volatile DiamondRotatingOrbit activeOrbit;
+    public DiamondRotatingOrbit activeOrbit() { return activeOrbit; }
+    public void requestOrbitPreview(double width,double amplitude,DiamondRotatingOrbit orbit) {
+        if(!Double.isFinite(width)||width<2||!Double.isFinite(amplitude)||amplitude<=0)
+            throw new IllegalArgumentException("Finite width >= 2 and positive amplitude required");
+        pending.set(new Request(width,amplitude,0,width,0,1e-9,1e-9,DiamondExcitationAxis.Z,
+            new DiamondSphericalSweep(orbit.period(),1,1),Objects.requireNonNull(orbit)));
+    }
+
+    public DiamondSphericalSweep activeSweep() {return activeSweep;}
+    public void requestSphericalProbeRun(double width,double amplitude,int shell,double positionThreshold,double gradientThreshold,
+                                        DiamondSphericalSweep sweep) {
+        Objects.requireNonNull(sweep);
+        if(!Double.isFinite(width)||width<2||!Double.isFinite(amplitude)||amplitude<=0||shell<0
+            ||!Double.isFinite(positionThreshold)||positionThreshold<=0||!Double.isFinite(gradientThreshold)||gradientThreshold<=0)
+            throw new IllegalArgumentException("Positive finite amplitude and thresholds, width >= 2, and valid shell required");
+        pending.set(new Request(width,amplitude,0,width,shell,positionThreshold,gradientThreshold,DiamondExcitationAxis.Z,sweep));
+    }
+
     private volatile boolean retainedResults;
     public String resultsLabel() {return retainedResults?"Previous run (retained)":running?"Current run":"Completed run";}
     private DiamondRuntimeReceivers receivers,outerReceivers;
@@ -94,7 +124,7 @@ public final class DiamondRuntimeDisturbance {
     public void requestFixedGeometry(double wavelength,double amplitude,double geometryWavelength,double receiverOffset) {
         pending.set(new Request(wavelength,amplitude,receiverOffset,geometryWavelength));
     }
-    public void cancel() {pending.set(null);running=false;retainedResults=receivers!=null;summary="Experiment cancelled (lattice/pulse changed)";}
+    public void cancel() {pending.set(null); if(activeSweep!=null)Project.getInstance().scene.finishProbeArrivalMeasurements(); activeSweep=null;activeOrbit=null;drivenNodes=List.of();running=false;retainedResults=receivers!=null;summary="Experiment cancelled (lattice/pulse changed)";}
     /** Releases interpolation bindings to the graph being replaced. */
     public void releaseLattice() {
         cancel();
@@ -118,6 +148,7 @@ public final class DiamondRuntimeDisturbance {
     public void initializePending(Lattice lattice) {
         Request request=pending.getAndSet(null);if(request==null) return;
         running=false;
+        activeSweep=null;activeOrbit=null;drivenNodes=List.of();
         controlledProbeRun=false;
         slabProbeRun=false;
         if(request.probeShell()>=0)Project.getInstance().scene.clearProbeArrivalMeasurements();
@@ -130,6 +161,8 @@ public final class DiamondRuntimeDisturbance {
             || !Double.isFinite(k) || !Double.isFinite(gamma) || k<=0 || gamma<=0 || gamma*k*k>1) {
             reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Use wavelength >= 2, positive finite amplitude (legacy two-radius runs <= 0.01), receiver offset [0, 1], and 0 < gamma*k^2 <= 1 in diamond mechanics.");return;
         }
+        activeOrbit=request.orbit();
+        if(request.sphericalSweep()!=null) {initializeSpherical(lattice,request);return;}
         var nodes=lattice.getNodeArray();var center=lattice.getPhysicalSliceCenter();double support=request.supportRadius();
         var planarProbes=project.scene.getProbes().stream().filter(p->p.getDefinition()!=null
             && p.getDefinition().getPlacement()!=null
@@ -228,6 +261,84 @@ public final class DiamondRuntimeDisturbance {
         }
         report(GeometryConfigurationStatusCode.GENERATED,"Wavelength "+request.wavelength()+"; amplitude "+request.amplitude()+"; steps 0/"+safeSteps+". "+activeAxis+"-polarized radial packet; no isotropy measurement yet.");
     }
+    /** Spherical source is a prescribed displacement in a compact 3D region. */
+    private void initializeSpherical(Lattice lattice,Request request) {
+        var project=Project.getInstance();var center=lattice.getPhysicalSliceCenter();
+        double support=request.supportRadius();var sources=new ArrayList<Node>();var boundaries=new ArrayList<Node>();
+        var probes=project.scene.getProbes();
+        if(activeOrbit==null && (probes.isEmpty() || probes.stream().anyMatch(p->p.getDefinition().getDetectorType()!=remframework.opengl.model.ProbeDetectorType.DIAMOND_INTERPOLATED
+            || p.getDefinition().getPlacement()==null || p.getDefinition().getPlacement().targets().stream().anyMatch(t->t.requestedRadius()<=support+1)))) {
+            reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Apply diamond probe shells outside spherical source support "+support);return;
+        }
+        for(Object value:lattice.getNodeArray()) {
+            Node node=(Node)value;
+            if(node.isFixed()) {
+                boundaries.add(node);
+                if(node.getEquilibriumPosition().distance(center)<=support+1) {
+                    reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Spherical source needs space in all three dimensions; source radius "+support);return;
+                }
+            } else if(node.getEquilibriumPosition().distance(center)<support)sources.add(node);
+        }
+        if(sources.isEmpty()){reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"No movable spherical source nodes");return;}
+        var probeNodes=probes.stream().flatMap(p->p.getOccupancies().stream()).map(Occupancy::getNode).distinct().toList();
+        if(activeOrbit!=null) safeSteps=Integer.MAX_VALUE;
+        else try {
+            safeSteps=DiamondReflectionWindow.safeSteps(sources,boundaries,probeNodes,node->{
+                var neighbors=new ArrayList<Node>(4);for(Neighbor slot:Neighbor.values()){Node other=node.getNeighbor(slot);if(other!=null)neighbors.add(other);}return neighbors;
+            });
+        } catch(IllegalArgumentException error){reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,error.getMessage());return;}
+        if(activeOrbit==null) safeSteps=Math.min(safeSteps,remframework.settings.AppSettings.getInstance().getDiamondProbeMaximumUpdates());
+        if(safeSteps<1){reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"No reflection-free spherical measurement window");return;}
+        double sigma=request.geometryWavelength()/2;
+        double peak=0;var bindings=new ArrayList<DrivenNode>();
+        for(var node:sources) {
+            double r=node.getEquilibriumPosition().distance(center);
+            double weight=Math.exp(-r*r/(2*sigma*sigma))*Math.pow(1-r*r/(support*support),2);
+            peak=Math.max(peak,weight);bindings.add(new DrivenNode(node,weight));
+        }
+        final double normalization=peak;
+        drivenNodes=bindings.stream().map(b->new DrivenNode(b.node,b.weight/normalization)).toList();
+        for(Object value:lattice.getNodeArray()) {
+            Node node=(Node)value;node.setPosition(new Vector3d(node.getEquilibriumPosition()));node.updatePosition();
+            node.getVelocity().zero();node.getAcceleration().zero();node.getForce().zero();node.resetAuxiliaryFieldMotion();
+        }
+        activeSweep=request.sphericalSweep();sweepAmplitude=request.amplitude();steps=0;
+        prescribeSweep(0,true);
+        receivers=null;outerReceivers=null;pairedMeasurements=List.of();troughMeasurements=List.of();
+        twoRadiusSummary="Single-axis research receivers are not used for spherical excitation";
+        diagnosticInner=new double[0][];diagnosticOuter=new double[0][];
+        project.scene.updateProbeMeasurements(remframework.opengl.controller.TransportSystem.getInstance());
+        if(activeOrbit==null) {
+        project.scene.startDiamondProbeMeasurements(probes,request.probeShell(),request.positionThreshold(),request.gradientThreshold());
+        project.scene.getProbeShellArrivalReport().enableSweep(activeSweep.updatesPerCycle(),activeSweep.measurementCycles(),center);
+        project.scene.getProbeShellArrivalReport().configureSweepSource(activeSweep.turns(),request.amplitude(),request.geometryWavelength());
+        }
+        controlledProbeRun=true;retainedResults=false;running=true;
+        report(GeometryConfigurationStatusCode.GENERATED,sweepStatus("Recording"));
+    }
+    private void prescribeSweep(int update,boolean publish) {
+        var offset=(activeOrbit==null?activeSweep.direction(update):activeOrbit.direction(update)).mul(sweepAmplitude);
+        var previous=(activeOrbit==null?activeSweep.direction(update-1L):activeOrbit.direction(update-1L)).mul(sweepAmplitude);
+        var velocity=new Vector3d(offset).sub(previous);
+        for(var binding:drivenNodes) {
+            var node=binding.node;
+            node.setPosition(new Vector3d(node.getEquilibriumPosition()).fma(binding.weight,offset));
+            if(publish)node.updatePosition();
+            node.getVelocity().set(velocity).mul(binding.weight);node.getAcceleration().zero();node.getForce().zero();
+        }
+    }
+    private String sweepStatus(String prefix) {
+        if(activeOrbit!=null) return "Continuous rotating orbit; update "+steps+"; X/Y/Z periods "
+            +activeOrbit.fastPeriod()+" / "+(activeOrbit.fastPeriod()*activeOrbit.ratio())+" / "+activeOrbit.period()
+            +". Repeats until paused. Reflections included; no arrival measurement.";
+
+        var rows=Project.getInstance().scene.getProbeShellArrivalReport().sweepRows();
+        long complete=rows.stream().filter(r->r.result().measurement().complete()).count();
+        return prefix+": spherical sweep; "+steps+" / "+safeSteps+" updates; period "+activeSweep.updatesPerCycle()
+            +"; turns "+activeSweep.turns()+"; "+activeSweep.measurementCycles()+" measurement cycles; probes "+complete+" / "+rows.size()
+            +" complete. Earliest possible whole-window completion: "+((long)activeSweep.updatesPerCycle()*(activeSweep.measurementCycles()+1))+" probe updates. Boundary cutoff remains active. Coverage is a finite spherical spiral, not exact equality of all rotation axes.";
+    }
+
     /** Called once after all Node workers finish, independent of rendered FPS. */
     public void completedStep() {
         if(!running) return;var project=Project.getInstance();
@@ -235,6 +346,16 @@ public final class DiamondRuntimeDisturbance {
             reject(GeometryConfigurationStatusCode.INVALID_PARAMETERS,"Mechanics parameters changed; repeat experiment from equilibrium.");return;
         }
         steps++;
+        if(activeSweep!=null) {
+            prescribeSweep(steps,false);
+            boolean complete=activeOrbit==null && project.scene.getProbeShellArrivalReport().sweepsComplete();
+            if(complete || steps>=safeSteps) {
+                running=false;project.getRemModel().stopSimulation();project.scene.finishProbeArrivalMeasurements();
+                report(GeometryConfigurationStatusCode.GEOMETRIC_SYMMETRY_UNKNOWN,
+                    sweepStatus(complete?"Completed configured sweep measurements":"Stopped at recording/boundary limit; incomplete windows retained"));
+            } else report(GeometryConfigurationStatusCode.GENERATED,sweepStatus("Recording"));
+            return;
+        }
         if(receivers!=null) receivers.sample(steps);
         if(outerReceivers!=null && outerReceivers.failure()==null && steps<=outerSafeSteps)outerReceivers.sample(steps);
         if(steps>=safeSteps) {running=false;project.getRemModel().stopSimulation();

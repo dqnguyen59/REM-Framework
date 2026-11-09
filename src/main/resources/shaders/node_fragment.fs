@@ -51,6 +51,7 @@ uniform DirectionalLight directionalLight;
 uniform Light lights[MAX_LIGHTS];
 uniform int ignoreLightIndex;
 uniform int useInstanceMaterial;
+uniform int slabPass;
 
 vec4 ambientC;
 vec4 diffuseC;
@@ -126,6 +127,8 @@ vec4 calcLight(Light light, vec3 position, vec3 normal) {
 
 void main() {
 	if (useInstanceMaterial == 1 && vInstanceVisible < 0.5) discard;
+    if(useInstanceMaterial==1 && slabPass==1 && vInstanceVisible>1.5)discard;
+    if(useInstanceMaterial==1 && slabPass==2 && vInstanceVisible<1.5)discard;
 	if (useInstanceMaterial == 1) {
 		ambientC = vInstanceAmbient;
 		diffuseC = vInstanceDiffuse;

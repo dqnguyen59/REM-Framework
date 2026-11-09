@@ -40,6 +40,13 @@ public final class DiamondProbePlacement {
     }
     public static List<ProbeDefinition> create(Object[] values,int firstRadius,int spacing,int shells,boolean xyOnly,int xyDirectionCount) {
         var directions=xyOnly?xyDirections(xyDirectionCount):DiamondDirectionalComparison.directions();
+        return create(values,firstRadius,spacing,shells,xyOnly,directions,null);
+    }
+    /** Rotated receivers at exact physical radii about a specified source position. */
+    public static List<ProbeDefinition> create(Object[] values,int firstRadius,int spacing,int shells,
+                                               boolean xyOnly,List<Vector3d> directions,Vector3d origin) {
+        if(directions.isEmpty() || directions.stream().anyMatch(d->!d.isFinite() || Math.abs(d.length()-1)>1e-9))
+            throw new IllegalArgumentException("Unit receiver directions required");
         if(values==null || values.length==0)throw new IllegalArgumentException("Load a diamond lattice first");
         if(firstRadius<1 || spacing<1 || shells<1 || shells>4096/directions.size())
             throw new IllegalArgumentException("Positive radius/spacing and at most "+(4096/directions.size())+" shells required (4096 probe budget)");
@@ -52,6 +59,7 @@ public final class DiamondProbePlacement {
             nodes[i]=n;minimum.min(n.getEquilibriumPosition());center.add(n.getEquilibriumPosition());
         }
         center.div(nodes.length);
+        if(origin!=null)center.set(origin);
         var dimensions=new org.joml.Vector3i();for(var n:nodes)dimensions.max(n.getIndex());dimensions.add(1,1,1);
         var topology=new remframework.lattice.DiamondTopology(dimensions.x,dimensions.y,dimensions.z);
         if(topology.size()!=nodes.length)throw new IllegalArgumentException("Complete regular diamond node array required");

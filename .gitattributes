@@ -1,0 +1,4 @@
+# Preserve generated reports and trace archives byte-for-byte.
+*.pdf binary
+*.png binary
+*.gz binary

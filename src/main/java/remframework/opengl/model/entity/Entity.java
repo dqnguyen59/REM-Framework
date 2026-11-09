@@ -93,6 +93,8 @@ public class Entity {
     protected boolean inspectionVisible = false;
     /** Temporary renderer color used only while neighborhood inspection is active. */
     protected Vector4f inspectionColor;
+    /** Color annotation on the actual node, independent of neighborhood inspection. */
+    protected Vector4f surveyHighlightColor;
     protected boolean isSelected  = false;
     protected boolean isHiLighted = false;
 
@@ -147,6 +149,9 @@ public class Entity {
         if (inspectionColor != null) {
             color.set(inspectionColor).mul(2.0f);
             alpha = Math.max(0.0f, Math.min(1.0f, inspectionColor.w));
+        } else if(surveyHighlightColor!=null) {
+            color.set(surveyHighlightColor).mul(2);
+            alpha=Math.max(0,Math.min(1,surveyHighlightColor.w));
         } else if (customColor != null) {
             color.set(customColor).mul(2.0f);
             alpha = 1.0f;
@@ -212,6 +217,8 @@ public class Entity {
             alpha = (alphaIntensity * (m.getDiffuseColor().length()));
         }
 
+        if(this instanceof Node node&&node.isSlabContextNode())
+            alpha=(float)(Math.max(0,Math.min(1,alpha))*settings.getOutsideSlabOpacity());
         m.setAmbientColor(color);
         m.getDiffuseColor().w = alpha;
         m.getAmbientColor().w = m.getDiffuseColor().w;

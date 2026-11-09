@@ -29,10 +29,10 @@ import remframework.helpers.AbstractSettings;
 import remframework.helpers.ISettings;
 
 /**
- * REM-FIELD Identity.
+ * REM Framework Identity.
  *
  * <p>
- * An Identity is the fundamental oscillator of REM-FIELD. It is not a
+ * An Identity is the fundamental oscillator of the REM Framework. It is not a
  * physical particle, but a computational entity that excites the recursive
  * lattice through oscillation.
  * </p>
@@ -121,6 +121,11 @@ public class Identity extends AbstractSettings implements ISettings, Occupant {
      */
     private Vector3d excitation = new Vector3d();
 
+    /** Coupled XYZ rotation instead of three independent axis waveforms. */
+    private boolean xyzOrbit;
+    private boolean equalAreaOrbit;
+    private transient long orbitUpdates;
+
     public Identity(String name) {
         this.name = name;
     }
@@ -134,6 +139,9 @@ public class Identity extends AbstractSettings implements ISettings, Occupant {
         identity.phaseIncrement = new Vector3d(phaseIncrement);
         identity.amplitude      = new Vector3d(amplitude);
         identity.excitation     = new Vector3d(excitation);
+        identity.xyzOrbit       = xyzOrbit;
+        identity.equalAreaOrbit = equalAreaOrbit;
+        identity.orbitUpdates   = orbitUpdates;
         return identity;
     }
 
@@ -205,6 +213,22 @@ public class Identity extends AbstractSettings implements ISettings, Occupant {
      */
     public Vector3d generateExcitation() {
         excitation.zero();
+        if (diagnosticPulseDirection != null) {
+            double t=++diagnosticPulseUpdate;
+            double duration=diagnosticPulsePeriod*diagnosticPulseCycles;
+            double envelope=t<duration?Math.pow(Math.sin(Math.PI*t/duration),2):0;
+            return excitation.set(diagnosticPulseDirection).mul(diagnosticPulseAmplitude*envelope
+                    *Math.sin(2*Math.PI*t/diagnosticPulsePeriod));
+        }
+
+        if (xyzOrbit) {
+            // The existing increments and offsets are degrees per update and degrees.
+            phase.add(phaseIncrement);
+            phase.set(wrapDegrees(phase.x), wrapDegrees(phase.y), wrapDegrees(phase.z));
+            orbitUpdates++;
+            excitation.set(sampleOrbitExcitation(0));
+            return excitation;
+        }
 
         excitation.x = exciteAxis(active.x, oscillatorType.x, phase, phaseAngle, phaseIncrement, 0);
         excitation.y = exciteAxis(active.y, oscillatorType.y, phase, phaseAngle, phaseIncrement, 1);
@@ -218,6 +242,29 @@ public class Identity extends AbstractSettings implements ISettings, Occupant {
         return excitation;
     }
 
+    private static double wrapDegrees(double value) {
+        return value % 360.0;
+    }
+
+    /** Samples the orbit relative to the current phase without advancing the Identity. */
+    public Vector3d sampleOrbitExcitation(double updatesFromCurrent) {
+        if (equalAreaOrbit) {
+            double longitude = Math.toRadians(phase.x + phaseAngle.x + phase.y + phaseAngle.y
+                    + updatesFromCurrent * (phaseIncrement.x + phaseIncrement.y));
+            double turn = (phase.z + phaseAngle.z + updatesFromCurrent * phaseIncrement.z) / 360.0;
+            turn -= Math.floor(turn);
+            // Uniform height and longitude sample equal spherical areas: dA = d(longitude) dz.
+            double z = 1 - 4 * Math.abs(turn - .5);
+            double radius = Math.sqrt(Math.max(0, 1 - z * z));
+            return new Vector3d(radius * Math.cos(longitude), radius * Math.sin(longitude), z).mul(amplitude);
+        }
+        return new Vector3d(0, 1, 0)
+                .rotateX(Math.toRadians(phase.x + phaseAngle.x + updatesFromCurrent * phaseIncrement.x))
+                .rotateY(Math.toRadians(phase.y + phaseAngle.y + updatesFromCurrent * phaseIncrement.y))
+                .rotateZ(Math.toRadians(phase.z + phaseAngle.z + updatesFromCurrent * phaseIncrement.z))
+                .mul(amplitude);
+    }
+
     /**
      * Resets the oscillator to its initial state.
      */
@@ -225,14 +272,27 @@ public class Identity extends AbstractSettings implements ISettings, Occupant {
     public void reset() {
         excitation.set(0);
         phase.set(0);
+        orbitUpdates = 0;
     }
 
     /**
      * Returns whether at least one oscillator axis is active.
      */
     public boolean isActive() {
-        return active.x || active.y || active.z;
+        return diagnosticPulseDirection != null || xyzOrbit || active.x || active.y || active.z;
     }
+
+    private Vector3d diagnosticPulseDirection;
+    private double diagnosticPulseAmplitude;
+    private int diagnosticPulsePeriod,diagnosticPulseCycles,diagnosticPulseUpdate;
+    /** Temporary finite pulse through the normal Identity force path; saved oscillator settings are unchanged. */
+    public void startDiagnosticPulse(Vector3d direction,double magnitude,int period,int cycles) {
+        if(!direction.isFinite()||Math.abs(direction.length()-1)>1e-9||!Double.isFinite(magnitude)||magnitude<=0||period<4||cycles<1)
+            throw new IllegalArgumentException("Invalid diagnostic pulse");
+        diagnosticPulseDirection=new Vector3d(direction);diagnosticPulseAmplitude=magnitude;
+        diagnosticPulsePeriod=period;diagnosticPulseCycles=cycles;diagnosticPulseUpdate=0;
+    }
+    public void endDiagnosticPulse(){diagnosticPulseDirection=null;}
 
     @Override
     public void loadFromFile(String filename) {
@@ -248,6 +308,8 @@ public class Identity extends AbstractSettings implements ISettings, Occupant {
         super.loadFromFile(ini, section, index);
         String s;
         name             = ini.get(section + index, "name");
+        xyzOrbit         = getBool(section + index, "xyzOrbit", false);
+        equalAreaOrbit   = getBool(section + index, "equalAreaOrbit", false);
         active.x         = getBool(section + index, "active.x", false);
         active.y         = getBool(section + index, "active.y", false);
         active.z         = getBool(section + index, "active.z", false);
@@ -272,6 +334,8 @@ public class Identity extends AbstractSettings implements ISettings, Occupant {
     public void saveToFile(Wini ini, String section, int index) {
         super.saveToFile(ini, section, index);
         put(section + index, "name", name);
+        put(section + index, "xyzOrbit", xyzOrbit);
+        put(section + index, "equalAreaOrbit", equalAreaOrbit);
         put(section + index, "active.x", active.x);
         put(section + index, "active.y", active.y);
         put(section + index, "active.z", active.z);

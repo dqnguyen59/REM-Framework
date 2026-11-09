@@ -53,6 +53,7 @@ public class Node extends Entity {
      * 5: neighbors back
      */
     private final Node[]  neighbors = new Node[6];
+    private int renderEntityIndex=-1;
     //    private       boolean isFixed;
     private       boolean isXFixed;
     private       boolean isYFixed;
@@ -70,6 +71,8 @@ public class Node extends Entity {
     private final Vector3d gradientImbalance = new Vector3d();
     /** Experimental graph measurement; cubic nodes retain opposite-slot differences. */
     private boolean geometricDistanceImbalance;
+    private boolean outsidePhysicalSlab;
+    public boolean isSlabContextNode(){return outsidePhysicalSlab&&getSurveyHighlightColor()==null&&getInspectionColor()==null&&!isHiLighted()&&!isSelected();}
 
     /**
      * Electric Field
@@ -261,7 +264,11 @@ public class Node extends Entity {
     public record FrameParameters(NodeFormulaVersion nodeFormulaVersion,
                                   double waveStep, double electricFactor,
                                   double magneticFactor, double absorption,
-                                  boolean useFixedNodes) {
+                                  boolean useFixedNodes, boolean diamondSponge) {
+        public FrameParameters(NodeFormulaVersion version, double step, double electric,
+                               double magnetic, double absorption, boolean fixed) {
+            this(version, step, electric, magnetic, absorption, fixed, false);
+        }
     }
 
     public void updateNodeProperties(NodeFormulaVersion nodeFormulaVersion) {
@@ -379,7 +386,15 @@ public class Node extends Entity {
 
         // Note that the result of the addition or multiplication is stored in the object
         // variable itself.
-        posBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul(0.5));
+        if (parameters.diamondSponge() && !isFixed && absorptionFactor < 1.0f) {
+            // Experimental boundary only: smoothly attenuate velocity and this update's displacement.
+            double retention = Math.exp(-0.2 * Math.pow(1.0 - absorptionFactor, 2));
+            velocity.add(acceleration.mul(cws));
+            posBuff.fma(retention, velocity).fma(retention, acceleration.mul(0.5));
+            velocity.mul(retention);
+        } else {
+            posBuff.add(velocity.add(acceleration.mul(cws))).add(acceleration.mul(0.5));
+        }
 
         //        if ((isXFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.x = fixedPos.x;
         //        if ((isYFixed || isFixed && appSettings.isUseFixedNodes()) || isWall) posBuff.y = fixedPos.y;

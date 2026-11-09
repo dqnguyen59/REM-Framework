@@ -67,6 +67,13 @@ public class Lattice {
      */
     private volatile int numEdgeAbsorptionLayers = 30;
     private volatile boolean absorptionFactorsDirty;
+    private volatile boolean diamondSpongeEnabled;
+    public boolean isDiamondSpongeEnabled() { return diamondSpongeEnabled; }
+    public void setDiamondSpongeEnabled(boolean enabled) {
+        if (diamondSpongeEnabled == enabled) return;
+        remModel.stopSimulation();
+        diamondSpongeEnabled = enabled;
+    }
 
     private volatile LatticeModel activeModel = SystemCubicLatticeModel.create(false);
     private final java.util.concurrent.atomic.AtomicBoolean mechanicalPulseRequested = new java.util.concurrent.atomic.AtomicBoolean();
@@ -118,7 +125,7 @@ public class Lattice {
         return new Node.FrameParameters(experimental ? remframework.settings.Settings.NodeFormulaVersion.v_0_1 : project.settings.getNodeFormulaVersion(),
             project.getConstantWaveSpeed()/activeModel.mechanicalDivisor(),project.getConstantElectricFactor(),
             experimental ? 0 : project.getConstantMagneticFactor(),experimental ? 0 : appSettings.getAbsorption(),
-            experimental || appSettings.isUseFixedNodes());
+            experimental || appSettings.isUseFixedNodes(), experimental && diamondSpongeEnabled);
     }
     /** Reports experimental numerical failure before publishing a bad physics frame. */
     public boolean validateMechanicalState() {

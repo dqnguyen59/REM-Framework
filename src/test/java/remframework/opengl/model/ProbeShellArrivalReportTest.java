@@ -5,6 +5,60 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ProbeShellArrivalReportTest {
+    @Test void responseSpreadDoesNotDisappearWhenSignedMeansCancelOrThresholdsAreNotReached() {
+        var one=probe(0);var two=probe(0);var report=new ProbeShellArrivalReport();
+        report.start(List.of(one,two),100,100);report.enableSharedSweep(20,1,new org.joml.Vector3d(-1,0,0),20);
+        for(int t=1;t<=40;t++) {
+            for(var p:List.of(one,two))p.getOccupancies().getFirst().saveGradientToHistory(new org.joml.Vector3d(0,0,(p==one?1:2)*Math.sin(2*Math.PI*t/20)));
+            report.sample();
+            if(t<40)assertTrue(Double.isNaN(report.responseSpreads().getFirst().spreadPercent()));
+        }
+        var result=report.responseSpreads().getFirst();assertEquals(2,result.complete());
+        assertEquals(1/Math.sqrt(2),result.minimum(),1e-12);assertEquals(Math.sqrt(2),result.maximum(),1e-12);
+        assertEquals(200.0/3,result.spreadPercent(),1e-10);
+        assertTrue(report.cycleArrivals().stream().noneMatch(ProbeShellArrivalReport.CycleArrival::complete));
+    }
+    @Test void sphericalWindowsContinueAfterThresholdsAndExportVectorStatistics() throws Exception {
+        var probe=probe(0);var report=new ProbeShellArrivalReport();report.start(List.of(probe),.1,.1);
+        report.enableSweep(20,2,new org.joml.Vector3d(-1,0,0));report.configureSweepSource(1,.001,4);
+        for(int t=1;t<=60;t++) {
+            probe.getNode().setPosition(new org.joml.Vector3d(0,0,1));probe.getNode().updatePosition();
+            probe.getOccupancies().getFirst().saveGradientToHistory(new org.joml.Vector3d(2,Math.sin(2*Math.PI*t/20),0));
+            report.sample();
+            if(t<60)assertFalse(report.sweepsComplete());
+        }
+        assertTrue(report.sweepsComplete());report.finish();
+        var writer=new java.io.StringWriter();report.writeSweeps(writer);
+        assertEquals(2,writer.toString().lines().count());
+        assertTrue(writer.toString().contains("perpendicular_rms"));
+        assertTrue(writer.toString().contains("source_period_windows_after_detection"));
+        String[] header=writer.toString().lines().findFirst().orElseThrow().split(",");
+        String[] row=writer.toString().lines().skip(1).findFirst().orElseThrow().split(",");
+        assertEquals(header.length,row.length);assertTrue(writer.toString().contains(",complete,"));
+    }
+
+    @Test void cycleArrivalStatisticsWaitForAllWindowsAndKeepDirectionalDifferences() throws Exception {
+        var early=probe(0);var late=probe(0);var report=new ProbeShellArrivalReport();
+        report.start(List.of(early,late),.1,.1);
+        report.enableSweep(20,1,new org.joml.Vector3d(-1,0,0));
+        for(int update=1;update<=40;update++) {
+            for(var p:List.of(early,late)) {
+                double value=update*(p==early?.2:.04);
+                p.getNode().setPosition(new org.joml.Vector3d(0,0,value));p.getNode().updatePosition();
+                p.getOccupancies().getFirst().saveGradientToHistory(new org.joml.Vector3d(0,0,value));
+            }
+            report.sample();
+            if(update<40)assertTrue(report.cycleArrivals().stream().allMatch(r->Double.isNaN(r.mean())));
+        }
+        for(var r:report.cycleArrivals()) {
+            assertTrue(r.complete());assertEquals(.5,r.minimum(),1e-12);assertEquals(2.5,r.maximum(),1e-12);
+            assertEquals(1.5,r.mean(),1e-12);assertEquals(2,r.range(),1e-12);
+            assertEquals(1,r.standardDeviation(),1e-12);assertEquals(100*2/1.5,r.spreadPercent(),1e-10);
+        }
+        var writer=new java.io.StringWriter();report.writeCycleArrivals(writer);
+        assertEquals(3,writer.toString().lines().count());assertTrue(writer.toString().contains("timing_spread_percent"));
+    }
+
     @Test void fullCyclesContinueAfterThresholdCompletionWithoutTraceRecording() throws Exception {
         var probe=probe(0);var report=new ProbeShellArrivalReport();report.setCycleDeadband(.1);
         report.start(List.of(probe),.1,.1);

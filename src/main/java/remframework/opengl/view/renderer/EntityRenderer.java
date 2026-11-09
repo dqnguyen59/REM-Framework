@@ -50,6 +50,12 @@ public class EntityRenderer implements IRenderer {
 	Project project = Project.getInstance();
 	
 	Shader shader;
+    private Shader surveyLineShader;
+    private int surveyLineVao,surveyLineVbo;
+    private Shader connectionShader;
+    private int connectionVao,connectionVbo;
+    private FloatBuffer connectionVertices;
+    private boolean slabContextPass;
     @Getter
     private Map<ObjFileModel, List<Entity>> entities = new  HashMap<>();
 
@@ -94,6 +100,16 @@ public class EntityRenderer implements IRenderer {
 		vertexShader = Utils.loadResource(Constants.SHADER_NODE_VERTEX_FILE);
 		fragmentShader = Utils.loadResource(Constants.SHADER_NODE_FRAGMENT_FILE);
 		updateShaders();
+        surveyLineShader=new Shader();
+        surveyLineShader.createVertextShader("#version 410 core\nlayout(location=0) in vec3 position; uniform mat4 mvp; void main(){gl_Position=mvp*vec4(position,1.0);}");
+        surveyLineShader.createFragmentShader("#version 410 core\nuniform float opacity; out vec4 color; void main(){color=vec4(1.0,0.1,0.8,opacity);}");
+        surveyLineShader.link();surveyLineShader.createUniform("mvp");surveyLineShader.createUniform("opacity");
+        surveyLineVao=GL30.glGenVertexArrays();surveyLineVbo=GL15.glGenBuffers();
+        connectionShader=new Shader();
+        connectionShader.createVertextShader("#version 410 core\nlayout(location=0) in vec3 position; layout(location=1) in vec4 nodeColor; uniform mat4 mvp; out vec4 endpointColor; void main(){gl_Position=mvp*vec4(position,1.0);endpointColor=nodeColor;}");
+        connectionShader.createFragmentShader("#version 410 core\nin vec4 endpointColor; out vec4 color; void main(){color=endpointColor;}");
+        connectionShader.link();connectionShader.createUniform("mvp");
+        connectionVao=GL30.glGenVertexArrays();connectionVbo=GL15.glGenBuffers();
 	}
 
 	public void updateShaders() {
@@ -112,6 +128,7 @@ public class EntityRenderer implements IRenderer {
 			shader.createUniform("depthVisibility");
 			shader.createUniform("ignoreLightIndex");
 			shader.createUniform("useInstanceMaterial");
+            shader.createUniform("slabPass");
 			shader.createDirectionalLightUniform("directionalLight");
 			shader.createLightListUniform("lights", numLights);
 		} catch (Exception e) {
@@ -183,15 +200,26 @@ public class EntityRenderer implements IRenderer {
 		shader.setUniform("useInstanceMaterial", 0);
 		boolean enhancedRendering = project.settings.getRenderingMethod()
 				!= Settings.RenderingMethod.DEFAULT_RENDERING;
+        boolean context=project.settings.isPhysicalSlab()&&project.settings.isShowOutsideSlab()&&project.settings.getOutsideSlabOpacity()>0&&!scene.isInspectionMode();
+        slabContextPass=false;shader.setUniform("slabPass",context?1:0);
 		if (!enhancedRendering) {
 			renderDefault(scene);
 		} else {
 			renderEnhanced(scene);
 		}
+        if(context) {
+            boolean writes=GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);GL11.glDepthMask(false);
+            slabContextPass=true;shader.setUniform("slabPass",2);
+            try{if(enhancedRendering)renderEnhanced(scene);else renderDefault(scene);}
+            finally{GL11.glDepthMask(writes);slabContextPass=false;}
+        }
+        shader.setUniform("slabPass",0);
 		renderOverlays(scene, probeEntities, gradientArrowEntities, enhancedRendering);
 
 		unbind();
 		shader.unbind();
+        renderConnections(camera,scene);
+        renderSurveyLines(camera,scene);
 		GL11.glDisable(GL11.GL_BLEND);
 		recordRenderMeasurement(startedNanos);
 	}
@@ -199,6 +227,88 @@ public class EntityRenderer implements IRenderer {
 	/** Keeps dynamic probe geometry out of the prepared lattice-node instance buffer. */
 	private void renderOverlays(Scene scene, List<Entity> probeEntities,
 			List<Entity> gradientArrowEntities, boolean enhancedRendering) {
+		renderOverlayBatch(scene,probeEntities,gradientArrowEntities,enhancedRendering);
+		if(!scene.getSurveyLineOverlays().isEmpty()) {
+            boolean writes=GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);GL11.glDepthMask(false);
+			try {
+                var marks=scene.getSurveyLineOverlays();
+                for(var marker:marks){marker.updateMatrix();marker.synchronizeTransformMatrixBuffers();}
+                renderOverlayBatch(scene,marks,List.of(),enhancedRendering);
+            }
+			finally {GL11.glDepthMask(writes);}
+		}
+	}
+
+    /** Streams each visible undirected bond once, using bounded reusable storage. */
+    private void renderConnections(Camera camera,Scene scene) {
+        var display=scene.getAppSettings();
+        if(!display.isShowLatticeConnections()||display.getLatticeConnectionOpacity()<=0||scene.isInspectionMode())return;
+        var nodes=scene.getLattice().getNodeArray();if(nodes==null||nodes.length==0)return;
+        if(connectionVertices==null)connectionVertices=MemoryUtil.memAllocFloat(16384*14);
+        boolean writes=GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
+        float width=GL11.glGetFloat(GL11.GL_LINE_WIDTH);
+        GL11.glDepthMask(false);GL11.glLineWidth(1);
+        try {
+            connectionShader.bind();
+            connectionShader.setUniform("mvp",new org.joml.Matrix4f(camera.getProjectionMatrix()).mul(camera.getViewMatrix()));
+            GL30.glBindVertexArray(connectionVao);GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER,connectionVbo);
+            GL20.glEnableVertexAttribArray(0);GL20.glVertexAttribPointer(0,3,GL11.GL_FLOAT,false,7*Float.BYTES,0);
+            GL20.glEnableVertexAttribArray(1);GL20.glVertexAttribPointer(1,4,GL11.GL_FLOAT,false,7*Float.BYTES,3L*Float.BYTES);
+            connectionVertices.clear();
+            for(Object value:nodes)if(value instanceof remframework.opengl.model.entity.Node node&&node.isVisible()) {
+                for(var neighbor:node.getNeighbors()) {
+                    if(neighbor==null||node.getRenderEntityIndex()>=neighbor.getRenderEntityIndex())continue;
+                    if(connectionVertices.remaining()<14)flushConnections();
+                    int start=connectionVertices.position();
+                    if(!scene.appendConnectionVertex(node,connectionVertices,display.getLatticeConnectionOpacity())
+                            ||!scene.appendConnectionVertex(neighbor,connectionVertices,display.getLatticeConnectionOpacity()))
+                        connectionVertices.position(start);
+                }
+            }
+            flushConnections();
+        } finally {
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER,0);GL30.glBindVertexArray(0);connectionShader.unbind();
+            GL11.glDepthMask(writes);GL11.glLineWidth(width);
+        }
+    }
+
+    private void flushConnections() {
+        if(connectionVertices.position()==0)return;
+        connectionVertices.flip();GL15.glBufferData(GL15.GL_ARRAY_BUFFER,connectionVertices,GL15.GL_STREAM_DRAW);
+        GL11.glDrawArrays(GL11.GL_LINES,0,connectionVertices.remaining()/7);connectionVertices.clear();
+    }
+
+    /** Real GL_LINES in lattice coordinates, independent of sphere geometry and lighting. */
+    private void renderSurveyLines(Camera camera,Scene scene) {
+        var segments=scene.getSurveySegments();if(segments.isEmpty())return;
+        float[] vertices=new float[segments.size()*6];int offset=0;
+        var root=scene.getLattice().getBaseEntity().getTransformMatrix4f();
+        for(var segment:segments)for(boolean start:new boolean[]{true,false}) {
+            var node=start?segment.from():segment.to();
+            org.joml.Vector3f point;
+            if(node!=null)point=node.getTransformMatrix4f().getTranslation(new org.joml.Vector3f());
+            else point=root.transformPosition(new org.joml.Vector3f(start?segment.start():segment.end()));
+            vertices[offset++]=point.x;vertices[offset++]=point.y;vertices[offset++]=point.z;
+        }
+        float width=GL11.glGetFloat(GL11.GL_LINE_WIDTH);
+        GL11.glLineWidth(1);
+        try {
+            surveyLineShader.bind();
+            var mvp=new org.joml.Matrix4f(camera.getProjectionMatrix()).mul(camera.getViewMatrix());
+            surveyLineShader.setUniform("mvp",mvp);
+            surveyLineShader.setUniform("opacity",(float)scene.getAppSettings().getSurveyLineOpacity());
+            GL30.glBindVertexArray(surveyLineVao);GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER,surveyLineVbo);
+            GL15.glBufferData(GL15.GL_ARRAY_BUFFER,vertices,GL15.GL_STREAM_DRAW);
+            GL20.glEnableVertexAttribArray(0);GL20.glVertexAttribPointer(0,3,GL11.GL_FLOAT,false,0,0);
+            GL11.glDrawArrays(GL11.GL_LINES,0,segments.size()*2);
+        } finally {
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER,0);GL30.glBindVertexArray(0);surveyLineShader.unbind();
+            GL11.glLineWidth(width);
+        }
+    }
+
+	private void renderOverlayBatch(Scene scene,List<Entity> probeEntities,
+			List<Entity> gradientArrowEntities,boolean enhancedRendering) {
 		Map<ObjFileModel, List<Entity>> overlaysByModel = new IdentityHashMap<>();
 		collectVisibleOverlays(scene, probeEntities, overlaysByModel);
 		collectVisibleOverlays(scene, gradientArrowEntities, overlaysByModel);
@@ -264,6 +374,7 @@ public class EntityRenderer implements IRenderer {
 			shader.setUniform("ignoreLightIndex", -1);
 			List<Entity> entityList = entities.get(model);
 			for (Entity entity : entityList) {
+                if(!scene.isInspectionMode() && ((entity instanceof remframework.opengl.model.entity.Node node&&node.isSlabContextNode())!=slabContextPass))continue;
 				boolean effectiveVisible = scene.isInspectionMode()
 						? entity.isInspectionVisible() : entity.isVisible();
 				if (!effectiveVisible) continue;
@@ -288,6 +399,7 @@ public class EntityRenderer implements IRenderer {
 				}
 				shader.setUniform("useInstanceMaterial", 0);
 				for (Entity entity : visibleEntities) {
+                    if(!scene.isInspectionMode() && ((entity instanceof remframework.opengl.model.entity.Node node&&node.isSlabContextNode())!=slabContextPass))continue;
 					shader.setUniform("material", entity.getMaterial());
 					shader.setUniform("transformationMatrix", entity.getTransformMatrix4f());
 					GL11.glDrawElements(GL11.GL_TRIANGLES, model.getVertexCount(),
@@ -354,7 +466,7 @@ public class EntityRenderer implements IRenderer {
 					put(data, entity.getMaterial().getDiffuseIntensityColor());
 					put(data, entity.getMaterial().getSpecularIntensityColor());
 					data.put((float) entity.getMaterial().getShininess());
-					data.put(1.0f);
+					data.put(entity instanceof remframework.opengl.model.entity.Node node&&node.isSlabContextNode()?2.0f:1.0f);
 				}
 				data.flip();
 			}
@@ -364,7 +476,7 @@ public class EntityRenderer implements IRenderer {
 			instancePreparationMaxNanos = Math.max(instancePreparationMaxNanos,
 					preparationElapsedNanos);
 			long bufferUploadStartedNanos = System.nanoTime();
-			GL15.glBufferData(GL15.GL_ARRAY_BUFFER, data, GL15.GL_STREAM_DRAW);
+            if(!slabContextPass||ownsData)GL15.glBufferData(GL15.GL_ARRAY_BUFFER, data, GL15.GL_STREAM_DRAW);
 			long bufferUploadElapsedNanos = System.nanoTime() - bufferUploadStartedNanos;
 			instanceBufferUploadLastNanos = bufferUploadElapsedNanos;
 			instanceBufferUploadWindowNanos += bufferUploadElapsedNanos;
@@ -503,6 +615,13 @@ public class EntityRenderer implements IRenderer {
 
 	@Override
 	public void cleanup() {
+        if(connectionShader!=null)connectionShader.cleanup();
+        if(connectionVbo!=0)GL15.glDeleteBuffers(connectionVbo);
+        if(connectionVao!=0)GL30.glDeleteVertexArrays(connectionVao);
+        if(connectionVertices!=null){MemoryUtil.memFree(connectionVertices);connectionVertices=null;}
+        if(surveyLineShader!=null)surveyLineShader.cleanup();
+        if(surveyLineVbo!=0)GL15.glDeleteBuffers(surveyLineVbo);
+        if(surveyLineVao!=0)GL30.glDeleteVertexArrays(surveyLineVao);
 		for (int bufferId : instanceBuffers.values()) {
 			GL15.glDeleteBuffers(bufferId);
 		}

@@ -60,6 +60,94 @@ public class Scene {
     private List<Terrain> terrains;
 
     private Lattice lattice;
+    private List<Entity> surveyLineOverlays=List.of();
+    public record SurveySegment(Vector3d start,Vector3d end,Node from,Node to) {
+        public SurveySegment(Vector3d start,Vector3d end){this(start,end,null,null);}
+        public SurveySegment(Node from,Node to){this(null,null,from,to);}
+        @Override public Vector3d start(){return from==null?new Vector3d(start):new Vector3d(from.getPosition());}
+        @Override public Vector3d end(){return to==null?new Vector3d(end):new Vector3d(to.getPosition());}
+    }
+    private List<SurveySegment> surveySegments=List.of();
+    private Object[] surveyLineNodes;
+    private final Map<Node,Boolean> surveyHighlightedNodes=new IdentityHashMap<>();
+
+    /** Renderer-only marks: no lattice nodes, forces or occupancies are modified. */
+    public void showSurveyLine(SurveyLineInspection.Selection selection,int shell,int selectedNode) {
+        showSurveyLine(selection,shell,selectedNode,List.of(),List.of(),false);
+    }
+
+    public void showSurveyLine(SurveyLineInspection.Selection selection,int shell,int selectedNode,
+                               List<TransverseIdentitySurvey.ReceiverDistance> receivers,List<Vector3i> path,boolean shortest) {
+        if(neighborhoodInspectionActive)exitNeighborhoodInspection();
+        clearSurveyNodeColors();
+        var marks=new ArrayList<Entity>();var segments=new ArrayList<SurveySegment>();
+        double scale=((Node)lattice.getNodeArray()[0]).getScale();
+        var cyan=new Vector4f(.1f,.9f,1,(float)appSettings.getSurveyProbeOpacity());
+        var magenta=new Vector4f(1,.1f,.8f,(float)appSettings.getSurveyHighlightOpacity());
+        var end=selection.probes().getLast().getPlacement().targets().getFirst().requestedCoordinate();
+        if(!shortest)segments.add(new SurveySegment(new Vector3d(selection.source()),end));
+        for(var receiver:receivers) {
+            var position=new Vector3d(receiver.nx(),receiver.ny(),receiver.nz()).mul(receiver.targetRadius()).add(selection.source());
+            marks.add(surveyMark(position,scale,receiver.orientation()==selection.orientation()&&receiver.ray()==selection.ray()?magenta:cyan));
+        }
+        if(receivers.isEmpty())for(var probe:selection.probes())
+            marks.add(surveyMark(probe.getPlacement().targets().getFirst().requestedCoordinate(),scale,magenta));
+        if(shortest) {
+            Node previous=null;
+            for(var index:path) {
+                var node=lattice.getNodeByIndex(index);
+                if(previous!=null)segments.add(new SurveySegment(previous,node));
+                markSurveyNode(node,magenta);previous=node;
+            }
+        } else {
+            for(var source:selection.probes().get(shell).getInterpolationSources())if(source.weight()>0) {
+                var node=lattice.getNodeByIndex(source.nodeIndex());
+                markSurveyNode(node,magenta);
+            }
+        }
+        // Draw the chosen sampling node and source last, retaining their original radius.
+        var sources=selection.probes().get(shell).getInterpolationSources().stream().filter(s->s.weight()>0).toList();
+        var selected=lattice.getNodeByIndex(sources.get(selectedNode).nodeIndex());
+        markSurveyNode(selected,magenta);
+        for(Object value:lattice.getNodeArray()) {
+            var node=(Node)value;
+            if(node.getEquilibriumPosition().distanceSquared(selection.source())<1e-16) {
+                markSurveyNode(node,new Vector4f(1,1,.1f,(float)appSettings.getSurveySourceOpacity()));break;
+            }
+        }
+        surveySegments=List.copyOf(segments);
+        surveyLineNodes=lattice.getNodeArray();surveyLineOverlays=List.copyOf(marks);
+        invalidateRenderInstanceDataLayout();settings.setChanged(true);
+    }
+
+    private void markSurveyNode(Node node,Vector4f color) {
+        surveyHighlightedNodes.putIfAbsent(node,node.isVisible());
+        node.setSurveyHighlightColor(new Vector4f(color.x*.5f,color.y*.5f,color.z*.5f,color.w));node.setVisible(true);
+    }
+
+    private void clearSurveyNodeColors() {
+        if(surveyHighlightedNodes.isEmpty())return;
+        for(var entry:surveyHighlightedNodes.entrySet()){entry.getKey().setSurveyHighlightColor(null);entry.getKey().setVisible(entry.getValue());}
+        surveyHighlightedNodes.clear();invalidateRenderInstanceDataLayout();settings.setChanged(true);
+    }
+
+    private Entity surveyMark(Vector3d position,double scale,Vector4f color) {
+        var marker=new Entity(lattice.getBaseEntity(),lattice.getModelSphere(),new Vector3d(position),new Vector3d(),scale,EntityType.ENTITY);
+        marker.setOverrideModelMaterial(true);
+        // customColor is consumed by updateMatrix; inspectionColor persists across camera refreshes.
+        marker.setInspectionColor(new Vector4f(color.x*.5f,color.y*.5f,color.z*.5f,color.w));
+        marker.getMaterial().setDiffuseColor(new Vector4f(color));
+        marker.getMaterial().setAmbientColor(new Vector4f(color));marker.getMaterial().setShininess(0);
+        marker.setVisible(true);marker.setInspectionVisible(true);marker.updateMatrix();marker.synchronizeTransformMatrixBuffers();return marker;
+    }
+
+    public List<Entity> getSurveyLineOverlays() {
+        if(lattice==null||surveyLineNodes!=lattice.getNodeArray())clearSurveyLine();
+        return surveyLineOverlays;
+    }
+
+    public List<SurveySegment> getSurveySegments(){getSurveyLineOverlays();return surveySegments;}
+    public void clearSurveyLine(){clearSurveyNodeColors();surveyLineOverlays=List.of();surveySegments=List.of();surveyLineNodes=null;}
 
     private ArrayList<Vector3i> wallNodeIndexList = new ArrayList<>();
     private ArrayList<Node>     hiLightedNodes    = new ArrayList<>();
@@ -76,7 +164,23 @@ public class Scene {
         probeArrivalMeasurement.start(selected,shell,position,gradient);
         probeShellArrivalReport.start(selected,position,gradient);
     }
-    public void clearProbeArrivalMeasurements(){probeArrivalMeasurement.clear();probeShellArrivalReport.clear();}
+    public void clearProbeArrivalMeasurements(){identityOrbitSpreadRun.invalidate(this);probeArrivalMeasurement.clear();probeShellArrivalReport.clear();}
+    private final IdentityOrbitSpreadRun identityOrbitSpreadRun=new IdentityOrbitSpreadRun();
+    public IdentityOrbitSpreadRun getIdentityOrbitSpreadRun(){return identityOrbitSpreadRun;}
+    private final TransverseIdentitySurvey transverseIdentitySurvey=new TransverseIdentitySurvey();
+    public TransverseIdentitySurvey getTransverseIdentitySurvey(){return transverseIdentitySurvey;}
+    private record PendingIdentityOrbit(remframework.opengl.model.entity.Identity source,int warmup,int cycles,double position,double gradient) {}
+    private final java.util.concurrent.atomic.AtomicReference<PendingIdentityOrbit> pendingIdentityOrbit=new java.util.concurrent.atomic.AtomicReference<>();
+    private String identityOrbitSpreadError="";
+    public String getIdentityOrbitSpreadError(){return identityOrbitSpreadError;}
+    public void requestIdentityOrbitSpread(remframework.opengl.model.entity.Identity source,int warmup,int cycles,double position,double gradient) {
+        project.getRemModel().stopSimulation();pendingIdentityOrbit.set(new PendingIdentityOrbit(source,warmup,cycles,position,gradient));
+    }
+    public void applyPendingIdentityOrbitSpread() {
+        var request=pendingIdentityOrbit.getAndSet(null);if(request==null)return;
+        try {identityOrbitSpreadRun.start(this,request.source(),request.warmup(),request.cycles(),request.position(),request.gradient());identityOrbitSpreadError="";}
+        catch(IllegalArgumentException error){identityOrbitSpreadError=error.getMessage();project.getRemModel().stopSimulation();}
+    }
     public void finishProbeArrivalMeasurements(){probeArrivalMeasurement.finish();probeShellArrivalReport.finish();}
     private final Map<PassiveObserver, Entity> gradientArrowEntities = new IdentityHashMap<>();
     private ObjFileModel gradientArrowModel;
@@ -219,6 +323,7 @@ public class Scene {
 
     /** Removes scene bindings before releasing the lattice graph. */
     public synchronized void releaseLattice() {
+        clearSurveyLine();
         pendingDiamondProbes.set(null);
         pendingDiamondArrival.set(null);
         diamondProbeStatus="Lattice replaced; generate diamond shells";
@@ -342,6 +447,23 @@ public class Scene {
     private record PendingDiamondProbes(Object[] nodes,List<ProbeDefinition> definitions) { }
     private final java.util.concurrent.atomic.AtomicReference<PendingDiamondProbes> pendingDiamondProbes=new java.util.concurrent.atomic.AtomicReference<>();
     private volatile String diamondProbeStatus="No diamond shells applied";
+    private final java.util.concurrent.atomic.AtomicReference<java.nio.file.Path> pendingExperimentPreset=new java.util.concurrent.atomic.AtomicReference<>();
+    private volatile String experimentPresetStatus="";
+    private volatile long experimentPresetRevision;
+    public String getExperimentPresetStatus(){return experimentPresetStatus;}
+    public long getExperimentPresetRevision(){return experimentPresetRevision;}
+    public void requestExperimentPreset(java.nio.file.Path path) {
+        project.getRemModel().stopSimulation();pendingExperimentPreset.set(path);
+        experimentPresetStatus="Waiting for completed frame to restore configuration";
+    }
+    public void applyPendingExperimentPreset() {
+        var path=pendingExperimentPreset.getAndSet(null);if(path==null)return;
+        try {
+            remframework.settings.DiamondExperimentPreset.load(path,appSettings,project);
+            experimentPresetRevision++;
+            experimentPresetStatus="Restored configuration. Generate and apply the saved shell layout, then run.";
+        } catch(java.io.IOException error){experimentPresetStatus="Load failed: "+error.getMessage();}
+    }
     private record PendingDiamondArrival(int shell,double position,double gradient) { }
     private final java.util.concurrent.atomic.AtomicReference<PendingDiamondArrival> pendingDiamondArrival=new java.util.concurrent.atomic.AtomicReference<>();
     public String getDiamondProbeStatus() {return diamondProbeStatus;}
@@ -383,6 +505,8 @@ public class Scene {
         }
         if(lattice.isMechanicsOnly() && lattice.isDiamondTransportEnabled())clearProbeArrivalMeasurements();
         else {probeArrivalMeasurement.sample();probeShellArrivalReport.sample();}
+        identityOrbitSpreadRun.sampled(this);
+        transverseIdentitySurvey.sampled(this);
     }
 
     /** Reconstructs a renderer-only passive observer without adding a project Identity Occupancy. */
@@ -1473,10 +1597,31 @@ public class Scene {
                                     final boolean synchronizeBothBuffers) {
         startTask(() -> {
             int i = start;
+            var contextMatrix=new Matrix4d();var contextFloat=new Matrix4f();var white=new Vector3d(1);
 
             while (i < end) {
                 int entityIndex = i++;
                 Entity entity = (Entity) lattice.getEntityArray()[entityIndex];
+                if(entity instanceof Node node&&node.isVisible()&&node.isSlabContextNode()
+                        &&!inspectionMode&&settings.getRenderingMethod()!=Settings.RenderingMethod.DEFAULT_RENDERING) {
+                    // Pack the faint context directly, retaining no per-node matrix pairs for the full volume.
+                    node.updatePosition();node.setColor(white);
+                    contextMatrix.set(lattice.getBaseEntity().getTransformMatrix()).translate(node.getPosition());
+                    var rotation=node.getRotationRad();
+                    if(rotation.x!=0||rotation.y!=0||rotation.z!=0)contextMatrix.rotateXYZ(rotation.x,rotation.y,rotation.z);
+                    contextMatrix.scale(renderScale*(node.getCustomScale()>0?node.getCustomScale():node.getScale()));
+                    contextFloat.set(contextMatrix);
+                    var buffers=instanceDataBuffersByEntity[entityIndex];
+                    if(buffers!=null) {
+                        int offset=instanceDataSlotsByEntity[entityIndex]*INSTANCE_FLOATS;
+                        contextFloat.get(offset,buffers[Entity.getSwapBufferIndex()]);
+                        writeInstanceAppearance(entity,buffers[Entity.getSwapBufferIndex()],offset);
+                        if(synchronizeBothBuffers){contextFloat.get(offset,buffers[1-Entity.getSwapBufferIndex()]);writeInstanceAppearance(entity,buffers[1-Entity.getSwapBufferIndex()],offset);}
+                    }
+                    node.setCustomScale(-1);node.setCustomColor(null);
+                    if(synchronizeBothBuffers)node.releaseRenderMatrices();
+                    continue;
+                }
                 if (entity instanceof Node node && !node.isVisible()
                         && !(inspectionMode && node.isInspectionVisible())) {
                     node.updatePosition();
@@ -1505,11 +1650,16 @@ public class Scene {
     private void writeInstanceData(Entity entity, FloatBuffer data, int entityIndex) {
         int offset = instanceDataSlotsByEntity[entityIndex] * INSTANCE_FLOATS;
         entity.getCalculatedTransformMatrix4f().get(offset, data);
+        writeInstanceAppearance(entity,data,offset);
+    }
+
+    private void writeInstanceAppearance(Entity entity,FloatBuffer data,int offset) {
         put(data, offset + 16, entity.getMaterial().getAmbientIntensityColor());
         put(data, offset + 20, entity.getMaterial().getDiffuseIntensityColor());
         put(data, offset + 24, entity.getMaterial().getSpecularIntensityColor());
         data.put(offset + 28, (float) entity.getMaterial().getShininess());
-        data.put(offset + 29, entity.getModel() != null && entity.isVisible() ? 1.0f : 0.0f);
+        data.put(offset + 29, entity.getModel() != null && entity.isVisible()
+            ?(entity instanceof Node node&&node.isSlabContextNode()?2.0f:1.0f):0.0f);
     }
 
     private static void put(FloatBuffer data, int offset, Vector4f value) {
@@ -1550,6 +1700,7 @@ public class Scene {
 
         Map<ObjFileModel, Integer> nextSlots = new IdentityHashMap<>();
         for (int i = 0; i < entityArray.length; i++) {
+            if(entityArray[i] instanceof Node node)node.setRenderEntityIndex(i);
             if (entityArray[i] == lattice.getBaseEntity()) preparedBaseEntityIndex = i;
             if (entityArray[i] instanceof Entity entity && entity.getModel() != null
                     && entity.isVisible()) {
@@ -1625,6 +1776,24 @@ public class Scene {
 
     public int getRenderInstanceEntityCount(ObjFileModel model) {
         return instanceDataEntityCounts.getOrDefault(model, 0);
+    }
+
+    /**
+     * Appends a bond endpoint as world XYZ and RGBA from the completed render frame.<br><br>
+     * The published packed buffer also covers faint slab nodes that retain no individual matrices.
+     * Hidden nodes produce no vertex. Opacity multiplies the node alpha, including slab transparency.
+     */
+    public boolean appendConnectionVertex(Node node,FloatBuffer vertices,double opacity) {
+        int index=node.getRenderEntityIndex();
+        if(!node.isVisible()||index<0||preparedInstanceEntities==null||index>=preparedInstanceEntities.length
+                ||preparedInstanceEntities[index]!=node)return false;
+        var buffers=instanceDataBuffersByEntity[index];if(buffers==null)return false;
+        var data=buffers[1-Entity.getSwapBufferIndex()];int offset=instanceDataSlotsByEntity[index]*INSTANCE_FLOATS;
+        if(data.get(offset+29)<.5f)return false;
+        vertices.put(data.get(offset+12)).put(data.get(offset+13)).put(data.get(offset+14));
+        for(int c=0;c<3;c++)vertices.put(Math.max(0,Math.min(1,data.get(offset+20+c))));
+        vertices.put((float)(Math.max(0,Math.min(1,data.get(offset+23)))*Math.max(0,Math.min(1,opacity))));
+        return true;
     }
 
     private void threadCalcRemField(final int start, final int end,

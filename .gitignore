@@ -22,6 +22,14 @@ geometry-discovery-new-draft.properties
 
 # log files
 .log
+/*.log
+
+# Local research data and screenshots are excluded from source checkpoints.
+/measurements/diamond-shells/
+/diamond-memory-audit.csv
+/diamond-probe-propagation-8.0-results.csv
+/diamond-xy-configuration-sweep.csv
+/docs/guided-spherical-test/*.png
 
 # Mac files
 .DS_Store

@@ -219,6 +219,12 @@ public class FramePreferences extends AbstractFrame {
             lattice.setNumEdgeAbsorptionLayers(nk_label_edit(
                     ctx, stack, " Edge Absorption Layers:", bufEdgeAbsorptionLayers,
                     lattice.getNumEdgeAbsorptionLayers(), leftCol, rightCol));
+            if (lattice.isMechanicsOnly()) {
+                lattice.setDiamondSpongeEnabled(nk_check_label(ctx, " Experimental edge absorber:",
+                        lattice.isDiamondSpongeEnabled(), leftCol, rightCol));
+                Nuklear.nk_layout_row_dynamic(ctx, rowHeight * 3, 1);
+                Nuklear.nk_label_wrap(ctx, "Damps boundary motion only; residual reflections remain. Keep probes inside the unaffected interior. An axis is skipped if twice the layer width reaches its size.");
+            }
 
             nk_spacer(ctx, spacer1, 1);
 			

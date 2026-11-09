@@ -31,6 +31,8 @@ public final class ProbeShellArrivalReport {
     private record Entry(double radius,ProbeArrivalMeasurement measurement) {}
     private final Map<Integer,Entry> entries=new TreeMap<>();
     private boolean recordTraces;
+    private int sweepTurns;
+    private double sweepAmplitude=Double.NaN,sweepWidth=Double.NaN;
     private double cycleDeadband = 1e-9;
     public synchronized double getCycleDeadband() { return cycleDeadband; }
     public synchronized void setCycleDeadband(double value) {
@@ -52,6 +54,98 @@ public final class ProbeShellArrivalReport {
                 row.shell+1,row.radius,result.probeId().replace("\"","\"\""),result.signal(),cycle.startUpdate(),cycle.middleUpdate(),cycle.endUpdate(),cycle.periodUpdates(),cycle.arrivalUpdate(),cycle.deadband(),cycle.status()));
         }
     }
+    public record SweepRow(int shell,double radius,ProbeArrivalMeasurement.SweepResult result) {}
+    public synchronized List<SweepRow> sweepRows() {
+        var rows=new ArrayList<SweepRow>();
+        for(var entry:entries.entrySet())for(var result:entry.getValue().measurement.sweepResults())
+            rows.add(new SweepRow(entry.getKey(),entry.getValue().radius,result));
+        return List.copyOf(rows);
+    }
+    public synchronized boolean sweepsComplete() {
+        var rows=sweepRows();return !rows.isEmpty() && rows.stream().allMatch(r->r.result.measurement().complete());
+    }
+    public synchronized void enableSweep(int period,int cycles,org.joml.Vector3d center) {
+        entries.values().forEach(e->e.measurement.enableSweep(period,cycles,center));
+    }
+    public synchronized void enableSharedSweep(int period,int cycles,org.joml.Vector3d center,long start) {
+        entries.values().forEach(e->e.measurement.enableSharedSweep(period,cycles,center,start));
+    }
+    public record ResponseSpread(int shell,double radius,int complete,int total,double minimum,double maximum,
+                                 double mean,double spreadPercent) {}
+    /** Spread of nonnegative per-probe RMS values; signed means are never used as a denominator. */
+    public synchronized List<ResponseSpread> responseSpreads() {
+        var result=new ArrayList<ResponseSpread>();
+        for(var entry:entries.entrySet()) {
+            var samples=entry.getValue().measurement.sweepResults();
+            if(samples.isEmpty())continue;
+            var complete=samples.stream().filter(s->s.measurement().complete()).toList();
+            boolean ready=complete.size()==samples.size();
+            var stats=complete.stream().mapToDouble(s->s.measurement().rms()).summaryStatistics();
+            double mean=ready?stats.getAverage():Double.NaN;
+            result.add(new ResponseSpread(entry.getKey(),entry.getValue().radius,complete.size(),samples.size(),
+                ready?stats.getMin():Double.NaN,ready?stats.getMax():Double.NaN,mean,
+                ready&&mean>0?100*(stats.getMax()-stats.getMin())/mean:Double.NaN));
+        }
+        return List.copyOf(result);
+    }
+    public synchronized void configureSweepSource(int turns,double amplitude,double width) {
+        sweepTurns=turns;sweepAmplitude=amplitude;sweepWidth=width;
+    }
+    public synchronized void writeSweeps(java.io.Writer writer) throws java.io.IOException {
+        writer.write("shell,radius_bond_lengths,probe_id,window_start_update,window_end_update,requested_cycles,completed_cycles,updates_per_cycle,samples,mean_imbalance_x,mean_imbalance_y,mean_imbalance_z,imbalance_rms,radial_mean,perpendicular_rms,status,spiral_turns_per_half_cycle,source_amplitude,source_width,measurement_basis\n");
+        for(var row:sweepRows()) {
+            var r=row.result.measurement();
+            writer.write(String.format(Locale.ROOT,"%d,%.17g,\"%s\",%d,%d,%d,%d,%d,%d,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%s,%d,%.17g,%.17g,source_period_windows_after_detection%n",
+                row.shell+1,row.radius,row.result.probeId().replace("\"","\"\""),r.startUpdate(),r.endUpdate(),r.requestedCycles(),r.completedCycles(),
+                r.updatesPerCycle(),r.samples(),r.meanX(),r.meanY(),r.meanZ(),r.rms(),r.radialMean(),r.perpendicularRms(),r.status(),sweepTurns,sweepAmplitude,sweepWidth));
+        }
+    }
+    public record CycleArrival(int shell, double radius, String signal, int completeDirections,
+                               int totalDirections, double minimum, double maximum, double mean,
+                               double standardDeviation, double spreadPercent) {
+        public boolean complete() { return totalDirections > 0 && completeDirections == totalDirections; }
+        public double range() { return maximum - minimum; }
+    }
+
+    /** Directional first-arrival statistics released only after every whole-cycle window completes.
+     * <br><br>Times are relative to source start (update zero); the common window end is never used.
+     * Spread is 100 * (maximum - minimum) / mean. This is timing spread, not inverse-time speed spread.
+     */
+    public synchronized List<CycleArrival> cycleArrivals() {
+        var result = new ArrayList<CycleArrival>();
+        for (var entry : entries.entrySet()) {
+            var measurement = entry.getValue().measurement;
+            var sweeps = measurement.sweepResults();
+            if (sweeps.isEmpty()) continue;
+            var arrivals = measurement.snapshot().results();
+            int complete = (int) sweeps.stream().filter(r -> r.measurement().complete()).count();
+            for (boolean gradient : new boolean[]{false, true}) {
+                var times = arrivals.stream().mapToDouble(r -> gradient
+                    ? r.gradientEstimatedArrival() : r.positionEstimatedArrival()).toArray();
+                boolean ready = complete == arrivals.size() && times.length > 0
+                    && java.util.Arrays.stream(times).allMatch(t -> Double.isFinite(t) && t > 0);
+                var stats = java.util.Arrays.stream(times).summaryStatistics();
+                double mean = ready ? stats.getAverage() : Double.NaN;
+                double variance = ready ? java.util.Arrays.stream(times)
+                    .map(t -> (t - mean) * (t - mean)).average().orElseThrow() : Double.NaN;
+                result.add(new CycleArrival(entry.getKey(), entry.getValue().radius,
+                    gradient ? "gradient" : "position", ready ? complete : 0, arrivals.size(),
+                    ready ? stats.getMin() : Double.NaN, ready ? stats.getMax() : Double.NaN,
+                    mean, Math.sqrt(variance), ready ? 100 * (stats.getMax() - stats.getMin()) / mean : Double.NaN));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    public synchronized void writeCycleArrivals(java.io.Writer writer) throws java.io.IOException {
+        writer.write("shell,radius_bond_lengths,signal,complete_directions,total_directions,min_arrival_update,max_arrival_update,mean_arrival_update,range_updates,population_stddev_updates,timing_spread_percent,status,time_basis\n");
+        for (var r : cycleArrivals()) writer.write(String.format(Locale.ROOT,
+            "%d,%.17g,%s,%d,%d,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%s,interpolated_first_threshold_from_source_start_after_whole_cycle_completion%n",
+            r.shell + 1, r.radius, r.signal, r.completeDirections, r.totalDirections,
+            r.minimum, r.maximum, r.mean, r.range(), r.standardDeviation, r.spreadPercent,
+            r.complete() ? "complete" : "incomplete"));
+    }
+
     public record PeakRow(int shell, double radius, boolean gradient, ProbePeakAnalysis.Result result) {}
     private List<PeakRow> peakRows;
     public record ReversalRow(int shell, double radius, String signal, ProbeReversalAnalysis.Result result) {}
@@ -105,6 +199,7 @@ public final class ProbeShellArrivalReport {
     }
     public synchronized void start(List<? extends PassiveObserver> probes,double position,double gradient) {
         entries.clear();
+        sweepTurns=0;sweepAmplitude=Double.NaN;sweepWidth=Double.NaN;
         peakRows=null;
         reversalRows=null;
         for(int shell:ProbeArrivalMeasurement.availableShells(probes)) {

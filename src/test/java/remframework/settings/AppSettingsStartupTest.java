@@ -7,6 +7,66 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AppSettingsStartupTest {
+    @Test void connectionDisplayDefaultsAndConfigurationSurviveReload() {
+        var settings=new AppSettings();settings.loadFromFile(new Wini(),"",0);
+        assertFalse(settings.isShowLatticeConnections());assertEquals(.15,settings.getLatticeConnectionOpacity());
+        settings.setLatticeConnectionDisplay(true,.27);var ini=new Wini();settings.saveToFile(ini,"",0);
+        var restored=new AppSettings();restored.loadFromFile(ini,"",0);
+        assertTrue(restored.isShowLatticeConnections());assertEquals(.27,restored.getLatticeConnectionOpacity());
+        restored.setLatticeConnectionDisplay(true,2);assertEquals(1,restored.getLatticeConnectionOpacity());
+        restored.setLatticeConnectionDisplay(false,Double.NaN);assertEquals(.15,restored.getLatticeConnectionOpacity());
+    }
+    @Test void surveyOpacityPersistsAndOldSettingsUseTransparentProbes() {
+        var settings=new AppSettings();settings.loadFromFile(new Wini(),"",0);
+        assertEquals(.2,settings.getSurveyProbeOpacity());assertEquals(1,settings.getSurveyHighlightOpacity());
+        settings.setSurveyDisplayOpacity(.15,.65,.8,.45);
+        var ini=new Wini();settings.saveToFile(ini,"",0);
+        var restored=new AppSettings();restored.loadFromFile(ini,"",0);
+        assertEquals(.15,restored.getSurveyProbeOpacity());assertEquals(.65,restored.getSurveyHighlightOpacity());
+        assertEquals(.8,restored.getSurveySourceOpacity());assertEquals(.45,restored.getSurveyLineOpacity());
+    }
+
+    @Test void surveyOpacityClampsInvalidRangesAndRejectsNonfiniteValues() {
+        var settings=new AppSettings();settings.setSurveyDisplayOpacity(-1,2,Double.NaN,Double.POSITIVE_INFINITY);
+        assertEquals(0,settings.getSurveyProbeOpacity());assertEquals(1,settings.getSurveyHighlightOpacity());
+        assertEquals(1,settings.getSurveySourceOpacity());assertEquals(1,settings.getSurveyLineOpacity());
+        var ini=new Wini();ini.put("SurveyDisplay","probeOpacity","NaN");ini.put("SurveyDisplay","lineOpacity",-5);
+        settings.loadFromFile(ini,"",0);assertEquals(.2,settings.getSurveyProbeOpacity());assertEquals(0,settings.getSurveyLineOpacity());
+    }
+    @Test void rotatingOrbitConfigurationSurvivesReload() throws Exception {
+        var settings=new AppSettings();
+        var ini=new org.ini4j.Wini();
+        settings.setOrbitConfiguration(96,8,6,.25);settings.setOrbitWarmupCycles(3);settings.saveToFile(ini,"",0);
+        settings.setOrbitConfiguration(64,4,4,1);settings.loadFromFile(ini,"",0);
+        assertEquals(96,settings.getOrbitFastPeriod());assertEquals(8,settings.getOrbitRatio());
+        assertEquals(6,settings.getOrbitWidth());assertEquals(.25,settings.getOrbitAmplitude());
+        assertEquals(3,settings.getOrbitWarmupCycles());
+    }
+
+    @Test void completeExperimentControlsSurviveReload() {
+        var settings=new AppSettings();settings.setDiamondProbeDetection(4,-9,-10,.5);
+        settings.setDiamondProbeShellLayout(12,4,3,false);settings.setDiamondProbeDiagnostics(1e-7,true);
+        var ini=new Wini();settings.saveToFile(ini,"",0);
+        var restored=new AppSettings();restored.loadFromFile(ini,"",0);
+        assertEquals(4,restored.getDiamondProbeSourceWidth());assertEquals(-9,restored.getDiamondProbePositionExponent());
+        assertEquals(-10,restored.getDiamondProbeGradientExponent());assertEquals(.5,restored.getDiamondProbeTolerance());
+        assertEquals(12,restored.getDiamondProbeFirstRadius());assertEquals(4,restored.getDiamondProbeShellSpacing());
+        assertEquals(3,restored.getDiamondProbeShellCount());assertFalse(restored.isDiamondProbeXYOnly());
+        assertEquals(1e-7,restored.getDiamondProbeCycleDeadband());assertTrue(restored.isDiamondProbeRecordTraces());
+    }
+
+    @Test void sphericalSettingsRoundTripAndRejectUndersampledSweeps() {
+        var settings=new AppSettings();settings.setDiamondProbeSphericalSweep(true);
+        settings.setDiamondProbeSweepConfiguration(512,8,3);
+        var ini=new Wini();settings.saveToFile(ini,"",0);
+        var restored=new AppSettings();restored.loadFromFile(ini,"",0);
+        assertTrue(restored.isDiamondProbeSphericalSweep());assertEquals(512,restored.getDiamondProbeSweepPeriod());
+        assertEquals(8,restored.getDiamondProbeSweepTurns());assertEquals(3,restored.getDiamondProbeMeasurementCycles());
+        assertThrows(IllegalArgumentException.class,()->restored.setDiamondProbeSweepPeriod(32));
+        ini.put("DiamondProbe","sweepPeriod",3);restored.loadFromFile(ini,"",0);
+        assertEquals(128,restored.getDiamondProbeSweepPeriod());assertEquals(4,restored.getDiamondProbeSweepTurns());
+    }
+
     @Test void explicitPacketPolarizationPersistsAndOldAutomaticSettingsBecomeZ() {
         var settings=new AppSettings();
         assertEquals(remframework.geometry.discovery.research.diamond.DiamondExcitationAxis.Z,settings.getDiamondProbeExcitationAxis());

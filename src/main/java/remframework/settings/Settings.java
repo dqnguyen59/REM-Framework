@@ -262,6 +262,13 @@ public class Settings extends AbstractSettings implements ISettings {
     }
 
     private double physicalSliceThickness = 1.0;
+    private boolean showOutsideSlab;
+    private double outsideSlabOpacity=.02;
+    public boolean isShowOutsideSlab(){return showOutsideSlab;}
+    public double getOutsideSlabOpacity(){return outsideSlabOpacity;}
+    public void setShowOutsideSlab(boolean value){if(showOutsideSlab!=value){showOutsideSlab=value;isChanged=true;}}
+    public void setOutsideSlabOpacity(double value){if(!Double.isFinite(value))return;value=Math.max(0,Math.min(1,value));if(value!=outsideSlabOpacity){outsideSlabOpacity=value;isChanged=true;}}
+    public boolean isPhysicalSlab(){return sliceType==SliceType.physicalXY||sliceType==SliceType.physicalXZ||sliceType==SliceType.physicalYZ;}
     public double getPhysicalSliceThickness() {return physicalSliceThickness;}
     public void setPhysicalSliceThickness(double thickness) {
         if (!Double.isFinite(thickness) || thickness <= 0) return;
@@ -360,6 +367,8 @@ public class Settings extends AbstractSettings implements ISettings {
         setSliceType((s = getString(section, "sliceType", "")).isEmpty() ? SliceType.sliceZ
                                                                          : SliceType.valueOf(s));
         setPhysicalSliceThickness(getFloat(section,"physicalSliceThickness",1));
+        setShowOutsideSlab(getInt(section,"showOutsideSlab",0)!=0);
+        setOutsideSlabOpacity(getFloat(section,"outsideSlabOpacity",.02f));
         visibleIndexX  = getInt(section, "visibleIndexX", 15);
         visibleIndexY  = getInt(section, "visibleIndexY", 15);
         visibleIndexZ  = getInt(section, "visibleIndexZ", 15);
@@ -402,6 +411,8 @@ public class Settings extends AbstractSettings implements ISettings {
         put(section, "colorMode", colorMode.toString());
         put(section, "sliceType", sliceType.toString());
         put(section,"physicalSliceThickness",physicalSliceThickness);
+        put(section,"showOutsideSlab",showOutsideSlab?1:0);
+        put(section,"outsideSlabOpacity",outsideSlabOpacity);
         put(section, "visibleIndexX", visibleIndexX);
         put(section, "visibleIndexY", visibleIndexY);
         put(section, "visibleIndexZ", visibleIndexZ);

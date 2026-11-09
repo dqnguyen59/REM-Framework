@@ -36,6 +36,11 @@ public final class FrameAddDiamondProbes extends AbstractFrame {
             Nuklear.nk_layout_row_dynamic(ctx,rowHeight*2,1);
             Nuklear.nk_label_wrap(ctx,"Select the diamond lattice before creating diamond probes.");return;
         }
+        if(first!=appSettings.getDiamondProbeFirstRadius()||spacing!=appSettings.getDiamondProbeShellSpacing()||shells!=appSettings.getDiamondProbeShellCount()) {
+            firstBuffer.setLength(0);spacingBuffer.setLength(0);shellBuffer.setLength(0);
+        }
+        first=appSettings.getDiamondProbeFirstRadius();spacing=appSettings.getDiamondProbeShellSpacing();
+        shells=appSettings.getDiamondProbeShellCount();xyOnly=appSettings.isDiamondProbeXYOnly();
         xyOnly=nk_check_label(ctx,"XY plane only",xyOnly,.8,.2);
         try(MemoryStack stack=MemoryStack.stackPush()) {
             if(xyOnly) {
@@ -46,6 +51,7 @@ public final class FrameAddDiamondProbes extends AbstractFrame {
             spacing=nk_label_edit(ctx,stack,"Shell spacing",spacingBuffer,spacing,.65,.35);
             shells=nk_label_edit(ctx,stack,"Shell count",shellBuffer,shells,.65,.35);
         }
+        if(first>0&&spacing>0&&shells>0)appSettings.setDiamondProbeShellLayout(first,spacing,shells,xyOnly);
         Nuklear.nk_layout_row_dynamic(ctx,rowHeight*3,1);
         Nuklear.nk_label_wrap(ctx,(xyOnly?appSettings.getDiamondProbeXYDirections()+" equally spaced XY directions. Fixed surface samples are included for thin slabs. ":"26 XYZ directions; fixed stencils rejected. ")+"Passive interpolation uses both diamond sublattices. Cubic probes are kept separately.");
         Nuklear.nk_layout_row_dynamic(ctx,rowHeight,1);

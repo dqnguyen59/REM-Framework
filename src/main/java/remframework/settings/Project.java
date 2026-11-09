@@ -163,6 +163,13 @@ public class Project extends AbstractSettings implements ISettings {
         }
     }
 
+    private boolean reuseLatticeForPreset;
+    /** Called at a completed-frame boundary; matching geometry can reuse the loaded graph. */
+    public void loadExperimentPreset(Wini ini,boolean reuse) {
+        reuseLatticeForPreset=reuse;
+        try {loadFromFile(ini,"",0);} finally {reuseLatticeForPreset=false;}
+    }
+
     @Override
     public void loadFromFile(Wini ini, String section, int index) {
         System.out.println("Project.loadFromFile() started");
@@ -174,6 +181,7 @@ public class Project extends AbstractSettings implements ISettings {
         setGlSwapInterval(getInt("QuantumField", "glSwapInterval", 1));
         scene.getLattice().setNumEdgeAbsorptionLayers(
                 getInt("QuantumField", "numEdgeAbsorptionLayers", 30));
+        scene.getLattice().setDiamondSpongeEnabled(getBool("QuantumField", "diamondSpongeEnabled", false));
         int x = getInt("QuantumField", "dimension.x", 15);
         int y = getInt("QuantumField", "dimension.y", 15);
         int z = getInt("QuantumField", "dimension.z", 15);
@@ -194,7 +202,9 @@ public class Project extends AbstractSettings implements ISettings {
             terrain.loadFromFile(ini, "Terrain", index);
         }
 
-        if (!headlessLoading) {
+        // The offscreen renderer reads its light list concurrently. A reused graph
+        // retains the existing render lights; experiment mechanics/settings still reload.
+        if (!headlessLoading && !reuseLatticeForPreset) {
             loadLights(ini);
         }
 
@@ -336,6 +346,9 @@ public class Project extends AbstractSettings implements ISettings {
         remModel.getCurrentMouseNodeIndex().y = dimension.y / 2;
         remModel.getCurrentMouseNodeIndex().z = dimension.z / 2;
 
+        if(reuseLatticeForPreset) {
+            scene.clearProbes();loadWalls(ini);return;
+        }
         reset();
         remModel.setLoadingReady(false);
         if (!headlessLoading) {
@@ -359,6 +372,7 @@ public class Project extends AbstractSettings implements ISettings {
         put("QuantumField", "glSwapInterval", glSwapInterval);
         put("QuantumField", "numEdgeAbsorptionLayers",
                 scene.getLattice().getNumEdgeAbsorptionLayers());
+        put("QuantumField", "diamondSpongeEnabled", scene.getLattice().isDiamondSpongeEnabled());
         put("QuantumField", "dimension.x", dimension.x);
         put("QuantumField", "dimension.y", dimension.y);
         put("QuantumField", "dimension.z", dimension.z);
