@@ -306,3 +306,9 @@ full application `.ini` preset.
 
 When changing lattice dimensions, explicitly recenter the source indices and
 check pulse completeness and the boundary cutoff again.
+
+The default 120³ transverse setup uses radii 40–42 with **edge absorption off**.
+The saved `last-experiment.ini` matches this setting. If the survey reports that a
+receiver overlaps edge absorption, uncheck **Edge absorption for next survey**
+before clicking **Run survey**, or use smaller radii / a thinner absorber. Loading
+an older absorber-enabled preset restores its original absorption setting.

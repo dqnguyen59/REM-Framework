@@ -290,8 +290,11 @@ public final class TransverseIdentitySurvey {
         var definitions=DiamondProbePlacement.create(nodes,first,spacing,shells,false,TransversePulseAnalysis.plane(polarization,rays),origin);
         receivers=new ArrayList<>();
         for(var d:definitions){var t=d.getPlacement().targets().getFirst();var stencil=d.getInterpolationSources().stream().map(s->lattice.getNodeByIndex(s.nodeIndex())).toList();
-            for(int i=0;i<stencil.size();i++)if(d.getInterpolationSources().get(i).weight()>0){var n=stencil.get(i);if(n.isFixed()||(sponge&&n.getAbsorptionFactor()<1f)||n.getEquilibriumPosition().distance(t.requestedCoordinate())>5)
-                throw new IllegalArgumentException("Receiver outside validated interior/stencil bound");}
+            for(int i=0;i<stencil.size();i++)if(d.getInterpolationSources().get(i).weight()>0){var n=stencil.get(i);
+                String receiver="Shell "+(t.shell()+1)+", ray "+(t.ray()+1)+", radius "+t.realizedRadius();
+                if(n.isFixed())throw new IllegalArgumentException(receiver+" samples a fixed boundary node; reduce receiver radii or move the source farther from the boundary");
+                if(sponge&&n.getAbsorptionFactor()<1f)throw new IllegalArgumentException(receiver+" overlaps edge absorption ("+spongeLayers+" layers). Turn off 'Edge absorption for next survey', or reduce receiver radii / absorber width");
+                if(n.getEquilibriumPosition().distance(t.requestedCoordinate())>5)throw new IllegalArgumentException(receiver+" exceeds the validated 5-bond interpolation stencil bound");}
             double distance=interpolatedDistance(origin,stencil.stream().map(Node::getEquilibriumPosition).toList(),d.getInterpolationSources());
             double latticeDistance=interpolatedDistance(latticeCenter,stencil.stream().map(Node::getEquilibriumPosition).toList(),d.getInterpolationSources());
             var paths=bondPaths.sample(stencil.stream().map(n->topology.idAtIndex(n.getIndex())).toList(),d.getInterpolationSources().stream().map(ProbeDefinition.InterpolationSource::weight).toList());
