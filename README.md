@@ -243,17 +243,50 @@ The current project name is:
 
 **REM Framework — Recursive Emergent Mechanics**
 
-## Building
+## Building and Running
 
 REM Framework is written in Java and built with Maven.
 
 ### Requirements
 
-- Java 21
-- Maven
-- OpenGL-capable graphics environment
+- JDK 21 or newer, with `java` and `javac` available on your PATH
+- Maven, with `mvn` available on your PATH
+- An OpenGL-capable graphics environment and a graphical desktop session
 
-Build the project with:
+Run the commands below from the repository root. Build on the operating system
+where you will run the application: Maven selects its native libraries for that
+platform. The Linux build currently targets x86-64.
+
+### Windows (PowerShell)
+
+```powershell
+git switch optimize-memory
+git pull --ff-only
+mvn clean package -DskipTests
+java --enable-native-access=ALL-UNNAMED -Xmx4g -jar target/rem.jar
+```
+
+### Linux (x86-64)
 
 ```bash
-mvn package
+git switch optimize-memory
+git pull --ff-only
+mvn clean package -DskipTests
+java --enable-native-access=ALL-UNNAMED -Xmx4g -jar target/rem.jar
+```
+
+The build produces `target/rem.jar`. Keep the repository root as the working
+directory when launching so the application can find its local resources.
+`-Xmx4g` allows up to 4 GB of Java heap; increase it if your machine has enough
+RAM for larger lattices.
+
+The launch build above skips tests. To build and run the test suite with a fresh
+JVM per test class, use:
+
+```bash
+mvn clean package -DreuseForks=false
+```
+
+Measurement files and saved experiment presets are local artifacts excluded from
+the current source checkpoint. Transfer them separately when moving an experiment
+to another machine.
